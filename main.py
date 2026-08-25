@@ -62,8 +62,7 @@ import reports.reports_page
 def agents_route():
     if not main_page.is_authenticated():
         ui.navigate.to("/")
-        return
-
+        return 
     from agents.agents_page import build_agents_page
     build_agents_page()
 
