@@ -172,9 +172,13 @@ def build_login_home():
             user_pass = password_input.value
 
             with get_session() as session:
-                user = session.query(
-                    Users
-                ).filter_by(user_name=user_name).first()
+                user = (
+                    session.query(
+                        Users
+                    )
+                    .filter_by(user_name=user_name)
+                    .first()
+                )
 
                 if user and user.check_password_correction(user_pass):
                     from nicegui import app
@@ -182,6 +186,7 @@ def build_login_home():
                     app.storage.user["authenticated"] = True
                     app.storage.user["user_name"] = user.user_name
                     app.storage.user["is_admin"] = user.is_admin
+
                     ui.notify(
                         f"Welcome, {user.user_name}!",
                         type="positive",
@@ -327,15 +332,16 @@ def export_db_page():
                 shutil.copy(db_file, dest_file)
 
                 db_path_label.set_text(f"Saved to: {dest_file}")
+
                 ui.notify(
                     f"A copy of the case's database folder was saved "
                     f"to the '{save_to_path}' directory.",
                     type="positive",
                 )
 
-            except Exception as e:
+            except Exception as err:
                 ui.notify(
-                    f"Export failed: {str(e)}",
+                    f"Export failed: {str(err)}",
                     type="negative",
                 )
 
@@ -345,7 +351,11 @@ def export_db_page():
         ).props("unelevated")
 
         with ui.card().classes("mt-4 p-4 bg-gray-800"):
-            ui.label("Export Location:").classes("text-sm font-mono")
+
+            ui.label(
+                "Export Location:"
+            ).classes("text-sm font-mono")
+
             ui.label(str(
                 Path(Config.USERPROFILE))
             ).classes("text-sm text-gray-500")
@@ -610,7 +620,9 @@ def saved_output_page():
     )
 
     with ui.column().classes("items-center w-full mt-8 max-w-3xl"):
-        ui.label("Saved Output").classes("text-2xl font-bold mb-6")
+        ui.label(
+            "Saved Output"
+        ).classes("text-2xl font-bold mb-6")
 
         ui.label(
             "Browse previously exported case files and database "
@@ -622,9 +634,9 @@ def saved_output_page():
                 "Output Directory"
             ).classes("text-base font-semibold mb-2")
             
-            ui.label(str(Path(Config.USERPROFILE))).classes(
-                "text-sm text-gray-500 font-mono mb-4"
-            )
+            ui.label(
+                str(Path(Config.USERPROFILE))
+            ).classes("text-sm text-gray-500 font-mono mb-4")
 
             # List exported folders (placeholder)
             ui.label(
