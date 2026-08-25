@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-persons_page.py — NiceGUI conversion of Flask persons blueprint (forms + routes).
+persons_page.pu
 
 Consolidates four Flask routes into one interactive page:
     /person_list       →  table display + delete
@@ -38,27 +38,41 @@ def build_persons_page():
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label("Person Management").classes("text-2xl font-bold m-4")
+        ui.label(
+            "Person Management"
+        ).classes("text-2xl font-bold m-4")
 
         # ── Add Person Form ──────────────────────────────────────
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
-            ui.label("Add Person").classes("text-lg font-semibold mb-4")
+            ui.label(
+                "Add Person"
+            ).classes("text-lg font-semibold mb-4")
 
             # sus_name — StringField (required, autofocused)
-            sus_name_input = ui.input(label="Name").classes("w-full")
+            sus_name_input = ui.input(
+                label="Name"
+            ).classes("w-full")
             sus_name_input.props("autofocus")
 
             # sus_dob — StringField
-            sus_dob_input = ui.input(label="DOB").classes("w-full")
+            sus_dob_input = ui.input(
+                label="DOB"
+            ).classes("w-full")
 
             # sus_address — StringField
-            sus_address_input = ui.input(label="Address").classes("w-full")
+            sus_address_input = ui.input(
+                label="Address"
+            ).classes("w-full")
 
             # sus_phone — StringField
-            sus_phone_input = ui.input(label="Phone Number").classes("w-full")
+            sus_phone_input = ui.input(
+                label="Phone Number"
+            ).classes("w-full")
 
             # sus_notes — TextAreaField
-            sus_notes_input = ui.textarea(label="Notes").classes("w-full")
+            sus_notes_input = ui.textarea(
+                label="Notes"
+            ).classes("w-full")
 
             # ── Buttons ────────────────────────────────────────
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
@@ -94,12 +108,17 @@ def build_persons_page():
                     # ── Duplicate name check (sus_name is unique) ──
                     with get_session() as session:
                         existing = (
-                            session.query(Persons).filter_by(sus_name=sus_name).first()
+                            session.query(
+                                Persons
+                            )
+                            .filter_by(sus_name=sus_name)
+                            .first()
                         )
+
                         if existing:
                             ui.notify(
-                                f"'{sus_name}' is already in the database. "
-                                "Person names must be unique.",
+                                f"'{sus_name}' is already in the "
+                                "database. Person names must be unique.",
                                 type="negative",
                                 timeout=NOTIFICATION_TIMEOUT,
                             )
@@ -120,15 +139,25 @@ def build_persons_page():
                         type="positive",
                         timeout=NOTIFICATION_TIMEOUT,
                     )
+
                     clear_form()
                     refresh_persons_table()
 
-                ui.button("Clear", on_click=clear_form).props("outline")
-                ui.button("Add Person", on_click=on_submit).props("unelevated")
+                ui.button(
+                    "Clear",
+                    on_click=clear_form,
+                ).props("outline")
+
+                ui.button(
+                    "Add Person",
+                    on_click=on_submit,
+                ).props("unelevated")
 
         # ── Existing Persons Table ───────────────────────────────
         ui.separator().classes("my-6")
-        ui.label("Current Persons").classes("text-xl font-bold mb-3")
+        ui.label(
+            "Current Persons"
+        ).classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2"
@@ -139,13 +168,15 @@ def build_persons_page():
             table_container.clear()
 
             with get_session() as session:
-                persons = session.query(Persons).order_by(Persons.sus_name).all()
+                persons = session.query(
+                    Persons
+                ).order_by(Persons.sus_name).all()
 
                 if not persons:
                     with table_container:
-                        ui.label("No persons in the database yet.").classes(
-                            "text-gray-500 italic"
-                        )
+                        ui.label(
+                            "No persons in the database yet"
+                        ).classes("text-gray-500 italic")
                     return
 
                 row_data = [
@@ -206,7 +237,11 @@ def build_persons_page():
                     },
                 ]
 
-                table = ui.table(columns=column_defs, rows=row_data, row_key="id")
+                table = ui.table(
+                    columns=column_defs, 
+                    rows=row_data, 
+                    row_key="id",
+                )
                 table.props("dense flat")
 
                 # ── Slot: Actions column ──
@@ -232,35 +267,37 @@ def build_persons_page():
                     with ui.dialog() as edit_dialog, ui.card().classes(
                         "w-full max-w-lg p-6"
                     ):
-                        ui.label(f'Edit Person: {row["sus_name"]}').classes(
-                            "text-lg font-semibold mb-4"
-                        )
+                        ui.label(
+                            f"Edit Person: {row['sus_name']}"
+                        ).classes("text-lg font-semibold mb-4")
 
                         edit_name = ui.input(
                             label="Name",
-                            value=row["sus_name"]
+                            value=row["sus_name"],
                         ).classes("w-full")
                         edit_dob = ui.input(
                             label="DOB",
-                            value=row["sus_dob"]
+                            value=row["sus_dob"],
                         ).classes("w-full")
                         edit_address = ui.input(
                             label="Address",
-                            value=row["sus_address"]
+                            value=row["sus_address"],
                         ).classes("w-full")
                         edit_phone = ui.input(
                             label="Phone Number",
-                            value=row["sus_phone"]
+                            value=row["sus_phone"],
                         ).classes("w-full")
                         edit_notes = ui.textarea(
                             label="Notes",
-                            value=row["sus_notes"]
+                            value=row["sus_notes"],
                         ).classes("w-full")
 
-                        with ui.row().classes("w-full justify-end gap-2 mt-4"):
+                        with ui.row().classes(
+                            "w-full justify-end gap-2 mt-4"
+                        ):
                             ui.button(
                                 "Cancel",
-                                on_click=edit_dialog.close
+                                on_click=edit_dialog.close,
                             ).props("flat")
 
                             def on_save_update():
@@ -285,9 +322,9 @@ def build_persons_page():
                                     )
                                     if dup:
                                         ui.notify(
-                                            f"'{new_name}' is already in the "
-                                            "database. Person names must be "
-                                            "unique.",
+                                            f"'{new_name}' is already "
+                                            "in the database. Person "
+                                            "names must be unique.",
                                             type="negative",
                                             timeout=NOTIFICATION_TIMEOUT,
                                         )
@@ -300,28 +337,41 @@ def build_persons_page():
                                     )
                                     if person:
                                         person.sus_name = new_name
-                                        person.sus_dob = edit_dob.value or ""
-                                        person.sus_address = edit_address.value or ""
-                                        person.sus_phone = edit_phone.value or ""
-                                        person.sus_notes = edit_notes.value or ""
-                                        # session.commit()
+                                        person.sus_dob = (
+                                            edit_dob.value or ""
+                                        )
+                                        person.sus_address = (
+                                            edit_address.value or ""
+                                        )
+                                        person.sus_phone = (
+                                            edit_phone.value or ""
+                                        )
+                                        person.sus_notes = (
+                                            edit_notes.value or ""
+                                        )
 
                                 ui.notify(
                                     f"{new_name} was updated successfully",
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
+
                                 edit_dialog.close()
                                 refresh_persons_table()
-
-                            ui.button("Save", on_click=on_save_update).props("unelevated")
+                                
+                                ui.button(
+                                    "Save",
+                                    on_click=on_save_update,
+                                ).props("unelevated")
 
                     edit_dialog.open()
 
                 # ── Delete confirmation dialog ──────────────────
                 def open_delete_dialog(e):
                     row = e.args
-                    with ui.dialog() as delete_dialog, ui.card().classes("max-w-sm p-6"):
+                    with ui.dialog() as delete_dialog, ui.card().classes(
+                        "max-w-sm p-6"
+                    ):
                         ui.label(
                             "Confirm Deletion"
                         ).classes("text-lg font-semibold mb-2")
@@ -333,13 +383,15 @@ def build_persons_page():
                         with ui.row().classes("w-full justify-end gap-2"):
                             ui.button(
                                 "Cancel",
-                                on_click=delete_dialog.close
+                                on_click=delete_dialog.close,
                             ).props("flat")
 
                             def on_confirm_delete():
                                 with get_session() as session:
                                     person = (
-                                        session.query(Persons)
+                                        session.query(
+                                            Persons
+                                        )
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -350,8 +402,8 @@ def build_persons_page():
                                         sus_name = row["sus_name"]
 
                                 ui.notify(
-                                    f"{sus_name} has been successfully removed "
-                                    f"from the file.",
+                                    f"{sus_name} has been successfully "
+                                    "removed from the file",
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
@@ -360,7 +412,7 @@ def build_persons_page():
 
                             ui.button(
                                 "Delete",
-                                on_click=on_confirm_delete
+                                on_click=on_confirm_delete,
                             ).props("negative unelevated")
 
                     delete_dialog.open()
