@@ -25,7 +25,13 @@ init_db()
 def seed_default_user():
     """Creates the default 'novaicac' user if it doesn't exist."""
     with get_session() as session:
-        existing = session.query(Users).filter_by(user_name="novaicac").first()
+        existing = (
+            session.query(
+                Users
+            )
+            .filter_by(user_name="novaicac")
+            .first()
+        )
         if not existing:
             default_user = Users(
                 user_name="novaicac",
@@ -35,7 +41,6 @@ def seed_default_user():
             # Set the default password — CHANGE THIS before deploying!
             default_user.set_password("ChangeMe123!")
             session.add(default_user)
-
 
 seed_default_user()
 
