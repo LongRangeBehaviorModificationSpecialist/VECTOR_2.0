@@ -1,0 +1,6 @@
+__pycache__
+temp
+.vscode
+.nicegui
+app_data.db
+/logs/

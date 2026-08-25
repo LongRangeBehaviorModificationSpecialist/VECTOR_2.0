@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+
+AGENT_ROLE_LIST = [
+    "Case Agent (Primary)",
+    "Case Agent (Assist)",
+    "Crime Scene Tech",
+    "Evidence Custodian",
+    "Evidence Triage",
+    "Funeral Home Employee",
+    "Interpreter",
+    "Interview (Primary)",
+    "Interview (Assist)",
+    "K-9 Handler",
+    "Medical Examiner",
+    "Observer",
+    "Other (Not Listed)" "Photographer",
+    "Polygraph Examiner",
+    "Room Labels",
+    "Room Label List",
+    "Scene Security",
+    "Scene Sketch",
+    "Search",
+    "Supervisor",
+]
