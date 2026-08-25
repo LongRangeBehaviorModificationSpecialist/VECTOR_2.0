@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-main_page.py — NiceGUI conversion of Flask main blueprint routes.
+main_page.py
 
 Handles:
     /               →  Home/Login page
@@ -18,7 +18,15 @@ from pathlib import Path
 from datetime import datetime
 import shutil
 
-from models import get_session, Agents, Cases, Evidence, Notes, Persons, Rooms
+from models import (
+    get_session,
+    Agents,
+    Cases,
+    Evidence,
+    Notes,
+    Persons,
+    Rooms,
+)
 from navbar import build_navbar, confirm_new_case_dialog
 from program.config import Config
 
@@ -27,27 +35,26 @@ from program.config import Config
 def is_authenticated() -> bool:
     """Stub — wire up to your session/auth logic."""
     from nicegui import app
-
     return app.storage.user.get("authenticated", False)
 
 
 def get_current_user_name() -> str:
     """Stub — returns username or 'Guest'."""
     from nicegui import app
-
     return app.storage.user.get("user_name", "Guest")
 
 
 def get_is_admin() -> bool:
     """Stub — returns True if user is admin."""
     from nicegui import app
-
     return app.storage.user.get("is_admin", False)
 
 
 # ── Home Page ─────────────────────────────────────────────────
 def build_home_page():
-    """Home/login page — shows menu if authenticated, login form otherwise."""
+    """Home/login page — shows menu if authenticated, login
+    form otherwise.
+    """
     authenticated = is_authenticated()
 
     build_navbar(
@@ -66,13 +73,18 @@ def build_authenticated_home():
     """Main menu for logged-in users."""
 
     with ui.column().classes("items-center w-full mt-8 mb-6"):
-        ui.label("V·E·C·T·O·R Home Page").classes("text-2xl font-normal text-center")
+        ui.label(
+            "V·E·C·T·O·R Home Page"
+        ).classes("text-2xl font-normal text-center")
 
     with ui.column().classes("items-center w-full"):
-        ui.label("Main Menu").classes("text-xl font-semibold mb-6")
+        ui.label(
+            "Main Menu"
+        ).classes("text-xl font-semibold mb-6")
 
-    # with ui.grid(columns=3).classes("w-full max-w-3xl mx-auto gap-6"):
-    with ui.row().classes("flex justify-center items-center gap-6 mb-4 w-full"):
+    with ui.row().classes(
+        "flex justify-center items-center gap-6 mb-4 w-full"
+    ):
         ui.button(
             "Start New Case",
             on_click=lambda: ui.navigate.to("/cases"),
@@ -94,9 +106,10 @@ def build_authenticated_home():
             "unelevated"
         ).classes("flex-shrink-0 min-w-48 py-3")
 
-        # Row 2: Add Evidence | Add Person | Add Note
-        # with ui.row().classes("justify-center gap-6 mb-4"):
-    with ui.row().classes("flex justify-center items-center gap-6 mb-4 w-full"):
+    # Row 2: Add Evidence | Add Person | Add Note
+    with ui.row().classes(
+        "flex justify-center items-center gap-6 mb-4 w-full"
+    ):
         ui.button(
             "Add Evidence",
             on_click=lambda: ui.navigate.to("/evidence"),
@@ -118,69 +131,37 @@ def build_authenticated_home():
             "unelevated"
         ).classes("flex-shrink-0 min-w-48 py-3")
 
-        # # Row 1
-        # with ui.row().classes("justify-center gap-4 mb-4"):
-        #     ui.button(
-        #         "Start New Case",
-        #         on_click=confirm_new_case_handler,
-        #     ).props(
-        #         "unelevated"
-        #     ).classes("px-6 py-3")
-
-        #     ui.button(
-        #         "Add Agent",
-        #         on_click=lambda: ui.navigate.to("/agents"),
-        #     ).props(
-        #         "unelevated"
-        #     ).classes("px-6 py-3")
-
-        #     ui.button(
-        #         "Add Room",
-        #         on_click=lambda: ui.navigate.to("/rooms"),
-        #     ).props(
-        #         "unelevated"
-        #     ).classes("px-6 py-3")
-
-        # # Row 2
-        # with ui.row().classes("justify-center gap-4"):
-        #     ui.button(
-        #         "Add Evidence",
-        #         on_click=lambda: ui.navigate.to("/evidence"),
-        #     ).props("unelevated").classes("px-6 py-3")
-
-        #     ui.button(
-        #         "Add Person",
-        #         on_click=lambda: ui.navigate.to("/persons"),
-        #     ).props(
-        #         "unelevated"
-        #     ).classes("px-6 py-3")
-
-        #     ui.button(
-        #         "Add Note",
-        #         on_click=lambda: ui.navigate.to("/notes"),
-        #     ).props(
-        #         "unelevated"
-        #     ).classes("px-6 py-3")
-
 
 def build_login_home():
     """Login page for unauthenticated users."""
 
     with ui.column().classes("items-center w-full mt-12"):
-        ui.icon("shield", size="80px").classes("text-purple-600 mb-4")
+        ui.icon(
+            "shield",
+            size="80px",
+        ).classes("text-purple-600 mb-4")
 
-        ui.label("-- V·E·C·T·O·R --").classes("text-3xl font-bold tracking-widest mb-6")
+        ui.label(
+            "-- V·E·C·T·O·R --"
+        ).classes("text-3xl font-bold tracking-widest mb-6")
 
         ui.label(
             "The Virginia Evidence Collection, Tracking, "
             "Organization, & Recording Program"
         ).classes("text-base text-gray-400 text-center max-w-xl mb-2")
 
-        ui.label("Please log in below").classes("text-lg mb-6")
+        ui.label(
+            "Please log in below"
+        ).classes("text-lg mb-6")
 
-        username_input = ui.input(label="Username").classes("w-full max-w-xs")
+        username_input = ui.input(
+            label="Username"
+        ).classes("w-full max-w-xs")
+        
         password_input = ui.input(
-            label="Password", password=True, password_toggle_button=True
+            label="Password",
+            password=True,
+            password_toggle_button=True,
         ).classes("w-full max-w-xs")
 
         def attempt_login():
@@ -191,7 +172,9 @@ def build_login_home():
             user_pass = password_input.value
 
             with get_session() as session:
-                user = session.query(Users).filter_by(user_name=user_name).first()
+                user = session.query(
+                    Users
+                ).filter_by(user_name=user_name).first()
 
                 if user and user.check_password_correction(user_pass):
                     from nicegui import app
@@ -199,14 +182,21 @@ def build_login_home():
                     app.storage.user["authenticated"] = True
                     app.storage.user["user_name"] = user.user_name
                     app.storage.user["is_admin"] = user.is_admin
-                    ui.notify(f"Welcome, {user.user_name}!", type="positive")
+                    ui.notify(
+                        f"Welcome, {user.user_name}!",
+                        type="positive",
+                    )
                     ui.navigate.to("/")
                 else:
-                    ui.notify("Invalid credentials.", type="negative")
+                    ui.notify(
+                        "Invalid credentials",
+                        type="negative",
+                    )
 
-        ui.button("Login", on_click=attempt_login).props("unelevated").classes(
-            "mt-4 px-8 py-3"
-        )
+        ui.button(
+            "Login",
+            on_click=attempt_login,
+        ).props("unelevated").classes("mt-4 px-8 py-3")
 
 
 # ── About Page ───────────────────────────────────────────────
@@ -223,13 +213,17 @@ def about_page():
     )
 
     with ui.column().classes("items-center w-full mt-8"):
-        ui.label("About VECTOR").classes("text-2xl font-bold mb-6")
+        ui.label(
+            "About VECTOR"
+        ).classes("text-2xl font-bold mb-6")
 
         with ui.card().classes("max-w-md p-6"):
             ui.label(f"Version: {Config.version}").classes("mb-2")
             ui.label(f"Author: {Config.author}").classes("mb-2")
             ui.label(f"Department: {Config.dept}").classes("mb-2")
-            ui.label(f"Last Updated: {Config.updated}").classes("text-sm text-gray-500")
+            ui.label(
+                f"Last Updated: {Config.updated}"
+            ).classes("text-sm text-gray-500")
 
 
 # ── Help Page ────────────────────────────────────────────────
@@ -246,14 +240,17 @@ def help_page():
     )
 
     with ui.column().classes("items-center w-full mt-8 max-w-3xl"):
-        ui.label("Help").classes("text-2xl font-bold mb-6")
+        ui.label(
+            "Help"
+        ).classes("text-2xl font-bold mb-6")
 
         with ui.card().classes("p-6"):
             ui.markdown("""
                 ### VECTOR Help Documentation
 
                 This application helps you manage evidence collection,
-                tracking, organization, and recording for law enforcement cases.
+                tracking, organization, and recording for law
+                enforcement cases.
 
                 #### Quick Start
 
@@ -291,11 +288,13 @@ def export_db_page():
     )
 
     with ui.column().classes("items-center w-full mt-8"):
-        ui.label("Export Database").classes("text-2xl font-bold mb-6")
+        ui.label(
+            "Export Database"
+        ).classes("text-2xl font-bold mb-6")
 
         ui.label(
-            "This will create a backup copy of the current case database "
-            "in your user profile folder."
+            "This will create a backup copy of the current case "
+            "database in your user profile folder."
         ).classes("text-sm text-gray-400 mb-4")
 
         db_path_label = ui.label("").classes("text-sm text-green-400")
@@ -304,7 +303,11 @@ def export_db_page():
             try:
                 with get_session() as session:
                     first_case = session.query(Cases).first()
-                    case_number = first_case.case_number if first_case else "UNKNOWN"
+                    case_number = (
+                        first_case.case_number
+                        if first_case
+                        else "UNKNOWN"
+                    )
 
                 timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
                 new_dir = f"{timestamp}_Case_File_Folder"
@@ -312,8 +315,12 @@ def export_db_page():
                 save_to_path.mkdir(parents=True, exist_ok=True)
 
                 db_file = Path.cwd() / "program" / "_VECTOR.db"
+
                 if not db_file.exists():
-                    ui.notify("Database file not found.", type="negative")
+                    ui.notify(
+                        "Database file not found",
+                        type="negative",
+                    )
                     return
 
                 dest_file = save_to_path / f"{case_number}_VECTOR.db"
@@ -321,39 +328,53 @@ def export_db_page():
 
                 db_path_label.set_text(f"Saved to: {dest_file}")
                 ui.notify(
-                    f"A copy of the case's database folder was saved to the "
-                    f"'{save_to_path}' directory.",
+                    f"A copy of the case's database folder was saved "
+                    f"to the '{save_to_path}' directory.",
                     type="positive",
                 )
 
             except Exception as e:
-                ui.notify(f"Export failed: {str(e)}", type="negative")
+                ui.notify(
+                    f"Export failed: {str(e)}",
+                    type="negative",
+                )
 
-        ui.button("Export Database", on_click=on_export).props("unelevated")
+        ui.button(
+            "Export Database",
+            on_click=on_export,
+        ).props("unelevated")
 
         with ui.card().classes("mt-4 p-4 bg-gray-800"):
             ui.label("Export Location:").classes("text-sm font-mono")
-            ui.label(str(Path(Config.USERPROFILE))).classes("text-sm text-gray-500")
+            ui.label(str(
+                Path(Config.USERPROFILE))
+            ).classes("text-sm text-gray-500")
 
 
 # ── Confirm New Case Handler ─────────────────────────────────
 def confirm_new_case_handler():
-    """
-    Called when user clicks "Make New Case File".
+    """Called when user clicks "Make New Case File".
+    
     Clears ALL data from all tables (destructive operation!).
     """
     with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
-        ui.label("⚠️ WARNING: Delete All Data").classes(
-            "text-red-400 text-lg font-bold mb-2"
-        )
+        
+        ui.label(
+            "⚠️ WARNING: Delete All Data"
+        ).classes("text-red-400 text-lg font-bold mb-2")
+        
         ui.label(
             "This will DELETE ALL DATA from all database tables:\n"
-            "- Agents\n- Cases\n- Evidence\n- Notes\n- Persons\n- Rooms\n\n"
-            "This action CANNOT be undone. Are you absolutely sure?"
+            "- Agents\n- Cases\n- Evidence\n- Notes\n- Persons\n"
+            "- Rooms\n\n. This action CANNOT be undone. Are you "
+            "absolutely sure?"
         ).classes("text-sm mb-4")
 
         with ui.row().classes("w-full justify-end gap-2"):
-            ui.button("Cancel", on_click=dialog.close).props("flat")
+            ui.button(
+                "Cancel",
+                on_click=dialog.close,
+            ).props("flat")
 
             def on_confirm_delete_all():
                 try:
@@ -368,7 +389,8 @@ def confirm_new_case_handler():
                         session.commit()
 
                     ui.notify(
-                        "All data in all database tables has been successfully deleted.",
+                        "All data in all database tables has "
+                        "been successfully deleted",
                         type="info",
                     )
                     ui.navigate.to("/")
@@ -376,15 +398,17 @@ def confirm_new_case_handler():
                 except Exception as e:
                     session.rollback()
                     ui.notify(
-                        "Database information was rolled back successfully.",
+                        "Database information was rolled back "
+                        "successfully",
                         type="warning",
                     )
                 finally:
                     dialog.close()
 
-            ui.button("DELETE ALL", on_click=on_confirm_delete_all).props(
-                "negative unelevated"
-            )
+            ui.button(
+                "DELETE ALL",
+                on_click=on_confirm_delete_all,
+            ).props("negative unelevated")
 
     dialog.open()
 
@@ -402,15 +426,19 @@ def error_check_page():
         on_new_case=confirm_new_case_handler,
     )
 
-    with ui.column().classes("items-start w-full mt-8 max-w-4xl gap-6"):
-        ui.label("Data Integrity Check").classes("text-2xl font-bold mb-4")
+    with ui.column().classes(
+        "items-start w-full mt-8 max-w-4xl gap-6"
+    ):
+        ui.label(
+            "Data Integrity Check"
+        ).classes("text-2xl font-bold mb-4")
 
         with ui.row().classes("gap-4 w-full"):
             # Case End Time Issues
             with ui.card().classes("flex-1"):
-                ui.label("Cases Without End Times").classes(
-                    "text-lg font-semibold mb-3 text-yellow-400"
-                )
+                ui.label(
+                    "Cases Without End Times"
+                ).classes("text-lg font-semibold mb-3 text-yellow-400")
                 with get_session() as session:
                     queryCaseEndTime = (
                         session.query(
@@ -422,7 +450,9 @@ def error_check_page():
                     )
 
                 if not queryCaseEndTime:
-                    ui.label("✓ No issues found.").classes("text-sm text-green-400")
+                    ui.label(
+                        "✓ No issues found"
+                    ).classes("text-sm text-green-400")
                 else:
                     with ui.table(
                         columns=[
@@ -450,9 +480,10 @@ def error_check_page():
 
             # Rooms with Missing Agents
             with ui.card().classes("flex-1"):
-                ui.label("Rooms with Missing Agents").classes(
-                    "text-lg font-semibold mb-3 text-orange-400"
-                )
+                ui.label(
+                    "Rooms with Missing Agents"
+                ).classes("text-lg font-semibold mb-3 text-orange-400")
+                
                 with get_session() as session:
                     queryTwoAgentsRooms = (
                         session.query(
@@ -469,7 +500,9 @@ def error_check_page():
                     )
 
                 if not queryTwoAgentsRooms:
-                    ui.label("✓ No issues found.").classes("text-sm text-green-400")
+                    ui.label(
+                        "✓ No issues found."
+                    ).classes("text-sm text-green-400")
                 else:
                     with ui.table(
                         columns=[
@@ -509,9 +542,10 @@ def error_check_page():
 
         # Evidence with Missing Witnesses
         with ui.card().classes("w-full"):
-            ui.label("Evidence without Witness Information").classes(
-                "text-lg font-semibold mb-3 text-orange-400"
-            )
+            ui.label(
+                "Evidence without Witness Information"
+            ).classes("text-lg font-semibold mb-3 text-orange-400")
+            
             with get_session() as session:
                 queryTwoAgentsEvid = (
                     session.query(
@@ -527,7 +561,9 @@ def error_check_page():
                 )
 
             if not queryTwoAgentsEvid:
-                ui.label("✓ No issues found.").classes("text-sm text-green-400")
+                ui.label(
+                    "✓ No issues found."
+                ).classes("text-sm text-green-400")
             else:
                 with ui.table(
                     columns=[
@@ -576,18 +612,24 @@ def saved_output_page():
     with ui.column().classes("items-center w-full mt-8 max-w-3xl"):
         ui.label("Saved Output").classes("text-2xl font-bold mb-6")
 
-        ui.label("Browse previously exported case files and database backups.").classes(
-            "text-sm text-gray-400 mb-4"
-        )
+        ui.label(
+            "Browse previously exported case files and database "
+            "backups"
+        ).classes("text-sm text-gray-400 mb-4")
 
         with ui.card().classes("p-6 w-full"):
-            ui.label("Output Directory").classes("text-base font-semibold mb-2")
+            ui.label(
+                "Output Directory"
+            ).classes("text-base font-semibold mb-2")
+            
             ui.label(str(Path(Config.USERPROFILE))).classes(
                 "text-sm text-gray-500 font-mono mb-4"
             )
 
             # List exported folders (placeholder)
-            ui.label("No recent exports found.").classes("text-sm text-gray-400")
+            ui.label(
+                "No recent exports found"
+            ).classes("text-sm text-gray-400")
 
 
 # ── Page Registration ────────────────────────────────────────
@@ -603,5 +645,8 @@ def logout_page():
     from nicegui import app
 
     app.storage.user.clear()
-    ui.notify("Logged out successfully.", type="info")
+    ui.notify(
+        "Logged out successfully",
+        type="info",
+    )
     ui.navigate.to("/")
