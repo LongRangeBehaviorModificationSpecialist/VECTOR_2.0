@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-links_page.py — NiceGUI conversion of Flask links blueprint (routes + dicts).
+links_page.py
 
 Displays categorized useful links in collapsible sections.
 No form needed — this is a read-only resource page.
@@ -77,15 +77,22 @@ osint_links = {
 
 # ── Link Section Builder ────────────────────────────────────
 def build_link_section(title: str, icon: str, links: dict[str, str]):
-    """
-    Builds a collapsible section of links using an expansion panel.
+    """Builds a collapsible section of links using an expansion panel.
+    
     Each link opens in a new tab.
     """
-    with ui.expansion(title, icon=icon).classes("w-full").props("default-opened"):
+    with ui.expansion(
+        title,
+        icon=icon,
+    ).classes("w-full").props("default-opened"):
         with ui.row().classes("w-full flex-wrap gap-2"):
             for name, url in links.items():
                 ui.button(
-                    name, on_click=lambda u=url: ui.navigate.to(u, new_tab=True)
+                    name,
+                    on_click=lambda u=url: ui.navigate.to(
+                        u,
+                        new_tab=True,
+                    )
                 ).props("outline no-caps").classes("text-left text-sm")
 
 
