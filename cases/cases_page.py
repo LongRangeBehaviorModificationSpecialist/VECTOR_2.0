@@ -58,12 +58,18 @@ def build_cases_page():
 
         # ── Input Form ────────────────────────────────────────────
         with ui.card().classes("w-full max-w-lg p-6 mx-auto"):
-            ui.label("Open New Case").classes("text-lg font-semibold mb-4")
+            ui.label(
+                "Open New Case"
+            ).classes("text-lg font-semibold mb-4")
 
-            case_number_input = ui.input(label="Case Number").classes("w-full")
+            case_number_input = ui.input(
+                label="Case Number"
+            ).classes("w-full")
             case_number_input.props("autofocus")
 
-            location_input = ui.input(label="Location").classes("w-full")
+            location_input = ui.input(
+                label="Location"
+            ).classes("w-full")
 
             jurisdiction_combo = ui.select(
                 options=load_jurisdiction_options(),
@@ -72,19 +78,16 @@ def build_cases_page():
                 new_value_mode="add",
             ).classes("w-full")
 
-            # case_date_time_begin_input = ui.input(
-            #     label="Date/Time Started",
-            #     placeholder="YYYY-MM-DD HH:MM",
-            # ).classes("w-full")
-
             # ── Date/Time Started ──────────────────────────────────
             ui.label("Date/Time Started").classes("text-sm font-medium mb-1")
             with ui.row().classes("w-full gap-2"):
                 case_date_begin = ui.date_input(
                     label="Date",
+                    placeholder="YYYY-MM-DD",
                 ).classes("flex-grow")
                 case_time_begin = ui.time_input(
                     label="Time",
+                    placeholder="HH:MM",
                 ).classes("flex-grow")
 
             # case_date_time_end_input = ui.input(
@@ -93,13 +96,17 @@ def build_cases_page():
             # ).classes("w-full")
 
             # ── Date/Time Ended ────────────────────────────────────
-            ui.label("Date/Time Ended (optional)").classes("text-sm font-medium mb-1 mt-4")
+            ui.label(
+                "Date/Time Ended (optional)"
+            ).classes("text-sm font-medium mb-1 mt-4")
             with ui.row().classes("w-full gap-2"):
                 case_date_end = ui.date_input(
                     label="Date",
+                    placeholder="YYYY-MM-DD",
                 ).classes("flex-grow")
                 case_time_end = ui.time_input(
                     label="Time",
+                    placeholder="HH:MM",
                 ).classes("flex-grow")
 
             # ── Buttons ─────────────────────────────────────────
@@ -179,8 +186,9 @@ def build_cases_page():
                             )
                             if existing:
                                 ui.notify(
-                                    f'Case "{case_number}" already exists. '
-                                    "Please use a unique case number.",
+                                    f"Case '{case_number}' already "
+                                    "exists. Please use a unique case "
+                                    "number.",
                                     type="negative",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
@@ -211,12 +219,20 @@ def build_cases_page():
                             timeout=NOTIFICATION_TIMEOUT,
                         )
 
-                ui.button("Clear", on_click=clear_form).props("outline")
-                ui.button("Open New Case", on_click=on_submit).props("unelevated")
+                ui.button(
+                    "Clear",
+                    on_click=clear_form,
+                ).props("outline")
+                ui.button(
+                    "Open New Case",
+                    on_click=on_submit,
+                ).props("unelevated")
 
         # ── Existing Cases Table ─────────────────────────────────
         ui.separator().classes("my-6")
-        ui.label("Existing Cases").classes("text-xl font-bold mb-3")
+        ui.label(
+            "Existing Cases"
+        ).classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2"
@@ -232,9 +248,9 @@ def build_cases_page():
 
                 if not cases:
                     with table_container:
-                        ui.label("No cases in the database yet.").classes(
-                            "text-gray-500 italic"
-                        )
+                        ui.label(
+                            "No cases in the database yet"
+                        ).classes("text-gray-500 italic")
                     return
 
                 # Build row_data INSIDE the session — BEFORE it closes
@@ -297,7 +313,11 @@ def build_cases_page():
                     },
                 ]
 
-                table = ui.table(columns=column_defs, rows=row_data, row_key="id")
+                table = ui.table(
+                    columns=column_defs,
+                    rows=row_data,
+                    row_key="id",
+                )
                 table.props("dense flat")
 
                 # ── Slot: Actions column ──
@@ -320,17 +340,23 @@ def build_cases_page():
                 # ── Edit dialog ──────────────────────────────────
                 def open_edit_dialog(e):
                     row = e.args
-                    with ui.dialog() as edit_dialog, ui.card().classes("w-full max-w-lg p-6"):
-                        ui.label(f'Edit Case: {row["case_number"]}').classes(
-                            "text-lg font-semibold mb-4"
-                        )
+                    with ui.dialog() as edit_dialog, ui.card().classes(
+                        "w-full max-w-lg p-6"
+                    ):
+                        ui.label(
+                            f"Edit Case: {row['case_number']}"
+                        ).classes("text-lg font-semibold mb-4")
 
                         edit_case_number = ui.input(
-                            label="Case Number", value=row["case_number"]
+                            label="Case Number",
+                            value=row["case_number"],
                         ).classes("w-full")
+                        
                         edit_location = ui.input(
-                            label="Location", value=row["location"]
+                            label="Location",
+                            value=row["location"],
                         ).classes("w-full")
+                        
                         edit_jurisdiction = ui.select(
                             options=load_jurisdiction_options(),
                             label="Jurisdiction",
@@ -338,100 +364,170 @@ def build_cases_page():
                             with_input=True,
                             new_value_mode="add",
                         ).classes("w-full")
-                        # edit_datetime_begin = ui.input(
-                        #     label="Date/Time Started",
-                        #     value=row["case_date_time_begin"],
-                        #     placeholder="YYYY-MM-DD HH:MM",
-                        # ).classes("w-full")
-                        # edit_datetime_end = ui.input(
-                        #     label="Date/Time Ended",
-                        #     value=row["case_date_time_end"] or "",
-                        #     placeholder="YYYY-MM-DD HH:MM",
-                        # ).classes("w-full")
-                        # Parse existing values for the picker
-                        existing_begin_parts = (row["case_date_time_begin"] or "").split(" ")
-                        existing_begin_date = existing_begin_parts[0] if len(existing_begin_parts) >= 1 else None
-                        existing_begin_time = existing_begin_parts[1] if len(existing_begin_parts) >= 2 else None
 
-                        existing_end_parts = (row["case_date_time_end"] or "").split(" ")
-                        existing_end_date = existing_end_parts[0] if len(existing_end_parts) >= 1 else None
-                        existing_end_time = existing_end_parts[1] if len(existing_end_parts) >= 2 else None
+                        existing_begin_parts = (
+                            row["case_date_time_begin"] or ""
+                        ).split(" ")
+                        
+                        existing_begin_date = (
+                            existing_begin_parts[0]
+                            if len(existing_begin_parts) >= 1 
+                            else None
+                        )
 
-                        ui.label("Date/Time Started").classes("text-sm font-medium mb-1")
+                        existing_begin_time = (
+                            existing_begin_parts[1]
+                            if len(existing_begin_parts) >= 2
+                            else None
+                        )
+
+                        existing_end_parts = (
+                            row["case_date_time_end"] or ""
+                        ).split(" ")
+                        
+                        existing_end_date = (
+                            existing_end_parts[0]
+                            if len(existing_end_parts) >= 1
+                            else None
+                        )
+
+                        existing_end_time = (
+                            existing_end_parts[1] 
+                            if len(existing_end_parts) >= 2
+                            else None
+                        )
+
+                        ui.label(
+                            "Date/Time Started"
+                        ).classes("text-sm font-medium mb-1")
+                        
                         with ui.row().classes("w-full gap-2"):
+
                             edit_date_begin = ui.date_input(
-                                label="Date", value=existing_begin_date
+                                label="Date",
+                                value=existing_begin_date,
                             ).classes("flex-grow")
+                            
                             edit_time_begin = ui.time_input(
-                                label="Time", value=existing_begin_time
+                                label="Time",
+                                value=existing_begin_time,
                             ).classes("flex-grow")
 
-                        ui.label("Date/Time Ended (optional)").classes("text-sm font-medium mb-1 mt-4")
+                        ui.label(
+                            "Date/Time Ended (optional)"
+                        ).classes("text-sm font-medium mb-1 mt-4")
+                        
                         with ui.row().classes("w-full gap-2"):
+
                             edit_date_end = ui.date_input(
-                                label="Date", value=existing_end_date
+                                label="Date",
+                                value=existing_end_date,
                             ).classes("flex-grow")
+                            
                             edit_time_end = ui.time_input(
-                                label="Time", value=existing_end_time
+                                label="Time",
+                                value=existing_end_time,
                             ).classes("flex-grow")
 
-                        with ui.row().classes("w-full justify-end gap-2 mt-4"):
-                            ui.button("Cancel", on_click=edit_dialog.close).props("flat")
+                        with ui.row().classes(
+                            "w-full justify-end gap-2 mt-4"
+                        ):
+                            ui.button(
+                                "Cancel",
+                                on_click=edit_dialog.close,
+                            ).props("flat")
 
                             def on_save_update():
                                 with get_session() as session:
-                                    case = session.query(Cases).filter_by(id=row["id"]).first()
+                                    case = (
+                                        session.query(
+                                            Cases
+                                        )
+                                        .filter_by(id=row["id"])
+                                        .first()
+                                    )
                                     if case:
-                                        case.case_number = edit_case_number.value or ""
+                                        case.case_number = (
+                                            edit_case_number.value or ""
+                                        )
                                         case.location = edit_location.value or ""
-                                        case.jurisdiction = edit_jurisdiction.value or ""
-                                        # case.case_date_time_begin = (
-                                        #     edit_datetime_begin.value or ""
-                                        # )
-                                        # case.case_date_time_end = edit_datetime_end.value or ""
-                                        # # session.commit()
-                                        # Combine date + time
-                                        begin_date = edit_date_begin.value or ""
-                                        begin_time = edit_time_begin.value or "00:00"
-                                        case.case_date_time_begin = f"{begin_date} {begin_time}" if begin_date else ""
+                                        case.jurisdiction = (
+                                            edit_jurisdiction.value or ""
+                                        )
 
-                                        end_date = edit_date_end.value or ""
+                                        # Combine date + time
+                                        begin_date = (
+                                            edit_date_begin.value 
+                                            or ""
+                                        )
+                                        begin_time = (
+                                            edit_time_begin.value
+                                            or "00:00"
+                                        )
+                                        case.case_date_time_begin = (
+                                            f"{begin_date} {begin_time}"
+                                            if begin_date else ""
+                                        )
+
+                                        end_date = (
+                                            edit_date_end.value 
+                                            or ""
+                                        )
                                         if end_date:
-                                            end_time = edit_time_end.value or "00:00"
-                                            case.case_date_time_end = f"{end_date} {end_time}"
+                                            end_time = (
+                                                edit_time_end.value 
+                                                or "00:00"
+                                            )
+                                            case.case_date_time_end = (
+                                                f"{end_date} {end_time}"
+                                            )
                                         else:
                                             case.case_date_time_end = ""
 
                                 ui.notify(
-                                    f"Case {edit_case_number.value} information "
-                                    f"was updated successfully",
+                                    f"Case {edit_case_number.value} "
+                                    "information was updated successfully",
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
                                 edit_dialog.close()
                                 refresh_cases_table()
 
-                            ui.button("Save", on_click=on_save_update).props("unelevated")
+                            ui.button(
+                                "Save",
+                                on_click=on_save_update,
+                            ).props("unelevated")
 
                     edit_dialog.open()
 
                 # ── Delete confirmation dialog ──────────────────
                 def open_delete_dialog(e):
                     row = e.args
-                    with ui.dialog() as delete_dialog, ui.card().classes("max-w-sm p-6"):
-                        ui.label("Confirm Deletion").classes("text-lg font-semibold mb-2")
+                    with ui.dialog() as delete_dialog, ui.card().classes(
+                        "max-w-sm p-6"
+                    ):
+                        ui.label(
+                            "Confirm Deletion"
+                        ).classes("text-lg font-semibold mb-2")
                         ui.label(
                             f"Are you sure you want to delete "
-                            f'case "{row["case_number"]}"?'
+                            f"case {row['case_number']}?"
                         ).classes("mb-4")
 
                         with ui.row().classes("w-full justify-end gap-2"):
-                            ui.button("Cancel", on_click=delete_dialog.close).props("flat")
+                            ui.button(
+                                "Cancel",
+                                on_click=delete_dialog.close,
+                            ).props("flat")
 
                             def on_confirm_delete():
                                 with get_session() as session:
                                     case = (
-                                        session.query(Cases).filter_by(id=row["id"]).first()
+                                        session.query(
+                                            Cases
+                                        )
+                                        .filter_by(id=row["id"])
+                                        .first()
                                     )
                                     if case:
                                         case_number = case.case_number
@@ -441,16 +537,18 @@ def build_cases_page():
                                         case_number = row["case_number"]
 
                                 ui.notify(
-                                    f"{case_number} has been deleted successfully",
+                                    f"{case_number} has been deleted "
+                                    "successfully",
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
                                 delete_dialog.close()
                                 refresh_cases_table()
 
-                            ui.button("Delete", on_click=on_confirm_delete).props(
-                                "negative unelevated"
-                            )
+                            ui.button(
+                                "Delete",
+                                on_click=on_confirm_delete,
+                            ).props("negative unelevated")
 
                     delete_dialog.open()
 
