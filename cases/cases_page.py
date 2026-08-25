@@ -28,8 +28,8 @@ NOTIFICATION_TIMEOUT = 1500
 
 # ── Helper: Load jurisdiction options ─────────────────────────
 def load_jurisdiction_options() -> list[str]:
-    """
-    Returns jurisdiction choices from JURISDICTIONS.
+    """Returns jurisdiction choices from JURISDICTIONS.
+    
     Handles both plain-string and (value, label) tuple formats.
     """
 
@@ -79,7 +79,9 @@ def build_cases_page():
             ).classes("w-full")
 
             # ── Date/Time Started ──────────────────────────────────
-            ui.label("Date/Time Started").classes("text-sm font-medium mb-1")
+            ui.label(
+                "Date/Time Started"
+            ).classes("text-sm font-medium mb-1")
             with ui.row().classes("w-full gap-2"):
                 case_date_begin = ui.date_input(
                     label="Date",
@@ -89,11 +91,6 @@ def build_cases_page():
                     label="Time",
                     placeholder="HH:MM",
                 ).classes("flex-grow")
-
-            # case_date_time_end_input = ui.input(
-            #     label="Date/Time Ended",
-            #     placeholder="YYYY-MM-DD HH:MM (optional)",
-            # ).classes("w-full")
 
             # ── Date/Time Ended ────────────────────────────────────
             ui.label(
@@ -448,11 +445,16 @@ def build_cases_page():
                                     )
                                     if case:
                                         case.case_number = (
-                                            edit_case_number.value or ""
+                                            edit_case_number.value 
+                                            or ""
                                         )
-                                        case.location = edit_location.value or ""
+                                        case.location = (
+                                            edit_location.value 
+                                            or ""
+                                        )
                                         case.jurisdiction = (
-                                            edit_jurisdiction.value or ""
+                                            edit_jurisdiction.value 
+                                            or ""
                                         )
 
                                         # Combine date + time
@@ -486,7 +488,8 @@ def build_cases_page():
 
                                 ui.notify(
                                     f"Case {edit_case_number.value} "
-                                    "information was updated successfully",
+                                    "information was updated "
+                                    "successfully",
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
@@ -532,7 +535,6 @@ def build_cases_page():
                                     if case:
                                         case_number = case.case_number
                                         session.delete(case)
-                                        # session.commit()
                                     else:
                                         case_number = row["case_number"]
 
