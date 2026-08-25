@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 """
-models.py — Converted from Flask to standalone SQLAlchemy/Marshmallow
-for use with NiceGUI.
+models.py
 
 Dependencies:
     pip install sqlalchemy marshmallow bcrypt
@@ -43,7 +42,10 @@ def generate_password_hash(plain_text: str) -> str:
 
 
 def check_password_hash(stored_hash: str, attempted: str) -> bool:
-    return bcrypt.checkpw(attempted.encode("utf-8"), stored_hash.encode("utf-8"))
+    return bcrypt.checkpw(
+        attempted.encode("utf-8"), 
+        stored_hash.encode("utf-8")
+    )
 
 
 # ══════════════════════════════════════════════════════════════
@@ -85,27 +87,6 @@ class AgentsSchema(Schema):
 
 
 agents_schema = AgentsSchema(many=True)
-
-
-# class AgentsFullList(Base):
-#     """
-#     Stores a master list of all agents associated with NOVA ICAC.
-#     Used to populate select fields in the agent add page.
-#     """
-
-#     __tablename__ = "AgentsFullList"
-
-#     id = Column(Integer(), primary_key=True)
-#     usual_agent_name = Column(String(), unique=True, nullable=False)
-#     usual_agent_initials = Column(String(), unique=True, nullable=False)
-#     usual_agent_parent_agency = Column(String(), nullable=False)
-#     usual_agent_phone = Column(String(), unique=True, nullable=False)
-
-#     def __repr__(self):
-#         return f"Agent {self.id}: {self.usual_agent_name}"
-
-#     def __str__(self):
-#         return f"Agent {self.id}: {self.usual_agent_name}"
 
 
 class Cases(Base):
