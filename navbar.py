@@ -7,7 +7,7 @@ Provides build_navbar() to be called at the top of every authenticated page.
 Uses Quasar's button + menu pattern for dropdown navigation items.
 
 Also registers the two modal dialogs from the original includes:
-    - _new_case_confirm.html   →  confirm_new_case_dialog()
+    - _new_case_confirm.html     →  confirm_new_case_dialog()
     - _confirm_data_delete.html  →  confirm_delete_dialog()
 """
 
