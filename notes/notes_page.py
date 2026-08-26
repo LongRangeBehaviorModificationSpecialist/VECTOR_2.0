@@ -85,7 +85,9 @@ def build_notes_page():
             ).classes("w-full")
 
             # note_text — TextAreaField
-            note_text_input = ui.textarea(label="Note").classes("w-full")
+            note_text_input = ui.textarea(
+                label="Note"
+            ).classes("w-full")
 
             # ── Buttons ────────────────────────────────────────
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
@@ -147,6 +149,7 @@ def build_notes_page():
                     "Clear",
                     on_click=clear_form,
                 ).props("outline")
+
                 ui.button(
                     "Add Note",
                     on_click=on_submit,
@@ -154,6 +157,7 @@ def build_notes_page():
 
         # ── Existing Notes Table ─────────────────────────────────
         ui.separator().classes("my-6")
+
         ui.label(
             "Current Notes"
         ).classes("text-xl font-bold mb-3")
@@ -260,9 +264,9 @@ def build_notes_page():
                     with ui.dialog() as edit_dialog, ui.card().classes(
                         "w-full max-w-lg p-6"
                     ):
-                        ui.label(f"Edit Note #{row['id']}").classes(
-                            "text-lg font-semibold mb-4"
-                        )
+                        ui.label(
+                            f"Edit Note #{row['id']}"
+                        ).classes("text-lg font-semibold mb-4")
 
                         # Original date/time
                         edit_date_added = ui.input(
@@ -311,6 +315,7 @@ def build_notes_page():
                                     return
 
                                 new_text = edit_text.value or ""
+                                
                                 if not new_text:
                                     ui.notify(
                                         "Note text is required",
@@ -327,6 +332,7 @@ def build_notes_page():
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
+                                    
                                     if note:
                                         # Only update these fields
                                         note.note_date_time_updated = (
@@ -392,6 +398,7 @@ def build_notes_page():
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
+
                                     if note:
                                         note_id = note.id
                                         session.delete(note)
@@ -404,6 +411,7 @@ def build_notes_page():
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
+
                                 delete_dialog.close()
                                 refresh_notes_table()
 
@@ -415,6 +423,7 @@ def build_notes_page():
                     delete_dialog.open()
 
                 table.on("edit", open_edit_dialog)
+
                 table.on("delete", open_delete_dialog)
 
     # Initial render
