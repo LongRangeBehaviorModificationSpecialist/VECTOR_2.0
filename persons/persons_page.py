@@ -155,6 +155,7 @@ def build_persons_page():
 
         # ── Existing Persons Table ───────────────────────────────
         ui.separator().classes("my-6")
+
         ui.label(
             "Current Persons"
         ).classes("text-xl font-bold mb-3")
@@ -168,9 +169,13 @@ def build_persons_page():
             table_container.clear()
 
             with get_session() as session:
-                persons = session.query(
-                    Persons
-                ).order_by(Persons.sus_name).all()
+                persons = (
+                    session.query(
+                        Persons
+                    )
+                    .order_by(Persons.sus_name)
+                    .all()
+                )
 
                 if not persons:
                     with table_container:
@@ -275,18 +280,22 @@ def build_persons_page():
                             label="Name",
                             value=row["sus_name"],
                         ).classes("w-full")
+
                         edit_dob = ui.input(
                             label="DOB",
                             value=row["sus_dob"],
                         ).classes("w-full")
+
                         edit_address = ui.input(
                             label="Address",
                             value=row["sus_address"],
                         ).classes("w-full")
+
                         edit_phone = ui.input(
                             label="Phone Number",
                             value=row["sus_phone"],
                         ).classes("w-full")
+
                         edit_notes = ui.textarea(
                             label="Notes",
                             value=row["sus_notes"],
@@ -302,6 +311,7 @@ def build_persons_page():
 
                             def on_save_update():
                                 new_name = edit_name.value or ""
+
                                 if not new_name:
                                     ui.notify(
                                         "Name is required",
@@ -313,13 +323,16 @@ def build_persons_page():
                                 with get_session() as session:
                                     # Check duplicate name (exclude self)
                                     dup = (
-                                        session.query(Persons)
+                                        session.query(
+                                            Persons
+                                        )
                                         .filter(
                                             Persons.sus_name == new_name,
                                             Persons.id != row["id"],
                                         )
                                         .first()
                                     )
+
                                     if dup:
                                         ui.notify(
                                             f"'{new_name}' is already "
@@ -331,10 +344,13 @@ def build_persons_page():
                                         return
 
                                     person = (
-                                        session.query(Persons)
+                                        session.query(
+                                            Persons
+                                        )
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
+
                                     if person:
                                         person.sus_name = new_name
                                         person.sus_dob = (
@@ -375,6 +391,7 @@ def build_persons_page():
                         ui.label(
                             "Confirm Deletion"
                         ).classes("text-lg font-semibold mb-2")
+
                         ui.label(
                             f"Are you sure you want to remove "
                             f"{row['sus_name']} from the case file?"
@@ -395,6 +412,7 @@ def build_persons_page():
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
+
                                     if person:
                                         sus_name = person.sus_name
                                         session.delete(person)
@@ -407,6 +425,7 @@ def build_persons_page():
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
+
                                 delete_dialog.close()
                                 refresh_persons_table()
 
@@ -418,6 +437,7 @@ def build_persons_page():
                     delete_dialog.open()
 
                 table.on("edit", open_edit_dialog)
+
                 table.on("delete", open_delete_dialog)
 
     # Initial render
