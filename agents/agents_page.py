@@ -329,7 +329,7 @@ def build_agents_page():
                         clear_form()
                         refresh_agent_table()
 
-                    except Exception as e:
+                    except Exception as err:
                         ui.notify(
                             "Please check the Agent Information you "
                             "just tried to enter/update — You may "
@@ -363,9 +363,13 @@ def build_agents_page():
             table_container.clear()
 
             with get_session() as session:
-                agents = session.query(
-                    Agents
-                ).order_by(Agents.agent_name).all()
+                agents = (
+                    session.query(
+                        Agents
+                    )
+                    .order_by(Agents.agent_name)
+                    .all()
+                )
 
                 if not agents:
                     with table_container:
@@ -529,7 +533,9 @@ def build_agents_page():
                             def on_save_update():
                                 with get_session() as session:
                                     agent = (
-                                        session.query(Agents)
+                                        session.query(
+                                            Agents
+                                        )
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -567,6 +573,7 @@ def build_agents_page():
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
+
                                 edit_dialog.close()
                                 refresh_agent_table()
 
@@ -586,6 +593,7 @@ def build_agents_page():
                         ui.label(
                             "Confirm Deletion"
                         ).classes("text-lg font-semibold mb-2")
+
                         ui.label(
                             f"Are you sure you want to remove "
                             f"{row['agent_name']} from the case file?"
@@ -602,7 +610,9 @@ def build_agents_page():
                             def on_confirm_delete():
                                 with get_session() as session:
                                     agent = (
-                                        session.query(Agents)
+                                        session.query(
+                                            Agents
+                                        )
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -645,4 +655,7 @@ if __name__ in {"__main__", "__mp_main__"}:
     from models import init_db
 
     init_db()
-    ui.run(title="VECTOR", port=8080)
+    ui.run(
+        title="VECTOR", 
+        port=8080,
+    )
