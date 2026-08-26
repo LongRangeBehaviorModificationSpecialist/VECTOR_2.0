@@ -24,6 +24,7 @@ from main_page import (
 
 NOTIFICATION_TIMEOUT = 1500
 
+
 # ── Helpers ─────────────────────────────────────────────────
 def load_agent_names() -> list[str]:
     """Returns a list of all agent names from the Agents table."""
@@ -80,6 +81,7 @@ def build_rooms_page():
 
         # ── Add Room Form ────────────────────────────────────────
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
+
             ui.label(
                 "Add Room"
             ).classes("text-lg font-semibold mb-4")
@@ -97,6 +99,7 @@ def build_rooms_page():
             room_desc_input = ui.input(
                 label="Room Description",
             ).classes("w-full")
+
             room_desc_input.props("autofocus")
 
             # room_first_agent —  populated from Agents
@@ -233,6 +236,7 @@ def build_rooms_page():
 
         # ── Existing Rooms Table ────────────────────────────────
         ui.separator().classes("my-6")
+
         ui.label(
             "Current Rooms"
         ).classes("text-xl font-bold mb-3")
@@ -391,9 +395,10 @@ def build_rooms_page():
                                     dup_label = (
                                         session.query(
                                             Rooms
-                                        ).filter(
+                                        )
+                                        .filter(
                                             Rooms.room_label == new_label,
-                                            Rooms.id != row["id"],
+                                            Rooms.id != row["id"]
                                         ).first()
                                     )
 
@@ -411,7 +416,8 @@ def build_rooms_page():
                                     dup_desc = (
                                         session.query(
                                             Rooms
-                                        ).filter(
+                                        )
+                                        .filter(
                                             Rooms.room_desc == new_desc,
                                             Rooms.id != row["id"],
                                         ).first()
@@ -517,6 +523,7 @@ def build_rooms_page():
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
+
                                 delete_dialog.close()
                                 refresh_rooms_table()
 
@@ -528,6 +535,7 @@ def build_rooms_page():
                     delete_dialog.open()
 
                 table.on("edit", open_edit_dialog)
+
                 table.on("delete", open_delete_dialog)
 
     # Initial render
