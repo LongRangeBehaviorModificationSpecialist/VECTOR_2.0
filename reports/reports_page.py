@@ -1,5 +1,5 @@
 """
-reports_page.py — NiceGUI conversion of Flask reports with print-ready HTML templates.
+reports_page.py
 
 Each report renders as formatted HTML that prints exactly like the original
 Flask templates. Uses window.print() for native browser printing.
@@ -76,7 +76,10 @@ def render_report_page(html_content: str):
     )
 
     with ui.column().classes("items-center w-full p-4 no-print"):
-        ui.button("Print", on_click=lambda: ui.run_javascript("window.print()")).props(
+        ui.button(
+            "Print",
+            on_click=lambda: ui.run_javascript("window.print()"),
+        ).props(
             "unelevated icon=print"
         ).classes("mb-4")
 
@@ -105,14 +108,24 @@ body {
 .font-11 { font-size: 11pt; }
 .font-12 { font-size: 12pt; }
 .font-16 { font-size: 16pt; }
-.fs-3 { font-weight: 700; margin: 0.25em auto 0 auto; text-align: center; }
-.fs-5 { margin: 0 auto 2em auto; text-align: center; }
+
+.fs-3 { 
+    font-weight: 700;
+    margin: 0.25em auto 0 auto;
+    text-align: center;
+}
+
+.fs-5 {
+    margin: 0 auto 2em auto;
+    text-align: center;
+}
 
 .headerTable {
     border-collapse: collapse;
     margin-bottom: 2em;
     width: 100%;
 }
+
 td.header {
     background-color: lightgray;
     font-size: 11pt;
@@ -120,6 +133,7 @@ td.header {
     border: 1px solid black;
     width: 30%;
 }
+
 td.data {
     font-family: "Courier New", Courier, monospace;
     font-size: 11pt;
@@ -129,23 +143,38 @@ td.data {
 }
 
 /* Shared table styles */
-.agentTable, .noteTable, .roomTable, .personTable, .evidTable {
+.agentTable,
+.noteTable,
+.roomTable,
+.personTable,
+.evidTable {
     border: 2px solid black;
     border-collapse: collapse;
     width: 100%;
 }
-.agentTableHeader, .noteTableHeader, .roomTableHeader, .personTableHeader {
+
+.agentTableHeader,
+.noteTableHeader,
+.roomTableHeader,
+.personTableHeader {
     background-color: lightgray;
     border-collapse: collapse;
     font-weight: bold;
     padding: 5px;
     text-align: left;
 }
-.agentTable thead tr, .noteTable thead tr,
-.roomTable thead tr, .personTable thead tr {
+
+.agentTable thead tr,
+.noteTable thead tr,
+.roomTable thead tr,
+.personTable thead tr {
     border: 2px solid black;
 }
-.agentTableData, .noteTableData, .roomTableData, .personTableData {
+
+.agentTableData,
+.noteTableData,
+.roomTableData,
+.personTableData {
     border-bottom: 1px dotted black;
     height: 1.25em;
     padding: 5px;
@@ -157,12 +186,14 @@ td.data {
     border: 2px solid gray;
     font-weight: 700;
 }
+
 td.evidTableData {
     border-bottom: 1px dotted gray;
     border-left: 1px solid gray;
     height: 1.15em;
     padding: 5px;
 }
+
 td.evidTableDataColOne {
     border-bottom: 1px dotted gray;
     border-left: 1px solid gray;
@@ -171,6 +202,7 @@ td.evidTableDataColOne {
     font-weight: bold;
     width: 30%;
 }
+
 td.evidTableDataColTwo {
     border-bottom: 1px dotted gray;
     border-left: 1px solid gray;
@@ -178,11 +210,13 @@ td.evidTableDataColTwo {
     padding: 5px;
     width: 70%;
 }
+
 .evidTableRoomNameRow {
     background-color: #515151;
     border: 2px solid gray;
     text-align: center;
 }
+
 .evidTableRoomNameRow th {
     background-color: #515151;
     border-bottom: 1pt solid gray;
@@ -201,11 +235,16 @@ td.evidTableDataColTwo {
 
 
 # ── Case Header Builder ─────────────────────────────────────
-def build_case_header_html(cases: list[dict], page_title: str, sub_title: str) -> str:
+def build_case_header_html(
+        cases: list[dict],
+        page_title: str,
+        sub_title: str
+) -> str:
     """Generates the standard report title + case info header HTML."""
     print_date, print_time = get_print_date_time()
 
-    case_tables = "".join([f"""<table class="headerTable">
+    case_tables = "".join([f"""
+        <table class="headerTable">
             <tr>
                 <td class="header font-11">Investigation Number:</td>
                 <td class="data font-11">{c["case_number"]}</td>
@@ -254,14 +293,15 @@ def build_report_footer_html() -> str:
 def build_agents_report_html(cases: list, agents: list) -> str:
     """Generates the complete HTML for the Agent List report."""
 
-    agent_rows = "".join([f"""<tr>
-            <td class="agentTableData font-12">{a["agent_name"]}</td>
-            <td class="agentTableData font-12">{a["agent_initials"]}</td>
-            <td class="agentTableData font-12">{a["agent_parent_agency"]}</td>
-            <td class="agentTableData font-12">{a["agent_role"]}</td>
-            <td class="agentTableData font-12">{a["agent_phone"]}</td>
-            <td class="agentTableData font-12">{a["agent_notes"] or ""}</td>
-        </tr>""" for a in agents])
+    agent_rows = "".join([f"""
+    <tr>
+        <td class="agentTableData font-12">{a["agent_name"]}</td>
+        <td class="agentTableData font-12">{a["agent_initials"]}</td>
+        <td class="agentTableData font-12">{a["agent_parent_agency"]}</td>
+        <td class="agentTableData font-12">{a["agent_role"]}</td>
+        <td class="agentTableData font-12">{a["agent_phone"]}</td>
+        <td class="agentTableData font-12">{a["agent_notes"] or ""}</td>
+    </tr>""" for a in agents])
 
     header = build_case_header_html(
         cases,
@@ -301,13 +341,15 @@ def build_agents_report_html(cases: list, agents: list) -> str:
 
 # ── Detailed Evidence Report HTML Template (AGENT COPY) ─────
 def build_evidence_report_html(cases: list, evidence: list) -> str:
-    """
-    Generates the complete HTML for the detailed Evidence report.
+    """Generates the complete HTML for the detailed Evidence report.
+    
     Each item is displayed as vertical label/value rows with ALL fields.
+    
     This is the "AGENT COPY" version.
     """
 
-    evid_rows = "".join([f"""<tr class="evidTableItemRow">
+    evid_rows = "".join([f"""
+        <tr class="evidTableItemRow">
             <td colspan="2" class="evidTableData">Item #:&ensp;{e["evid_num"]}</td>
         </tr>
         <tr>
@@ -385,11 +427,14 @@ def build_evidence_report_html(cases: list, evidence: list) -> str:
 
 # ── Evidence By Room Report HTML Template ───────────────────
 def build_evidence_by_room_report_html(
-    cases: list, evidence: list, unique_rooms: list
+        cases: list,
+        evidence: list,
+        unique_rooms: list
 ) -> str:
-    """
-    Generates the complete HTML for the Evidence By Room report.
+    """Generates the complete HTML for the Evidence By Room report.
+    
     Groups evidence items under dark-background room headers with item counts.
+    
     Uses the same full detail layout as the AGENT COPY evidence report.
     """
 
@@ -408,7 +453,8 @@ def build_evidence_by_room_report_html(
         # Filter evidence items for this room
         room_items = [e for e in evidence if e["evid_loc_room"] == room_name]
 
-        evid_rows = "".join([f"""<tr class="evidTableItemRow">
+        evid_rows = "".join([f"""
+            <tr class="evidTableItemRow">
                 <td colspan="2" class="evidTableData">Item #:&ensp;{e["evid_num"]}</td>
             </tr>
             <tr>
@@ -497,13 +543,15 @@ def build_evidence_by_room_report_html(
 
 # ── Basic Evidence Report HTML Template (RETURN COPY) ───────
 def build_basic_evidence_report_html(cases: list, evidence: list) -> str:
-    """
-    Generates the complete HTML for the Basic Evidence report.
+    """Generates the complete HTML for the Basic Evidence report.
+    
     Each item shows only Item#, Quantity, Description, Model#, and Serial#.
+    
     This is the "RETURN COPY" version.
     """
 
-    evid_rows = "".join([f"""<tr class="evidTableItemRow">
+    evid_rows = "".join([f"""
+        <tr class="evidTableItemRow">
             <td colspan="2" class="evidTableData">Item #:&ensp;&ensp;{e["evid_num"]}</td>
         </tr>
         <tr>
@@ -551,7 +599,8 @@ def build_basic_evidence_report_html(cases: list, evidence: list) -> str:
 def build_rooms_report_html(cases: list, rooms: list) -> str:
     """Generates the complete HTML for the Room List report."""
 
-    room_rows = "".join([f"""<tr>
+    room_rows = "".join([f"""
+        <tr>
             <td class="roomTableData" style="padding-left:25px;">{r["room_label"]}</td>
             <td class="roomTableData">{r["room_desc"]}</td>
             <td class="roomTableData">{r["room_first_agent"]}</td>
@@ -596,7 +645,8 @@ def build_rooms_report_html(cases: list, rooms: list) -> str:
 def build_persons_report_html(cases: list, persons: list) -> str:
     """Generates the complete HTML for the Person List report."""
 
-    person_rows = "".join([f"""<tr>
+    person_rows = "".join([f"""
+        <tr>
             <td class="personTableData">{p["sus_name"]}</td>
             <td class="personTableData">{p["sus_dob"]}</td>
             <td class="personTableData">{p["sus_address"]}</td>
@@ -643,7 +693,8 @@ def build_persons_report_html(cases: list, persons: list) -> str:
 def build_notes_report_html(cases: list, notes: list) -> str:
     """Generates the complete HTML for the Notes report."""
 
-    note_rows = "".join([f"""<tr>
+    note_rows = "".join([f"""
+        <tr>
             <td class="noteTableData">{n["note_date_time"]}</td>
             <td class="noteTableData">{n["note_date_time_updated"]}</td>
             <td class="noteTableData">{n["note_author"]}</td>
@@ -975,7 +1026,7 @@ def json_output_page():
         ui.button(
             "Copy JSON",
             on_click=lambda: ui.run_javascript(
-                f"navigator.clipboard.writeText(`{json_str}`)"
+                f"navigator.clipboard.writeText('{json_str}')"
             ),
         ).props("outline icon=content_copy").classes("mb-4")
 
