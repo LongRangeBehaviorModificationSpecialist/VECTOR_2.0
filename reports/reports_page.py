@@ -30,10 +30,10 @@ from main_page import (
 )
 
 
-NOTIFICATION_TIMEOUT = 1500
+NOTIFICATION_TIMEOUT = 4000
 
 
-# ── Helpers ─────────────────────────────────────────────────
+# ── Helpers
 def get_date_time() -> str:
     """Gets the current date and time for report headers."""
     now = datetime.now()
@@ -66,7 +66,7 @@ def get_case_info() -> list[dict]:
         ]
 
 
-# ── Report Page Wrapper ─────────────────────────────────────
+# ── Report Page Wrapper
 def render_report_page(html_content: str):
     """Wraps report HTML with navigation and print button."""
     build_navbar(
@@ -75,23 +75,76 @@ def render_report_page(html_content: str):
         on_new_case=confirm_new_case_handler,
     )
 
-    with ui.column().classes("items-center w-full p-4 no-print"):
-        ui.button(
-            "Print",
-            on_click=lambda: ui.run_javascript("window.print()"),
-        ).props(
-            "unelevated icon=print"
-        ).classes("mb-4")
+    with ui.column().classes("w-full items-center"):
+        # with ui.column().classes("items-center w-full p-4 no-print"):
+        with ui.element().props("id='report-container'").classes("w-full"):
+            ui.button(
+                "Print Report",
+                on_click=open_report_window,
+            ).props(
+                "unelevated icon=print"
+            ).classes("mb-4 no-print")
+            # ui.label("Case Report").classes("text-2xl font-bold")
 
-    ui.html(html_content)
+            ui.html(html_content)
 
 
-# ── Common Print Styles ──────────────────────────────────────
+def validate_case_has_end_datetime(case_id: int) -> tuple[bool, str]:
+    """Validates that the case has an end_date_time set.
+
+    Returns (is_valid, error_message).
+    """
+    from models import get_session, Cases
+
+    with get_session() as session:
+        case = session.query(Cases).filter_by(id=case_id).first()
+
+        if not case:
+            return False, "Case not found."
+
+        if not case.end_date_time:
+            return False, (
+                "Cannot generate report: End Date/Time is not set. "
+                "Please complete the case details first."
+            )
+
+        return True, ""
+
+
+# ── Common Print Styles
 COMMON_STYLES = """
-<style>
 @media print {
-    .no-print { display: none !important; }
-    body { background: white !important; color: black !important; }
+    .no-print {
+        display: none !important;
+    }
+    body {
+        background: white !important;
+        color: black !important;
+    }
+    .agentTable thead tr th.agentTableHeader,
+    .noteTable thead tr th.noteTableHeader,
+    .personTable thead tr th.personTableHeader,
+    .roomTable thead tr th.roomTableHeader,
+    .evidTableItemRow {
+        border-collapse: collapse;
+        font-weight: lighter;
+    }
+    .headerTable tr td.data,
+    .evidTableRoomNameRow {
+        font-family: "Times New Roman", Times, serif;
+        font-size: 11pt;
+    }
+    .agentTable tbody tr td.agentTableData,
+    .evidTable tr td.evidTableDataColTwo,
+    .noteTable tbody tr td.noteTableData,
+    .personTable tbody tr td.personTableData,
+    .roomTable tbody tr td.roomTableData {
+        font-family: "Times New Roman", Times, serif;
+    }
+    .evidTableDataColOne,
+    .evidTableDataColTwo {
+        font-size: 11pt;
+    }
 }
 
 body {
@@ -102,16 +155,19 @@ body {
     padding: 1em;
 }
 
-.reportTitle { text-align: center; margin-bottom: 1em; }
+.reportTitle {
+    text-align: center;
+    margin-bottom: 1em;
+}
 .font-09 { font-size: 9pt; }
 .font-10 { font-size: 10pt; }
 .font-11 { font-size: 11pt; }
 .font-12 { font-size: 12pt; }
 .font-16 { font-size: 16pt; }
 
-.fs-3 { 
-    font-weight: 700;
-    margin: 0.25em auto 0 auto;
+.fs-3 {
+    font-weight: bold;
+    margin: 1em auto 0.25em auto;
     text-align: center;
 }
 
@@ -120,26 +176,31 @@ body {
     text-align: center;
 }
 
+.top-table {
+    padding-left: 5%;
+    padding-right: 5%;
+}
+
 .headerTable {
     border-collapse: collapse;
     margin-bottom: 2em;
     width: 100%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 td.header {
-    background-color: lightgray;
     font-size: 11pt;
-    padding: 1px 10px;
-    border: 1px solid black;
-    width: 30%;
+    padding: 5px 10px;
+    width: 35%;
 }
 
 td.data {
     font-family: "Courier New", Courier, monospace;
-    font-size: 11pt;
-    padding: 3px 20px;
-    border: 1px solid black;
-    width: 70%;
+    padding: 0px 10px;
+    border-bottom: 1px dotted gray;
+    width: 65%;
+    vertical-align: bottom;
 }
 
 /* Shared table styles */
@@ -148,7 +209,6 @@ td.data {
 .roomTable,
 .personTable,
 .evidTable {
-    border: 2px solid black;
     border-collapse: collapse;
     width: 100%;
 }
@@ -157,9 +217,8 @@ td.data {
 .noteTableHeader,
 .roomTableHeader,
 .personTableHeader {
-    background-color: lightgray;
     border-collapse: collapse;
-    font-weight: bold;
+    font-weight: 650;
     padding: 5px;
     text-align: left;
 }
@@ -168,61 +227,56 @@ td.data {
 .noteTable thead tr,
 .roomTable thead tr,
 .personTable thead tr {
-    border: 2px solid black;
+    border-top: 0px solid black;
+    border-bottom: 1px solid black;
 }
 
 .agentTableData,
 .noteTableData,
 .roomTableData,
 .personTableData {
-    border-bottom: 1px dotted black;
-    height: 1.25em;
-    padding: 5px;
+    border-bottom: 1px dotted gray;
+    height: 1.85em;
+    padding: 0px 5px;
+    vertical-align: bottom;
 }
 
 /* Evidence table styles */
 .evidTableItemRow {
     text-align: center;
-    border: 2px solid gray;
     font-weight: 700;
 }
 
 td.evidTableData {
-    border-bottom: 1px dotted gray;
-    border-left: 1px solid gray;
-    height: 1.15em;
-    padding: 5px;
+    border-bottom: 1px solid black;
+    height: 1.75em;
+    font-size: 11pt;
+    padding: 2px 5px;
 }
 
 td.evidTableDataColOne {
-    border-bottom: 1px dotted gray;
-    border-left: 1px solid gray;
-    height: 1.15em;
-    padding: 5px;
-    font-weight: bold;
+    height: 1.85em;
+    padding: 0px 5px;
+    font-size: 11pt;
+    font-weight: normal;
     width: 30%;
+    vertical-align: bottom;
 }
 
 td.evidTableDataColTwo {
     border-bottom: 1px dotted gray;
-    border-left: 1px solid gray;
-    height: 1.15em;
-    padding: 5px;
+    height: 1.85em;
+    padding: 0 px 5px;
     width: 70%;
+    vertical-align: bottom;
 }
 
 .evidTableRoomNameRow {
-    background-color: #515151;
-    border: 2px solid gray;
+    border-bottom: 1px solid black;
+    height: 1.75em;
     text-align: center;
-}
-
-.evidTableRoomNameRow th {
-    background-color: #515151;
-    border-bottom: 1pt solid gray;
-    border-top: 1px solid gray;
-    font-weight: 700;
-    padding: 5px;
+    font-size: 11 pt;
+    padding: 2px 5px;
 }
 
 .end {
@@ -230,11 +284,10 @@ td.evidTableDataColTwo {
     margin-top: 2rem;
     text-align: center;
 }
-</style>
 """
 
 
-# ── Case Header Builder ─────────────────────────────────────
+# ── Case Header Builder
 def build_case_header_html(
         cases: list[dict],
         page_title: str,
@@ -243,7 +296,8 @@ def build_case_header_html(
     """Generates the standard report title + case info header HTML."""
     print_date, print_time = get_print_date_time()
 
-    case_tables = "".join([f"""
+    report_header_table = "".join([f"""
+    <div class="top-table">
         <table class="headerTable">
             <tr>
                 <td class="header font-11">Investigation Number:</td>
@@ -269,14 +323,15 @@ def build_case_header_html(
                 <td class="header font-11">Report Printed Date:</td>
                 <td class="data font-11">{print_date} at {print_time}</td>
             </tr>
-        </table>""" for c in cases])
+        </table>
+    </div>""" for c in cases])
 
     return f"""
     <div class="reportTitle">
-        <p class="fs-3 font-16">{page_title}</p>
-        <p class="fs-5 font-12">{sub_title}</p>
+        <p class="fs-3 font-14">{page_title}</p>
+        <p class="fs-5 font-10">{sub_title}</p>
     </div>
-    {case_tables}
+    {report_header_table}
     """
 
 
@@ -289,18 +344,16 @@ def build_report_footer_html() -> str:
     """
 
 
-# ── Agent List Report HTML Template ─────────────────────────
+# ── Agent List Report HTML Template
 def build_agents_report_html(cases: list, agents: list) -> str:
     """Generates the complete HTML for the Agent List report."""
 
     agent_rows = "".join([f"""
     <tr>
-        <td class="agentTableData font-12">{a["agent_name"]}</td>
-        <td class="agentTableData font-12">{a["agent_initials"]}</td>
-        <td class="agentTableData font-12">{a["agent_parent_agency"]}</td>
-        <td class="agentTableData font-12">{a["agent_role"]}</td>
-        <td class="agentTableData font-12">{a["agent_phone"]}</td>
-        <td class="agentTableData font-12">{a["agent_notes"] or ""}</td>
+        <td class="agentTableData font-10">{a["agent_name"]}</td>
+        <td class="agentTableData font-10">{a["agent_parent_agency"]}</td>
+        <td class="agentTableData font-10">{a["agent_role"]}</td>
+        <td class="agentTableData font-10">{a["agent_phone"]}</td>
     </tr>""" for a in agents])
 
     header = build_case_header_html(
@@ -314,20 +367,20 @@ def build_agents_report_html(cases: list, agents: list) -> str:
 <html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8" />
-    <title>VECTOR | Agent List Report</title>
-    {COMMON_STYLES}
+    <title>V·E·C·T·O·R | Agent List Report</title>
+    <style>
+        {COMMON_STYLES}
+    </style>
 </head>
 <body>
     {header}
     <table class="agentTable">
         <thead>
             <tr>
-                <th class="agentTableHeader font-12">Agent Name</th>
-                <th class="agentTableHeader font-12">Initials</th>
-                <th class="agentTableHeader font-12">Agency</th>
-                <th class="agentTableHeader font-12">Primary Role</th>
-                <th class="agentTableHeader font-12">Primary Phone Number</th>
-                <th class="agentTableHeader font-12">Notes</th>
+                <th class="agentTableHeader font-10">Agent Name</th>
+                <th class="agentTableHeader font-10">Agency</th>
+                <th class="agentTableHeader font-10">Primary Role</th>
+                <th class="agentTableHeader font-10">Phone Number</th>
             </tr>
         </thead>
         <tbody>
@@ -339,12 +392,12 @@ def build_agents_report_html(cases: list, agents: list) -> str:
 </html>"""
 
 
-# ── Detailed Evidence Report HTML Template (AGENT COPY) ─────
+# ── Detailed Evidence Report HTML Template (AGENT COPY)
 def build_evidence_report_html(cases: list, evidence: list) -> str:
     """Generates the complete HTML for the detailed Evidence report.
-    
+
     Each item is displayed as vertical label/value rows with ALL fields.
-    
+
     This is the "AGENT COPY" version.
     """
 
@@ -381,7 +434,7 @@ def build_evidence_report_html(cases: list, evidence: list) -> str:
             <td class="evidTableDataColTwo">{e["evid_found_by"]}</td>
         </tr>
         <tr>
-            <td class="evidTableDataColOne">Witness:</td>
+            <td class="evidTableDataColOne">Witnessed By:</td>
             <td class="evidTableDataColTwo">{e["evid_found_by_witness"]}</td>
         </tr>
         <tr>
@@ -399,6 +452,9 @@ def build_evidence_report_html(cases: list, evidence: list) -> str:
         <tr>
             <td class="evidTableDataColOne">Notes:</td>
             <td class="evidTableDataColTwo">{e["evid_notes"]}</td>
+        </tr>
+        <tr>
+            <td colspan="2" style="height: 1.5em;"></td>
         </tr>""" for e in evidence])
 
     header = build_case_header_html(
@@ -412,8 +468,10 @@ def build_evidence_report_html(cases: list, evidence: list) -> str:
 <html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8" />
-    <title>VECTOR | Evidence Inventory List</title>
-    {COMMON_STYLES}
+    <title>V·E·C·T·O·R | Evidence Inventory List</title>
+    <style>
+        {COMMON_STYLES}
+    </style>
 </head>
 <body>
     {header}
@@ -425,38 +483,47 @@ def build_evidence_report_html(cases: list, evidence: list) -> str:
 </html>"""
 
 
-# ── Evidence By Room Report HTML Template ───────────────────
+# ── Evidence By Room Report HTML Template
 def build_evidence_by_room_report_html(
         cases: list,
         evidence: list,
         unique_rooms: list
 ) -> str:
     """Generates the complete HTML for the Evidence By Room report.
-    
+
     Groups evidence items under dark-background room headers with item counts.
-    
+
     Uses the same full detail layout as the AGENT COPY evidence report.
     """
 
     room_tables = ""
 
+    print(f"DEBUG: unique_room = {unique_rooms}")
+
     for room in unique_rooms:
         room_name = room[0]
+        print(f"DEBUG: room_name = {room_name}")
         item_count = room[1]
+        print(f"DEBUG: item_count = {item_count}")
 
         # Singular vs plural
         if item_count == 1:
-            count_text = f"{room_name}&ensp;({item_count} item)"
+            count_text = f"Room {room_name}&ensp;:&ensp;({item_count} item)"
         else:
-            count_text = f"{room_name}&ensp;({item_count} items)"
+            count_text = f"Room {room_name}&ensp;:&ensp;({item_count} items)"
 
         # Filter evidence items for this room
         room_items = [e for e in evidence if e["evid_loc_room"] == room_name]
+        print(f"DEBUG: room_items = {room_items}")
 
         evid_rows = "".join([f"""
-            <tr class="evidTableItemRow">
-                <td colspan="2" class="evidTableData">Item #:&ensp;{e["evid_num"]}</td>
+            <tr>
+                <td class="evidTableDataColOne">Item No.:</td>
+                <td class="evidTableDataColTwo" style="font-weight:bold">
+                    {e["evid_num"]}
+                </td>
             </tr>
+
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
                 <td class="evidTableDataColTwo">{e["evid_qty"]}</td>
@@ -486,8 +553,10 @@ def build_evidence_by_room_report_html(
                 <td class="evidTableDataColTwo">{e["evid_found_by"]}</td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Witness:</td>
-                <td class="evidTableDataColTwo">{e["evid_found_by_witness"]}</td>
+                <td class="evidTableDataColOne">Witnessed By:</td>
+                <td class="evidTableDataColTwo">
+                    {e["evid_found_by_witness"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Photographed:</td>
@@ -504,7 +573,11 @@ def build_evidence_by_room_report_html(
             <tr>
                 <td class="evidTableDataColOne">Notes:</td>
                 <td class="evidTableDataColTwo">{e["evid_notes"]}</td>
-            </tr>""" for e in room_items])
+            </tr>
+            <tr>
+                <td colspan="2" style="height: 1.5em;"></td>
+            </tr>
+            """ for e in room_items])
 
         room_tables += f"""
         <table class="evidTable">
@@ -524,14 +597,17 @@ def build_evidence_by_room_report_html(
         page_title="Items Seized at Search Warrant Site (By Room)",
         sub_title="( AGENT COPY )",
     )
+
     footer = build_report_footer_html()
 
     return f"""<!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8" />
-    <title>VECTOR | Evidence Found By Room</title>
-    {COMMON_STYLES}
+    <title>V·E·C·T·O·R | Evidence Found By Room</title>
+    <style>
+        {COMMON_STYLES}
+    </style>
 </head>
 <body>
     {header}
@@ -541,12 +617,12 @@ def build_evidence_by_room_report_html(
 </html>"""
 
 
-# ── Basic Evidence Report HTML Template (RETURN COPY) ───────
+# ── Basic Evidence Report HTML Template (RETURN COPY)
 def build_basic_evidence_report_html(cases: list, evidence: list) -> str:
     """Generates the complete HTML for the Basic Evidence report.
-    
+
     Each item shows only Item#, Quantity, Description, Model#, and Serial#.
-    
+
     This is the "RETURN COPY" version.
     """
 
@@ -582,8 +658,10 @@ def build_basic_evidence_report_html(cases: list, evidence: list) -> str:
 <html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8" />
-    <title>VECTOR | Basic Evidence Inventory List</title>
-    {COMMON_STYLES}
+    <title>V·E·C·T·O·R | Basic Evidence Inventory List</title>
+    <style>
+        {COMMON_STYLES}
+    <style>
 </head>
 <body>
     {header}
@@ -595,7 +673,7 @@ def build_basic_evidence_report_html(cases: list, evidence: list) -> str:
 </html>"""
 
 
-# ── Room List Report HTML Template ──────────────────────────
+# ── Room List Report HTML Template
 def build_rooms_report_html(cases: list, rooms: list) -> str:
     """Generates the complete HTML for the Room List report."""
 
@@ -618,18 +696,20 @@ def build_rooms_report_html(cases: list, rooms: list) -> str:
 <html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8" />
-    <title>VECTOR | Room List Report</title>
-    {COMMON_STYLES}
+    <title>V·E·C·T·O·R | Room List Report</title>
+    <style>
+        {COMMON_STYLES}
+    </style>
 </head>
 <body>
     {header}
     <table class="roomTable">
         <thead>
             <tr>
-                <th class="roomTableHeader">Room ID</th>
-                <th class="roomTableHeader">Room Name</th>
-                <th class="roomTableHeader">Searched By (1)</th>
-                <th class="roomTableHeader">Searched By (2)</th>
+                <th class="roomTableHeader font-10">Room ID</th>
+                <th class="roomTableHeader font-10">Room Name</th>
+                <th class="roomTableHeader font-10">Searched By (1)</th>
+                <th class="roomTableHeader font-10">Searched By (2)</th>
             </tr>
         </thead>
         <tbody>
@@ -641,7 +721,7 @@ def build_rooms_report_html(cases: list, rooms: list) -> str:
 </html>"""
 
 
-# ── Person List Report HTML Template ────────────────────────
+# ── Person List Report HTML Template
 def build_persons_report_html(cases: list, persons: list) -> str:
     """Generates the complete HTML for the Person List report."""
 
@@ -665,8 +745,10 @@ def build_persons_report_html(cases: list, persons: list) -> str:
 <html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8" />
-    <title>VECTOR | Person List</title>
-    {COMMON_STYLES}
+    <title>V·E·C·T·O·R | Person List</title>
+    <style>
+        {COMMON_STYLES}
+    </style>
 </head>
 <body>
     {header}
@@ -689,7 +771,7 @@ def build_persons_report_html(cases: list, persons: list) -> str:
 </html>"""
 
 
-# ── Notes Report HTML Template ──────────────────────────────
+# ── Notes Report HTML Template
 def build_notes_report_html(cases: list, notes: list) -> str:
     """Generates the complete HTML for the Notes report."""
 
@@ -712,8 +794,10 @@ def build_notes_report_html(cases: list, notes: list) -> str:
 <html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8" />
-    <title>VECTOR | Search Warrant Notes</title>
-    {COMMON_STYLES}
+    <title>V·E·C·T·O·R | Search Warrant Notes</title>
+    <style>
+        {COMMON_STYLES}
+    </style>
 </head>
 <body>
     {header}
@@ -735,7 +819,7 @@ def build_notes_report_html(cases: list, notes: list) -> str:
 </html>"""
 
 
-# ── Updated Route ───────────────────────────────────────────
+# ── Updated Agents Route
 @ui.page("/reports/agents")
 def print_agents_report():
     if not is_authenticated():
@@ -760,7 +844,7 @@ def print_agents_report():
     render_report_page(html)
 
 
-# ── Updated Routes ─────────────────────────────────────────
+# ── Updated Evidence Routes
 @ui.page("/reports/evidence")
 def print_evidence_report():
     if not is_authenticated():
@@ -792,7 +876,7 @@ def print_evidence_report():
     render_report_page(html)
 
 
-# ── Updated Route ───────────────────────────────────────────
+# ── Updated Evidence By Room Route
 @ui.page("/reports/evidence-by-room")
 def print_evidence_by_room_report():
     if not is_authenticated():
@@ -834,11 +918,16 @@ def print_evidence_by_room_report():
             for e in session.query(Evidence).order_by(Evidence.evid_num).all()
         ]
 
-    html = build_evidence_by_room_report_html(cases, evidence, unique_rooms_list)
+    html = build_evidence_by_room_report_html(
+        cases,
+        evidence,
+        unique_rooms_list
+    )
+
     render_report_page(html)
 
 
-# ── Updated Route ───────────────────────────────────────────
+# ── Updated Basic Evidence Report Route
 @ui.page("/reports/evidence-basic")
 def print_basic_evidence_report():
     if not is_authenticated():
@@ -862,7 +951,7 @@ def print_basic_evidence_report():
     render_report_page(html)
 
 
-# ── Updated Route ───────────────────────────────────────────
+# ── Updated Rooms Route
 @ui.page("/reports/rooms")
 def print_rooms_report():
     if not is_authenticated():
@@ -885,7 +974,7 @@ def print_rooms_report():
     render_report_page(html)
 
 
-# ── Updated Route ───────────────────────────────────────────
+# ── Updated Persons Route
 @ui.page("/reports/persons")
 def print_persons_report():
     if not is_authenticated():
@@ -909,7 +998,7 @@ def print_persons_report():
     render_report_page(html)
 
 
-# ── Updated Route ───────────────────────────────────────────
+# ── Updated Notes Route
 @ui.page("/reports/notes")
 def print_notes_report():
     if not is_authenticated():
@@ -932,7 +1021,7 @@ def print_notes_report():
     render_report_page(html)
 
 
-# ── JSON Output ─────────────────────────────────────────────
+# ── JSON Output
 @ui.page("/reports/json")
 def json_output_page():
     if not is_authenticated():
@@ -1031,3 +1120,56 @@ def json_output_page():
         ).props("outline icon=content_copy").classes("mb-4")
 
         ui.code(json_str, language="json").classes("w-full")
+
+
+def open_report_window():
+    """Extracts the report innerHTML and opens it in a clean new tab.
+
+    The report can be printed after validation has occured.
+    """
+
+    REPORT_PRINT_STYLES = COMMON_STYLES.replace('"', '\\"')
+
+    ui.run_javascript(f"""
+        const reportContent = document.getElementById('report-container');
+        if (!reportContent) {{
+            alert('No report content found to print.');
+            return;
+        }}
+
+        const html = reportContent.innerHTML;
+
+        const newWindow = window.open('', '_blank');
+        if (!newWindow) {{
+            alert('Pop-up blocked. Please allow pop-ups for this site.');
+            return;
+        }}
+
+        const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V·E·C·T·O·R</title>
+    <style>
+        {REPORT_PRINT_STYLES}
+    </style>
+</head>
+<body>
+    <div class="print-toolbar no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Print Report</button>
+        <button class="close-btn" onclick="window.close()">✕ Close</button>
+    </div>
+    <div class="report-body">
+        ${{html}}
+    </div>
+    <script>
+        // Auto-trigger print dialog after a short delay
+        setTimeout(() => {{ window.print(); }}, 500);
+    </script>
+</body>
+</html>`;
+
+        newWindow.document.write(fullHtml);
+        newWindow.document.close();
+    """)

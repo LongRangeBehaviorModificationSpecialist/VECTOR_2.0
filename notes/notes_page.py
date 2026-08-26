@@ -23,7 +23,7 @@ from main_page import (
 )
 
 
-NOTIFICATION_TIMEOUT = 1500
+NOTIFICATION_TIMEOUT = 4000
 
 
 # ── Helpers ─────────────────────────────────────────────────
@@ -96,11 +96,11 @@ def build_notes_page():
                     note_date_time_input.value = get_current_timestamp()
                     note_author_combo.value = None
                     note_text_input.value = ""
-                    ui.notify(
-                        "Form cleared",
-                        type="info",
-                        timeout=NOTIFICATION_TIMEOUT
-                    )
+                    # ui.notify(
+                    #     "Form cleared",
+                    #     type="info",
+                    #     timeout=NOTIFICATION_TIMEOUT
+                    # )
 
                 def on_submit():
                     # ── Required field validation ──
@@ -123,7 +123,7 @@ def build_notes_page():
                         return
 
                     note_date_time = (
-                        note_date_time_input.value or 
+                        note_date_time_input.value or
                         get_current_timestamp()
                     )
 
@@ -234,7 +234,7 @@ def build_notes_page():
 
                 table = ui.table(
                     columns=column_defs,
-                    rows=row_data, 
+                    rows=row_data,
                     row_key="id",
                 )
                 table.props("dense flat")
@@ -315,7 +315,7 @@ def build_notes_page():
                                     return
 
                                 new_text = edit_text.value or ""
-                                
+
                                 if not new_text:
                                     ui.notify(
                                         "Note text is required",
@@ -332,7 +332,7 @@ def build_notes_page():
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
-                                    
+
                                     if note:
                                         # Only update these fields
                                         note.note_date_time_updated = (
@@ -343,7 +343,7 @@ def build_notes_page():
                                         # session.commit()
 
                                 ui.notify(
-                                    f"Note from {new_author} was updated " 
+                                    f"Note from {new_author} was updated "
                                     "successfully.",
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
@@ -352,7 +352,7 @@ def build_notes_page():
                                 refresh_notes_table()
 
                             ui.button(
-                                "Update Note", 
+                                "Update Note",
                                 on_click=on_save_update,
                             ).props("unelevated")
 
@@ -367,7 +367,7 @@ def build_notes_page():
                         ui.label(
                             "Confirm Deletion"
                         ).classes("text-lg font-semibold mb-2")
-                        
+
                         ui.label(
                             f"Are you sure you want to delete "
                             "Note #{row['id']}?"

@@ -18,14 +18,20 @@ from sqlalchemy import (
     Text,
     Boolean,
     DateTime,
+    LargeBinary,
     select,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 from marshmallow import Schema, fields
 
-# ── Database Setup ──────────────────────────────────────────
-# For SQLite; change the connection string for Postgres/MySQL etc.
-DATABASE_URL = "sqlite:///app_data.db"
+
+# ── Database Setup
+# To add the date to the database file name
+current_date = datetime.today().strftime("%Y-%m-%d")
+
+
+# For SQLite databases, use the below syntax
+DATABASE_URL = f"sqlite:///{current_date}_app_data.db"
 engine = create_engine(DATABASE_URL, echo=False, future=True)
 SessionLocal = sessionmaker(
     bind=engine,
@@ -36,21 +42,19 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
-# ── Password Hashing (replaces flask_bcrypt) ─────────────────
+# ── Password Hashing
 def generate_password_hash(plain_text: str) -> str:
     return bcrypt.hashpw(plain_text.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def check_password_hash(stored_hash: str, attempted: str) -> bool:
     return bcrypt.checkpw(
-        attempted.encode("utf-8"), 
+        attempted.encode("utf-8"),
         stored_hash.encode("utf-8")
     )
 
 
-# ══════════════════════════════════════════════════════════════
-#  MODELS
-# ══════════════════════════════════════════════════════════════
+# --- MODELS ---
 
 
 class Agents(Base):
@@ -73,7 +77,6 @@ class Agents(Base):
     def __str__(self):
         return f"Agent {self.id}: {self.agent_name}"
 
-
 class AgentsSchema(Schema):
     """Agent schema."""
 
@@ -84,7 +87,6 @@ class AgentsSchema(Schema):
     agent_role_secondary = fields.Str()
     agent_phone = fields.Str()
     agent_notes = fields.Str()
-
 
 agents_schema = AgentsSchema(many=True)
 
@@ -107,7 +109,6 @@ class Cases(Base):
     def __str__(self):
         return f"Case Number: {self.case_number}"
 
-
 class CaseSchema(Schema):
     """Case schema."""
 
@@ -116,7 +117,6 @@ class CaseSchema(Schema):
     jurisdiction = fields.Str()
     case_date_time_begin = fields.Str()
     case_date_time_end = fields.Str()
-
 
 case_schema = CaseSchema(many=True)
 
@@ -148,7 +148,6 @@ class Evidence(Base):
     def __str__(self):
         return f"Item {self.id}: {self.evid_desc}"
 
-
 class EvidenceSchema(Schema):
     """Evidence schema."""
 
@@ -166,7 +165,6 @@ class EvidenceSchema(Schema):
     evid_triaged_by = fields.Str()
     evid_contains_contraband = fields.Str()
     evid_notes = fields.Str()
-
 
 evid_schema = EvidenceSchema(many=True)
 
@@ -188,7 +186,6 @@ class Notes(Base):
     def __str__(self):
         return f"Note {self.id}: {self.note_text}"
 
-
 class NotesSchema(Schema):
     """Notes schema."""
 
@@ -196,7 +193,6 @@ class NotesSchema(Schema):
     note_date_time_updated = fields.Str()
     note_author = fields.Str()
     note_text = fields.Str()
-
 
 note_schema = NotesSchema(many=True)
 
@@ -219,7 +215,6 @@ class Persons(Base):
     def __str__(self):
         return f"Person {self.id}: {self.sus_name}"
 
-
 class PersonSchema(Schema):
     """Person schema."""
 
@@ -228,7 +223,6 @@ class PersonSchema(Schema):
     sus_address = fields.Str()
     sus_phone = fields.Str()
     sus_notes = fields.Str()
-
 
 person_schema = PersonSchema(many=True)
 
@@ -268,26 +262,29 @@ class UploadedFiles(Base):
 
     __tablename__ = "files"
 
-    id = Column(Integer(), primary_key=True)
+    id = Column(Integer(), primary_key=True, autoincrement=True)
     file_name = Column(String(), nullable=False)
+    file_size = Column(Integer(), nullable=False)
     file_mime_type = Column(String(50))
-    file_data = Column(Text(), nullable=False, unique=True)
+    upload_date = Column(DateTime(), default=datetime.utcnow)
+    file_data = Column(LargeBinary(), nullable=False, unique=True)
+    uploaded_by = Column(String(100), nullable=False)
     file_notes = Column(Text())
 
     def __repr__(self):
-        return f"File Name: {self.file_name}; Notes: {self.file_notes}"
+        return f"File Name: {self.file_name}, Uploaded at: {self.file_upload_date}, Notes: {self.file_notes}"
 
     def __str__(self):
-        return f"File Name: {self.file_name}; Notes: {self.file_notes}"
+        return f"File Name: {self.file_name}, Uploaded at: {self.file_upload_date}, Notes: {self.file_notes}"
 
 
 class FileSchema(Schema):
     """File schema."""
 
     file_name = fields.Str()
+    file_size = fields.Int()
     file_mime_type = fields.Str()
     file_notes = fields.Str()
-
 
 file_schema = FileSchema(many=True)
 
@@ -297,9 +294,9 @@ class Users(Base):
 
     __tablename__ = "users"
 
-    id = Column(Integer(), primary_key=True)
+    id = Column(Integer(), primary_key=True, autoincrement=True)
     user_name = Column(String(100), unique=True, nullable=False)
-    password_hash = Column(String(), nullable=False)
+    password_hash = Column(String(255), nullable=False)
     is_admin = Column(Boolean(), default=False)
     is_active = Column(Boolean(), default=False)
     created_at = Column(DateTime(), default=datetime.utcnow)
@@ -310,13 +307,24 @@ class Users(Base):
     def __str__(self):
         return f"User {self.id}: {self.user_name}"
 
-    def set_password(self, plain_text_password: str):
-        """Hash and store a password."""
-        self.password_hash = generate_password_hash(plain_text_password)
+    def set_password(self, password: str):
+        """Hashes a plaintext password and stores it."""
+        password_bytes = password.encode("utf-8")
+        salt = bcrypt.gensalt()
+        self.password_hash = bcrypt.hashpw(
+            password_bytes,
+            salt,
+        ).decode("utf-8")
 
     def check_password_correction(self, attempted_password: str) -> bool:
-        """Verify a password attempt against the stored hash."""
-        return check_password_hash(self.password_hash, attempted_password)
+        """Checks a plaintext password against the stored bcrypt hash."""
+        try:
+            return bcrypt.checkpw(
+                attempted_password.encode("utf-8"),
+                self.password_hash.encode("utf-8"),
+            )
+        except (ValueError, TypeError):
+            return False
 
 
 # ── Table Creation ──────────────────────────────────────────
@@ -327,7 +335,6 @@ def init_db():
 
 # ── Convenience Context Manager ─────────────────────────────
 from contextlib import contextmanager
-
 
 @contextmanager
 def get_session():

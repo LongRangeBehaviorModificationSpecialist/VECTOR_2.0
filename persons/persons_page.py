@@ -22,7 +22,7 @@ from main_page import (
 )
 
 
-NOTIFICATION_TIMEOUT = 1500
+NOTIFICATION_TIMEOUT = 4000
 
 
 # ── Main Page Builder ────────────────────────────────────────
@@ -83,11 +83,11 @@ def build_persons_page():
                     sus_address_input.value = ""
                     sus_phone_input.value = ""
                     sus_notes_input.value = ""
-                    ui.notify(
-                        "Form cleared",
-                        type="info",
-                        timeout=NOTIFICATION_TIMEOUT,
-                    )
+                    # ui.notify(
+                    #     "Form cleared",
+                    #     type="info",
+                    #     timeout=NOTIFICATION_TIMEOUT,
+                    # )
 
                 def on_submit():
                     # ── Required field validation (DataRequired) ──
@@ -243,8 +243,8 @@ def build_persons_page():
                 ]
 
                 table = ui.table(
-                    columns=column_defs, 
-                    rows=row_data, 
+                    columns=column_defs,
+                    rows=row_data,
                     row_key="id",
                 )
                 table.props("dense flat")
@@ -374,7 +374,7 @@ def build_persons_page():
 
                                 edit_dialog.close()
                                 refresh_persons_table()
-                                
+
                                 ui.button(
                                     "Save",
                                     on_click=on_save_update,

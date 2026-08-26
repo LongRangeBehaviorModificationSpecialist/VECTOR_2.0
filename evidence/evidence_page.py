@@ -22,7 +22,7 @@ from models import get_session, Agents, Evidence, Rooms
 from navbar import build_navbar, confirm_new_case_dialog
 
 
-NOTIFICATION_TIMEOUT = 1500
+NOTIFICATION_TIMEOUT = 4000
 
 
 # ── Helpers ─────────────────────────────────────────────────
@@ -55,7 +55,7 @@ def load_room_labels() -> list[str]:
 def get_next_evid_num() -> str:
     """Gets the highest evidence number from the database and
     increments it.
-    
+
     Returns "1" if no evidence exists yet.
     """
     with get_session() as session:
@@ -99,7 +99,7 @@ def build_evidence_page():
 
         # ── Add Evidence Form ────────────────────────────────────
         with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
-            
+
             ui.label(
                 "Add Evidence Item"
             ).classes("text-lg font-semibold mb-4")
@@ -222,11 +222,11 @@ def build_evidence_page():
                     evid_triaged_by_combo.disable()
                     evid_contraband_combo.value = None
                     evid_notes_input.value = ""
-                    ui.notify(
-                        "Form cleared",
-                        type="info",
-                        timeout=NOTIFICATION_TIMEOUT
-                    )
+                    # ui.notify(
+                    #     "Form cleared",
+                    #     type="info",
+                    #     timeout=NOTIFICATION_TIMEOUT
+                    # )
 
                 def on_submit():
                     # ── Required field validation ──
@@ -503,7 +503,7 @@ def build_evidence_page():
                 ]
 
                 table = ui.table(
-                    columns=column_defs, 
+                    columns=column_defs,
                     rows=row_data,
                     row_key="id",
                 )
@@ -610,7 +610,7 @@ def build_evidence_page():
                             with_input=True,
                         ).classes("w-full")
 
-                        # Enable/disable triaged_by based on 
+                        # Enable/disable triaged_by based on
                         # current triaged value
                         if row["evid_triaged"] != "Yes":
                             edit_triaged_by.disable()
@@ -664,19 +664,19 @@ def build_evidence_page():
 
                                 new_triaged = edit_triaged.value or ""
                                 new_triaged_by = edit_triaged_by.value or ""
-                                
+
                                 if new_triaged == "Yes" and not new_triaged_by:
-                                    
+
                                     ui.notify(
-                                        "Please enter the name of the 
-                                        "agent who " triaged the evidence "
+                                        "Please enter the name of the "
+                                        "agent who triaged the evidence "
                                         "item to save the update",
                                         type="warning",
                                         timeout=NOTIFICATION_TIMEOUT,
                                     )
                                     return
 
-                                # Duplicate evidence number check 
+                                # Duplicate evidence number check
                                 # (exclude self)
                                 new_num = edit_num.value or ""
                                 with get_session() as session:
@@ -790,7 +790,7 @@ def build_evidence_page():
 
                             def on_confirm_delete():
                                 with get_session() as session:
-                                    
+
                                     evid = (
                                         session.query(
                                             Evidence

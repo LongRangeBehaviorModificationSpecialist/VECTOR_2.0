@@ -115,13 +115,16 @@ def build_navbar(
             If None, navigates to /cases/new.
     """
 
-    with ui.header().classes("items-center bg-dark"):
+    with ui.header().classes("items-center bg-dark no-print"):
 
         # ── Logo + Brand ────────────────────────────────────
-        ui.icon("shield", size="32px").classes("text-white mr-2")
+        ui.image(
+            "/static/novadc_icac.ico",
+        ).classes("w-[32px] h-[32px]")
 
         ui.link(
-            "V·E·C·T·O·R", "https://www.novadcicac.org/"
+            "V·E·C·T·O·R",
+            "https://novadcicac.vsp.virginia.gov/"
         ).classes(
             "text-white font-bold mr-6 no-underline"
         ).props("target=_blank")
@@ -142,88 +145,50 @@ def build_navbar(
             ],
         )
 
-        # ── Case Info (direct link — no dropdown) ───────────
+        # ── Case Info Button
         ui.button(
             "Case Info",
             on_click=lambda: ui.navigate.to("/cases"),
         ).props("flat color=white")
 
-        # ── Agents Dropdown ─────────────────────────────────
-        _nav_dropdown(
+        # ── Agents Button
+        ui.button(
             "Agents",
-            [
-                (
-                    "Agent List",
-                    lambda: ui.navigate.to("/agents")
-                ),
-                (
-                    "Add Agent",
-                    lambda: ui.navigate.to("/agents")
-                ),
-            ],
-        )
+            on_click=lambda: ui.navigate.to("/agents"),
+        ).props("flat color=white")
 
-        # ── Rooms Dropdown ──────────────────────────────────
-        _nav_dropdown(
+        # ── Rooms Button
+        ui.button(
             "Rooms",
-            [
-                (
-                    "Room List",
-                    lambda: ui.navigate.to("/rooms")
-                ),
-                (
-                    "Add Room",
-                    lambda: ui.navigate.to("/rooms")
-                ),
-            ],
-        )
+            on_click=lambda: ui.navigate.to("/rooms"),
+        ).props("flat color=white")
 
-        # ── Evidence Dropdown ───────────────────────────────
-        _nav_dropdown(
+
+        # ── Evidence Button
+        ui.button(
             "Evidence",
-            [
-                (
-                    "Evidence List",
-                    lambda: ui.navigate.to("/evidence")
-                ),
-                (
-                    "Add Evidence",
-                    lambda: ui.navigate.to("/evidence")
-                ),
-            ],
-        )
+            on_click=lambda: ui.navigate.to("/evidence"),
+        ).props("flat color=white")
 
-        # ── People Dropdown ─────────────────────────────────
-        _nav_dropdown(
+        # ── People Button
+        ui.button(
             "People",
-            [
-                (
-                    "Person List",
-                    lambda: ui.navigate.to("/persons")
-                ),
-                (
-                    "Add Person",
-                    lambda: ui.navigate.to("/persons")
-                ),
-            ],
-        )
+            on_click= lambda: ui.navigate.to("/persons"),
+        ).props("flat color=white")
 
-        # ── Notes Dropdown ──────────────────────────────────
-        _nav_dropdown(
+        # ── Notes Button
+        ui.button(
             "Notes",
-            [
-                (
-                    "Note List",
-                    lambda: ui.navigate.to("/notes")
-                ),
-                (
-                    "Add Note",
-                    lambda: ui.navigate.to("/notes")
-                ),
-            ],
-        )
+            on_click=lambda: ui.navigate.to("/notes")
+        ).props("flat color=white")
 
-        # ── Tools Dropdown ──────────────────────────────────
+        # ── Files Button
+        ui.button(
+            "Files",
+            on_click=lambda: ui.navigate.to("/uploads")
+        ).props("flat color=white")
+
+        # ── Tools Button
         _nav_dropdown(
             "Tools",
             [
@@ -239,7 +204,7 @@ def build_navbar(
             "Reports",
             [
                 (
-                    "Print Agent List", 
+                    "Print Agent List",
                     lambda: ui.navigate.to("/reports/agents")
                 ),
                 (
@@ -259,7 +224,7 @@ def build_navbar(
                     lambda: ui.navigate.to("/reports/persons")
                 ),
                 (
-                    "Print Notes List", 
+                    "Print Notes List",
                     lambda: ui.navigate.to("/reports/notes")
                 ),
                 ("---", None),

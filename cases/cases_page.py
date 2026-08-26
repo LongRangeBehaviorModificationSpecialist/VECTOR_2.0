@@ -23,13 +23,13 @@ from navbar import build_navbar
 from program.inc.jurisdictions import JURISDICTIONS
 
 
-NOTIFICATION_TIMEOUT = 1500
+NOTIFICATION_TIMEOUT = 4000
 
 
 # ── Helper: Load jurisdiction options ─────────────────────────
 def load_jurisdiction_options() -> list[str]:
     """Returns jurisdiction choices from JURISDICTIONS.
-    
+
     Handles both plain-string and (value, label) tuple formats.
     """
 
@@ -100,7 +100,7 @@ def build_cases_page():
 
             # ── Date/Time Ended ────────────────────────────────────
             ui.label(
-                "Date/Time Ended (optional)"
+                "Date/Time Ended"
             ).classes("text-sm font-medium mb-1 mt-4")
 
             with ui.row().classes("w-full gap-2"):
@@ -126,11 +126,11 @@ def build_cases_page():
                     case_time_begin.value = None
                     case_date_end.value = None
                     case_time_end.value = None
-                    ui.notify(
-                        "Form cleared",
-                        type="info",
-                        timeout=NOTIFICATION_TIMEOUT,
-                    )
+                    # ui.notify(
+                    #     "Form cleared",
+                    #     type="info",
+                    #     timeout=NOTIFICATION_TIMEOUT,
+                    # )
 
                 def on_submit():
                     # ── Required field validation (InputRequired) ──
@@ -178,7 +178,7 @@ def build_cases_page():
 
                     datetime_begin = f"{date_begin} {time_begin}"
 
-                    # End date/time is optional
+                    # End date/time is not optional
                     date_end = case_date_end.value or None
                     time_end = case_time_end.value or None
 
@@ -265,7 +265,7 @@ def build_cases_page():
 
                 if not cases:
                     with table_container:
-                        
+
                         ui.label(
                             "No cases in the database yet"
                         ).classes("text-gray-500 italic")
@@ -371,12 +371,12 @@ def build_cases_page():
                             label="Case Number",
                             value=row["case_number"],
                         ).classes("w-full")
-                        
+
                         edit_location = ui.input(
                             label="Location",
                             value=row["location"],
                         ).classes("w-full")
-                        
+
                         edit_jurisdiction = ui.select(
                             options=load_jurisdiction_options(),
                             label="Jurisdiction",
@@ -388,10 +388,10 @@ def build_cases_page():
                         existing_begin_parts = (
                             row["case_date_time_begin"] or ""
                         ).split(" ")
-                        
+
                         existing_begin_date = (
                             existing_begin_parts[0]
-                            if len(existing_begin_parts) >= 1 
+                            if len(existing_begin_parts) >= 1
                             else None
                         )
 
@@ -404,7 +404,7 @@ def build_cases_page():
                         existing_end_parts = (
                             row["case_date_time_end"] or ""
                         ).split(" ")
-                        
+
                         existing_end_date = (
                             existing_end_parts[0]
                             if len(existing_end_parts) >= 1
@@ -412,7 +412,7 @@ def build_cases_page():
                         )
 
                         existing_end_time = (
-                            existing_end_parts[1] 
+                            existing_end_parts[1]
                             if len(existing_end_parts) >= 2
                             else None
                         )
@@ -420,30 +420,30 @@ def build_cases_page():
                         ui.label(
                             "Date/Time Started"
                         ).classes("text-sm font-medium mb-1")
-                        
+
                         with ui.row().classes("w-full gap-2"):
 
                             edit_date_begin = ui.date_input(
                                 label="Date",
                                 value=existing_begin_date,
                             ).classes("flex-grow")
-                            
+
                             edit_time_begin = ui.time_input(
                                 label="Time",
                                 value=existing_begin_time,
                             ).classes("flex-grow")
 
                         ui.label(
-                            "Date/Time Ended (optional)"
+                            "Date/Time Ended"
                         ).classes("text-sm font-medium mb-1 mt-4")
-                        
+
                         with ui.row().classes("w-full gap-2"):
 
                             edit_date_end = ui.date_input(
                                 label="Date",
                                 value=existing_end_date,
                             ).classes("flex-grow")
-                            
+
                             edit_time_end = ui.time_input(
                                 label="Time",
                                 value=existing_end_time,
@@ -471,21 +471,21 @@ def build_cases_page():
 
                                     if case:
                                         case.case_number = (
-                                            edit_case_number.value 
+                                            edit_case_number.value
                                             or ""
                                         )
                                         case.location = (
-                                            edit_location.value 
+                                            edit_location.value
                                             or ""
                                         )
                                         case.jurisdiction = (
-                                            edit_jurisdiction.value 
+                                            edit_jurisdiction.value
                                             or ""
                                         )
 
                                         # Combine date + time
                                         begin_date = (
-                                            edit_date_begin.value 
+                                            edit_date_begin.value
                                             or ""
                                         )
                                         begin_time = (
@@ -498,12 +498,12 @@ def build_cases_page():
                                         )
 
                                         end_date = (
-                                            edit_date_end.value 
+                                            edit_date_end.value
                                             or ""
                                         )
                                         if end_date:
                                             end_time = (
-                                                edit_time_end.value 
+                                                edit_time_end.value
                                                 or "00:00"
                                             )
                                             case.case_date_time_end = (
@@ -606,6 +606,6 @@ if __name__ in {"__main__", "__mp_main__"}:
 
     init_db()
     ui.run(
-        title="VECTOR",
+        title="V·E·C·T·O·R",
         port=8080,
     )

@@ -29,7 +29,8 @@ from main_page import (
 from navbar import build_navbar, confirm_new_case_dialog
 
 
-NOTIFICATION_TIMEOUT = 1500
+NOTIFICATION_TIMEOUT = 4000
+
 AGENTS_JSON_PATH = Path(__file__).parent / "agents.json"
 
 
@@ -106,7 +107,7 @@ def load_role_options() -> list[str]:
     if AGENT_ROLE_LIST:
         return (
             [
-                role[1] 
+                role[1]
                 if isinstance(role, tuple)
                 else role for role in AGENT_ROLE_LIST
             ]
@@ -187,7 +188,7 @@ def build_agents_page():
             agent_phone_input = ui.input(
                 label="Agent's Phone Number"
             ).classes("w-full")
-            
+
             agent_notes_input = ui.textarea(
                 label="Notes"
             ).classes("w-full")
@@ -209,11 +210,11 @@ def build_agents_page():
                         "agency", "") or ""
                     agent_phone_input.value = info.get(
                         "phone", "") or ""
-                    ui.notify(
-                        f"Auto-filled fields for {selected}",
-                        type="info",
-                        timeout=NOTIFICATION_TIMEOUT,
-                    )
+                    # ui.notify(
+                    #     f"Auto-filled fields for {selected}",
+                    #     type="info",
+                    #     timeout=NOTIFICATION_TIMEOUT,
+                    # )
                 else:
                     # New name typed — clear the fields for manual entry
                     agent_initials_input.value = ""
@@ -233,11 +234,11 @@ def build_agents_page():
                     agent_role_secondary_input.value = None
                     agent_phone_input.value = ""
                     agent_notes_input.value = ""
-                    ui.notify(
-                        "Form cleared",
-                        type="info",
-                        timeout=NOTIFICATION_TIMEOUT,
-                    )
+                    # ui.notify(
+                    #     "Form cleared",
+                    #     type="info",
+                    #     timeout=NOTIFICATION_TIMEOUT,
+                    # )
 
                 def on_submit():
                     name = agent_name_input.value
@@ -541,23 +542,23 @@ def build_agents_page():
                                     )
                                     if agent:
                                         agent.agent_name = (
-                                            edit_name.value 
+                                            edit_name.value
                                             or ""
                                         )
                                         agent.agent_initials = (
-                                            edit_initials.value 
+                                            edit_initials.value
                                             or ""
                                         )
                                         agent.agent_parent_agency = (
-                                            edit_agency.value 
+                                            edit_agency.value
                                             or ""
                                         )
                                         agent.agent_role = (
-                                            edit_role.value 
+                                            edit_role.value
                                             or ""
                                         )
                                         agent.agent_role_secondary = (
-                                            edit_role_secondary.value 
+                                            edit_role_secondary.value
                                             or ""
                                         )
                                         agent.agent_phone = (
@@ -656,6 +657,6 @@ if __name__ in {"__main__", "__mp_main__"}:
 
     init_db()
     ui.run(
-        title="VECTOR", 
+        title="V·E·C·T·O·R",
         port=8080,
     )

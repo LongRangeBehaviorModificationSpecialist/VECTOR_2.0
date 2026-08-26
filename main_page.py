@@ -4,13 +4,13 @@
 main_page.py
 
 Handles:
-    /               →  Home/Login page
-    /about          →  About page
-    /help           →  Help page
-    /export_db      →  Database export
-    /make_new_case  →  Clear all data (dangerous!)
-    /error_check    →  Data integrity checks
-    /saved_output   →  Save output viewer
+    /                →   Home/Login page
+    /about           →   About page
+    /help            →   Help page
+    /export_db       →   Database export
+    /make_new_case   →   Clear all data (dangerous!)
+    /error_check     →   Data integrity checks
+    /saved_output    →   Save output viewer
 """
 
 from nicegui import ui
@@ -73,11 +73,16 @@ def build_authenticated_home():
     """Main menu for logged-in users."""
 
     with ui.column().classes("items-center w-full mt-8 mb-6"):
+
+        ui.image(
+            "/static/novadc_icac.png",
+        ).classes("w-[150px] h-[150px] mb-4")
+
         ui.label(
             "V·E·C·T·O·R Home Page"
         ).classes("text-2xl font-normal text-center")
 
-    with ui.column().classes("items-center w-full"):
+    # with ui.column().classes("items-center w-full"):
         ui.label(
             "Main Menu"
         ).classes("text-xl font-semibold mb-6")
@@ -131,15 +136,32 @@ def build_authenticated_home():
             "unelevated"
         ).classes("flex-shrink-0 min-w-48 py-3")
 
+    # Row 3: Add Evidence | Add Person | Add Note
+    with ui.row().classes(
+        "flex justify-center items-center gap-6 mb-4 w-full"
+    ):
+        ui.button(
+            "Add File",
+            on_click=lambda: ui.navigate.to("/uploads"),
+        ).props(
+            "unelevated"
+        ).classes("flex-shrink-0 min-w-48 py-3")
+
+        ui.button(
+            "Useful Links",
+            on_click=lambda: ui.navigate.to("/links"),
+        ).props(
+            "unelevated"
+        ).classes("flex-shrink-0 min-w-48 py-3")
+
 
 def build_login_home():
     """Login page for unauthenticated users."""
 
     with ui.column().classes("items-center w-full mt-12"):
-        ui.icon(
-            "shield",
-            size="80px",
-        ).classes("text-purple-600 mb-4")
+        ui.image(
+            "/static/novadc_icac.png",
+        ).classes("w-[150px] h-[150px] mb-4")
 
         ui.label(
             "-- V·E·C·T·O·R --"
@@ -157,7 +179,8 @@ def build_login_home():
         username_input = ui.input(
             label="Username"
         ).classes("w-full max-w-xs")
-        
+        username_input.props("autofocus")
+
         password_input = ui.input(
             label="Password",
             password=True,
@@ -168,19 +191,27 @@ def build_login_home():
             # Wire this to your Users model authentication
             from models import get_session, Users
 
-            user_name = username_input.value
-            user_pass = password_input.value
+            # user_name = username_input.value.strip()
+            entered_user = username_input.value.strip()
+            # user_pass = password_input.value
+            entered_pass = password_input.value
+
+            if not entered_user or not entered_pass:
+                ui.notify(
+                    "Both a username and password are required",
+                    type="warning",
+                    timeout=2000,
+                )
+                return
 
             with get_session() as session:
                 user = (
-                    session.query(
-                        Users
-                    )
-                    .filter_by(user_name=user_name)
+                    session.query(Users)
+                    .filter_by(user_name=entered_user, is_active=True)
                     .first()
                 )
 
-                if user and user.check_password_correction(user_pass):
+                if user and user.check_password_correction(entered_pass):
                     from nicegui import app
 
                     app.storage.user["authenticated"] = True
@@ -190,13 +221,19 @@ def build_login_home():
                     ui.notify(
                         f"Welcome, {user.user_name}!",
                         type="positive",
+                        timeout=2000,
                     )
                     ui.navigate.to("/")
                 else:
                     ui.notify(
-                        "Invalid credentials",
+                        "Invalid username or password",
                         type="negative",
+                        timeout=2000,
                     )
+                    password_input.value = ""
+
+        # Submit on Enter key
+        password_input.on("keydown.enter", attempt_login)
 
         ui.button(
             "Login",
@@ -219,15 +256,15 @@ def about_page():
 
     with ui.column().classes("items-center w-full mt-8"):
         ui.label(
-            "About VECTOR"
+            "About V·E·C·T·O·R"
         ).classes("text-2xl font-bold mb-6")
 
         with ui.card().classes("max-w-md p-6"):
-            ui.label(f"Version: {Config.version}").classes("mb-2")
-            ui.label(f"Author: {Config.author}").classes("mb-2")
-            ui.label(f"Department: {Config.dept}").classes("mb-2")
+            ui.label(f"Version  :  {Config.version}").classes("mb-2")
+            ui.label(f"Author  :  {Config.author}").classes("mb-2")
+            ui.label(f"Department  :  {Config.dept}").classes("mb-2")
             ui.label(
-                f"Last Updated: {Config.updated}"
+                f"Last Updated  :  {Config.updated}"
             ).classes("text-sm text-gray-500")
 
 
@@ -244,39 +281,45 @@ def help_page():
         on_new_case=confirm_new_case_handler,
     )
 
-    with ui.column().classes("items-center w-full mt-8 max-w-3xl"):
-        ui.label(
-            "Help"
-        ).classes("text-2xl font-bold mb-6")
+    with ui.column().classes("w-full items-center"):
 
-        with ui.card().classes("p-6"):
-            ui.markdown("""
-                ### VECTOR Help Documentation
+        with ui.column().classes("items-center w-full mt-8 max-w-3xl"):
+            ui.label(
+                "Help"
+            ).classes("text-2xl font-bold mb-6")
 
-                This application helps you manage evidence collection,
-                tracking, organization, and recording for law
-                enforcement cases.
+            with ui.card().classes("p-6"):
+                ui.markdown("""
+### V·E·C·T·O·R Help Documentation
 
-                #### Quick Start
+---
 
-                1. **Start New Case** — Begin a fresh case file
-                2. **Add Agent** — Register agents who will work on cases
-                3. **Add Room** — Define storage rooms for evidence
-                4. **Add Evidence** — Record evidence items
-                5. **Add Person** — Document suspects/witnesses
-                6. **Add Notes** — Write case notes
+This application helps you manage evidence collection,
+tracking, organization, and recording for law
+enforcement cases.
 
-                #### Navigation
+#### Quick Start
 
-                Use the top menu to access different sections:
-                - **Case Info** — View/edit case details
-                - **Agents** — Manage agent roster
-                - **Rooms** — Manage storage locations
-                - **Evidence** — Track evidence chain of custody
-                - **People** — Document persons of interest
-                - **Notes** — Write case documentation
-                - **Reports** — Print various reports
-            """)
+1.&ensp;**Start New Case**&ensp;→&ensp;Begin a fresh case file\n
+2.&ensp;**Add Agent**&ensp;→&ensp;Register agents who will work on cases\n
+3.&ensp;**Add Room**&ensp;→&ensp;Define rooms at search location\n
+4.&ensp;**Add Evidence**&ensp;→&ensp;Record evidence items\n
+5.&ensp;**Add Person**&ensp;→&ensp;Document suspects/witnesses\n
+6.&ensp;**Add Notes**&ensp;→&ensp;Write case notes\n
+7.&ensp;**Add Files**&ensp;→&ensp;Upload files to the case database\n
+
+#### Navigation
+
+Use the top menu to access different sections:\n
+1.&ensp;**Case Info**&ensp;→&ensp;View/edit case details\n
+2.&ensp;**Agents**&ensp;→&ensp;Manage agent roster\n
+3.&ensp;**Rooms**&ensp;→&ensp;Manage defined rooms\n
+4.&ensp;**Evidence**&ensp;→&ensp;Track evidence information\n
+5.&ensp;**People**&ensp;→&ensp;Document persons of interest\n
+6.&ensp;**Notes**&ensp;→&ensp;Write case documentation\n
+7.&ensp;**Files**&ensp;→&ensp;Upload a file to case\n
+8.&ensp;**Reports**&ensp;→&ensp;Print various reports\n
+""").classes("text-sm")
 
 
 # ── Export Database Page ─────────────────────────────────────
@@ -364,15 +407,15 @@ def export_db_page():
 # ── Confirm New Case Handler ─────────────────────────────────
 def confirm_new_case_handler():
     """Called when user clicks "Make New Case File".
-    
+
     Clears ALL data from all tables (destructive operation!).
     """
     with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
-        
+
         ui.label(
             "⚠️ WARNING: Delete All Data"
         ).classes("text-red-400 text-lg font-bold mb-2")
-        
+
         ui.label(
             "This will DELETE ALL DATA from all database tables:\n"
             "- Agents\n- Cases\n- Evidence\n- Notes\n- Persons\n"
@@ -493,7 +536,7 @@ def error_check_page():
                 ui.label(
                     "Rooms with Missing Agents"
                 ).classes("text-lg font-semibold mb-3 text-orange-400")
-                
+
                 with get_session() as session:
                     queryTwoAgentsRooms = (
                         session.query(
@@ -555,7 +598,7 @@ def error_check_page():
             ui.label(
                 "Evidence without Witness Information"
             ).classes("text-lg font-semibold mb-3 text-orange-400")
-            
+
             with get_session() as session:
                 queryTwoAgentsEvid = (
                     session.query(
@@ -633,7 +676,7 @@ def saved_output_page():
             ui.label(
                 "Output Directory"
             ).classes("text-base font-semibold mb-2")
-            
+
             ui.label(
                 str(Path(Config.USERPROFILE))
             ).classes("text-sm text-gray-500 font-mono mb-4")
@@ -656,9 +699,13 @@ def logout_page():
     """Logs out the current user."""
     from nicegui import app
 
-    app.storage.user.clear()
+    app.storage.user["authenticated"] = False
+    app.storage.user["user_name"] = ""
+    app.storage.user["is_admin"] = False
+
     ui.notify(
-        "Logged out successfully",
+        "You have been logged out successfully",
         type="info",
+        timeout=2000,
     )
     ui.navigate.to("/")

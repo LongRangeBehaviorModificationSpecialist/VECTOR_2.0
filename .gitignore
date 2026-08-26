@@ -2,5 +2,8 @@ __pycache__
 temp
 .vscode
 .nicegui
-app_data.db
+*_app_data.db
 /logs/
+*.ico
+*.png
+*temp*

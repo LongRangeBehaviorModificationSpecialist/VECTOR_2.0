@@ -22,7 +22,7 @@ from main_page import (
 )
 
 
-NOTIFICATION_TIMEOUT = 1500
+NOTIFICATION_TIMEOUT = 4000
 
 
 # ── Helpers ─────────────────────────────────────────────────
@@ -40,7 +40,7 @@ def load_agent_names() -> list[str]:
 
 
 def get_next_room_ltr() -> str:
-    """Gets the label of the last room in the database and 
+    """Gets the label of the last room in the database and
     increments it to the next letter.
 
     Returns "A" if no rooms exist yet.
@@ -55,7 +55,7 @@ def get_next_room_ltr() -> str:
         )
         if rooms:
             last_label = rooms[-1].room_label
-            # Increment the ASCII value by 1, 
+            # Increment the ASCII value by 1,
             # then convert back to char
             return chr(ord(last_label) + 1)
         else:
@@ -124,11 +124,11 @@ def build_rooms_page():
                     room_desc_input.value = ""
                     room_first_agent_combo.value = None
                     room_second_agent_combo.value = None
-                    ui.notify(
-                        "Form cleared",
-                        type="info",
-                        timeout=NOTIFICATION_TIMEOUT,
-                    )
+                    # ui.notify(
+                    #     "Form cleared",
+                    #     type="info",
+                    #     timeout=NOTIFICATION_TIMEOUT,
+                    # )
 
                 def on_submit():
                     # ── Required field validation ──
@@ -192,8 +192,8 @@ def build_rooms_page():
 
                         # ── Same agent checks
                         if (
-                            first_agent and 
-                            second_agent and 
+                            first_agent and
+                            second_agent and
                             first_agent == second_agent
                         ):
                             ui.notify(
@@ -230,7 +230,7 @@ def build_rooms_page():
                 ).props("outline")
 
                 ui.button(
-                    "Add Room", 
+                    "Add Room",
                     on_click=on_submit,
                 ).props("unelevated")
 
@@ -385,7 +385,7 @@ def build_rooms_page():
                             ).props("flat")
 
                             def on_save_update():
-                                # Validate uniqueness 
+                                # Validate uniqueness
                                 # (excluding current record)
                                 new_label = edit_label.value or ""
                                 new_desc = edit_desc.value or ""
@@ -411,7 +411,7 @@ def build_rooms_page():
                                         )
                                         return
 
-                                    # Check duplicate description 
+                                    # Check duplicate description
                                     # (exclude self)
                                     dup_desc = (
                                         session.query(

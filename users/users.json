@@ -1,0 +1,7 @@
+{
+    "user_name": "novaicac",
+    "salt": "b'$2b$12$UU8G9v4xM/Xfc0gUZHwsjO",
+    "password_hash": "b'$2b$12$UU8G9v4xM/Xfc0gUZHwsjOTBNglEGHiEelR.m8BXi9GzS2DppzlPS'",
+    "is_admin": true,
+    "is_active": true
+}

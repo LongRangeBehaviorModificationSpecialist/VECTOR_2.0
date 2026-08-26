@@ -3,8 +3,7 @@
 # ==============================================================================
 
 """
-main.py — VECTOR Application Bootstrap
-NiceGUI conversion of the original Flask VECTOR application.
+main.py
 
 V·E·C·T·O·R —
 Virginia Evidence Collection, Tracking, Organization, & Recording Program
@@ -14,7 +13,19 @@ Usage:
     Open browser to http://localhost:8080
 """
 
+import ast
+import json
 from nicegui import ui, app
+import os
+from pathlib import Path
+
+
+# Explicitly tell NiceGUI where the static folder is
+app.add_static_files(
+    "/static",
+    os.path.join(os.path.dirname(__file__), "static")
+)
+
 
 # ── Initialize Database ─────────────────────────────────────
 from models import init_db, get_session, Users
@@ -23,29 +34,115 @@ init_db()
 
 # ── Seed Default User ───────────────────────────────────────
 def seed_default_user():
-    """Creates the default 'novaicac' user if it doesn't exist."""
+    """Reads user credentials from users.json and upserts into the
+    Users table.
+
+    The JSON stores hashes as Python byte-string literals.
+    """
+    user_folder = "users"
+    json_path = Path(__file__).parent / f"{user_folder}\\users.json"
+    if not json_path.exists():
+        print("WARNING → 'users.json' not found — no user seeded.")
+        return
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        user_data = json.load(f)
+
+    # Extract the password hash from the byte-string representation
+    raw_hash = user_data.get("password_hash", "")
+
+    # The JSON stores it as "b'$2b$12$...'"
+    # parse it back to bytes, then decode to str
+    try:
+        hash_bytes = ast.literal_eval(raw_hash)
+        if isinstance(hash_bytes, bytes):
+            clean_hash = hash_bytes.decode("utf-8")
+        else:
+            clean_hash = str(hash_bytes)
+    except (ValueError, SyntaxError):
+        # If ast.literal_eval fails, try stripping the b'' wrapper manually
+        clean_hash = raw_hash
+        if clean_hash.startswith("b'") and clean_hash.endswith("'"):
+            clean_hash = clean_hash[2:-1]
+
+    user_name = user_data.get("user_name", "")
+    is_admin = user_data.get("is_admin", False)
+
     with get_session() as session:
         existing = (
-            session.query(
-                Users
-            )
-            .filter_by(user_name="novaicac")
+            session.query(Users)
+            .filter_by(user_name=user_name)
             .first()
         )
-        if not existing:
-            default_user = Users(
-                user_name="novaicac",
-                is_admin=False,
+        if existing:
+            # Update existing user with latest hash from JSON
+            existing.password_hash = clean_hash
+            existing.is_admin = is_admin
+            existing.is_active = True
+            print(f"✓ Updated user '{user_name}' from users.json")
+        else:
+            # Create new user
+            new_user = Users(
+                user_name=user_name,
+                password_hash=clean_hash,
+                is_admin=is_admin,
                 is_active=True,
             )
-            # Set the default password — CHANGE THIS before deploying!
-            default_user.set_password("ChangeMe123!")
-            session.add(default_user)
+            session.add(new_user)
+            print(f"✓ Created user '{user_name}' from users.json")
 
 seed_default_user()
 
 
 # ── Theme Configuration ─────────────────────────────────────
+# Shrinks all textarea heights to match input/select field heights
+ui.add_css(
+    """
+    textarea.q-field__native {
+        min-height: 40px !important;
+        max-height: 40px !important;
+        line-height: 24px;
+        padding: 8px 12px;
+        resize: none !important;
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    /* Hide navbar */
+    .q-header {
+        display: none !important;
+    }
+
+    /* Hide all images */
+    img {
+        display: none !important;
+    }
+
+    /* Remove padding/margins so content fills the page */
+    main,
+    .nicegui-content,
+    .q-page {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    body {
+        padding: 0 !important;
+    }
+}
+
+@media print {
+
+    }
+}
+
+""",
+    shared=True,
+)
 
 # ── Import All Page Modules ─────────────────────────────────
 # Each module registers its own @ui.page routes on import.
@@ -67,7 +164,7 @@ import reports.reports_page
 def agents_route():
     if not main_page.is_authenticated():
         ui.navigate.to("/")
-        return 
+        return
     from agents.agents_page import build_agents_page
     build_agents_page()
 
@@ -117,6 +214,15 @@ def notes_route():
     build_notes_page()
 
 
+@ui.page("/uploads")
+def uploads_route():
+    if not main_page.is_authenticated():
+        ui.navigate.to("/")
+        return
+    from files.files_page import build_uploads_page
+    build_uploads_page()
+
+
 @ui.page("/links")
 def links_route():
     if not main_page.is_authenticated():
@@ -142,6 +248,7 @@ async def initialize_app():
         warning="#f59e0b",
         info="#3b82f6",
     )
+    ui.html("<link rel='icon' type='image/x-icon' href='/static/favicon.ico'" + "'>")
     # Ensure storage keys exist
     if "authenticated" not in app.storage.user:
         app.storage.user["authenticated"] = False
@@ -156,8 +263,8 @@ if __name__ in {"__main__", "__mp_main__"}:
     ui.run(
         title="V·E·C·T·O·R",
         port=8080,
-        reload=False,
+        reload=True,
         dark=True,
         storage_secret="vector-secret-key-change-in-production-2024",
-        favicon="🛡️",
+        favicon="/static/favicon.ico",
     )
