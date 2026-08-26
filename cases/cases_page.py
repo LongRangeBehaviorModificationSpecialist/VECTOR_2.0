@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 """
-cases_page.py — NiceGUI conversion of Flask cases blueprint routes.
+cases_page.py
 
 Consolidates four Flask routes into one interactive page:
-    /case_list       →  table display + delete
+    /case_list        →  table display + delete
     /case_add_page    →  add form (with jurisdiction from JURISDICTIONS)
     /case_update      →  inline edit dialog
     /case_delete      →  delete with confirmation
@@ -82,11 +82,14 @@ def build_cases_page():
             ui.label(
                 "Date/Time Started"
             ).classes("text-sm font-medium mb-1")
+
             with ui.row().classes("w-full gap-2"):
+
                 case_date_begin = ui.date_input(
                     label="Date",
                     placeholder="YYYY-MM-DD",
                 ).classes("flex-grow")
+
                 case_time_begin = ui.time_input(
                     label="Time",
                     placeholder="HH:MM",
@@ -96,11 +99,14 @@ def build_cases_page():
             ui.label(
                 "Date/Time Ended (optional)"
             ).classes("text-sm font-medium mb-1 mt-4")
+
             with ui.row().classes("w-full gap-2"):
+
                 case_date_end = ui.date_input(
                     label="Date",
                     placeholder="YYYY-MM-DD",
                 ).classes("flex-grow")
+
                 case_time_end = ui.time_input(
                     label="Time",
                     placeholder="HH:MM",
@@ -220,6 +226,7 @@ def build_cases_page():
                     "Clear",
                     on_click=clear_form,
                 ).props("outline")
+
                 ui.button(
                     "Open New Case",
                     on_click=on_submit,
@@ -429,6 +436,7 @@ def build_cases_page():
                         with ui.row().classes(
                             "w-full justify-end gap-2 mt-4"
                         ):
+
                             ui.button(
                                 "Cancel",
                                 on_click=edit_dialog.close,
@@ -512,6 +520,7 @@ def build_cases_page():
                         ui.label(
                             "Confirm Deletion"
                         ).classes("text-lg font-semibold mb-2")
+
                         ui.label(
                             f"Are you sure you want to delete "
                             f"case {row['case_number']}?"
@@ -544,6 +553,7 @@ def build_cases_page():
                                     type="positive",
                                     timeout=NOTIFICATION_TIMEOUT,
                                 )
+
                                 delete_dialog.close()
                                 refresh_cases_table()
 
@@ -571,4 +581,7 @@ if __name__ in {"__main__", "__mp_main__"}:
     from models import init_db
 
     init_db()
-    ui.run(title="VECTOR", port=8080)
+    ui.run(
+        title="VECTOR",
+        port=8080,
+    )
