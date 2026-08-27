@@ -21,19 +21,22 @@ from main_page import (
     get_is_admin,
     confirm_new_case_handler,
 )
-from utils import required_input, required_select, required_textarea
+from utils import required_select, required_textarea, MESSAGES
 
 
-NOTIFICATION_TIMEOUT = 4000
+NOTIFICATION_TIMEOUT = 0
+POSITIVE_NOTIFICATION_TIMEOUT = 4000
 
 
 # ── Helpers ─────────────────────────────────────────────────
 def load_agent_names() -> list[str]:
     """Returns a list of all agent names from the Agents table."""
     with get_session() as session:
-        rows = session.query(
-            Agents.agent_name
-        ).order_by(Agents.agent_name).all()
+        rows = (
+            session.query(Agents.agent_name)
+            .order_by(Agents.agent_name)
+            .all()
+        )
         return [r[0] for r in rows]
 
 
@@ -84,10 +87,11 @@ def build_notes_page():
                 label="Agent Name",
                 with_input=True,
             ).classes("w-full")
+            note_author_combo.props("autofocus")
 
             # note_text — TextAreaField
             note_text_input = required_textarea(
-                label="Note"
+                label="Note Text"
             ).classes("w-full")
 
             # ── Buttons ────────────────────────────────────────
@@ -103,18 +107,22 @@ def build_notes_page():
                     note_author = note_author_combo.value
                     if not note_author:
                         ui.notify(
-                            "Agent Name is required",
+                            MESSAGES["notes_1"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
                     note_text = note_text_input.value or ""
                     if not note_text:
                         ui.notify(
-                            "Note text is required.",
+                            MESSAGES["note_2"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -134,9 +142,10 @@ def build_notes_page():
                         session.add(new_note)
 
                     ui.notify(
-                        f"Note from {note_author} was added successfully",
-                        type="positive",
-                        timeout=NOTIFICATION_TIMEOUT,
+                        f"Note from {note_author} was added successfully.",
+                        timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                        close_button="OK",
+                        position="bottom",
                     )
                     clear_form()
                     refresh_notes_table()
@@ -167,9 +176,11 @@ def build_notes_page():
             table_container.clear()
 
             with get_session() as session:
-                notes = session.query(
-                    Notes
-                ).order_by(Notes.id.desc()).all()
+                notes = (
+                    session.query(Notes)
+                    .order_by(Notes.id.desc())
+                    .all()
+                )
 
                 if not notes:
                     with table_container:
@@ -304,9 +315,11 @@ def build_notes_page():
                                 new_author = edit_author.value or ""
                                 if not new_author:
                                     ui.notify(
-                                        "Agent Name is required",
+                                        MESSAGES["note_1"],
                                         type="warning",
                                         timeout=NOTIFICATION_TIMEOUT,
+                                        close_button="OK",
+                                        position="center",
                                     )
                                     return
 
@@ -314,17 +327,17 @@ def build_notes_page():
 
                                 if not new_text:
                                     ui.notify(
-                                        "Note text is required",
+                                        MESSAGES["note_2"],
                                         type="warning",
                                         timeout=NOTIFICATION_TIMEOUT,
+                                        close_button="OK",
+                                        position="center",
                                     )
                                     return
 
                                 with get_session() as session:
                                     note = (
-                                        session.query(
-                                            Notes
-                                        )
+                                        session.query(Notes)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -341,8 +354,9 @@ def build_notes_page():
                                 ui.notify(
                                     f"Note from {new_author} was updated "
                                     "successfully.",
-                                    type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
                                 edit_dialog.close()
                                 refresh_notes_table()
@@ -366,7 +380,7 @@ def build_notes_page():
 
                         ui.label(
                             f"Are you sure you want to delete "
-                            "Note #{row['id']}?"
+                            f"Note #{row['id']}?"
                         ).classes("mb-4")
 
                         # Show a preview of the note text (truncated)
@@ -388,9 +402,7 @@ def build_notes_page():
                             def on_confirm_delete():
                                 with get_session() as session:
                                     note = (
-                                        session.query(
-                                            Notes
-                                        )
+                                        session.query(Notes)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -404,8 +416,9 @@ def build_notes_page():
                                 ui.notify(
                                     f"Note {note_id} was successfully "
                                     "deleted.",
-                                    type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
 
                                 delete_dialog.close()
@@ -413,7 +426,8 @@ def build_notes_page():
 
                             ui.button(
                                 "Delete",
-                                on_click=on_confirm_delete
+                                on_click=on_confirm_delete,
+                                color="#FF0000",
                             ).props("negative unelevated")
 
                     delete_dialog.open()

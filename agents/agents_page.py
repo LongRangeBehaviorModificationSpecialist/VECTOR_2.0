@@ -27,10 +27,15 @@ from main_page import (
     confirm_new_case_handler,
 )
 from navbar import build_navbar, confirm_new_case_dialog
-from utils import required_input, required_select
+from utils import (
+    required_input,
+    required_select,
+    check_agent_dup_role,
+    MESSAGES
+)
 
-
-NOTIFICATION_TIMEOUT = 4000
+NOTIFICATION_TIMEOUT = 0
+POSITIVE_NOTIFICATION_TIMEOUT = 4000
 
 AGENTS_JSON_PATH = Path(__file__).parent / "agents.json"
 
@@ -162,6 +167,7 @@ def build_agents_page():
                 with_input=True,
                 new_value_mode="add",
             ).classes("w-full")
+            agent_name_input.props("autofocus")
 
             agent_initials_input = ui.input(
                 label="Agent's Initials",
@@ -186,7 +192,7 @@ def build_agents_page():
                 with_input=True,
             ).classes("w-full")
 
-            agent_phone_input = ui.input(
+            agent_phone_input = required_input(
                 label="Agent's Phone Number"
             ).classes("w-full")
 
@@ -211,11 +217,7 @@ def build_agents_page():
                         "agency", "") or ""
                     agent_phone_input.value = info.get(
                         "phone", "") or ""
-                    # ui.notify(
-                    #     f"Auto-filled fields for {selected}",
-                    #     type="info",
-                    #     timeout=NOTIFICATION_TIMEOUT,
-                    # )
+
                 else:
                     # New name typed — clear the fields for manual entry
                     agent_initials_input.value = ""
@@ -235,49 +237,53 @@ def build_agents_page():
                     agent_role_secondary_input.value = None
                     agent_phone_input.value = ""
                     agent_notes_input.value = ""
-                    # ui.notify(
-                    #     "Form cleared",
-                    #     type="info",
-                    #     timeout=NOTIFICATION_TIMEOUT,
-                    # )
 
                 def on_submit():
+                    """Handles form submission for new agents."""
+
                     name = agent_name_input.value
                     if not name:
                         ui.notify(
-                            "Agent's Name is required",
+                            MESSAGES["agent_1"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
-                        )
-                        return
-
-                    role = agent_role_input.value
-                    if not role:
-                        ui.notify(
-                            "Agent's Role is required",
-                            type="warning",
-                            timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
                     initials = agent_initials_input.value or ""
                     agency = agent_parent_agency_input.value or ""
+
+                    role = agent_role_input.value
+                    if not role:
+                        ui.notify(
+                            MESSAGES["agent_2"],
+                            type="warning",
+                            timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
+                        )
+                        return
+
                     role_secondary = agent_role_secondary_input.value or ""
                     phone = agent_phone_input.value or ""
                     notes = agent_notes_input.value or ""
 
                     try:
                         with get_session() as session:
-                            # Uniqueness checks
-                            if session.query(
-                                Agents
-                            ).filter_by(agent_name=name).first():
+                            # Uniqueness checks for data
+                            if (
+                                session.query(Agents)
+                                .filter_by(agent_name=name)
+                                .first()
+                            ):
                                 ui.notify(
-                                    "That Agent's Name is already in "
-                                    "the case database. Please check "
-                                    "the name and try again.",
-                                    type="negative",
+                                    MESSAGES["agent_3"],
+                                    type="warning",
                                     timeout=NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="center",
                                 )
                                 return
                             if (
@@ -287,12 +293,18 @@ def build_agents_page():
                                 .first()
                             ):
                                 ui.notify(
-                                    "Those initials are already used "
-                                    "for another agent. Please change "
-                                    "the initials and re-submit.",
-                                    type="negative",
+                                    MESSAGES["agent_4"],
+                                    type="warning",
                                     timeout=NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="center",
                                 )
+                                return
+                            if check_agent_dup_role(
+                                agent=name,
+                                role=role,
+                                role_secondary=role_secondary,
+                            ):
                                 return
                             if (
                                 phone
@@ -301,10 +313,11 @@ def build_agents_page():
                                 .first()
                             ):
                                 ui.notify(
-                                    "That phone number is already "
-                                    "assigned to an agent",
-                                    type="negative",
+                                    MESSAGES["agent_5"],
+                                    type="warning",
                                     timeout=NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="center",
                                 )
                                 return
 
@@ -324,9 +337,10 @@ def build_agents_page():
 
                         ui.notify(
                             f"{name} was added to the case file "
-                            "successfully",
-                            type="positive",
-                            timeout=NOTIFICATION_TIMEOUT,
+                            "successfully.",
+                            timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="bottom",
                         )
                         clear_form()
                         refresh_agent_table()
@@ -339,6 +353,8 @@ def build_agents_page():
                             "changes were not successful.",
                             type="negative",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
 
                 ui.button(
@@ -366,9 +382,7 @@ def build_agents_page():
 
             with get_session() as session:
                 agents = (
-                    session.query(
-                        Agents
-                    )
+                    session.query(Agents)
                     .order_by(Agents.agent_name)
                     .all()
                 )
@@ -482,7 +496,7 @@ def build_agents_page():
                             f"Edit Agent: {row['agent_name']}"
                         ).classes("text-lg font-semibold mb-4")
 
-                        edit_name = ui.input(
+                        edit_name = required_input(
                             label="Agent's Name",
                             value=row["agent_name"],
                         ).classes("w-full")
@@ -492,7 +506,7 @@ def build_agents_page():
                             value=row["agent_initials"],
                         ).classes("w-full")
 
-                        edit_agency = ui.select(
+                        edit_agency = required_select(
                             options=load_agency_options(),
                             label="Parent Agency",
                             value=row["agent_parent_agency"],
@@ -500,7 +514,7 @@ def build_agents_page():
                             new_value_mode="add",
                         ).classes("w-full")
 
-                        edit_role = ui.select(
+                        edit_role = required_select(
                             options=load_role_options(),
                             label="Agent's Role",
                             value=row["agent_role"],
@@ -514,7 +528,7 @@ def build_agents_page():
                             with_input=True,
                         ).classes("w-full")
 
-                        edit_phone = ui.input(
+                        edit_phone = required_input(
                             label="Agent's Phone Number",
                             value=row["agent_phone"],
                         ).classes("w-full")
@@ -535,9 +549,7 @@ def build_agents_page():
                             def on_save_update():
                                 with get_session() as session:
                                     agent = (
-                                        session.query(
-                                            Agents
-                                        )
+                                        session.query(Agents)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -568,12 +580,18 @@ def build_agents_page():
                                         agent.agent_notes = (
                                             edit_notes.value or ""
                                         )
+                                        if check_agent_dup_role(
+                                            agent=edit_name.value,
+                                            role=edit_role.value,
+                                            role_secondary=edit_role_secondary.value
+                                        ):
+                                            return
 
                                 ui.notify(
-                                    f"{edit_name.value} was updated "
-                                    "successfully",
-                                    type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    f"{edit_name.value} was updated " "successfully.",
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
 
                                 edit_dialog.close()
@@ -612,9 +630,7 @@ def build_agents_page():
                             def on_confirm_delete():
                                 with get_session() as session:
                                     agent = (
-                                        session.query(
-                                            Agents
-                                        )
+                                        session.query(Agents)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -626,9 +642,10 @@ def build_agents_page():
 
                                 ui.notify(
                                     f"{agent_name} has been removed "
-                                    "from the case file",
-                                    type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    "from the case file.",
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
                                 delete_dialog.close()
                                 refresh_agent_table()
@@ -636,6 +653,7 @@ def build_agents_page():
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
+                                color="#FF0000",
                             ).props("negative unelevated")
 
                     delete_dialog.open()

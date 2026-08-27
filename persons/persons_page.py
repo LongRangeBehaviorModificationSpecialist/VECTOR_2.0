@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-persons_page.pu
+persons_page.py
 
 Consolidates four Flask routes into one interactive page:
     /person_list       →  table display + delete
@@ -20,10 +20,11 @@ from main_page import (
     get_is_admin,
     confirm_new_case_handler,
 )
-from utils import required_input, required_select, required_textarea
+from utils import required_input, required_textarea, MESSAGES
 
 
-NOTIFICATION_TIMEOUT = 4000
+NOTIFICATION_TIMEOUT = 0
+POSITIVE_NOTIFICATION_TIMEOUT = 4000
 
 
 # ── Main Page Builder ────────────────────────────────────────
@@ -90,9 +91,11 @@ def build_persons_page():
                     sus_name = sus_name_input.value
                     if not sus_name:
                         ui.notify(
-                            "Name is required",
+                            MESSAGES["person_1"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -104,9 +107,7 @@ def build_persons_page():
                     # ── Duplicate name check (sus_name is unique) ──
                     with get_session() as session:
                         existing = (
-                            session.query(
-                                Persons
-                            )
+                            session.query(Persons)
                             .filter_by(sus_name=sus_name)
                             .first()
                         )
@@ -115,8 +116,10 @@ def build_persons_page():
                             ui.notify(
                                 f"'{sus_name}' is already in the "
                                 "database. Person names must be unique.",
-                                type="negative",
+                                type="warning",
                                 timeout=NOTIFICATION_TIMEOUT,
+                                close_button="OK",
+                                position="center",
                             )
                             return
 
@@ -131,9 +134,10 @@ def build_persons_page():
                         session.add(new_person)
 
                     ui.notify(
-                        f"'{sus_name}' was added successfully",
-                        type="positive",
-                        timeout=NOTIFICATION_TIMEOUT,
+                        f"'{sus_name}' was added successfully.",
+                        timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                        close_button="OK",
+                        position="bottom",
                     )
 
                     clear_form()
@@ -166,9 +170,7 @@ def build_persons_page():
 
             with get_session() as session:
                 persons = (
-                    session.query(
-                        Persons
-                    )
+                    session.query(Persons)
                     .order_by(Persons.sus_name)
                     .all()
                 )
@@ -272,7 +274,7 @@ def build_persons_page():
                             f"Edit Person: {row['sus_name']}"
                         ).classes("text-lg font-semibold mb-4")
 
-                        edit_name = ui.input(
+                        edit_name = required_input(
                             label="Name",
                             value=row["sus_name"],
                         ).classes("w-full")
@@ -292,7 +294,7 @@ def build_persons_page():
                             value=row["sus_phone"],
                         ).classes("w-full")
 
-                        edit_notes = ui.textarea(
+                        edit_notes = required_textarea(
                             label="Notes",
                             value=row["sus_notes"],
                         ).classes("w-full")
@@ -310,18 +312,18 @@ def build_persons_page():
 
                                 if not new_name:
                                     ui.notify(
-                                        "Name is required",
+                                        MESSAGES["person_1"],
                                         type="warning",
                                         timeout=NOTIFICATION_TIMEOUT,
+                                        close_button="OK",
+                                        position="center",
                                     )
                                     return
 
                                 with get_session() as session:
                                     # Check duplicate name (exclude self)
                                     dup = (
-                                        session.query(
-                                            Persons
-                                        )
+                                        session.query(Persons)
                                         .filter(
                                             Persons.sus_name == new_name,
                                             Persons.id != row["id"],
@@ -334,15 +336,15 @@ def build_persons_page():
                                             f"'{new_name}' is already "
                                             "in the database. Person "
                                             "names must be unique.",
-                                            type="negative",
+                                            type="warning",
                                             timeout=NOTIFICATION_TIMEOUT,
+                                            close_button="OK",
+                                            position="center",
                                         )
                                         return
 
                                     person = (
-                                        session.query(
-                                            Persons
-                                        )
+                                        session.query(Persons)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -363,9 +365,10 @@ def build_persons_page():
                                         )
 
                                 ui.notify(
-                                    f"{new_name} was updated successfully",
-                                    type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    f"'{new_name}' was updated successfully.",
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
 
                                 edit_dialog.close()
@@ -402,9 +405,7 @@ def build_persons_page():
                             def on_confirm_delete():
                                 with get_session() as session:
                                     person = (
-                                        session.query(
-                                            Persons
-                                        )
+                                        session.query(Persons)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -416,10 +417,11 @@ def build_persons_page():
                                         sus_name = row["sus_name"]
 
                                 ui.notify(
-                                    f"{sus_name} has been successfully "
-                                    "removed from the file",
-                                    type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    f"'{sus_name}' has been successfully "
+                                    "removed from the file.",
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
 
                                 delete_dialog.close()
@@ -428,6 +430,7 @@ def build_persons_page():
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
+                                color="#FF0000",
                             ).props("negative unelevated")
 
                     delete_dialog.open()

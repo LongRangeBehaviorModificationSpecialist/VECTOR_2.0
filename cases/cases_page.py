@@ -21,10 +21,11 @@ from main_page import (
 from models import get_session, Cases
 from navbar import build_navbar
 from program.inc.jurisdictions import JURISDICTIONS
-from utils import required_input, required_select
+from utils import required_input, required_select, MESSAGES
 
 
-NOTIFICATION_TIMEOUT = 4000
+NOTIFICATION_TIMEOUT = 0
+POSITIVE_NOTIFICATION_TIMEOUT = 4000
 
 
 # ── Helper: Load jurisdiction options ─────────────────────────
@@ -127,11 +128,6 @@ def build_cases_page():
                     case_time_begin.value = None
                     case_date_end.value = None
                     case_time_end.value = None
-                    # ui.notify(
-                    #     "Form cleared",
-                    #     type="info",
-                    #     timeout=NOTIFICATION_TIMEOUT,
-                    # )
 
                 def on_submit():
                     # ── Required field validation (InputRequired) ──
@@ -139,9 +135,11 @@ def build_cases_page():
 
                     if not case_number:
                         ui.notify(
-                            "Case Number is required",
+                            MESSAGES["case_1"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -149,9 +147,11 @@ def build_cases_page():
 
                     if not location:
                         ui.notify(
-                            "Location is required",
+                            MESSAGES["case_2"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -159,9 +159,11 @@ def build_cases_page():
 
                     if not jurisdiction:
                         ui.notify(
-                            "Jurisdiction is required",
+                            MESSAGES["case_3"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -169,9 +171,11 @@ def build_cases_page():
 
                     if not date_begin:
                         ui.notify(
-                            "Date/Time Started is required",
+                            MESSAGES["case_4"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -203,8 +207,10 @@ def build_cases_page():
                                     f"Case '{case_number}' already "
                                     "exists. Please use a unique case "
                                     "number.",
-                                    type="negative",
+                                    type="warning",
                                     timeout=NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="center",
                                 )
                                 return
 
@@ -219,9 +225,10 @@ def build_cases_page():
                             session.add(new_case)
 
                         ui.notify(
-                            f"Case {case_number} was added successfully",
-                            type="positive",
-                            timeout=NOTIFICATION_TIMEOUT,
+                            f"Case {case_number} was added successfully.",
+                            timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="bottom",
                         )
 
                         clear_form()
@@ -229,10 +236,11 @@ def build_cases_page():
 
                     except Exception:
                         ui.notify(
-                            "An error occurred while creating the case. "
-                            "Please check the information and try again.",
+                            MESSAGES["case_err"],
                             type="negative",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
 
                 ui.button(
@@ -268,7 +276,7 @@ def build_cases_page():
                     with table_container:
 
                         ui.label(
-                            "No cases in the database yet"
+                            "No cases in the database yet."
                         ).classes("text-gray-500 italic")
 
                     return
@@ -368,17 +376,17 @@ def build_cases_page():
                             f"Edit Case: {row['case_number']}"
                         ).classes("text-lg font-semibold mb-4")
 
-                        edit_case_number = ui.input(
+                        edit_case_number = required_input(
                             label="Case Number",
                             value=row["case_number"],
                         ).classes("w-full")
 
-                        edit_location = ui.input(
+                        edit_location = required_input(
                             label="Location",
                             value=row["location"],
                         ).classes("w-full")
 
-                        edit_jurisdiction = ui.select(
+                        edit_jurisdiction = required_select(
                             options=load_jurisdiction_options(),
                             label="Jurisdiction",
                             value=row["jurisdiction"],
@@ -514,9 +522,10 @@ def build_cases_page():
                                 ui.notify(
                                     f"Case {edit_case_number.value} "
                                     "information was updated "
-                                    "successfully",
-                                    type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    "successfully.",
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
 
                                 edit_dialog.close()
@@ -569,10 +578,10 @@ def build_cases_page():
                                         case_number = row["case_number"]
 
                                 ui.notify(
-                                    f"{case_number} has been deleted "
-                                    "successfully",
-                                    type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    f"{case_number} has been deleted " "successfully.",
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
 
                                 delete_dialog.close()
@@ -581,6 +590,7 @@ def build_cases_page():
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
+                                color="#FF0000",
                             ).props("negative unelevated")
 
                     delete_dialog.open()

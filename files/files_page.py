@@ -5,8 +5,7 @@ uploads_page.py — File upload and management page.
 Stores files as BLOBs in the SQLite database with download and delete capability.
 """
 
-from nicegui import ui, app
-from pathlib import Path
+from nicegui import ui
 import os
 import mimetypes
 import tempfile
@@ -30,7 +29,8 @@ mimetypes.add_type('application/x-bzip2', '.bz2')
 mimetypes.add_type('application/x-xz', '.xz')
 
 
-NOTIFICATION_TIMEOUT = 4000
+NOTIFICATION_TIMEOUT = 0
+POSITIVE_NOTIFICATION_TIMEOUT = 4000
 
 
 # Allowed MIME types for images, videos, and documents
@@ -136,8 +136,10 @@ def build_uploads_page():
                             f"'{file_name}' is not an allowed file type "
                             f"({file_mime_type}). "
                             f"Only images, videos, documents, and archives are permitted.",
-                            type="negative",
+                            type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -155,17 +157,20 @@ def build_uploads_page():
 
                     ui.notify(
                         f"'{file_name}' uploaded successfully ("
-                        f"{file_size:,} bytes), {file_mime_type}",
-                        type="positive",
-                        timeout=NOTIFICATION_TIMEOUT,
+                        f"{file_size:,} bytes), {file_mime_type}.",
+                        timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                        close_button="OK",
+                        position="bottom",
                     )
                     refresh_files_table()
 
                 except Exception as err:
                     ui.notify(
-                        f"Error uploading file → {str(err)}",
+                        f"Error uploading file → {str(err)}.",
                         type="negative",
                         timeout=NOTIFICATION_TIMEOUT,
+                        close_button="OK",
+                        position="center",
                     )
                     import traceback
                     traceback.print_exc()
@@ -329,7 +334,7 @@ def build_uploads_page():
 
                         ui.label(
                             f"Are you sure you want to delete "
-                            f"'{row['file_name']}'?"
+                            f"'{row['file_name']}'? This cannot be undone!"
                         ).classes("mb-4")
 
                         with ui.row().classes("w-full justify-end gap-2"):
@@ -349,10 +354,10 @@ def build_uploads_page():
                                         session.delete(file_record)
 
                                 ui.notify(
-                                    f"File: {row['file_name']} has been "
-                                    "deleted",
-                                    type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    f"File: {row['file_name']} has been " "deleted.",
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
 
                                 delete_dialog.close()
@@ -361,6 +366,7 @@ def build_uploads_page():
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
+                                color="#FF0000",
                             ).props("negative unelevated")
 
                     delete_dialog.open()

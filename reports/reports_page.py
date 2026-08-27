@@ -51,19 +51,13 @@ def has_active_case() -> bool:
     with get_session() as session:
         return session.query(Cases).count() > 0
 
-def get_date_time() -> str:
-    """Gets the current date and time for report headers."""
-    now = datetime.now()
-    date = now.strftime("%a, %b %d, %Y")
-    time = now.strftime("%H:%M %p")
-    return f"{date} at {time}"
 
-def get_print_date_time() -> tuple[str, str]:
+def get_print_date_time() -> str:
     """Returns date and time separately for template compatibility."""
     now = datetime.now()
-    print_date = now.strftime("%m/%d/%Y")
-    print_time = now.strftime("%H:%M")
-    return print_date, print_time
+    print_date_time = now.strftime("%Y-%m-%d %H:%M")
+    return print_date_time
+
 
 def get_case_info() -> dict | None:
     """Returns the single active case info (or None if no case exists)."""
@@ -122,7 +116,7 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
 
     with get_session() as session:
 
-        case = session.query(Cases).first()  # Only one case at a time
+        case = session.query(Cases).first()
         evidence = session.query(Evidence).all()
 
         if not case:
@@ -147,20 +141,28 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
         if not case.case_date_time_end:
             errors.append("End Date/Time is required for reports.")
 
-        
+
 
     return (len(errors) == 0, errors)
 
 def show_validation_errors(errors: list[str]):
     """Displays validation errors as a NiceGUI notification."""
     if len(errors) == 1:
-        ui.notify(errors[0], type="negative", timeout=5000)
+        ui.notify(
+            errors[0],
+            type="negative",
+            timeout=0,
+            close_button="OK",
+            position="center"
+        )
     else:
         error_text = "\n".join(f"• {err}" for err in errors)
         ui.notify(
-            f"Cannot generate report — missing information:\n\n{error_text}",
+            f"Cannot generate report — missing information:\n\n{error_text}.",
             type="negative",
-            timeout=7000,
+            timeout=0,
+            close_button="OK",
+            position="center"
         )
 
 
@@ -346,13 +348,16 @@ def build_case_header_html(active_case: dict | None, page_title: str, sub_title:
 
     if not active_case:
         ui.notify(
-            "No active case — please create a case first",
-            type="warning"
+            "No active case — please create a case first.",
+            type="warning",
+            timeout=0,
+            close_button="OK",
+            position="center",
         )
         # Redirect to case creation page
         ui.navigate.to("/cases")
 
-    print_date, print_time = get_print_date_time()
+    print_date_time = get_print_date_time()
 
     report_header_table = f"""
     <div class="top-table">
@@ -379,7 +384,7 @@ def build_case_header_html(active_case: dict | None, page_title: str, sub_title:
             </tr>
             <tr>
                 <td class="header font-11">Report Printed Date:</td>
-                <td class="data font-11">{print_date} at {print_time}</td>
+                <td class="data font-11">{print_date_time}</td>
             </tr>
         </table>
     </div>"""

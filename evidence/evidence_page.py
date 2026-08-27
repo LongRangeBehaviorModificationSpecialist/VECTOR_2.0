@@ -20,10 +20,10 @@ from main_page import (
 )
 from models import get_session, Agents, Evidence, Rooms
 from navbar import build_navbar, confirm_new_case_dialog
-from utils import required_input, required_select
-
+from utils import required_input, required_select, MESSAGES
 
 NOTIFICATION_TIMEOUT = 0
+POSITIVE_NOTIFICATION_TIMEOUT = 4000
 
 
 # ── Helpers ─────────────────────────────────────────────────
@@ -31,9 +31,7 @@ def load_agent_names() -> list[str]:
     """Returns a list of all agent names from the Agents table."""
     with get_session() as session:
         rows = (
-            session.query(
-                Agents.agent_name
-            )
+            session.query(Agents.agent_name)
             .order_by(Agents.agent_name)
             .all()
         )
@@ -44,9 +42,7 @@ def load_room_labels() -> list[str]:
     """Returns a list of all room labels from the Rooms table."""
     with get_session() as session:
         rows = (
-            session.query(
-                Rooms.room_label
-            )
+            session.query(Rooms.room_label)
             .order_by(Rooms.room_label)
             .all()
         )
@@ -61,9 +57,7 @@ def get_next_evid_num() -> str:
     """
     with get_session() as session:
         evid_query = (
-            session.query(
-                Evidence
-            )
+            session.query(Evidence)
             .order_by(Evidence.evid_num)
             .all()
         )
@@ -80,11 +74,11 @@ def get_next_evid_num() -> str:
             return "1"
 
 
-# ── Main Page Builder ────────────────────────────────────────
+# ── Main Page Builder
 def build_evidence_page():
     """Builds the full Evidence page UI."""
 
-    # ── Header / Navbar ──────────────────────────────────────
+    # ── Header / Navbar
 
     build_navbar(
         is_admin=get_is_admin(),
@@ -98,7 +92,7 @@ def build_evidence_page():
             "Evidence Management"
         ).classes("text-2xl font-bold m-4")
 
-        # ── Add Evidence Form ────────────────────────────────────
+        # ── Add Evidence Form
         with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
 
             ui.label(
@@ -110,10 +104,11 @@ def build_evidence_page():
             room_options = load_room_labels()
 
             # evid_num — StringField, pre-populated with next number
-            evid_num_input = ui.input(
+            evid_num_input = required_input(
                 label="Evidence Item Number",
                 value=next_evid,
             ).classes("w-full")
+            evid_num_input.props("readonly")
 
             # evid_qty — StringField (required, autofocused)
             evid_qty_input = required_input(
@@ -144,7 +139,7 @@ def build_evidence_page():
             ).classes("w-full")
 
             # evid_loc_room_detail — (required)
-            evid_room_detail_input = ui.input(
+            evid_room_detail_input = required_input(
                 label="Where Located"
             ).classes("w-full")
 
@@ -230,7 +225,7 @@ def build_evidence_page():
 
                     if not evid_num:
                         ui.notify(
-                            "Evidence Item Number is required",
+                            MESSAGES["evid_3"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
                             close_button="OK",
@@ -242,7 +237,7 @@ def build_evidence_page():
 
                     if not evid_qty:
                         ui.notify(
-                            "An item quantity is required",
+                            MESSAGES["evid_4"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
                             close_button="OK",
@@ -254,7 +249,7 @@ def build_evidence_page():
 
                     if not evid_desc:
                         ui.notify(
-                            "Evidence Description is required",
+                            MESSAGES["evid_5"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
                             close_button="OK",
@@ -266,7 +261,7 @@ def build_evidence_page():
 
                     if not evid_loc_room:
                         ui.notify(
-                            "Room Located is required",
+                            MESSAGES["evid_6"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
                             close_button="OK",
@@ -278,7 +273,7 @@ def build_evidence_page():
 
                     if not evid_room_detail:
                         ui.notify(
-                            "Where Located is required",
+                            MESSAGES["evid_7"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
                             close_button="OK",
@@ -290,7 +285,7 @@ def build_evidence_page():
 
                     if not evid_found_by:
                         ui.notify(
-                            "Found By is required",
+                            MESSAGES["evid_8"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
                             close_button="OK",
@@ -302,7 +297,7 @@ def build_evidence_page():
 
                     if not evid_witness:
                         ui.notify(
-                            "Witnessed By is required",
+                            MESSAGES["evid_9"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
                             close_button="OK",
@@ -314,8 +309,7 @@ def build_evidence_page():
                     # Same agent check
                     if evid_found_by == evid_witness:
                         ui.notify(
-                            "You cannot have the same agent "
-                            "as the 'Found By' and 'Witnessed By'",
+                            MESSAGES["evid_2"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
                             close_button="OK",
@@ -328,8 +322,7 @@ def build_evidence_page():
                     evid_triaged_by = evid_triaged_by_combo.value or ""
                     if evid_triaged == "Yes" and not evid_triaged_by:
                         ui.notify(
-                            "Please enter the name of the agent "
-                            "who triaged the evidence item",
+                            MESSAGES["evid_1"],
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
                             close_button="OK",
@@ -340,16 +333,14 @@ def build_evidence_page():
                     # ── Duplicate evidence number check ──
                     with get_session() as session:
                         existing = (
-                            session.query(
-                                Evidence
-                            )
+                            session.query(Evidence)
                             .filter_by(evid_num=evid_num)
                             .first()
                         )
 
                         if existing:
                             ui.notify(
-                                f"Evidence number {evid_num} is "
+                                f"Evidence Item Number '{evid_num}' is "
                                 "already used.",
                                 type="negative",
                                 timeout=NOTIFICATION_TIMEOUT,
@@ -378,10 +369,9 @@ def build_evidence_page():
                         session.add(new_evid)
 
                     ui.notify(
-                        f"Item {evid_num} ({evid_desc}) has been "
+                        f"Evidence Item {evid_num} ({evid_desc}) has been "
                         "added to the case file.",
-                        type="positive",
-                        timeout=4000,
+                        timeout=POSITIVE_NOTIFICATION_TIMEOUT,
                         close_button="OK",
                         position="bottom",
                     )
@@ -416,9 +406,7 @@ def build_evidence_page():
             with get_session() as session:
 
                 evidence = (
-                    session.query(
-                        Evidence
-                    )
+                    session.query(Evidence)
                     .order_by(Evidence.evid_num)
                     .all()
                 )
@@ -426,7 +414,7 @@ def build_evidence_page():
                 if not evidence:
                     with table_container:
                         ui.label(
-                            "No evidence items in the database yet"
+                            "No evidence items in the database yet."
                         ).classes("text-gray-500 italic")
                     return
 
@@ -556,17 +544,17 @@ def build_evidence_page():
                             f"Edit Evidence: {row['evid_num']}"
                         ).classes("text-lg font-semibold mb-4")
 
-                        edit_num = ui.input(
+                        edit_num = required_input(
                             label="Evidence Item Number",
                             value=row["evid_num"],
                         ).classes("w-full")
 
-                        edit_qty = ui.input(
+                        edit_qty = required_input(
                             label="Quantity",
                             value=row["evid_qty"],
                         ).classes("w-full")
 
-                        edit_desc = ui.input(
+                        edit_desc = required_input(
                             label="Evidence Description",
                             value=row["evid_desc"],
                         ).classes("w-full")
@@ -581,26 +569,26 @@ def build_evidence_page():
                             value=row["evid_serial_num"],
                         ).classes("w-full")
 
-                        edit_room = ui.select(
+                        edit_room = required_select(
                             options=current_rooms,
                             label="Room Located",
                             value=row["evid_loc_room"] or None,
                             with_input=True,
                         ).classes("w-full")
 
-                        edit_room_detail = ui.input(
+                        edit_room_detail = required_input(
                             label="Where Located",
                             value=row["evid_loc_room_detail"],
                         ).classes("w-full")
 
-                        edit_found_by = ui.select(
+                        edit_found_by = required_select(
                             options=current_agents,
                             label="Found By",
                             value=row["evid_found_by"] or None,
                             with_input=True,
                         ).classes("w-full")
 
-                        edit_witness = ui.select(
+                        edit_witness = required_select(
                             options=current_agents,
                             label="Witnessed By",
                             value=row["evid_found_by_witness"] or None,
@@ -670,9 +658,7 @@ def build_evidence_page():
                                     and new_found_by == new_witness
                                 ):
                                     ui.notify(
-                                        "You cannot have the same agent "
-                                        "in both 'Found By' and 'Witnessed "
-                                        "By' fields",
+                                        MESSAGES["evid_2"],
                                         type="warning",
                                         timeout=NOTIFICATION_TIMEOUT,
                                         close_button="OK",
@@ -686,9 +672,7 @@ def build_evidence_page():
                                 if new_triaged == "Yes" and not new_triaged_by:
 
                                     ui.notify(
-                                        "Please enter the name of the "
-                                        "agent who triaged the evidence "
-                                        "item to save the update",
+                                        MESSAGES["evid_1"],
                                         type="warning",
                                         timeout=NOTIFICATION_TIMEOUT,
                                         close_button="OK",
@@ -701,9 +685,7 @@ def build_evidence_page():
                                 new_num = edit_num.value or ""
                                 with get_session() as session:
                                     dup = (
-                                        session.query(
-                                            Evidence
-                                        )
+                                        session.query(Evidence)
                                         .filter(
                                             Evidence.evid_num == new_num,
                                             Evidence.id != row["id"],
@@ -715,7 +697,7 @@ def build_evidence_page():
                                         ui.notify(
                                             f"Evidence number {new_num} is "
                                             "already used",
-                                            type="negative",
+                                            type="warning",
                                             timeout=NOTIFICATION_TIMEOUT,
                                             close_button="OK",
                                             position="center",
@@ -723,9 +705,7 @@ def build_evidence_page():
                                         return
 
                                     evid = (
-                                        session.query(
-                                            Evidence
-                                        )
+                                        session.query(Evidence)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -770,10 +750,8 @@ def build_evidence_page():
                                         )
 
                                 ui.notify(
-                                    f"Item {new_num} was successfully "
-                                    "updated",
-                                    type="positive",
-                                    timeout=4000,
+                                    f"Item {new_num} was successfully " "updated.",
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
                                     close_button="OK",
                                     position="bottom",
                                 )
@@ -800,7 +778,7 @@ def build_evidence_page():
 
                         ui.label(
                             f"Are you sure you want to delete "
-                            f"Item {row['evid_num']} - "
+                            f"Item {row['evid_num']} -- "
                             f"{row['evid_desc']}?"
                         ).classes("mb-4")
 
@@ -816,9 +794,7 @@ def build_evidence_page():
                                 with get_session() as session:
 
                                     evid = (
-                                        session.query(
-                                            Evidence
-                                        )
+                                        session.query(Evidence)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -831,10 +807,9 @@ def build_evidence_page():
                                         evid_desc = row["evid_desc"]
 
                                 ui.notify(
-                                    f"Item {evid_num} - {evid_desc} "
-                                    "was deleted successfully",
-                                    type="positive",
-                                    timeout=4000,
+                                    f"Item {evid_num} ({evid_desc}) was "
+                                    "deleted successfully.",
+                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
                                     close_button="OK",
                                     position="bottom",
                                 )
@@ -844,6 +819,7 @@ def build_evidence_page():
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
+                                color="#FF0000",
                             ).props("negative unelevated")
 
                     delete_dialog.open()

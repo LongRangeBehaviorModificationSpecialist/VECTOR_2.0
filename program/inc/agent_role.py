@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 AGENT_ROLE_LIST = [
+    "",
     "Case Agent (Primary)",
     "Case Agent (Assist)",
     "Crime Scene Tech",

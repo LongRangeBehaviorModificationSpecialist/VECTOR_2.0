@@ -31,6 +31,10 @@ from navbar import build_navbar, confirm_new_case_dialog
 from program.config import Config
 
 
+NOTIFICATION_TIMEOUT = 0
+POSITIVE_NOTIFICATION_TIMEOUT = 4000
+
+
 # ── Auth Helpers ──────────────────────────────────────────────
 def is_authenticated() -> bool:
     """Stub — wire up to your session/auth logic."""
@@ -198,9 +202,11 @@ def build_login_home():
 
             if not entered_user or not entered_pass:
                 ui.notify(
-                    "Both a username and password are required",
+                    "Both a username and password are required.",
                     type="warning",
-                    timeout=2000,
+                    timeout=NOTIFICATION_TIMEOUT,
+                    close_button="OK",
+                    position="center",
                 )
                 return
 
@@ -220,15 +226,18 @@ def build_login_home():
 
                     ui.notify(
                         f"Welcome, {user.user_name}!",
-                        type="positive",
-                        timeout=2000,
+                        timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                        close_button="OK",
+                        position="bottom",
                     )
                     ui.navigate.to("/")
                 else:
                     ui.notify(
-                        "Invalid username or password",
-                        type="negative",
-                        timeout=2000,
+                        "Invalid username or password.",
+                        type="warning",
+                        timeout=NOTIFICATION_TIMEOUT,
+                        close_button="OK",
+                        position="center",
                     )
                     password_input.value = ""
 
@@ -366,8 +375,11 @@ def export_db_page():
 
                 if not db_file.exists():
                     ui.notify(
-                        "Database file not found",
+                        "Database file not found.",
                         type="negative",
+                        timeout=NOTIFICATION_TIMEOUT,
+                        close_button="OK",
+                        position="center",
                     )
                     return
 
@@ -379,13 +391,18 @@ def export_db_page():
                 ui.notify(
                     f"A copy of the case's database folder was saved "
                     f"to the '{save_to_path}' directory.",
-                    type="positive",
+                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                    close_button="OK",
+                    position="bottom",
                 )
 
             except Exception as err:
                 ui.notify(
-                    f"Export failed: {str(err)}",
+                    f"Export failed → {str(err)}.",
                     type="negative",
+                    timeout=NOTIFICATION_TIMEOUT,
+                    close_button="OK",
+                    position="center",
                 )
 
         ui.button(
@@ -443,8 +460,11 @@ def confirm_new_case_handler():
 
                     ui.notify(
                         "All data in all database tables has "
-                        "been successfully deleted",
+                        "been successfully deleted.",
                         type="info",
+                        timeout=NOTIFICATION_TIMEOUT,
+                        close_button="OK",
+                        position="center",
                     )
                     ui.navigate.to("/")
 
@@ -452,8 +472,10 @@ def confirm_new_case_handler():
                     session.rollback()
                     ui.notify(
                         "Database information was rolled back "
-                        "successfully",
-                        type="warning",
+                        "successfully.",
+                        timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                        close_button="OK",
+                        position="bottom",
                     )
                 finally:
                     dialog.close()
@@ -704,8 +726,9 @@ def logout_page():
     app.storage.user["is_admin"] = False
 
     ui.notify(
-        "You have been logged out successfully",
-        type="info",
-        timeout=2000,
+        "You have been logged out successfully.",
+        timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+        close_button="OK",
+        position="bottom",
     )
     ui.navigate.to("/")
