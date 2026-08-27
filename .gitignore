@@ -7,3 +7,4 @@ temp
 *.ico
 *.png
 *temp*
+agents.json

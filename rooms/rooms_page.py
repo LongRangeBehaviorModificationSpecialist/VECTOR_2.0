@@ -20,6 +20,7 @@ from main_page import (
     get_is_admin,
     confirm_new_case_handler
 )
+from utils import required_input, required_select, required_textarea
 
 
 NOTIFICATION_TIMEOUT = 4000
@@ -96,21 +97,21 @@ def build_rooms_page():
             ).classes("w-full")
 
             # room_desc — (required, autofocused)
-            room_desc_input = ui.input(
+            room_desc_input = required_input(
                 label="Room Description",
             ).classes("w-full")
 
             room_desc_input.props("autofocus")
 
             # room_first_agent —  populated from Agents
-            room_first_agent_combo = ui.select(
+            room_first_agent_combo = required_select(
                 options=agent_options,
                 label="First Agent Name",
                 with_input=True,
             ).classes("w-full")
 
             # room_second_agent — populated from Agents
-            room_second_agent_combo = ui.select(
+            room_second_agent_combo = required_select(
                 options=agent_options,
                 label="Second Agent Name",
                 with_input=True,
@@ -124,11 +125,6 @@ def build_rooms_page():
                     room_desc_input.value = ""
                     room_first_agent_combo.value = None
                     room_second_agent_combo.value = None
-                    # ui.notify(
-                    #     "Form cleared",
-                    #     type="info",
-                    #     timeout=NOTIFICATION_TIMEOUT,
-                    # )
 
                 def on_submit():
                     # ── Required field validation ──

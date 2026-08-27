@@ -31,7 +31,7 @@ current_date = datetime.today().strftime("%Y-%m-%d")
 
 
 # For SQLite databases, use the below syntax
-DATABASE_URL = f"sqlite:///{current_date}_app_data.db"
+DATABASE_URL = f"sqlite:///app_data.db"
 engine = create_engine(DATABASE_URL, echo=False, future=True)
 SessionLocal = sessionmaker(
     bind=engine,

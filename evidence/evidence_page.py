@@ -20,9 +20,10 @@ from main_page import (
 )
 from models import get_session, Agents, Evidence, Rooms
 from navbar import build_navbar, confirm_new_case_dialog
+from utils import required_input, required_select
 
 
-NOTIFICATION_TIMEOUT = 4000
+NOTIFICATION_TIMEOUT = 0
 
 
 # ── Helpers ─────────────────────────────────────────────────
@@ -115,13 +116,13 @@ def build_evidence_page():
             ).classes("w-full")
 
             # evid_qty — StringField (required, autofocused)
-            evid_qty_input = ui.input(
+            evid_qty_input = required_input(
                 label="Quantity"
             ).classes("w-full")
             evid_qty_input.props("autofocus")
 
             # evid_desc — StringField (required)
-            evid_desc_input = ui.input(
+            evid_desc_input = required_input(
                 label="Evidence Description"
             ).classes("w-full")
 
@@ -136,7 +137,7 @@ def build_evidence_page():
             ).classes("w-full")
 
             # evid_loc_room — (required), populated from Rooms
-            evid_room_combo = ui.select(
+            evid_room_combo = required_select(
                 options=room_options,
                 label="Room Located",
                 with_input=True,
@@ -148,14 +149,14 @@ def build_evidence_page():
             ).classes("w-full")
 
             # evid_found_by — (required), populated from Agents
-            evid_found_by_combo = ui.select(
+            evid_found_by_combo = required_select(
                 options=agent_options,
                 label="Found By",
                 with_input=True,
             ).classes("w-full")
 
             # evid_found_by_witness — (required), populated from Agents
-            evid_witness_combo = ui.select(
+            evid_witness_combo = required_select(
                 options=agent_options,
                 label="Witnessed By",
                 with_input=True,
@@ -222,11 +223,6 @@ def build_evidence_page():
                     evid_triaged_by_combo.disable()
                     evid_contraband_combo.value = None
                     evid_notes_input.value = ""
-                    # ui.notify(
-                    #     "Form cleared",
-                    #     type="info",
-                    #     timeout=NOTIFICATION_TIMEOUT
-                    # )
 
                 def on_submit():
                     # ── Required field validation ──
@@ -237,6 +233,8 @@ def build_evidence_page():
                             "Evidence Item Number is required",
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -247,6 +245,8 @@ def build_evidence_page():
                             "An item quantity is required",
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -257,6 +257,8 @@ def build_evidence_page():
                             "Evidence Description is required",
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -267,6 +269,8 @@ def build_evidence_page():
                             "Room Located is required",
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -277,6 +281,8 @@ def build_evidence_page():
                             "Where Located is required",
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -287,6 +293,8 @@ def build_evidence_page():
                             "Found By is required",
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -297,6 +305,8 @@ def build_evidence_page():
                             "Witnessed By is required",
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -304,12 +314,12 @@ def build_evidence_page():
                     # Same agent check
                     if evid_found_by == evid_witness:
                         ui.notify(
-                            "You cannot have the same agent listed "
-                            "in both 'Found By' and 'Witnessed By' — "
-                            "please check the names and resubmit the "
-                            "form.",
+                            "You cannot have the same agent "
+                            "as the 'Found By' and 'Witnessed By'",
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -322,6 +332,8 @@ def build_evidence_page():
                             "who triaged the evidence item",
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
+                            close_button="OK",
+                            position="center",
                         )
                         return
 
@@ -341,6 +353,8 @@ def build_evidence_page():
                                 "already used.",
                                 type="negative",
                                 timeout=NOTIFICATION_TIMEOUT,
+                                close_button="OK",
+                                position="center",
                             )
                             return
 
@@ -367,7 +381,9 @@ def build_evidence_page():
                         f"Item {evid_num} ({evid_desc}) has been "
                         "added to the case file.",
                         type="positive",
-                        timeout=NOTIFICATION_TIMEOUT,
+                        timeout=4000,
+                        close_button="OK",
+                        position="bottom",
                     )
 
                     clear_form()
@@ -659,6 +675,8 @@ def build_evidence_page():
                                         "By' fields",
                                         type="warning",
                                         timeout=NOTIFICATION_TIMEOUT,
+                                        close_button="OK",
+                                        position="center",
                                     )
                                     return
 
@@ -673,6 +691,8 @@ def build_evidence_page():
                                         "item to save the update",
                                         type="warning",
                                         timeout=NOTIFICATION_TIMEOUT,
+                                        close_button="OK",
+                                        position="center",
                                     )
                                     return
 
@@ -697,6 +717,8 @@ def build_evidence_page():
                                             "already used",
                                             type="negative",
                                             timeout=NOTIFICATION_TIMEOUT,
+                                            close_button="OK",
+                                            position="center",
                                         )
                                         return
 
@@ -751,7 +773,9 @@ def build_evidence_page():
                                     f"Item {new_num} was successfully "
                                     "updated",
                                     type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    timeout=4000,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
 
                                 edit_dialog.close()
@@ -810,7 +834,9 @@ def build_evidence_page():
                                     f"Item {evid_num} - {evid_desc} "
                                     "was deleted successfully",
                                     type="positive",
-                                    timeout=NOTIFICATION_TIMEOUT,
+                                    timeout=4000,
+                                    close_button="OK",
+                                    position="bottom",
                                 )
                                 delete_dialog.close()
                                 refresh_evidence_table()

@@ -21,6 +21,7 @@ from main_page import (
 from models import get_session, Cases
 from navbar import build_navbar
 from program.inc.jurisdictions import JURISDICTIONS
+from utils import required_input, required_select
 
 
 NOTIFICATION_TIMEOUT = 4000
@@ -65,16 +66,16 @@ def build_cases_page():
                 "Open New Case"
             ).classes("text-lg font-semibold mb-4")
 
-            case_number_input = ui.input(
+            case_number_input = required_input(
                 label="Case Number"
             ).classes("w-full")
             case_number_input.props("autofocus")
 
-            location_input = ui.input(
+            location_input =required_input(
                 label="Location"
             ).classes("w-full")
 
-            jurisdiction_combo = ui.select(
+            jurisdiction_combo = required_select(
                 options=load_jurisdiction_options(),
                 label="Jurisdiction",
                 with_input=True,
@@ -462,9 +463,7 @@ def build_cases_page():
                                 with get_session() as session:
 
                                     case = (
-                                        session.query(
-                                            Cases
-                                        )
+                                        session.query(Cases)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
@@ -490,11 +489,11 @@ def build_cases_page():
                                         )
                                         begin_time = (
                                             edit_time_begin.value
-                                            or "00:00"
+                                            # or "00:00"
                                         )
                                         case.case_date_time_begin = (
                                             f"{begin_date} {begin_time}"
-                                            if begin_date else ""
+                                            # if begin_date else ""
                                         )
 
                                         end_date = (
@@ -504,7 +503,7 @@ def build_cases_page():
                                         if end_date:
                                             end_time = (
                                                 edit_time_end.value
-                                                or "00:00"
+                                                # or "00:00"
                                             )
                                             case.case_date_time_end = (
                                                 f"{end_date} {end_time}"
@@ -558,9 +557,7 @@ def build_cases_page():
                                 with get_session() as session:
 
                                     case = (
-                                        session.query(
-                                            Cases
-                                        )
+                                        session.query(Cases)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )

@@ -104,41 +104,43 @@ ui.add_css(
         line-height: 24px;
         padding: 8px 12px;
         resize: none !important;
+    }
+
+    /* Required field asterisk */
+    .required {
+        color: #ef4444 !important;
+        margin-left: 2px;
+
+    /* Print styles */
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+
+        /* Hide navbar */
+        .q-header {
+            display: none !important;
+        }
+
+        /* Hide all images */
+        img {
+            display: none !important;
+        }
+
+        /* Remove padding/margins so content fills the page */
+        main,
+        .nicegui-content,
+        .q-page {
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        body {
+            padding: 0 !important;
+        }
+    }
 }
 
-/* Print styles */
-@media print {
-    .no-print {
-        display: none !important;
-    }
-
-    /* Hide navbar */
-    .q-header {
-        display: none !important;
-    }
-
-    /* Hide all images */
-    img {
-        display: none !important;
-    }
-
-    /* Remove padding/margins so content fills the page */
-    main,
-    .nicegui-content,
-    .q-page {
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-
-    body {
-        padding: 0 !important;
-    }
-}
-
-@media print {
-
-    }
-}
 
 """,
     shared=True,

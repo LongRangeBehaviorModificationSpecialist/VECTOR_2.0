@@ -21,6 +21,7 @@ from main_page import (
     get_is_admin,
     confirm_new_case_handler,
 )
+from utils import required_input, required_select, required_textarea
 
 
 NOTIFICATION_TIMEOUT = 4000
@@ -78,14 +79,14 @@ def build_notes_page():
             # (will be set when the note is updated via the edit dialog)
 
             # note_author — SelectField (required), populated from Agents
-            note_author_combo = ui.select(
+            note_author_combo = required_select(
                 options=agent_options,
                 label="Agent Name",
                 with_input=True,
             ).classes("w-full")
 
             # note_text — TextAreaField
-            note_text_input = ui.textarea(
+            note_text_input = required_textarea(
                 label="Note"
             ).classes("w-full")
 
@@ -96,11 +97,6 @@ def build_notes_page():
                     note_date_time_input.value = get_current_timestamp()
                     note_author_combo.value = None
                     note_text_input.value = ""
-                    # ui.notify(
-                    #     "Form cleared",
-                    #     type="info",
-                    #     timeout=NOTIFICATION_TIMEOUT
-                    # )
 
                 def on_submit():
                     # ── Required field validation ──

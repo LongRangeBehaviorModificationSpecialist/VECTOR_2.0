@@ -20,6 +20,7 @@ from main_page import (
     get_is_admin,
     confirm_new_case_handler,
 )
+from utils import required_input, required_select, required_textarea
 
 
 NOTIFICATION_TIMEOUT = 4000
@@ -49,7 +50,7 @@ def build_persons_page():
             ).classes("text-lg font-semibold mb-4")
 
             # sus_name — StringField (required, autofocused)
-            sus_name_input = ui.input(
+            sus_name_input = required_input(
                 label="Name"
             ).classes("w-full")
             sus_name_input.props("autofocus")
@@ -70,7 +71,7 @@ def build_persons_page():
             ).classes("w-full")
 
             # sus_notes — TextAreaField
-            sus_notes_input = ui.textarea(
+            sus_notes_input = required_textarea(
                 label="Notes"
             ).classes("w-full")
 
@@ -83,11 +84,6 @@ def build_persons_page():
                     sus_address_input.value = ""
                     sus_phone_input.value = ""
                     sus_notes_input.value = ""
-                    # ui.notify(
-                    #     "Form cleared",
-                    #     type="info",
-                    #     timeout=NOTIFICATION_TIMEOUT,
-                    # )
 
                 def on_submit():
                     # ── Required field validation (DataRequired) ──

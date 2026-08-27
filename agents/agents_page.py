@@ -27,6 +27,7 @@ from main_page import (
     confirm_new_case_handler,
 )
 from navbar import build_navbar, confirm_new_case_dialog
+from utils import required_input, required_select
 
 
 NOTIFICATION_TIMEOUT = 4000
@@ -155,7 +156,7 @@ def build_agents_page():
             agent_lookup = {a["name"]: a for a in full_agent_info}
 
             # Agent Name — dropdown populated from agents.json
-            agent_name_input = ui.select(
+            agent_name_input = required_select(
                 options=load_agent_names(),
                 label="Agent's Name",
                 with_input=True,
@@ -166,14 +167,14 @@ def build_agents_page():
                 label="Agent's Initials",
             ).classes("w-full")
 
-            agent_parent_agency_input = ui.select(
+            agent_parent_agency_input = required_select(
                 options=load_agency_options(),
                 label="Parent Agency",
                 with_input=True,
                 new_value_mode="add",
             ).classes("w-full")
 
-            agent_role_input = ui.select(
+            agent_role_input = required_select(
                 options=load_role_options(),
                 label="Agent's Role",
                 with_input=True,

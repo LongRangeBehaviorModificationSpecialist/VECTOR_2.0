@@ -4,6 +4,7 @@ reports_page.py
 Each report renders as formatted HTML that prints exactly like the original
 Flask templates. Uses window.print() for native browser printing.
 
+
 Routes:
     /reports/json              →  JSON data viewer
     /reports/agents            →  Agent list report
@@ -13,6 +14,17 @@ Routes:
     /reports/evidence-by-room  →  Evidence by room (pending template)
     /reports/persons           →  Person list (pending template)
     /reports/notes             →  Notes list (pending template)
+
+
+Workflow for report creation:
+    (1) `print_<type>_report() function is called from the navbar button ->
+    (2) That function calls `get_case_info()` ->
+    (3) `build_<type>_report_html(active_case=active_case,
+            <type>=<type>)` compiles the html string for report ->
+        (a) `build_case_header_html(active_case, page_title, sub_title)`
+        (b) `build_report_footer_html()`
+    (4) `render_report_page()` is run with the output from step 3 (html_content)
+
 """
 
 from nicegui import ui
@@ -34,13 +46,17 @@ NOTIFICATION_TIMEOUT = 4000
 
 
 # ── Helpers
+def has_active_case() -> bool:
+    """Quick check if any case exits in the database"""
+    with get_session() as session:
+        return session.query(Cases).count() > 0
+
 def get_date_time() -> str:
     """Gets the current date and time for report headers."""
     now = datetime.now()
     date = now.strftime("%a, %b %d, %Y")
     time = now.strftime("%H:%M %p")
     return f"{date} at {time}"
-
 
 def get_print_date_time() -> tuple[str, str]:
     """Returns date and time separately for template compatibility."""
@@ -49,22 +65,27 @@ def get_print_date_time() -> tuple[str, str]:
     print_time = now.strftime("%H:%M")
     return print_date, print_time
 
+def get_case_info() -> dict | None:
+    """Returns the single active case info (or None if no case exists)."""
 
-def get_case_info() -> list[dict]:
-    """Returns case info for report headers."""
     with get_session() as session:
-        cases = session.query(Cases).all()
-        return [
-            {
-                "case_number": c.case_number,
-                "location": c.location,
-                "jurisdiction": c.jurisdiction,
-                "case_date_time_begin": c.case_date_time_begin,
-                "case_date_time_end": c.case_date_time_end or "",
-            }
-            for c in cases
-        ]
 
+        case = session.query(Cases).first()
+
+        if not case:
+            return None
+
+        return {
+            "case_number": case.case_number or "",
+            "location": case.location or "",
+            "jurisdiction": case.jurisdiction or "",
+            "case_date_time_begin": (
+                str(case.case_date_time_begin) if case.case_date_time_begin else ""
+            ),
+            "case_date_time_end": (
+                str(case.case_date_time_end) if case.case_date_time_end else ""
+            ),
+        }
 
 # ── Report Page Wrapper
 def render_report_page(html_content: str):
@@ -89,26 +110,58 @@ def render_report_page(html_content: str):
             ui.html(html_content)
 
 
-def validate_case_has_end_datetime(case_id: int) -> tuple[bool, str]:
-    """Validates that the case has an end_date_time set.
+def validate_case_for_report() -> tuple[bool, list[str]]:
+    """Validates that the single active case has all required fields
+    for reporting.
 
-    Returns (is_valid, error_message).
+    Returns:
+        (is_valid, list_of_error_messages).
     """
-    from models import get_session, Cases
+
+    errors = []
 
     with get_session() as session:
-        case = session.query(Cases).filter_by(id=case_id).first()
+
+        case = session.query(Cases).first()  # Only one case at a time
+        evidence = session.query(Evidence).all()
 
         if not case:
-            return False, "Case not found."
-
-        if not case.end_date_time:
-            return False, (
-                "Cannot generate report: End Date/Time is not set. "
-                "Please complete the case details first."
+            errors.append(
+                "No case exists in the database. Create a case first."
             )
+            return False, errors
 
-        return True, ""
+        # Check Case Number
+        if not case.case_number or not str(case.case_number).strip():
+            errors.append("Case Number is required.")
+
+        # Check Location
+        if not case.location or not str(case.location).strip():
+            errors.append("Location is required.")
+
+        # Check Jurisdiction
+        if not case.jurisdiction or not str(case.jurisdiction).strip():
+            errors.append("Jurisdiction is required.")
+
+        # Check End Date/Time (required for complete reports)
+        if not case.case_date_time_end:
+            errors.append("End Date/Time is required for reports.")
+
+        
+
+    return (len(errors) == 0, errors)
+
+def show_validation_errors(errors: list[str]):
+    """Displays validation errors as a NiceGUI notification."""
+    if len(errors) == 1:
+        ui.notify(errors[0], type="negative", timeout=5000)
+    else:
+        error_text = "\n".join(f"• {err}" for err in errors)
+        ui.notify(
+            f"Cannot generate report — missing information:\n\n{error_text}",
+            type="negative",
+            timeout=7000,
+        )
 
 
 # ── Common Print Styles
@@ -286,45 +339,50 @@ td.evidTableDataColTwo {
 }
 """
 
-
 # ── Case Header Builder
-def build_case_header_html(
-        cases: list[dict],
-        page_title: str,
-        sub_title: str
-) -> str:
+def build_case_header_html(active_case: dict | None, page_title: str, sub_title: str) -> str:
     """Generates the standard report title + case info header HTML."""
+    active_case = get_case_info()
+
+    if not active_case:
+        ui.notify(
+            "No active case — please create a case first",
+            type="warning"
+        )
+        # Redirect to case creation page
+        ui.navigate.to("/cases")
+
     print_date, print_time = get_print_date_time()
 
-    report_header_table = "".join([f"""
+    report_header_table = f"""
     <div class="top-table">
         <table class="headerTable">
             <tr>
                 <td class="header font-11">Investigation Number:</td>
-                <td class="data font-11">{c["case_number"]}</td>
+                <td class="data font-11">{active_case["case_number"]}</td>
             </tr>
             <tr>
                 <td class="header font-11">Site Address:</td>
-                <td class="data font-11">{c["location"]}</td>
+                <td class="data font-11">{active_case["location"]}</td>
             </tr>
             <tr>
                 <td class="header font-11">Jurisdiction:</td>
-                <td class="data font-11">{c["jurisdiction"]}</td>
+                <td class="data font-11">{active_case["jurisdiction"]}</td>
             </tr>
             <tr>
                 <td class="header font-11">Starting Date and Time:</td>
-                <td class="data font-11">{c["case_date_time_begin"]}</td>
+                <td class="data font-11">{active_case["case_date_time_begin"]}</td>
             </tr>
             <tr>
                 <td class="header font-11">Ending Date and Time:</td>
-                <td class="data font-11">{c["case_date_time_end"]}</td>
+                <td class="data font-11">{active_case["case_date_time_end"]}</td>
             </tr>
             <tr>
                 <td class="header font-11">Report Printed Date:</td>
                 <td class="data font-11">{print_date} at {print_time}</td>
             </tr>
         </table>
-    </div>""" for c in cases])
+    </div>"""
 
     return f"""
     <div class="reportTitle">
@@ -334,7 +392,6 @@ def build_case_header_html(
     {report_header_table}
     """
 
-
 def build_report_footer_html() -> str:
     """Generates the standard END OF REPORT footer."""
     return """
@@ -343,9 +400,8 @@ def build_report_footer_html() -> str:
     </p>
     """
 
-
 # ── Agent List Report HTML Template
-def build_agents_report_html(cases: list, agents: list) -> str:
+def build_agents_report_html(active_case: dict, agents: list) -> str:
     """Generates the complete HTML for the Agent List report."""
 
     agent_rows = "".join([f"""
@@ -357,7 +413,7 @@ def build_agents_report_html(cases: list, agents: list) -> str:
     </tr>""" for a in agents])
 
     header = build_case_header_html(
-        cases,
+        active_case,
         page_title="Investigators At Search Warrant Site",
         sub_title="( AGENT COPY )",
     )
@@ -391,9 +447,8 @@ def build_agents_report_html(cases: list, agents: list) -> str:
 </body>
 </html>"""
 
-
 # ── Detailed Evidence Report HTML Template (AGENT COPY)
-def build_evidence_report_html(cases: list, evidence: list) -> str:
+def build_evidence_report_html(active_case: list, evidence: list) -> str:
     """Generates the complete HTML for the detailed Evidence report.
 
     Each item is displayed as vertical label/value rows with ALL fields.
@@ -458,7 +513,7 @@ def build_evidence_report_html(cases: list, evidence: list) -> str:
         </tr>""" for e in evidence])
 
     header = build_case_header_html(
-        cases,
+        active_case,
         page_title="Items Seized at Search Warrant Site",
         sub_title="( AGENT COPY )",
     )
@@ -482,13 +537,8 @@ def build_evidence_report_html(cases: list, evidence: list) -> str:
 </body>
 </html>"""
 
-
 # ── Evidence By Room Report HTML Template
-def build_evidence_by_room_report_html(
-        cases: list,
-        evidence: list,
-        unique_rooms: list
-) -> str:
+def build_evidence_by_room_report_html(active_case: list, evidence: list, unique_rooms: list) -> str:
     """Generates the complete HTML for the Evidence By Room report.
 
     Groups evidence items under dark-background room headers with item counts.
@@ -593,7 +643,7 @@ def build_evidence_by_room_report_html(
         </br />"""
 
     header = build_case_header_html(
-        cases,
+        active_case,
         page_title="Items Seized at Search Warrant Site (By Room)",
         sub_title="( AGENT COPY )",
     )
@@ -616,9 +666,8 @@ def build_evidence_by_room_report_html(
 </body>
 </html>"""
 
-
 # ── Basic Evidence Report HTML Template (RETURN COPY)
-def build_basic_evidence_report_html(cases: list, evidence: list) -> str:
+def build_basic_evidence_report_html(active_case: list, evidence: list) -> str:
     """Generates the complete HTML for the Basic Evidence report.
 
     Each item shows only Item#, Quantity, Description, Model#, and Serial#.
@@ -648,7 +697,7 @@ def build_basic_evidence_report_html(cases: list, evidence: list) -> str:
         </tr>""" for e in evidence])
 
     header = build_case_header_html(
-        cases,
+        active_case,
         page_title="Items Seized at Search Warrant Site",
         sub_title="( RETURN COPY )",
     )
@@ -672,9 +721,8 @@ def build_basic_evidence_report_html(cases: list, evidence: list) -> str:
 </body>
 </html>"""
 
-
 # ── Room List Report HTML Template
-def build_rooms_report_html(cases: list, rooms: list) -> str:
+def build_rooms_report_html(active_case: list, rooms: list) -> str:
     """Generates the complete HTML for the Room List report."""
 
     room_rows = "".join([f"""
@@ -686,7 +734,7 @@ def build_rooms_report_html(cases: list, rooms: list) -> str:
         </tr>""" for r in rooms])
 
     header = build_case_header_html(
-        cases,
+        active_case,
         page_title="Rooms at Search Warrant Site",
         sub_title="( AGENT COPY )",
     )
@@ -720,9 +768,8 @@ def build_rooms_report_html(cases: list, rooms: list) -> str:
 </body>
 </html>"""
 
-
 # ── Person List Report HTML Template
-def build_persons_report_html(cases: list, persons: list) -> str:
+def build_persons_report_html(active_case: list, persons: list) -> str:
     """Generates the complete HTML for the Person List report."""
 
     person_rows = "".join([f"""
@@ -735,7 +782,7 @@ def build_persons_report_html(cases: list, persons: list) -> str:
         </tr>""" for p in persons])
 
     header = build_case_header_html(
-        cases,
+        active_case,
         page_title="Persons List",
         sub_title="( AGENT COPY )",
     )
@@ -770,9 +817,8 @@ def build_persons_report_html(cases: list, persons: list) -> str:
 </body>
 </html>"""
 
-
 # ── Notes Report HTML Template
-def build_notes_report_html(cases: list, notes: list) -> str:
+def build_notes_report_html(active_case: list, notes: list) -> str:
     """Generates the complete HTML for the Notes report."""
 
     note_rows = "".join([f"""
@@ -784,7 +830,7 @@ def build_notes_report_html(cases: list, notes: list) -> str:
         </tr>""" for n in notes])
 
     header = build_case_header_html(
-        cases,
+        active_case,
         page_title="Search Warrant Notes",
         sub_title="( AGENT COPY )",
     )
@@ -818,7 +864,6 @@ def build_notes_report_html(cases: list, notes: list) -> str:
 </body>
 </html>"""
 
-
 # ── Updated Agents Route
 @ui.page("/reports/agents")
 def print_agents_report():
@@ -827,7 +872,9 @@ def print_agents_report():
         return
 
     with get_session() as session:
-        cases = get_case_info()
+
+        active_case = get_case_info()
+
         agents = [
             {
                 "agent_name": a.agent_name,
@@ -840,9 +887,12 @@ def print_agents_report():
             for a in session.query(Agents).all()
         ]
 
-    html = build_agents_report_html(cases, agents)
-    render_report_page(html)
+    html = build_agents_report_html(
+        active_case=active_case,
+        agents=agents
+    )
 
+    render_report_page(html_content=html)
 
 # ── Updated Evidence Routes
 @ui.page("/reports/evidence")
@@ -852,7 +902,9 @@ def print_evidence_report():
         return
 
     with get_session() as session:
-        cases = get_case_info()
+
+        active_case = get_case_info()
+
         evidence = [
             {
                 "evid_num": e.evid_num,
@@ -872,9 +924,12 @@ def print_evidence_report():
             for e in session.query(Evidence).order_by(Evidence.evid_num).all()
         ]
 
-    html = build_evidence_report_html(cases, evidence)
-    render_report_page(html)
+    html = build_evidence_report_html(
+        active_case=active_case,
+        evidence=evidence
+    )
 
+    render_report_page(html_content=html)
 
 # ── Updated Evidence By Room Route
 @ui.page("/reports/evidence-by-room")
@@ -884,7 +939,7 @@ def print_evidence_by_room_report():
         return
 
     with get_session() as session:
-        cases = get_case_info()
+        active_case = get_case_info()
 
         # Get unique rooms with item counts (matches Flask route query)
         unique_rooms = (
@@ -919,13 +974,12 @@ def print_evidence_by_room_report():
         ]
 
     html = build_evidence_by_room_report_html(
-        cases,
-        evidence,
-        unique_rooms_list
+        active_case=active_case,
+        evidence=evidence,
+        unique_rooms=unique_rooms_list,
     )
 
-    render_report_page(html)
-
+    render_report_page(html_content=html)
 
 # ── Updated Basic Evidence Report Route
 @ui.page("/reports/evidence-basic")
@@ -935,7 +989,7 @@ def print_basic_evidence_report():
         return
 
     with get_session() as session:
-        cases = get_case_info()
+        active_case = get_case_info()
         evidence = [
             {
                 "evid_num": e.evid_num,
@@ -947,9 +1001,12 @@ def print_basic_evidence_report():
             for e in session.query(Evidence).order_by(Evidence.evid_num).all()
         ]
 
-    html = build_basic_evidence_report_html(cases, evidence)
-    render_report_page(html)
+    html = build_basic_evidence_report_html(
+        active_case=active_case,
+        evidence=evidence
+    )
 
+    render_report_page(html_content=html)
 
 # ── Updated Rooms Route
 @ui.page("/reports/rooms")
@@ -959,7 +1016,7 @@ def print_rooms_report():
         return
 
     with get_session() as session:
-        cases = get_case_info()
+        active_case = get_case_info()
         rooms = [
             {
                 "room_label": r.room_label,
@@ -970,9 +1027,12 @@ def print_rooms_report():
             for r in session.query(Rooms).order_by(Rooms.room_label).all()
         ]
 
-    html = build_rooms_report_html(cases, rooms)
-    render_report_page(html)
+    html = build_rooms_report_html(
+        active_case=active_case,
+        rooms=rooms
+    )
 
+    render_report_page(html_content=html)
 
 # ── Updated Persons Route
 @ui.page("/reports/persons")
@@ -982,7 +1042,7 @@ def print_persons_report():
         return
 
     with get_session() as session:
-        cases = get_case_info()
+        active_case = get_case_info()
         persons = [
             {
                 "sus_name": p.sus_name,
@@ -994,9 +1054,12 @@ def print_persons_report():
             for p in session.query(Persons).order_by(Persons.sus_name).all()
         ]
 
-    html = build_persons_report_html(cases, persons)
-    render_report_page(html)
+    html = build_persons_report_html(
+        active_case=active_case,
+        persons=persons
+    )
 
+    render_report_page(html_content=html)
 
 # ── Updated Notes Route
 @ui.page("/reports/notes")
@@ -1006,7 +1069,7 @@ def print_notes_report():
         return
 
     with get_session() as session:
-        cases = get_case_info()
+        active_case = get_case_info()
         notes = [
             {
                 "note_date_time": n.note_date_time,
@@ -1017,9 +1080,12 @@ def print_notes_report():
             for n in session.query(Notes).order_by(Notes.note_date_time).all()
         ]
 
-    html = build_notes_report_html(cases, notes)
-    render_report_page(html)
+    html = build_notes_report_html(
+        active_case=active_case,
+        notes=notes
+    )
 
+    render_report_page(html_content=html)
 
 # ── JSON Output
 @ui.page("/reports/json")
@@ -1037,17 +1103,17 @@ def json_output_page():
     ui.label("JSON Data Output").classes("text-2xl font-bold m-4")
 
     with get_session() as session:
+
+        case = session.query(Cases).first()
+
         data = {
-            "case": [
-                {
-                    "case_number": c.case_number,
-                    "location": c.location,
-                    "jurisdiction": c.jurisdiction,
-                    "case_date_time_begin": c.case_date_time_begin,
-                    "case_date_time_end": c.case_date_time_end,
-                }
-                for c in session.query(Cases).all()
-            ],
+            "case": {
+                    "case_number": case.case_number,
+                    "location": case.location,
+                    "jurisdiction": case.jurisdiction,
+                    "case_date_time_begin": case.case_date_time_begin,
+                    "case_date_time_end": case.case_date_time_end,
+                },
             "agents": [
                 {
                     "agent_name": a.agent_name,
@@ -1109,7 +1175,7 @@ def json_output_page():
             ],
         }
 
-    json_str = json.dumps(data, indent=2)
+    json_str = json.dumps(data, indent=4)
 
     with ui.column().classes("w-full max-w-4xl mx-auto p-4"):
         ui.button(
@@ -1121,12 +1187,17 @@ def json_output_page():
 
         ui.code(json_str, language="json").classes("w-full")
 
-
 def open_report_window():
     """Extracts the report innerHTML and opens it in a clean new tab.
 
     The report can be printed after validation has occured.
     """
+
+    # Validate all of the requirements are met before opening the report
+    is_valid, errors = validate_case_for_report()
+    if not is_valid:
+        show_validation_errors(errors)
+        return
 
     REPORT_PRINT_STYLES = COMMON_STYLES.replace('"', '\\"')
 
