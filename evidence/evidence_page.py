@@ -42,11 +42,15 @@ def load_room_labels() -> list[str]:
     """Returns a list of all room labels from the Rooms table."""
     with get_session() as session:
         rows = (
-            session.query(Rooms.room_label)
+            session.query(
+                Rooms.room_label,
+                Rooms.room_desc
+            )
             .order_by(Rooms.room_label)
             .all()
         )
-        return [r[0] for r in rows]
+
+        return [f"Room {r[0]} ({r[1]})" for r in rows]
 
 
 def get_next_evid_num() -> str:
@@ -78,8 +82,11 @@ def get_next_evid_num() -> str:
 def build_evidence_page():
     """Builds the full Evidence page UI."""
 
-    # ── Header / Navbar
+    if not is_authenticated():
+        ui.navigate.to("/")
+        return
 
+    # ── Header / Navbar
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -92,101 +99,106 @@ def build_evidence_page():
             "Evidence Management"
         ).classes("text-2xl font-bold m-4")
 
-        # ── Add Evidence Form
-        with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
+        ui.label(
+            "Add Evidence Item"
+        ).classes("text-lg font-semibold mb-4")
 
-            ui.label(
-                "Add Evidence Item"
-            ).classes("text-lg font-semibold mb-4")
+        # ─── TWO-COLUMN GRID LAYOUT ───
+        with ui.card().classes("w-full max-w-6xl mx-auto p-6"):
+            with ui.grid(columns=2).classes("w-full gap-6 items-start"):
+                # ═══ LEFT COLUMN (Fields 1-7) ═══
+                with ui.column().classes("gap-4"):
 
-            next_evid = get_next_evid_num()
-            agent_options = load_agent_names()
-            room_options = load_room_labels()
+                    next_evid = get_next_evid_num()
+                    agent_options = load_agent_names()
+                    room_options = load_room_labels()
 
-            # evid_num — StringField, pre-populated with next number
-            evid_num_input = required_input(
-                label="Evidence Item Number",
-                value=next_evid,
-            ).classes("w-full")
-            evid_num_input.props("readonly")
+                    # evid_num — StringField, pre-populated with next number
+                    evid_num_input = required_input(
+                        label="Evidence Item Number",
+                        value=next_evid,
+                    ).classes("w-full")
+                    evid_num_input.props("readonly")
 
-            # evid_qty — StringField (required, autofocused)
-            evid_qty_input = required_input(
-                label="Quantity"
-            ).classes("w-full")
-            evid_qty_input.props("autofocus")
+                    # evid_qty — StringField (required, autofocused)
+                    evid_qty_input = required_input(
+                        label="Quantity"
+                    ).classes("w-full")
+                    evid_qty_input.props("autofocus")
 
-            # evid_desc — StringField (required)
-            evid_desc_input = required_input(
-                label="Evidence Description"
-            ).classes("w-full")
+                    # evid_desc — StringField (required)
+                    evid_desc_input = required_input(
+                        label="Evidence Description"
+                    ).classes("w-full")
 
-            # evid_model_num — StringField
-            evid_model_input = ui.input(
-                label="Model Number"
-            ).classes("w-full")
+                    # evid_model_num — StringField
+                    evid_model_input = ui.input(
+                        label="Model Number"
+                    ).classes("w-full")
 
-            # evid_serial_num — StringField
-            evid_serial_input = ui.input(
-                label="Serial Number"
-            ).classes("w-full")
+                    # evid_serial_num — StringField
+                    evid_serial_input = ui.input(
+                        label="Serial Number"
+                    ).classes("w-full")
 
-            # evid_loc_room — (required), populated from Rooms
-            evid_room_combo = required_select(
-                options=room_options,
-                label="Room Located",
-                with_input=True,
-            ).classes("w-full")
+                    # evid_loc_room — (required), populated from Rooms
+                    evid_room_combo = required_select(
+                        options=room_options,
+                        label="Room Located",
+                        with_input=True,
+                    ).classes("w-full")
 
-            # evid_loc_room_detail — (required)
-            evid_room_detail_input = required_input(
-                label="Where Located"
-            ).classes("w-full")
+                    # evid_loc_room_detail — (required)
+                    evid_room_detail_input = required_input(
+                        label="Where Located"
+                    ).classes("w-full")
 
-            # evid_found_by — (required), populated from Agents
-            evid_found_by_combo = required_select(
-                options=agent_options,
-                label="Found By",
-                with_input=True,
-            ).classes("w-full")
+                # ═══ RIGHT COLUMN (Fields 8-14) ════
+                with ui.column().classes("gap-4"):
+                    # evid_found_by — (required), populated from Agents
+                    evid_found_by_combo = required_select(
+                        options=agent_options,
+                        label="Found By",
+                        with_input=True,
+                    ).classes("w-full")
 
-            # evid_found_by_witness — (required), populated from Agents
-            evid_witness_combo = required_select(
-                options=agent_options,
-                label="Witnessed By",
-                with_input=True,
-            ).classes("w-full")
+                    # evid_found_by_witness — (required), populated from Agents
+                    evid_witness_combo = required_select(
+                        options=agent_options,
+                        label="Witnessed By",
+                        with_input=True,
+                    ).classes("w-full")
 
-            # evid_pic_taken — (Yes/No)
-            evid_pic_combo = ui.select(
-                options=["Yes", "No"],
-                label="Item Photographed",
-            ).classes("w-full")
+                    # evid_pic_taken — (Yes/No)
+                    evid_pic_combo = ui.select(
+                        options=["Yes", "No"],
+                        label="Item Photographed",
+                    ).classes("w-full")
 
-            # evid_triaged — (empty/Yes/No)
-            evid_triaged_combo = ui.select(
-                options=["", "Yes", "No"],
-                label="Item Triaged?",
-            ).classes("w-full")
+                    # evid_triaged — (empty/Yes/No)
+                    evid_triaged_combo = ui.select(
+                        options=["", "Yes", "No"],
+                        label="Item Triaged?",
+                    ).classes("w-full")
 
-            # evid_triaged_by — disabled until triaged = Yes
-            evid_triaged_by_combo = ui.select(
-                options=agent_options,
-                label="Triaged By",
-                with_input=True,
-            ).classes("w-full")
-            evid_triaged_by_combo.disable()
+                    # evid_triaged_by — disabled until triaged = Yes
+                    evid_triaged_by_combo = ui.select(
+                        options=agent_options,
+                        label="Triaged By",
+                        with_input=True,
+                    ).classes("w-full")
+                    evid_triaged_by_combo.disable()
 
-            # evid_contains_contraband
-            evid_contraband_combo = ui.select(
-                options=["", "Yes", "No", "Unknown", "N/A"],
-                label="Contains Contraband?",
-            ).classes("w-full")
+                    # evid_contains_contraband
+                    evid_contraband_combo = ui.select(
+                        options=["", "Yes", "No", "Unknown", "N/A"],
+                        label="Contains Contraband?",
+                    ).classes("w-full")
 
-            # evid_notes — TextAreaField
-            evid_notes_input = ui.textarea(
-                label="Notes"
-            ).classes("w-full")
+                    # evid_notes — TextAreaField
+                    evid_notes_input = ui.input(
+                        label="Notes"
+                    ).classes("w-full")
 
             # ── Triaged toggle logic ─────────────────────────────
             def on_triage_change(e):

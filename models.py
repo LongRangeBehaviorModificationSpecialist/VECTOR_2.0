@@ -56,7 +56,6 @@ def check_password_hash(stored_hash: str, attempted: str) -> bool:
 
 # --- MODELS ---
 
-
 class Agents(Base):
     """Agents table — stores agent details."""
 
@@ -64,7 +63,7 @@ class Agents(Base):
 
     id = Column(Integer(), primary_key=True)
     agent_name = Column(String(), nullable=False, unique=True)
-    agent_initials = Column(String(), nullable=False, unique=True)
+    # agent_initials = Column(String(), nullable=False, unique=True)
     agent_parent_agency = Column(String(), nullable=False)
     agent_role = Column(String(), nullable=False)
     agent_role_secondary = Column(String())
@@ -81,7 +80,7 @@ class AgentsSchema(Schema):
     """Agent schema."""
 
     agent_name = fields.Str()
-    agent_initials = fields.Str()
+    # agent_initials = fields.Str()
     agent_parent_agency = fields.Str()
     agent_role = fields.Str()
     agent_role_secondary = fields.Str()

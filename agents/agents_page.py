@@ -41,40 +41,22 @@ AGENTS_JSON_PATH = Path(__file__).parent / "agents.json"
 
 
 def load_agents_from_json() -> list[dict]:
-    """Load agent list from agents.json."""
+    """Loads the agents list from agents.json."""
     if not AGENTS_JSON_PATH.exists():
         return []
     try:
         with open(AGENTS_JSON_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get("agent_list", [])
+            return json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         return []
 
 
 def save_agent_to_json(
-        name: str,
-        initials: str,
-        agency: str,
-        phone: str
+        agents: list
 ) -> None:
-    """Append a new agent to agents.json."""
-    agents = load_agents_from_json()
-
-    # Check if agent already exists in JSON (by name)
-    if any(a["name"].lower() == name.lower() for a in agents):
-        return  # Don't duplicate
-
-    new_entry = {
-        "name": name,
-        "initials": initials,
-        "agency": agency,
-        "phone": phone
-    }
-    agents.append(new_entry)
-
+    """Saves the agents list to agents.json with proper formatting."""
     with open(AGENTS_JSON_PATH, "w", encoding="utf-8") as f:
-        json.dump({"agent_list": agents}, f, indent=4)
+        json.dump(agents, f, indent=4, ensure_ascii=False)
 
 
 # ── Helper: Load agent dict from agents.json ──────────────
@@ -83,14 +65,21 @@ def get_agent_dict() -> list[dict]:
 
     Returns rows as dicts for auto-population.
     """
+    data = load_agents_from_json()
+
+    # If the JSON file is a dict instead of a list, wrap it in a list
+    if isinstance(data, dict):
+        data = [data]
+
     return [
         {
-            "name": a["name"],
-            "initials": a.get("initials", "") or "",
+            "name": a.get("name", ""),
+            # "initials": a.get("initials", "") or "",
             "agency": a.get("agency", "") or "",
             "phone": a.get("phone", "") or "",
         }
-        for a in load_agents_from_json()
+        for a in data
+        if isinstance(a, dict)
     ]
 
 
@@ -131,10 +120,10 @@ def load_agency_options() -> list[str]:
     return []
 
 
-# ── Main Page Builder ────────────────────────────────────────
+# ── Main Page Builder ───
 def build_agents_page():
 
-    # ── Header / Navbar ──────────────────────────────────────
+    # ── Header / Navbar ───
 
     build_navbar(
         is_admin=get_is_admin(),
@@ -145,11 +134,11 @@ def build_agents_page():
     with ui.column().classes("w-full items-center"):
 
         ui.label(
-            "Agent Management"
+            "Agents"
         ).classes("text-2xl font-bold m-4")
 
-        # ── Add Agent Section ───────────────────────────────────
-        with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
+        # ── Add Agent Section ───
+        with ui.card().classes("w-full max-w-lg p-6 mx-auto"):
             ui.label(
                 "Add Agent"
             ).classes("text-lg font-semibold mb-4")
@@ -158,7 +147,7 @@ def build_agents_page():
 
             # Build a lookup dict for auto-population:
             # {name: {initials, agency, phone}}
-            agent_lookup = {a["name"]: a for a in full_agent_info}
+            # agent_lookup = {a["name"]: a for a in full_agent_info}
 
             # Agent Name — dropdown populated from agents.json
             agent_name_input = required_select(
@@ -168,10 +157,6 @@ def build_agents_page():
                 new_value_mode="add",
             ).classes("w-full")
             agent_name_input.props("autofocus")
-
-            agent_initials_input = ui.input(
-                label="Agent's Initials",
-            ).classes("w-full")
 
             agent_parent_agency_input = required_select(
                 options=load_agency_options(),
@@ -211,8 +196,6 @@ def build_agents_page():
 
                 if selected in agent_lookup:
                     info = agent_lookup[selected]
-                    agent_initials_input.value = info.get(
-                        "initials", "") or ""
                     agent_parent_agency_input.value = info.get(
                         "agency", "") or ""
                     agent_phone_input.value = info.get(
@@ -220,7 +203,6 @@ def build_agents_page():
 
                 else:
                     # New name typed — clear the fields for manual entry
-                    agent_initials_input.value = ""
                     agent_parent_agency_input.value = None
                     agent_phone_input.value = ""
 
@@ -229,9 +211,8 @@ def build_agents_page():
             # ── Buttons ────────────────────────────────────────
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
-                def clear_form():
+                def clear_agent_form():
                     agent_name_input.value = None
-                    agent_initials_input.value = ""
                     agent_parent_agency_input.value = None
                     agent_role_input.value = None
                     agent_role_secondary_input.value = None
@@ -240,7 +221,6 @@ def build_agents_page():
 
                 def on_submit():
                     """Handles form submission for new agents."""
-
                     name = agent_name_input.value
                     if not name:
                         ui.notify(
@@ -252,7 +232,6 @@ def build_agents_page():
                         )
                         return
 
-                    initials = agent_initials_input.value or ""
                     agency = agent_parent_agency_input.value or ""
 
                     role = agent_role_input.value
@@ -286,20 +265,6 @@ def build_agents_page():
                                     position="center",
                                 )
                                 return
-                            if (
-                                initials
-                                and session.query(Agents)
-                                .filter_by(agent_initials=initials)
-                                .first()
-                            ):
-                                ui.notify(
-                                    MESSAGES["agent_4"],
-                                    type="warning",
-                                    timeout=NOTIFICATION_TIMEOUT,
-                                    close_button="OK",
-                                    position="center",
-                                )
-                                return
                             if check_agent_dup_role(
                                 agent=name,
                                 role=role,
@@ -323,7 +288,6 @@ def build_agents_page():
 
                             new_agent = Agents(
                                 agent_name=name,
-                                agent_initials=initials,
                                 agent_parent_agency=agency,
                                 agent_role=role,
                                 agent_role_secondary=role_secondary,
@@ -332,17 +296,26 @@ def build_agents_page():
                             )
                             session.add(new_agent)
 
+                        # RIGHT — Load → Append → Save
                         # Save to JSON file
-                        save_agent_to_json(name, initials, agency, phone)
+                        agents = load_agents_from_json()
+
+                        new_agent = {
+                            "name": name,
+                            "agency": agency,
+                            "phone": phone,
+                        }
+
+                        agents.append(new_agent)
+                        save_agent_to_json(agents=agents)
 
                         ui.notify(
-                            f"{name} was added to the case file "
-                            "successfully.",
+                            f"{name} added successfully.",
                             timeout=POSITIVE_NOTIFICATION_TIMEOUT,
                             close_button="OK",
                             position="bottom",
                         )
-                        clear_form()
+                        clear_agent_form()
                         refresh_agent_table()
 
                     except Exception as err:
@@ -359,7 +332,7 @@ def build_agents_page():
 
                 ui.button(
                     "Clear",
-                    on_click=clear_form,
+                    on_click=clear_agent_form,
                 ).props("outline")
                 ui.button(
                     "Add Agent",
@@ -398,7 +371,7 @@ def build_agents_page():
                     {
                         "id": r.id,
                         "agent_name": r.agent_name or "",
-                        "agent_initials": r.agent_initials or "",
+                        # "agent_initials": r.agent_initials or "",
                         "agent_parent_agency": r.agent_parent_agency or "",
                         "agent_role": r.agent_role or "",
                         "agent_role_secondary": r.agent_role_secondary or "",
@@ -418,13 +391,13 @@ def build_agents_page():
                         "sortable": True,
                         "align": "left",
                     },
-                    {
-                        "name": "agent_initials",
-                        "label": "Initials",
-                        "field": "agent_initials",
-                        "sortable": True,
-                        "align": "left",
-                    },
+                    # {
+                    #     "name": "agent_initials",
+                    #     "label": "Initials",
+                    #     "field": "agent_initials",
+                    #     "sortable": True,
+                    #     "align": "left",
+                    # },
                     {
                         "name": "agent_parent_agency",
                         "label": "Agency",
@@ -496,17 +469,17 @@ def build_agents_page():
                             f"Edit Agent: {row['agent_name']}"
                         ).classes("text-lg font-semibold mb-4")
 
-                        edit_name = required_input(
+                        agent_name = required_input(
                             label="Agent's Name",
                             value=row["agent_name"],
                         ).classes("w-full")
 
-                        edit_initials = ui.input(
-                            label="Agent's Initials",
-                            value=row["agent_initials"],
-                        ).classes("w-full")
+                        # agent_initials = ui.input(
+                        #     label="Agent's Initials",
+                        #     value=row["agent_initials"],
+                        # ).classes("w-full")
 
-                        edit_agency = required_select(
+                        agent_parent_agency = required_select(
                             options=load_agency_options(),
                             label="Parent Agency",
                             value=row["agent_parent_agency"],
@@ -514,26 +487,26 @@ def build_agents_page():
                             new_value_mode="add",
                         ).classes("w-full")
 
-                        edit_role = required_select(
+                        agent_role = required_select(
                             options=load_role_options(),
                             label="Agent's Role",
                             value=row["agent_role"],
                             with_input=True,
                         ).classes("w-full")
 
-                        edit_role_secondary = ui.select(
+                        agent_role_secondary = ui.select(
                             options=load_role_options(),
                             label="Agent's Secondary Role",
                             value=row["agent_role_secondary"] or None,
                             with_input=True,
                         ).classes("w-full")
 
-                        edit_phone = required_input(
+                        agent_phone = required_input(
                             label="Agent's Phone Number",
                             value=row["agent_phone"],
                         ).classes("w-full")
 
-                        edit_notes = ui.textarea(
+                        agent_notes = ui.textarea(
                             label="Notes",
                             value=row["agent_notes"],
                         ).classes("w-full")
@@ -547,48 +520,37 @@ def build_agents_page():
                             ).props("flat")
 
                             def on_save_update():
+                                """Handles form submission for updating
+                                existing agents.
+                                """
                                 with get_session() as session:
                                     agent = (
                                         session.query(Agents)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
-                                    if agent:
-                                        agent.agent_name = (
-                                            edit_name.value
-                                            or ""
-                                        )
-                                        agent.agent_initials = (
-                                            edit_initials.value
-                                            or ""
-                                        )
-                                        agent.agent_parent_agency = (
-                                            edit_agency.value
-                                            or ""
-                                        )
-                                        agent.agent_role = (
-                                            edit_role.value
-                                            or ""
-                                        )
-                                        agent.agent_role_secondary = (
-                                            edit_role_secondary.value
-                                            or ""
-                                        )
-                                        agent.agent_phone = (
-                                            edit_phone.value or ""
-                                        )
-                                        agent.agent_notes = (
-                                            edit_notes.value or ""
-                                        )
-                                        if check_agent_dup_role(
-                                            agent=edit_name.value,
-                                            role=edit_role.value,
-                                            role_secondary=edit_role_secondary.value
-                                        ):
-                                            return
+                                    if not agent:
+                                        ui.notify("Agent not found", type="warning", close_button="OK")
+                                        return
+
+                                    agent.agent_name = agent_name
+                                    # agent.agent_initials = agent_initials
+                                    agent.agent_parent_agency = agent_parent_agency
+                                    agent.agent_role = agent_role
+                                    agent.agent_role_secondary = agent_role_secondary
+                                    agent.agent_phone = agent_phone
+                                    agent.agent_notes = agent_notes
+
+                                    if check_agent_dup_role(
+                                        agent=agent_name,
+                                        role=agent_role,
+                                        role_secondary=agent_role_secondary,
+                                    ):
+                                        return
 
                                 ui.notify(
-                                    f"{edit_name.value} was updated " "successfully.",
+                                    f"{agent_name.value} was updated "
+                                    "successfully.",
                                     timeout=POSITIVE_NOTIFICATION_TIMEOUT,
                                     close_button="OK",
                                     position="bottom",
@@ -627,7 +589,7 @@ def build_agents_page():
                                 on_click=delete_dialog.close,
                             ).props("flat")
 
-                            def on_confirm_delete():
+                            def confirm_agent_delete():
                                 with get_session() as session:
                                     agent = (
                                         session.query(Agents)
@@ -652,7 +614,7 @@ def build_agents_page():
 
                             ui.button(
                                 "Delete",
-                                on_click=on_confirm_delete,
+                                on_click=confirm_agent_delete,
                                 color="#FF0000",
                             ).props("negative unelevated")
 

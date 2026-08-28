@@ -9,7 +9,6 @@ from nicegui import ui
 
 NOTIFICATION_TIMEOUT = 0
 
-
 MESSAGES = {
     "agent_1": "The 'Agent's Name' field is required",
     "agent_2": "The 'Agent's Role' field is required.",
@@ -33,7 +32,7 @@ MESSAGES = {
     "evid_8": "The 'Found By' field is required.",
     "evid_9": "The 'Witnessed By' field is required.",
 
-    "note_1": "The 'Agent Name' is required.",
+    "note_1": "The 'Agent Name' field is required.",
     "note_2": "The 'Note Text' field is required.",
 
     "room_1": "A Room Label is required.",
@@ -45,14 +44,12 @@ MESSAGES = {
     "person_1": "The 'Name' field is required.",
 }
 
-
 def required_input(label: str, **kwargs):
     """Creates a ui.input with a red asterisk in the label."""
     req_input = ui.input(**kwargs)
     req_input.props("label-slot")
     req_input.add_slot("label", f'{label}<span style="color:#ef4444;"> *</span>')
     return req_input
-
 
 def required_select(label: str, options: list, **kwargs):
     """Creates a ui.select with a red asterisk in the label."""
@@ -61,14 +58,12 @@ def required_select(label: str, options: list, **kwargs):
     req_select.add_slot("label", f'{label}<span style="color:#ef4444;"> *</span>')
     return req_select
 
-
 def required_textarea(label: str, **kwargs):
     """Creates a ui.textarea with a red asterisk in the label."""
     req_textarea = ui.textarea(**kwargs)
     req_textarea.props("label-slot")
     req_textarea.add_slot("label", f'{label}<span style="color:#ef4444;"> *</span>')
     return req_textarea
-
 
 def check_agent_dup_role(agent: str, role: str, role_secondary: str) -> bool:
     if role and role_secondary:
@@ -83,3 +78,24 @@ def check_agent_dup_role(agent: str, role: str, role_secondary: str) -> bool:
                 )
             return True
         return False
+
+
+def confirm_delete_all(action: str, callback):
+    """Shows a confirmation dialog before executing a destructive action."""
+    with ui.dialog() as dialog, ui.card().classes("max-w-sm p-6"):
+        ui.label(f"Warning!").classes("text-lg font-bold mb-2 text-red-500")
+        ui.label(
+            f"This will permanently delete ALL {action} from the database. "
+            "This action cannot be undone."
+        ).classes("mb-4")
+
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Cancel", on_click=dialog.close).props("flat")
+
+            def on_confirm():
+                callback()
+                dialog.close()
+
+            ui.button("Delete All", on_click=on_confirm).props("negative unelevated")
+
+    dialog.open()

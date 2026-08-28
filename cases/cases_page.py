@@ -64,7 +64,7 @@ def build_cases_page():
         with ui.card().classes("w-full max-w-lg p-6 mx-auto"):
 
             ui.label(
-                "Open New Case"
+                "Add Case Details"
             ).classes("text-lg font-semibold mb-4")
 
             case_number_input = required_input(

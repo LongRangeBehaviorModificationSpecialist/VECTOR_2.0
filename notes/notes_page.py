@@ -64,9 +64,7 @@ def build_notes_page():
 
         # ── Add Note Form ────────────────────────────────────────
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
-            ui.label(
-                "Add Note"
-            ).classes("text-lg font-semibold mb-4")
+            ui.label("Add Note").classes("text-lg font-semibold mb-4")
 
             agent_options = load_agent_names()
             current_time = get_current_timestamp()

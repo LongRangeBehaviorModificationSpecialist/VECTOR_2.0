@@ -98,55 +98,67 @@ seed_default_user()
 # Shrinks all textarea heights to match input/select field heights
 ui.add_css(
     """
-    textarea.q-field__native {
-        min-height: 40px !important;
-        max-height: 40px !important;
-        line-height: 24px;
-        padding: 8px 12px;
-        resize: none !important;
-    }
-
-    /* Required field asterisk */
-    .required {
-        color: #ef4444 !important;
-        margin-left: 2px;
-
-    /* Print styles */
-    @media print {
-        .no-print {
-            display: none !important;
-        }
-
-        /* Hide navbar */
-        .q-header {
-            display: none !important;
-        }
-
-        /* Hide all images */
-        img {
-            display: none !important;
-        }
-
-        /* Remove padding/margins so content fills the page */
-        main,
-        .nicegui-content,
-        .q-page {
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-
-        body {
-            padding: 0 !important;
-        }
-    }
+/* ── Theme Colors (replaces ui.colors) ── */
+:root {
+    --q-primary: #6d4aff;
+    --q-secondary: #264653;
+    --q-accent: #2a9d8f;
+    --q-dark: #1a1a1a;
+    --q-dark-page: #212121;
+    --q-positive: #22c55e;
+    --q-negative: #ef4444;
+    --q-warning: #f59e0b;
+    --q-info: #3b82f6;
 }
 
+/* Textarea height */
+textarea.q-field__native {
+    min-height: 40px !important;
+    max-height: 40px !important;
+    line-height: 20px;
+    padding: 8px 12px;
+    resize: none !important;
+}
 
+/* Required field asterisk */
+.required {
+    color: #ef4444 !important;
+    margin-left: 2px;
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    /* Hide navbar */
+    .q-header {
+        display: none !important;
+    }
+
+    /* Hide all images */
+    img {
+        display: none !important;
+    }
+
+    /* Remove padding/margins so content fills the page */
+    main,
+    .nicegui-content,
+    .q-page {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    body {
+        padding: 0 !important;
+    }
+}
 """,
     shared=True,
 )
 
-# ── Import All Page Modules ─────────────────────────────────
+# ── Import All Page Modules ───
 # Each module registers its own @ui.page routes on import.
 # Order matters: shared utilities first, then pages.
 
@@ -154,10 +166,7 @@ ui.add_css(
 import navbar
 import main_page  # (/, /home, /about, /help, /export_db, /logout)
 
-# Reports (self-registers all /reports/* routes on import)
-import reports.reports_page
-
-# ── Page Registrations ─────────────────────────────────────
+# ── Page Registrations ───
 # Some page modules define their own @ui.page decorators internally.
 # The ones below are registered here for centralized control.
 
@@ -234,39 +243,55 @@ def links_route():
     build_links_page()
 
 
-# ── Startup Configuration ──────────────────────────────────
-@app.on_startup
-async def initialize_app():
-    """Initialize app storage and verify database."""
-    # Matches the original Flask app's dark theme (#212121 background)
-    ui.colors(
-        primary="#6d4aff",
-        secondary="#264653",
-        accent="#2a9d8f",
-        dark="#1a1a1a",
-        dark_page="#212121",
-        positive="#22c55e",
-        negative="#ef4444",
-        warning="#f59e0b",
-        info="#3b82f6",
-    )
-    ui.html("<link rel='icon' type='image/x-icon' href='/static/favicon.ico'" + "'>")
-    # Ensure storage keys exist
-    if "authenticated" not in app.storage.user:
-        app.storage.user["authenticated"] = False
-    if "user_name" not in app.storage.user:
-        app.storage.user["user_name"] = ""
-    if "is_admin" not in app.storage.user:
-        app.storage.user["is_admin"] = False
+# ── Startup Configuration ───
+# async def initialize_app():
+#     """Initialize app storage and verify database."""
+#     # Ensure storage keys exist
+#     if "authenticated" not in app.storage.user:
+#         app.storage.user["authenticated"] = False
+#     if "user_name" not in app.storage.user:
+#         app.storage.user["user_name"] = ""
+#     if "is_admin" not in app.storage.user:
+#         app.storage.user["is_admin"] = False
 
 
-# ── Run ─────────────────────────────────────────────────────
+def is_authenticated() -> bool:
+    """Checks if user is authenticated (defaults to False)."""
+    try:
+        return app.storage.user.get("authenticated", False)
+    except Exception:
+        return False
+
+
+def get_current_user_name() -> str:
+    """Gets current username (defaults to empty)."""
+    try:
+        return app.storage.user.get("user_name", "")
+    except Exception:
+        return ""
+
+
+def get_is_admin() -> bool:
+    """Checks if current user is admin (defaults to False)."""
+    try:
+        return app.storage.user.get("is_admin", False)
+    except Exception:
+        return False
+
+
+# ── Run ───
 if __name__ in {"__main__", "__mp_main__"}:
+
+    ui.add_head_html(
+        '<link rel="icon" type="image/x-icon" href="/static/favicon.ico">',
+        shared=True
+    )
+
     ui.run(
         title="V·E·C·T·O·R",
         port=8080,
         reload=True,
         dark=True,
         storage_secret="vector-secret-key-change-in-production-2024",
-        favicon="/static/favicon.ico",
+        # favicon="/static/favicon.ico",
     )

@@ -116,7 +116,7 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
 
     with get_session() as session:
 
-        case = session.query(Cases).first()
+        case = session.query(Cases).first()  # Only one case at a time
         evidence = session.query(Evidence).all()
 
         if not case:
@@ -189,6 +189,10 @@ COMMON_STYLES = """
         font-family: "Times New Roman", Times, serif;
         font-size: 11pt;
     }
+    .headerTable tr td.header,
+    .headerTable tr td.data {
+        vertical-align: "bottom";
+    }
     .agentTable tbody tr td.agentTableData,
     .evidTable tr td.evidTableDataColTwo,
     .noteTable tbody tr td.noteTableData,
@@ -196,9 +200,21 @@ COMMON_STYLES = """
     .roomTable tbody tr td.roomTableData {
         font-family: "Times New Roman", Times, serif;
     }
-    .evidTableDataColOne,
-    .evidTableDataColTwo {
-        font-size: 11pt;
+    .top-table .evidTable tr td.evidTableDataColOne,
+    .top-table .evidTable tr td.evidTableDataColTwo {
+        height: 1.45rem;
+    }
+    .top-table .evidTable tr td.evidTableDataColOne {
+        font-size: 10pt;
+    }
+    .top-table .evidTable tr td.evidTableDataColTwo {
+        font-size: 12pt;
+    }
+    .top-table .headerTable tr td.header {
+        font-size: 10pt;
+    }
+    .reportTitle p.fs-5 {
+        font-size: 10pt;
     }
 }
 
@@ -214,10 +230,12 @@ body {
     text-align: center;
     margin-bottom: 1em;
 }
+.font-08 { font-size: 8pt; }
 .font-09 { font-size: 9pt; }
 .font-10 { font-size: 10pt; }
 .font-11 { font-size: 11pt; }
 .font-12 { font-size: 12pt; }
+.font-13 { font-size: 13pt; }
 .font-16 { font-size: 16pt; }
 
 .fs-3 {
@@ -236,6 +254,13 @@ body {
     padding-right: 5%;
 }
 
+.evidTable {
+    border-collapse: collapse;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 2em;
+    width: 100%;
+}
 .headerTable {
     border-collapse: collapse;
     margin-bottom: 2em;
@@ -253,7 +278,7 @@ td.header {
 td.data {
     font-family: "Courier New", Courier, monospace;
     padding: 0px 10px;
-    border-bottom: 1px dotted gray;
+    border-bottom: 1px dashed black;
     width: 65%;
     vertical-align: bottom;
 }
@@ -262,8 +287,7 @@ td.data {
 .agentTable,
 .noteTable,
 .roomTable,
-.personTable,
-.evidTable {
+.personTable {
     border-collapse: collapse;
     width: 100%;
 }
@@ -283,14 +307,14 @@ td.data {
 .roomTable thead tr,
 .personTable thead tr {
     border-top: 0px solid black;
-    border-bottom: 1px solid black;
+    border-bottom: 1px dashed black;
 }
 
 .agentTableData,
 .noteTableData,
 .roomTableData,
 .personTableData {
-    border-bottom: 1px dotted gray;
+    border-bottom: 1px dashed black;
     height: 1.85em;
     padding: 0px 5px;
     vertical-align: bottom;
@@ -303,7 +327,7 @@ td.data {
 }
 
 td.evidTableData {
-    border-bottom: 1px solid black;
+    border-bottom: 0px solid black;
     height: 1.75em;
     font-size: 11pt;
     padding: 2px 5px;
@@ -312,22 +336,21 @@ td.evidTableData {
 td.evidTableDataColOne {
     height: 1.85em;
     padding: 0px 5px;
-    font-size: 11pt;
     font-weight: normal;
-    width: 30%;
+    width: 20%;
     vertical-align: bottom;
 }
 
 td.evidTableDataColTwo {
-    border-bottom: 1px dotted gray;
+    border-bottom: 1px dashed black;
     height: 1.85em;
     padding: 0 px 5px;
-    width: 70%;
+    width: 80%;
     vertical-align: bottom;
 }
 
 .evidTableRoomNameRow {
-    border-bottom: 1px solid black;
+    border-bottom: 0px dashed black;
     height: 1.75em;
     text-align: center;
     font-size: 11 pt;
@@ -391,14 +414,15 @@ def build_case_header_html(active_case: dict | None, page_title: str, sub_title:
 
     return f"""
     <div class="reportTitle">
-        <p class="fs-3 font-14">{page_title}</p>
-        <p class="fs-5 font-10">{sub_title}</p>
+        <p class="fs-3 font-11">{page_title}</p>
+        <p class="fs-5 font-8">{sub_title}</p>
     </div>
     {report_header_table}
     """
 
 def build_report_footer_html() -> str:
     """Generates the standard END OF REPORT footer."""
+
     return """
     <p class="end font-11">
         &ndash;&ensp;&ndash;&ensp;END OF REPORT&ensp;&ndash;&ensp;&ndash;
@@ -415,12 +439,13 @@ def build_agents_report_html(active_case: dict, agents: list) -> str:
         <td class="agentTableData font-10">{a["agent_parent_agency"]}</td>
         <td class="agentTableData font-10">{a["agent_role"]}</td>
         <td class="agentTableData font-10">{a["agent_phone"]}</td>
-    </tr>""" for a in agents])
+    </tr>
+""" for a in agents])
 
     header = build_case_header_html(
         active_case,
-        page_title="Investigators At Search Warrant Site",
-        sub_title="( AGENT COPY )",
+        page_title="INVESTIGATORS AT SEARCH WARRANT SITE",
+        sub_title="(Agent Copy)",
     )
     footer = build_report_footer_html()
 
@@ -515,12 +540,13 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
         </tr>
         <tr>
             <td colspan="2" style="height: 1.5em;"></td>
-        </tr>""" for e in evidence])
+        </tr>
+    """ for e in evidence])
 
     header = build_case_header_html(
         active_case,
-        page_title="Items Seized at Search Warrant Site",
-        sub_title="( AGENT COPY )",
+        page_title="FULL EVIDENCE INVENTORY LIST",
+        sub_title="(Agent Copy)",
     )
     footer = build_report_footer_html()
 
@@ -535,9 +561,11 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
 </head>
 <body>
     {header}
-    <table class="evidTable">
-        {evid_rows}
-    </table>
+    <div class="top-table">
+        <table class="evidTable">
+            {evid_rows}
+        </table>
+    </div>
     {footer}
 </body>
 </html>"""
@@ -553,24 +581,18 @@ def build_evidence_by_room_report_html(active_case: list, evidence: list, unique
 
     room_tables = ""
 
-    print(f"DEBUG: unique_room = {unique_rooms}")
-
     for room in unique_rooms:
         room_name = room[0]
-        print(f"DEBUG: room_name = {room_name}")
         item_count = room[1]
-        print(f"DEBUG: item_count = {item_count}")
 
         # Singular vs plural
         if item_count == 1:
-            count_text = f"Room {room_name}&ensp;:&ensp;({item_count} item)"
+            count_text = f"{room_name}&ensp;:&ensp;({item_count} item)"
         else:
-            count_text = f"Room {room_name}&ensp;:&ensp;({item_count} items)"
+            count_text = f"{room_name}&ensp;:&ensp;({item_count} items)"
 
         # Filter evidence items for this room
         room_items = [e for e in evidence if e["evid_loc_room"] == room_name]
-        print(f"DEBUG: room_items = {room_items}")
-
         evid_rows = "".join([f"""
             <tr>
                 <td class="evidTableDataColOne">Item No.:</td>
@@ -578,7 +600,6 @@ def build_evidence_by_room_report_html(active_case: list, evidence: list, unique
                     {e["evid_num"]}
                 </td>
             </tr>
-
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
                 <td class="evidTableDataColTwo">{e["evid_qty"]}</td>
@@ -601,7 +622,9 @@ def build_evidence_by_room_report_html(active_case: list, evidence: list, unique
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Where Found</td>
-                <td class="evidTableDataColTwo">{e["evid_loc_room_detail"]}</td>
+                <td class="evidTableDataColTwo">
+                    {e["evid_loc_room_detail"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Located By:</td>
@@ -629,28 +652,27 @@ def build_evidence_by_room_report_html(active_case: list, evidence: list, unique
                 <td class="evidTableDataColOne">Notes:</td>
                 <td class="evidTableDataColTwo">{e["evid_notes"]}</td>
             </tr>
-            <tr>
-                <td colspan="2" style="height: 1.5em;"></td>
-            </tr>
-            """ for e in room_items])
+        """ for e in room_items])
 
         room_tables += f"""
-        <table class="evidTable">
-            <thead>
-            </thead>
-            <tbody>
-                <tr class="evidTableRoomNameRow">
-                    <th colspan="2">{count_text}</th>
-                </tr>
-                {evid_rows}
-            </tbody>
-        </table>
+        <div class="top-table">
+            <table class="evidTable">
+                <thead>
+                </thead>
+                <tbody>
+                    <tr class="evidTableRoomNameRow">
+                        <th colspan="2">{count_text}</th>
+                    </tr>
+                    {evid_rows}
+                </tbody>
+            </table>
+        </div>
         </br />"""
 
     header = build_case_header_html(
         active_case,
-        page_title="Items Seized at Search Warrant Site (By Room)",
-        sub_title="( AGENT COPY )",
+        page_title="EVIDENCE FOUND LIST BY ROOM",
+        sub_title="(Agent Copy)",
     )
 
     footer = build_report_footer_html()
@@ -682,7 +704,9 @@ def build_basic_evidence_report_html(active_case: list, evidence: list) -> str:
 
     evid_rows = "".join([f"""
         <tr class="evidTableItemRow">
-            <td colspan="2" class="evidTableData">Item #:&ensp;&ensp;{e["evid_num"]}</td>
+            <td colspan="2" class="evidTableData">
+                Item #:&ensp;{e["evid_num"]}
+            </td>
         </tr>
         <tr>
             <td class="evidTableDataColOne">Quantity:</td>
@@ -699,12 +723,13 @@ def build_basic_evidence_report_html(active_case: list, evidence: list) -> str:
         <tr>
             <td class="evidTableDataColOne">Serial #:</td>
             <td class="evidTableDataColTwo">{e["evid_serial_num"]}</td>
-        </tr>""" for e in evidence])
+        </tr>
+    """ for e in evidence])
 
     header = build_case_header_html(
         active_case,
-        page_title="Items Seized at Search Warrant Site",
-        sub_title="( RETURN COPY )",
+        page_title="SEARCH INVENTORY AND RETURN",
+        sub_title="(Return Copy)",
     )
     footer = build_report_footer_html()
 
@@ -715,13 +740,15 @@ def build_basic_evidence_report_html(active_case: list, evidence: list) -> str:
     <title>V·E·C·T·O·R | Basic Evidence Inventory List</title>
     <style>
         {COMMON_STYLES}
-    <style>
+    </style>
 </head>
 <body>
     {header}
-    <table class="evidTable">
-        {evid_rows}
-    </table>
+    <div class="top-table">
+        <table class="evidTable">
+            {evid_rows}
+        </table>
+    </div>
     {footer}
 </body>
 </html>"""
@@ -732,16 +759,19 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
 
     room_rows = "".join([f"""
         <tr>
-            <td class="roomTableData" style="padding-left:25px;">{r["room_label"]}</td>
+            <td class="roomTableData" style="padding-left:25px;">
+                {r["room_label"]}
+            </td>
             <td class="roomTableData">{r["room_desc"]}</td>
             <td class="roomTableData">{r["room_first_agent"]}</td>
             <td class="roomTableData">{r["room_second_agent"]}</td>
-        </tr>""" for r in rooms])
+        </tr>
+    """ for r in rooms])
 
     header = build_case_header_html(
         active_case,
-        page_title="Rooms at Search Warrant Site",
-        sub_title="( AGENT COPY )",
+        page_title="ROOM LIST",
+        sub_title="(Agent Copy)",
     )
     footer = build_report_footer_html()
 
@@ -752,7 +782,7 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
     <title>V·E·C·T·O·R | Room List Report</title>
     <style>
         {COMMON_STYLES}
-    </style>
+    </>
 </head>
 <body>
     {header}
@@ -788,8 +818,8 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 
     header = build_case_header_html(
         active_case,
-        page_title="Persons List",
-        sub_title="( AGENT COPY )",
+        page_title="PERSONS LIST",
+        sub_title="(Agent Copy)",
     )
     footer = build_report_footer_html()
 
@@ -832,12 +862,13 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
             <td class="noteTableData">{n["note_date_time_updated"]}</td>
             <td class="noteTableData">{n["note_author"]}</td>
             <td class="noteTableData">{n["note_text"]}</td>
-        </tr>""" for n in notes])
+        </tr>
+    """ for n in notes])
 
     header = build_case_header_html(
         active_case,
-        page_title="Search Warrant Notes",
-        sub_title="( AGENT COPY )",
+        page_title="NOTES LIST",
+        sub_title="(Agent Copy)",
     )
     footer = build_report_footer_html()
 
@@ -872,6 +903,7 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 # ── Updated Agents Route
 @ui.page("/reports/agents")
 def print_agents_report():
+
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -883,7 +915,7 @@ def print_agents_report():
         agents = [
             {
                 "agent_name": a.agent_name,
-                "agent_initials": a.agent_initials,
+                # "agent_initials": a.agent_initials,
                 "agent_parent_agency": a.agent_parent_agency,
                 "agent_role": a.agent_role,
                 "agent_phone": a.agent_phone,
@@ -902,6 +934,7 @@ def print_agents_report():
 # ── Updated Evidence Routes
 @ui.page("/reports/evidence")
 def print_evidence_report():
+
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -939,6 +972,7 @@ def print_evidence_report():
 # ── Updated Evidence By Room Route
 @ui.page("/reports/evidence-by-room")
 def print_evidence_by_room_report():
+
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -989,12 +1023,15 @@ def print_evidence_by_room_report():
 # ── Updated Basic Evidence Report Route
 @ui.page("/reports/evidence-basic")
 def print_basic_evidence_report():
+
     if not is_authenticated():
         ui.navigate.to("/")
         return
 
     with get_session() as session:
+
         active_case = get_case_info()
+
         evidence = [
             {
                 "evid_num": e.evid_num,
@@ -1122,7 +1159,7 @@ def json_output_page():
             "agents": [
                 {
                     "agent_name": a.agent_name,
-                    "agent_initials": a.agent_initials,
+                    # "agent_initials": a.agent_initials,
                     "agent_parent_agency": a.agent_parent_agency,
                     "agent_role": a.agent_role,
                     "agent_role_secondary": a.agent_role_secondary or "",
