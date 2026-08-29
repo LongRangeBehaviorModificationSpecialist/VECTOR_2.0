@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """
 uploads_page.py — File upload and management page.
 
@@ -7,7 +8,6 @@ Stores files as BLOBs in the SQLite database with download and delete capability
 
 from nicegui import ui
 import os
-import mimetypes
 import tempfile
 
 from models import get_session, UploadedFiles
@@ -18,77 +18,19 @@ from main_page import (
     get_is_admin,
     confirm_new_case_handler,
 )
+from utils import (
+    get_mime_type,
+    is_allowed_file,
+    format_file_size,
+    NOTIFICATION_TIMEOUT,
+    POSITIVE_NOTIFICATION_TIMEOUT,
+)
 
-# Ensure uncommon archive types are recognized
-mimetypes.add_type('application/x-7z-compressed', '.7z')
-mimetypes.add_type('application/x-tar', '.tar')
-mimetypes.add_type('application/gzip', '.gz')
-mimetypes.add_type('application/gzip', '.tgz')
-mimetypes.add_type('application/vnd.rar', '.rar')
-mimetypes.add_type('application/x-bzip2', '.bz2')
-mimetypes.add_type('application/x-xz', '.xz')
-
-
-NOTIFICATION_TIMEOUT = 0
-POSITIVE_NOTIFICATION_TIMEOUT = 4000
-
-
-# Allowed MIME types for images, videos, and documents
-ALLOWED_MIME_TYPES = {
-    # Images
-    "image/jpeg", "image/png", "image/gif", "image/bmp",
-    "image/webp", "image/svg+xml", "image/tiff",
-    # Videos
-    "video/mp4", "video/quicktime", "video/x-msvideo",
-    "video/x-ms-wmv", "video/webm", "video/mpeg",
-    "video/x-flv", "video/3gpp",
-    # Documents
-    "application/pdf", "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.ms-powerpoint",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "text/plain", "text/rtf", "application/rtf",
-    # Archives / Containers
-    'application/zip', 'application/x-zip-compressed',
-    'application/x-7z-compressed', 'application/x-tar',
-    'application/gzip', 'application/x-gzip',
-    'application/vnd.rar', 'application/x-bzip2',
-    'application/x-xz',
-}
-
-
-def get_mime_type(file_name: str, browser_type: str) -> str:
-    """Determines MIME type using browser hint, then mimetypes fallback."""
-    if browser_type and browser_type != "application/octet-stream":
-        return browser_type
-    guessed, _ = mimetypes.guess_type(file_name)
-    return guessed or "application/octet-stream"
-
-
-def is_allowed_file(mime_type: str) -> bool:
-    """Checks if the MIME type is in the allowed set."""
-    return mime_type in ALLOWED_MIME_TYPES
-
-
-def format_file_size(size_bytes: int) -> str:
-    """Formats file size into human-readable format."""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    elif size_bytes < 1024 * 1024 * 1024:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
-    else:
-        return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
-
-
+# ─── Main Page Builder ───
 def build_uploads_page():
     """Builds the full File Upload page UI."""
 
-    # ── Header / Navbar ──────────────────────────────────────
-    build_navbar,
+    # ── Header / Navbar ───
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -97,15 +39,12 @@ def build_uploads_page():
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label(
-            "File Upload & Management"
-        ).classes("text-2xl font-bold m-4")
+        ui.label("File Upload & Management").classes("text-2xl font-bold m-4")
 
-        # ── Upload Section ───────────────────────────────────────
+        # ── Upload Section ───
         with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
-            ui.label(
-                "Upload New File"
-            ).classes("text-lg font-semibold mb-4")
+
+            ui.label("Upload New File").classes("text-lg font-semibold mb-4")
 
             ui.label(
                 "Allowed file types → (1) Images, (2) Videos, (3) Documents, "
@@ -116,7 +55,6 @@ def build_uploads_page():
                 """Handles file upload from ui.upload component."""
                 try:
                     uploaded_file = e.file
-
                     file_name = uploaded_file.name
                     file_mime_type = (
                         uploaded_file.content_type
@@ -135,7 +73,8 @@ def build_uploads_page():
                         ui.notify(
                             f"'{file_name}' is not an allowed file type "
                             f"({file_mime_type}). "
-                            f"Only images, videos, documents, and archives are permitted.",
+                            f"Only images, videos, documents, and archives "
+                            "are permitted.",
                             type="warning",
                             timeout=NOTIFICATION_TIMEOUT,
                             close_button="OK",
@@ -186,13 +125,10 @@ def build_uploads_page():
                 ".zip, .7z, .tar, .tgz, .gz, .tar.gz, .rar, .bz2, .xz"
             ).classes("w-full")
 
-        # ── Existing Files Table ────────────────────────────────
+        # ── Existing Files Table ───
         ui.separator().classes("my-6")
 
-        # with ui.column().classes("w-full items-center"):
-        ui.label(
-            "Uploaded Files"
-        ).classes("text-xl font-bold mb-3")
+        ui.label("Uploaded Files").classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2"
@@ -302,15 +238,18 @@ def build_uploads_page():
                     """,
                 )
 
-                # ── Download handler ──────────────────────────
+                # ── Download handler ───
                 def on_download(e):
+
                     row = e.args
+
                     with get_session() as session:
                         file_record = (
                             session.query(UploadedFiles)
                             .filter_by(id=row["id"])
                             .first()
                         )
+
                         if file_record:
                             temp_dir = tempfile.gettempdir()
                             temp_path = os.join.path(
@@ -321,13 +260,15 @@ def build_uploads_page():
                                 f.write(file_record.file_data)
                             ui.download(temp_path)
 
-                # ── Delete confirmation dialog ────────────────
+                # ── Delete confirmation dialog ───
                 def open_delete_dialog(e):
                     """Confirms and deletes a file."""
                     row = e.args
+
                     with ui.dialog() as delete_dialog, ui.card().classes(
                         "max-w-sm p-6"
                     ):
+
                         ui.label(
                             "Confirm Deletion"
                         ).classes("text-lg font-semibold mb-2")
@@ -338,6 +279,7 @@ def build_uploads_page():
                         ).classes("mb-4")
 
                         with ui.row().classes("w-full justify-end gap-2"):
+
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
@@ -354,7 +296,8 @@ def build_uploads_page():
                                         session.delete(file_record)
 
                                 ui.notify(
-                                    f"File: {row['file_name']} has been " "deleted.",
+                                    f"File: {row['file_name']} has been "
+                                    "deleted.",
                                     timeout=POSITIVE_NOTIFICATION_TIMEOUT,
                                     close_button="OK",
                                     position="bottom",
@@ -366,7 +309,7 @@ def build_uploads_page():
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#FF0000",
+                                color="#ef4444",
                             ).props("negative unelevated")
 
                     delete_dialog.open()
@@ -378,7 +321,7 @@ def build_uploads_page():
     refresh_files_table()
 
 
-# ── Page Registration ────────────────────────────────────────
+# ── Page Registration ───
 @ui.page("/uploads")
 def uploads_page():
     if not is_authenticated():

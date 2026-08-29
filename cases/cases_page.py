@@ -20,34 +20,21 @@ from main_page import (
 )
 from models import get_session, Cases
 from navbar import build_navbar
-from program.inc.jurisdictions import JURISDICTIONS
-from utils import required_input, required_select, MESSAGES
+from utils import (
+    required_input,
+    required_select,
+    load_jurisdiction_options,
+    MESSAGES,
+    NOTIFICATION_TIMEOUT,
+    POSITIVE_NOTIFICATION_TIMEOUT,
+)
 
 
-NOTIFICATION_TIMEOUT = 0
-POSITIVE_NOTIFICATION_TIMEOUT = 4000
-
-
-# ── Helper: Load jurisdiction options ─────────────────────────
-def load_jurisdiction_options() -> list[str]:
-    """Returns jurisdiction choices from JURISDICTIONS.
-
-    Handles both plain-string and (value, label) tuple formats.
-    """
-
-    if not JURISDICTIONS:
-        return []
-    if isinstance(JURISDICTIONS[0], tuple):
-        return [j[1] for j in JURISDICTIONS]
-    return list(JURISDICTIONS)
-
-
-# ── Main Page Builder ────────────────────────────────────────
+# ── Main Page Builder ───
 def build_cases_page():
     """Builds the full Cases page UI."""
 
-    # ── Header / Navbar ──────────────────────────────────────
-
+    # ── Header / Navbar ───
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -56,16 +43,12 @@ def build_cases_page():
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label(
-            "Case Management"
-        ).classes("text-2xl font-bold mb-4")
+        ui.label("Case Management").classes("text-2xl font-bold mb-4")
 
-        # ── Input Form ────────────────────────────────────────────
+        # ── Input Form ───
         with ui.card().classes("w-full max-w-lg p-6 mx-auto"):
 
-            ui.label(
-                "Add Case Details"
-            ).classes("text-lg font-semibold mb-4")
+            ui.label("Add Case").classes("text-lg font-semibold mb-4")
 
             case_number_input = required_input(
                 label="Case Number"
@@ -83,10 +66,8 @@ def build_cases_page():
                 new_value_mode="add",
             ).classes("w-full")
 
-            # ── Date/Time Started ──────────────────────────────────
-            ui.label(
-                "Date/Time Started"
-            ).classes("text-sm font-medium mb-1")
+            # ── Date/Time Started ───
+            ui.label("Date/Time Started").classes("text-sm font-medium mb-1")
 
             with ui.row().classes("w-full gap-2"):
 
@@ -100,7 +81,7 @@ def build_cases_page():
                     placeholder="HH:MM",
                 ).classes("flex-grow")
 
-            # ── Date/Time Ended ────────────────────────────────────
+            # ── Date/Time Ended ───
             ui.label(
                 "Date/Time Ended"
             ).classes("text-sm font-medium mb-1 mt-4")
@@ -117,7 +98,7 @@ def build_cases_page():
                     placeholder="HH:MM",
                 ).classes("flex-grow")
 
-            # ── Buttons ─────────────────────────────────────────
+            # ─── Buttons ───
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form():
@@ -130,7 +111,7 @@ def build_cases_page():
                     case_time_end.value = None
 
                 def on_submit():
-                    # ── Required field validation (InputRequired) ──
+                    # ─── Required field validation (InputRequired) ───
                     case_number = case_number_input.value
 
                     if not case_number:
@@ -194,8 +175,8 @@ def build_cases_page():
 
                     try:
                         with get_session() as session:
-                            # Check for duplicate case number
 
+                            # Check for duplicate case number
                             existing = (
                                 session.query(Cases)
                                 .filter_by(case_number=case_number)
@@ -253,7 +234,7 @@ def build_cases_page():
                     on_click=on_submit,
                 ).props("unelevated")
 
-        # ── Existing Cases Table ─────────────────────────────────
+        # ─── Existing Cases Table ───
         ui.separator().classes("my-6")
 
         ui.label(
@@ -348,7 +329,7 @@ def build_cases_page():
                 )
                 table.props("dense flat")
 
-                # ── Slot: Actions column ──
+                # ─── Slot: Actions column ───
                 table.add_slot(
                     "body-cell-actions",
                     """
@@ -365,13 +346,15 @@ def build_cases_page():
                 """,
                 )
 
-                # ── Edit dialog ──────────────────────────────────
+                # ─── Edit dialog ───
                 def open_edit_dialog(e):
+
                     row = e.args
 
                     with ui.dialog() as edit_dialog, ui.card().classes(
                         "w-full max-w-lg p-6"
                     ):
+
                         ui.label(
                             f"Edit Case: {row['case_number']}"
                         ).classes("text-lg font-semibold mb-4")
@@ -538,8 +521,9 @@ def build_cases_page():
 
                     edit_dialog.open()
 
-                # ── Delete confirmation dialog ──────────────────
+                # ─── Delete confirmation dialog ───
                 def open_delete_dialog(e):
+
                     row = e.args
 
                     with ui.dialog() as delete_dialog, ui.card().classes(
@@ -578,7 +562,8 @@ def build_cases_page():
                                         case_number = row["case_number"]
 
                                 ui.notify(
-                                    f"{case_number} has been deleted " "successfully.",
+                                    f"{case_number} has been deleted "
+                                    "successfully.",
                                     timeout=POSITIVE_NOTIFICATION_TIMEOUT,
                                     close_button="OK",
                                     position="bottom",
@@ -590,7 +575,7 @@ def build_cases_page():
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#FF0000",
+                                color="#ef4444",
                             ).props("negative unelevated")
 
                     delete_dialog.open()
@@ -602,9 +587,12 @@ def build_cases_page():
     refresh_cases_table()
 
 
-# ── Page Registration ────────────────────────────────────────
+# ─── Page Registration ───
 @ui.page("/cases")
 def cases_page():
+    if not is_authenticated():
+        ui.navigate.to("/")
+        return
     build_cases_page()
 
 
@@ -612,7 +600,4 @@ if __name__ in {"__main__", "__mp_main__"}:
     from models import init_db
 
     init_db()
-    ui.run(
-        title="V·E·C·T·O·R",
-        port=8080,
-    )
+    ui.run(title="V·E·C·T·O·R", port=8080)

@@ -40,46 +40,8 @@ from main_page import (
     get_is_admin,
     confirm_new_case_handler,
 )
+from utils import get_print_date_time, get_case_info
 
-
-NOTIFICATION_TIMEOUT = 4000
-
-
-# ── Helpers
-def has_active_case() -> bool:
-    """Quick check if any case exits in the database"""
-    with get_session() as session:
-        return session.query(Cases).count() > 0
-
-
-def get_print_date_time() -> str:
-    """Returns date and time separately for template compatibility."""
-    now = datetime.now()
-    print_date_time = now.strftime("%Y-%m-%d %H:%M")
-    return print_date_time
-
-
-def get_case_info() -> dict | None:
-    """Returns the single active case info (or None if no case exists)."""
-
-    with get_session() as session:
-
-        case = session.query(Cases).first()
-
-        if not case:
-            return None
-
-        return {
-            "case_number": case.case_number or "",
-            "location": case.location or "",
-            "jurisdiction": case.jurisdiction or "",
-            "case_date_time_begin": (
-                str(case.case_date_time_begin) if case.case_date_time_begin else ""
-            ),
-            "case_date_time_end": (
-                str(case.case_date_time_end) if case.case_date_time_end else ""
-            ),
-        }
 
 # ── Report Page Wrapper
 def render_report_page(html_content: str):
@@ -116,7 +78,7 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
 
     with get_session() as session:
 
-        case = session.query(Cases).first()  # Only one case at a time
+        case = session.query(Cases).first()
         evidence = session.query(Evidence).all()
 
         if not case:
@@ -1182,7 +1144,7 @@ def json_output_page():
                     "evid_pic_taken": e.evid_pic_taken,
                     "evid_triaged": e.evid_triaged,
                     "evid_triaged_by": e.evid_triaged_by,
-                    "evid_contains_contraband": e.evid_contains_contraband,
+                    "evid_is_contraband": e.evid_is_contraband,
                     "evid_notes": e.evid_notes,
                 }
                 for e in session.query(Evidence).all()

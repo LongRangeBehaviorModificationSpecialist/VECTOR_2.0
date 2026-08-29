@@ -11,9 +11,8 @@ Consolidates four Flask routes into one interactive page:
 """
 
 from nicegui import ui
-from datetime import datetime
 
-from models import get_session, Notes, Agents
+from models import get_session, Notes
 from navbar import build_navbar
 from main_page import (
     is_authenticated,
@@ -21,35 +20,22 @@ from main_page import (
     get_is_admin,
     confirm_new_case_handler,
 )
-from utils import required_select, required_textarea, MESSAGES
+from utils import (
+    required_select,
+    required_textarea,
+    load_agent_names,
+    get_current_timestamp,
+    MESSAGES,
+    NOTIFICATION_TIMEOUT,
+    POSITIVE_NOTIFICATION_TIMEOUT,
+)
 
 
-NOTIFICATION_TIMEOUT = 0
-POSITIVE_NOTIFICATION_TIMEOUT = 4000
-
-
-# ── Helpers ─────────────────────────────────────────────────
-def load_agent_names() -> list[str]:
-    """Returns a list of all agent names from the Agents table."""
-    with get_session() as session:
-        rows = (
-            session.query(Agents.agent_name)
-            .order_by(Agents.agent_name)
-            .all()
-        )
-        return [r[0] for r in rows]
-
-
-def get_current_timestamp() -> str:
-    """Returns current date/time formatted as MM-DD-YYYY HH:MM:SS."""
-    return datetime.now().strftime("%m-%d-%Y %H:%M:%S")
-
-
-# ── Main Page Builder ────────────────────────────────────────
+# ─── Main Page Builder ───
 def build_notes_page():
     """Builds the full Notes page UI."""
 
-    # ── Header / Navbar ──────────────────────────────────────
+    # ─── Header / Navbar ───
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -58,12 +44,11 @@ def build_notes_page():
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label(
-            "Notes Management"
-        ).classes("text-2xl font-bold m-4")
+        ui.label("Operational Notes").classes("text-2xl font-bold m-4")
 
-        # ── Add Note Form ────────────────────────────────────────
+        # ─── Add Note Form ───
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
+
             ui.label("Add Note").classes("text-lg font-semibold mb-4")
 
             agent_options = load_agent_names()
@@ -92,7 +77,7 @@ def build_notes_page():
                 label="Note Text"
             ).classes("w-full")
 
-            # ── Buttons ────────────────────────────────────────
+            # ─── Buttons ───
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form():
@@ -101,7 +86,7 @@ def build_notes_page():
                     note_text_input.value = ""
 
                 def on_submit():
-                    # ── Required field validation ──
+                    # ─── Required field validation ───
                     note_author = note_author_combo.value
                     if not note_author:
                         ui.notify(
@@ -129,7 +114,7 @@ def build_notes_page():
                         get_current_timestamp()
                     )
 
-                    # ── Save to database ──
+                    # ─── Save to database ───
                     with get_session() as session:
                         new_note = Notes(
                             note_date_time=note_date_time,
@@ -158,7 +143,7 @@ def build_notes_page():
                     on_click=on_submit,
                 ).props("unelevated")
 
-        # ── Existing Notes Table ─────────────────────────────────
+        # ─── Existing Notes Table ───
         ui.separator().classes("my-6")
 
         ui.label(
@@ -191,7 +176,9 @@ def build_notes_page():
                     {
                         "id": r.id,
                         "note_date_time": r.note_date_time or "",
-                        "note_date_time_updated": r.note_date_time_updated or "",
+                        "note_date_time_updated": (
+                            r.note_date_time_updated or ""
+                        ),
                         "note_author": r.note_author or "",
                         "note_text": r.note_text or "",
                     }
@@ -244,7 +231,7 @@ def build_notes_page():
                 )
                 table.props("dense flat")
 
-                # ── Slot: Actions column ──
+                # ─── Slot: Actions column ───
                 table.add_slot(
                     "body-cell-actions",
                     """
@@ -261,14 +248,17 @@ def build_notes_page():
                 """,
                 )
 
-                # ── Edit dialog ──────────────────────────────────
+                # ─── Edit dialog ───
                 def open_edit_dialog(e):
+
                     row = e.args
+
                     current_agents = load_agent_names()
 
                     with ui.dialog() as edit_dialog, ui.card().classes(
                         "w-full max-w-lg p-6"
                     ):
+
                         ui.label(
                             f"Edit Note #{row['id']}"
                         ).classes("text-lg font-semibold mb-4")
@@ -366,12 +356,15 @@ def build_notes_page():
 
                     edit_dialog.open()
 
-                # ── Delete confirmation dialog ──────────────────
+                # ─── Delete confirmation dialog ───
                 def open_delete_dialog(e):
+
                     row = e.args
+
                     with ui.dialog() as delete_dialog, ui.card().classes(
                         "max-w-sm p-6"
                     ):
+
                         ui.label(
                             "Confirm Deletion"
                         ).classes("text-lg font-semibold mb-2")
@@ -392,6 +385,7 @@ def build_notes_page():
                         )
 
                         with ui.row().classes("w-full justify-end gap-2"):
+
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
@@ -425,20 +419,19 @@ def build_notes_page():
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#FF0000",
+                                color="#ef4444",
                             ).props("negative unelevated")
 
                     delete_dialog.open()
 
                 table.on("edit", open_edit_dialog)
-
                 table.on("delete", open_delete_dialog)
 
     # Initial render
     refresh_notes_table()
 
 
-# ── Page Registration ────────────────────────────────────────
+# ─── Page Registration ───
 @ui.page("/notes")
 def notes_page():
     if not is_authenticated():

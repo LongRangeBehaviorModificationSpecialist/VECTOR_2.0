@@ -138,7 +138,7 @@ class Evidence(Base):
     evid_pic_taken = Column(String(), nullable=False)
     evid_triaged = Column(String(), nullable=False)
     evid_triaged_by = Column(String(), nullable=False)
-    evid_contains_contraband = Column(String(), nullable=False)
+    evid_is_contraband = Column(String(), nullable=False)
     evid_notes = Column(Text(), nullable=False)
 
     def __repr__(self):
@@ -162,7 +162,7 @@ class EvidenceSchema(Schema):
     evid_pic_taken = fields.Str()
     evid_triaged = fields.Str()
     evid_triaged_by = fields.Str()
-    evid_contains_contraband = fields.Str()
+    evid_is_contraband = fields.Str()
     evid_notes = fields.Str()
 
 evid_schema = EvidenceSchema(many=True)
