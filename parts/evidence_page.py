@@ -12,7 +12,7 @@ Consolidates four Flask routes into one interactive page:
 
 from nicegui import ui
 
-from main_page import (
+from home_page import (
     is_authenticated,
     get_current_user_name,
     get_is_admin,
@@ -132,7 +132,7 @@ def build_evidence_page():
                         label="Contains Contraband?",
                     ).classes("w-full")
 
-                    evid_notes_input = ui.input(
+                    evid_note_input = ui.input(
                         label="Notes"
                     ).classes("w-full")
 
@@ -165,7 +165,7 @@ def build_evidence_page():
                     evid_triaged_by_combo.value = None
                     evid_triaged_by_combo.disable()
                     evid_contraband_combo.value = None
-                    evid_notes_input.value = ""
+                    evid_note_input.value = ""
 
                 def on_submit():
                     # ─── Required field validation ───
@@ -314,7 +314,7 @@ def build_evidence_page():
                             evid_is_contraband=(
                                 evid_contraband_combo.value or ""
                             ),
-                            evid_notes=evid_notes_input.value or "",
+                            evid_note=evid_note_input.value or "",
                         )
                         session.add(new_evid)
 
@@ -393,7 +393,7 @@ def build_evidence_page():
                                 "evid_is_contraband": (
                                     r.evid_is_contraband or ""
                                 ),
-                                "evid_notes": r.evid_notes or "",
+                                "evid_note": r.evid_note or "",
                             }
                             for r in evidence
                         ]
@@ -609,9 +609,9 @@ def build_evidence_page():
                                     ),
                                 ).classes("w-full")
 
-                                edit_notes = ui.textarea(
+                                edit_notes = ui.input(
                                     label="Notes",
-                                    value=row["evid_notes"],
+                                    value=row["evid_note"],
                                 ).classes("w-full")
 
                                 with ui.row().classes(
@@ -739,7 +739,7 @@ def build_evidence_page():
                                                     edit_contraband.value
                                                     or ""
                                                 )
-                                                evid.evid_notes = (
+                                                evid.evid_note = (
                                                     edit_notes.value
                                                     or ""
                                                 )

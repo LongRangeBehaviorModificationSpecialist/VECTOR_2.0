@@ -14,7 +14,7 @@ from nicegui import ui
 
 from models import get_session, Notes
 from navbar import build_navbar
-from main_page import (
+from home_page import (
     is_authenticated,
     get_current_user_name,
     get_is_admin,
@@ -22,14 +22,13 @@ from main_page import (
 )
 from utils import (
     required_select,
-    required_textarea,
+    required_input,
     load_agent_names,
     get_current_timestamp,
     MESSAGES,
     NOTIFICATION_TIMEOUT,
     POSITIVE_NOTIFICATION_TIMEOUT,
 )
-
 
 # ─── Main Page Builder ───
 def build_notes_page():
@@ -73,8 +72,8 @@ def build_notes_page():
             note_author_combo.props("autofocus")
 
             # note_text — TextAreaField
-            note_text_input = required_textarea(
-                label="Note Text"
+            note_text_input = required_input(
+                label="Note"
             ).classes("w-full")
 
             # ─── Buttons ───
@@ -286,7 +285,7 @@ def build_notes_page():
                         ).classes("w-full")
 
                         # Note text — editable
-                        edit_text = ui.textarea(
+                        edit_text = required_input(
                             label="Note",
                             value=row["note_text"],
                         ).classes("w-full")

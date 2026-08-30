@@ -16,7 +16,7 @@ from sqlalchemy import inspect as sa_inspect
 from models import get_session, Agents
 
 
-from main_page import (
+from home_page import (
     is_authenticated,
     get_current_user_name,
     get_is_admin,
@@ -25,6 +25,7 @@ from main_page import (
 from navbar import build_navbar
 from utils import (
     load_agents_from_json,
+    is_duplicate_agent,
     save_agent_to_json,
     get_agent_dict,
     load_agent_names_for_page,
@@ -34,6 +35,8 @@ from utils import (
     required_select,
     check_agent_dup_role,
     confirm_delete_all,
+    check_if_agent_name,
+    check_if_agent_role,
     MESSAGES,
     NOTIFICATION_TIMEOUT,
     POSITIVE_NOTIFICATION_TIMEOUT,
@@ -62,7 +65,7 @@ def build_agents_page():
             # Agent Name — dropdown populated from agents.json
             agent_name_input = required_select(
                 options=load_agent_names_for_page(),
-                label="Agent's Name",
+                label="Agent Name",
                 with_input=True,
                 new_value_mode="add",
             ).classes("w-full")
@@ -77,23 +80,27 @@ def build_agents_page():
 
             agent_role_input = required_select(
                 options=load_role_options(),
-                label="Agent's Role",
+                label="Agent Role",
                 with_input=True,
             ).classes("w-full")
 
             agent_role_secondary_input = ui.select(
                 options=load_role_options(),
-                label="Agent's Secondary Role (if applicable)",
+                label="Agent Secondary Role (if applicable)",
                 with_input=True,
             ).classes("w-full")
 
             agent_phone_input = required_input(
-                label="Agent's Phone Number"
+                label="Agent Phone Number"
             ).classes("w-full")
 
-            agent_notes_input = ui.textarea(label="Notes").classes("w-full")
+            agent_email_input = ui.input(
+                label="Agent Email"
+            ).classes("w-full")
 
-            # ─── Auto-populate on name selection ───
+            agent_note_input = ui.input(label="Notes").classes("w-full")
+
+            # ───── Auto-populate on name selection ─────
             def on_name_change(e):
                 selected = e.value
                 if not selected:
@@ -108,11 +115,14 @@ def build_agents_page():
                         "agency", "") or ""
                     agent_phone_input.value = info.get(
                         "phone", "") or ""
+                    agent_email_input.value = info.get(
+                        "email", "") or ""
 
                 else:
                     # New name typed — clear the fields for manual entry
                     agent_parent_agency_input.value = None
                     agent_phone_input.value = ""
+                    agent_email_input.value = ""
 
             agent_name_input.on_value_change(on_name_change)
 
@@ -125,37 +135,23 @@ def build_agents_page():
                     agent_role_input.value = None
                     agent_role_secondary_input.value = None
                     agent_phone_input.value = ""
-                    agent_notes_input.value = ""
+                    agent_email_input.value = ""
+                    agent_note_input.value = ""
 
                 def on_submit():
                     """Handles form submission for new agents."""
                     name = agent_name_input.value
-                    if not name:
-                        ui.notify(
-                            MESSAGES["agent_1"],
-                            type="warning",
-                            timeout=NOTIFICATION_TIMEOUT,
-                            close_button="OK",
-                            position="center",
-                        )
-                        return
+                    check_if_agent_name(name=name)
 
                     agency = agent_parent_agency_input.value or ""
 
                     role = agent_role_input.value
-                    if not role:
-                        ui.notify(
-                            MESSAGES["agent_2"],
-                            type="warning",
-                            timeout=NOTIFICATION_TIMEOUT,
-                            close_button="OK",
-                            position="center",
-                        )
-                        return
+                    check_if_agent_role(role=role)
 
                     role_secondary = agent_role_secondary_input.value or ""
                     phone = agent_phone_input.value or ""
-                    notes = agent_notes_input.value or ""
+                    email = agent_email_input.value or ""
+                    notes = agent_note_input.value or ""
 
                     try:
                         with get_session() as session:
@@ -179,20 +175,15 @@ def build_agents_page():
                                 role_secondary=role_secondary,
                             ):
                                 return
-                            if (
-                                phone
-                                and session.query(Agents)
-                                .filter_by(agent_phone=phone)
-                                .first()
-                            ):
-                                ui.notify(
-                                    MESSAGES["agent_5"],
-                                    type="warning",
-                                    timeout=NOTIFICATION_TIMEOUT,
-                                    close_button="OK",
-                                    position="center",
-                                )
-                                return
+
+                                # ui.notify(
+                                #     "An agent with this name, phone number, "
+                                #     "or email already exists in the JSON file.",
+                                #     type="negative",
+                                #     timeout=0,
+                                #     close_button="OK",
+                                # )
+                                # return
 
                             new_agent = Agents(
                                 agent_name=name,
@@ -200,31 +191,46 @@ def build_agents_page():
                                 agent_role=role,
                                 agent_role_secondary=role_secondary,
                                 agent_phone=phone,
-                                agent_notes=notes,
+                                agent_email=email,
+                                agent_note=notes,
                             )
                             session.add(new_agent)
 
-                        # RIGHT — Load → Append → Save
-                        # Save to JSON file
-                        agents = load_agents_from_json()
+                        if not is_duplicate_agent(
+                                name=name,
+                                phone=phone,
+                                email=email,
+                            ):
 
-                        new_agent = {
-                            "name": name,
-                            "agency": agency,
-                            "phone": phone,
-                        }
+                            # RIGHT — Load → Append → Save
+                            # Save to JSON file
+                            agents = load_agents_from_json()
 
-                        agents.append(new_agent)
-                        save_agent_to_json(agents=agents)
+                            agents.append({
+                                    "name": name,
+                                    "agency": agency,
+                                    "phone": phone,
+                                    "email": email,
+                            })
+                            save_agent_to_json(agents=agents)
 
-                        ui.notify(
-                            f"{name} added successfully.",
-                            timeout=POSITIVE_NOTIFICATION_TIMEOUT,
-                            close_button="OK",
-                            position="bottom",
-                        )
-                        clear_agent_form()
+                            ui.notify(
+                                "New agent saved to the JSON file.",
+                                type="positive",
+                                timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                close_button="OK",
+                                position="bottom",
+                            )
+                        else:
+                            ui.notify(
+                                f"{name} added to the case dataabse.",
+                                type="positive",
+                                timeout=POSITIVE_NOTIFICATION_TIMEOUT,
+                                close_button="OK",
+                                position="bottom",
+                            )
                         refresh_agent_table()
+                        clear_agent_form()
 
                     except Exception as err:
                         ui.notify(
@@ -242,6 +248,7 @@ def build_agents_page():
                     "Clear",
                     on_click=clear_agent_form,
                 ).props("outline")
+
                 ui.button(
                     "Add Agent",
                     on_click=on_submit,
@@ -290,7 +297,8 @@ def build_agents_page():
                                     r.agent_role_secondary or ""
                                 ),
                                 "agent_phone": r.agent_phone or "",
-                                "agent_notes": r.agent_notes or "",
+                                "agent_email": r.agent_email or "",
+                                "agent_note": r.agent_note or "",
                             }
                             for r in agents
                         ]
@@ -330,6 +338,13 @@ def build_agents_page():
                                 "name": "agent_phone",
                                 "label": "Phone",
                                 "field": "agent_phone",
+                                "sortable": True,
+                                "align": "left",
+                            },
+                            {
+                                "name": "agent_email",
+                                "label": "Email",
+                                "field": "agent_email",
                                 "sortable": True,
                                 "align": "left",
                             },
@@ -412,9 +427,14 @@ def build_agents_page():
                                     value=row["agent_phone"],
                                 ).classes("w-full")
 
-                                agent_notes = ui.textarea(
+                                agent_email = ui.input(
+                                    label="Agent's Email",
+                                    value=row["agent_email"],
+                                ).classes("w-full")
+
+                                agent_note = ui.input(
                                     label="Notes",
-                                    value=row["agent_notes"],
+                                    value=row["agent_note"],
                                 ).classes("w-full")
 
                                 with ui.row().classes(
@@ -452,7 +472,8 @@ def build_agents_page():
                                                 agent_role_secondary
                                             )
                                             agent.agent_phone = agent_phone
-                                            agent.agent_notes = agent_notes
+                                            agent.agent_email = agent_email
+                                            agent.agent_note = agent_note
 
                                             if check_agent_dup_role(
                                                 agent=agent_name,

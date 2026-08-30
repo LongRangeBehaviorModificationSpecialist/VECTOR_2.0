@@ -14,17 +14,15 @@ from program.inc.agency_list import AGENCY_LIST
 from program.inc.jurisdictions import JURISDICTIONS
 
 NOTIFICATION_TIMEOUT = 0
-POSITIVE_NOTIFICATION_TIMEOUT = 4000
+POSITIVE_NOTIFICATION_TIMEOUT = 1000
 
-AGENTS_JSON_PATH = Path(__file__).parent / "agents.json"
+AGENTS_JSON_PATH = Path(__file__).parent / "parts/agents.json"
 
 MESSAGES = {
     "agent_1": "The 'Agent's Name' field is required",
     "agent_2": "The 'Agent's Role' field is required.",
     "agent_3": "That Agent's Name is already in the case database. Please "
         "check the name and try again.",
-    "agent_4": "Those initials are already used for another agent. Please "
-        "change the initials and re-submit.",
     "agent_5": "That phone number is already assigned to another agent.",
 
     "case_1": "The 'Case Number' field is required.",
@@ -109,6 +107,7 @@ mimetypes.add_type("application/gzip", ".tgz")
 mimetypes.add_type("application/vnd.rar", ".rar")
 mimetypes.add_type("application/x-bzip2", ".bz2")
 mimetypes.add_type("application/x-xz", ".xz")
+
 
 def get_current_timestamp() -> str:
     """Returns current date/time formatted as MM-DD-YYYY HH:MM:SS."""
@@ -226,6 +225,7 @@ def get_agent_dict() -> list[dict]:
             "name": a.get("name", ""),
             "agency": a.get("agency", "") or "",
             "phone": a.get("phone", "") or "",
+            "email": a.get("email", "") or "",
         }
         for a in data
         if isinstance(a, dict)
@@ -264,6 +264,49 @@ def load_agency_options() -> list[str]:
             return [a[1] for a in AGENCY_LIST]
         return list(AGENCY_LIST)
     return []
+
+
+def is_duplicate_agent(name: str, phone: str, email: str = "") -> bool:
+    """
+    Checks if an agent with the same name, phone, or email already exists in agents.json.
+    Returns True if duplicate found, False otherwise.
+    """
+    agents = load_agents_from_json()
+
+    name_lower = name.strip().lower()
+    phone_clean = (
+        phone.strip()
+        .replace("-", "")
+        .replace("(", "")
+        .replace(")", "")
+        .replace(" ", "")
+    )
+
+    for agent in agents:
+        # Check name match
+        if agent.get("name", "").strip().lower() == name_lower:
+            return True
+
+        # Check phone match (normalize format first)
+        existing_phone = agent.get("phone", "").strip()
+        existing_phone_clean = (
+            existing_phone.replace("-", "")
+            .replace("(", "")
+            .replace(")", "")
+            .replace(" ", "")
+        )
+
+        if existing_phone_clean and phone_clean and existing_phone_clean == phone_clean:
+            return True
+
+        # Check email match (if applicable)
+        if email:
+            email_lower = email.strip().lower()
+            existing_email = agent.get("email", "").strip().lower()
+            if email_lower and existing_email and existing_email == email_lower:
+                return True
+
+    return False
 
 
 def check_agent_dup_role(agent: str, role: str, role_secondary: str) -> bool:
@@ -305,17 +348,6 @@ def confirm_delete_all(action: str, callback):
             ).props("negative unelevated")
 
     dialog.open()
-
-
-def load_agent_names() -> list[str]:
-    """Returns a list of all agent names from the Agents table."""
-    with get_session() as session:
-        rows = (
-            session.query(Agents.agent_name)
-            .order_by(Agents.agent_name)
-            .all()
-        )
-        return [r[0] for r in rows]
 
 
 def load_room_labels() -> list[str]:
@@ -405,3 +437,27 @@ def format_file_size(size_bytes: int) -> str:
         return f"{size_bytes / (1024 * 1024):.1f} MB"
     else:
         return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+
+
+def check_if_agent_name(name: str | None):
+    if not name:
+        ui.notify(
+            MESSAGES["agent_1"],
+            type="warning",
+            timeout=NOTIFICATION_TIMEOUT,
+            close_button="OK",
+            position="center",
+        )
+        return
+
+
+def check_if_agent_role(role: str | None):
+    if not role:
+        ui.notify(
+            MESSAGES["agent_2"],
+            type="warning",
+            timeout=NOTIFICATION_TIMEOUT,
+            close_button="OK",
+            position="center",
+        )
+        return

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-uploads_page.py — File upload and management page.
+files_page.py — File upload and management page.
 
 Stores files as BLOBs in the SQLite database with download and delete capability.
 """
@@ -12,7 +12,7 @@ import tempfile
 
 from models import get_session, UploadedFiles
 from navbar import build_navbar
-from main_page import (
+from home_page import (
     is_authenticated,
     get_current_user_name,
     get_is_admin,
@@ -56,17 +56,16 @@ def build_uploads_page():
                 try:
                     uploaded_file = e.file
                     file_name = uploaded_file.name
+                    # SmallFileUpload stores the data as bytes in _data
+                    file_data = uploaded_file._data
+                    file_size = len(file_data)
                     file_mime_type = (
                         uploaded_file.content_type
                         or "application/octet-stream"
                     )
-
-                    # SmallFileUpload stores the data as bytes in _data
-                    content = uploaded_file._data
-                    file_size = len(content)
-
                     # Determine MIME type using fallback
                     file_mime_type = get_mime_type(file_name, file_mime_type)
+
 
                     # Validate file type
                     if not is_allowed_file(file_mime_type):
@@ -87,7 +86,7 @@ def build_uploads_page():
                     with get_session() as session:
                         new_file = UploadedFiles(
                             file_name=file_name,
-                            file_data=content,
+                            file_data=file_data,
                             file_size=file_size,
                             file_mime_type=file_mime_type,
                             uploaded_by=uploader,

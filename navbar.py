@@ -189,51 +189,16 @@ def build_navbar(
         ).props("flat color=white")
 
         # ── Tools Button
-        _nav_dropdown(
+        ui.button(
             "Tools",
-            [
-                (
-                    "Useful Links",
-                    lambda: ui.navigate.to("/links")
-                ),
-            ],
-        )
+            on_click=lambda: ui.navigate.to("/links")
+        ).props("flat color=white")
 
-        # ── Reports Dropdown ────────────────────────────────
-        _nav_dropdown(
+        # ── Reports Button
+        ui.button(
             "Reports",
-            [
-                (
-                    "Print Agent List",
-                    lambda: ui.navigate.to("/reports/agents")
-                ),
-                (
-                    "Print Room List",
-                    lambda: ui.navigate.to("/reports/rooms")
-                ),
-                (
-                    "Print Evidence List (Detailed)",
-                    lambda: ui.navigate.to("/reports/evidence"),
-                ),
-                (
-                    "Print Evidence List (By Room)",
-                    lambda: ui.navigate.to("/reports/evidence-by-room"),
-                ),
-                (
-                    "Print Person List",
-                    lambda: ui.navigate.to("/reports/persons")
-                ),
-                (
-                    "Print Notes List",
-                    lambda: ui.navigate.to("/reports/notes")
-                ),
-                ("---", None),
-                (
-                    "Print Evidence List (Basic)",
-                    lambda: ui.navigate.to("/reports/evidence-basic"),
-                ),
-            ],
-        )
+            on_click=lambda: ui.navigate.to("/reports")
+        ).props("flat color=white")
 
         # ── Spacer ──────────────────────────────────────────
         ui.space()

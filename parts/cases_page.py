@@ -12,7 +12,7 @@ Consolidates four Flask routes into one interactive page:
 
 from nicegui import ui
 
-from main_page import (
+from home_page import (
     is_authenticated,
     get_current_user_name,
     get_is_admin,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-main_page.py
+home_page.py
 
 Handles:
     /                →   Home/Login page
@@ -13,11 +13,12 @@ Handles:
     /saved_output    →   Save output viewer
 """
 
+from datetime import datetime
 from nicegui import ui
 from pathlib import Path
-from datetime import datetime
 import shutil
 
+from import_export import export_database, import_database
 from models import (
     get_session,
     Agents,
@@ -27,15 +28,12 @@ from models import (
     Persons,
     Rooms,
 )
-from navbar import build_navbar, confirm_new_case_dialog
+from navbar import build_navbar
 from program.config import Config
+from utils import NOTIFICATION_TIMEOUT, POSITIVE_NOTIFICATION_TIMEOUT
 
 
-NOTIFICATION_TIMEOUT = 0
-POSITIVE_NOTIFICATION_TIMEOUT = 4000
-
-
-# ── Auth Helpers ──────────────────────────────────────────────
+# ───── Auth Helpers ─────
 def is_authenticated() -> bool:
     """Stub — wire up to your session/auth logic."""
     from nicegui import app
@@ -54,7 +52,7 @@ def get_is_admin() -> bool:
     return app.storage.user.get("is_admin", False)
 
 
-# ── Home Page ─────────────────────────────────────────────────
+# ───── Home Page ─────
 def build_home_page():
     """Home/login page — shows menu if authenticated, login
     form otherwise.
@@ -86,77 +84,176 @@ def build_authenticated_home():
             "V·E·C·T·O·R Home Page"
         ).classes("text-2xl font-normal text-center")
 
-    # with ui.column().classes("items-center w-full"):
-        ui.label(
-            "Main Menu"
-        ).classes("text-xl font-semibold mb-6")
+        ui.label("Main Menu").classes("text-xl font-semibold mb-6")
 
+    # ───── Action Buttons ROW 1: Start New Case | Add Agent | Add Room ─────
     with ui.row().classes(
         "flex justify-center items-center gap-6 mb-4 w-full"
     ):
+
         ui.button(
             "Start New Case",
             on_click=lambda: ui.navigate.to("/cases"),
-        ).props(
-            "unelevated"
-        ).classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
 
         ui.button(
             "Add Agent",
             on_click=lambda: ui.navigate.to("/agents"),
-        ).props(
-            "unelevated"
-        ).classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
 
         ui.button(
             "Add Room",
             on_click=lambda: ui.navigate.to("/rooms"),
-        ).props(
-            "unelevated"
-        ).classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
 
-    # Row 2: Add Evidence | Add Person | Add Note
+    # ───── Action Buttons ROW 2: Add Evidence | Add Person | Add Note ─────
     with ui.row().classes(
         "flex justify-center items-center gap-6 mb-4 w-full"
     ):
         ui.button(
             "Add Evidence",
             on_click=lambda: ui.navigate.to("/evidence"),
-        ).props(
-            "unelevated"
-        ).classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
 
         ui.button(
             "Add Person",
             on_click=lambda: ui.navigate.to("/persons"),
-        ).props(
-            "unelevated"
-        ).classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
 
         ui.button(
             "Add Note",
             on_click=lambda: ui.navigate.to("/notes"),
-        ).props(
-            "unelevated"
-        ).classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
 
-    # Row 3: Add Evidence | Add Person | Add Note
+    # ───── Action Buttons ROW 3: Add File | Useful Links ─────
     with ui.row().classes(
         "flex justify-center items-center gap-6 mb-4 w-full"
     ):
+
         ui.button(
             "Add File",
             on_click=lambda: ui.navigate.to("/uploads"),
-        ).props(
-            "unelevated"
-        ).classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
 
         ui.button(
             "Useful Links",
             on_click=lambda: ui.navigate.to("/links"),
-        ).props(
-            "unelevated"
-        ).classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+
+        ui.button(
+            "Reports",
+            on_click=lambda: ui.navigate.to("/reports"),
+        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+
+    # ───── Import / Export ROW ─────
+    ui.separator().classes("my-6")
+
+    with ui.column().classes("items-center w-full"):
+
+        ui.label("Data Management").classes("text-lg font-bold mb-3")
+
+        with ui.row().classes("flex justify-center items-center gap-6 w-full"):
+
+            # ── EXPORT BUTTON ─────
+            def confirm_export():
+                with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
+
+                    ui.label(
+                        "Export All Data"
+                    ).classes("text-lg font-bold mb-2")
+
+                    ui.label(
+                        "This will export all database tables to CSV files and "
+                        "any uploaded files to your home directory.\n\n"
+                        "The folder will be named:\n"
+                        "<case-number>_<datetime>_saved_results"
+                    ).classes("mb-4 text-sm")
+
+                    with ui.row().classes("w-full justify-end gap-2"):
+
+                        ui.button(
+                            "Cancel",
+                            on_click=dialog.close
+                        ).props("flat")
+
+                        def do_export():
+                            dialog.close()
+                            export_database()
+
+                        ui.button(
+                            "Export Now",
+                            on_click=do_export
+                        ).props("unelevated primary")
+
+                dialog.open()
+
+            ui.button(
+                "📤 Export All Data",
+                on_click=confirm_export,
+            ).props("unelevated").classes("w-56 py-3")
+
+            # ───── IMPORT BUTTON ─────
+            def open_import_dialog():
+                with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
+
+                    ui.label("Import Data").classes("text-lg font-bold mb-2")
+
+                    ui.label(
+                        "Select a folder containing previously exported "
+                        "CSV files and a 'files' subfolder.\n\n"
+                        "⚠️ WARNING: This will REPLACE all existing data "
+                        "in the database!"
+                    ).classes("mb-4 text-sm")
+
+                    folder_path_input = ui.input(
+                        label="Folder Path",
+                        placeholder=(
+                            r"C:\Users\username\\"
+                            r"case-001_20260828_120000_saved_results",
+                        )
+                    ).classes("w-full")
+
+                    def do_import():
+                        path = folder_path_input.value.strip()
+                        if not path:
+                            ui.notify(
+                                "Please enter a folder path.",
+                                type="warning",
+                                timeout=NOTIFICATION_TIMEOUT,
+                                close_button="OK",
+                                position="center",
+                            )
+                            return
+                        if not Path(path).exists():
+                            ui.notify(
+                                "Directory not found.",
+                                type="negative",
+                                timeout=NOTIFICATION_TIMEOUT,
+                                close_button="OK",
+                                position="center",
+                            )
+                            return
+                        dialog.close()
+                        import_database(path)
+
+                    with ui.row().classes("w-full justify-end gap-2"):
+
+                        ui.button(
+                            "Cancel",
+                            on_click=dialog.close
+                        ).props("flat")
+
+                        ui.button(
+                            "Import Now",
+                            on_click=do_import
+                        ).props("unelevated warning")
+
+                dialog.open()
+
+            ui.button(
+                "📥 Import Data",
+                on_click=open_import_dialog,
+            ).props("unelevated").classes("w-56 py-3")
 
 
 def build_login_home():
@@ -250,7 +347,7 @@ def build_login_home():
         ).props("unelevated").classes("mt-4 px-8 py-3")
 
 
-# ── About Page ───────────────────────────────────────────────
+# ───── About Page ─────
 @ui.page("/about")
 def about_page():
     if not is_authenticated():
@@ -277,7 +374,7 @@ def about_page():
             ).classes("text-sm text-gray-500")
 
 
-# ── Help Page ────────────────────────────────────────────────
+# ───── Help Page ─────
 @ui.page("/help")
 def help_page():
     if not is_authenticated():
@@ -331,7 +428,7 @@ Use the top menu to access different sections:\n
 """).classes("text-sm")
 
 
-# ── Export Database Page ─────────────────────────────────────
+# ───── Export Database Page ─────
 @ui.page("/export_db")
 def export_db_page():
     if not is_authenticated():
@@ -421,7 +518,7 @@ def export_db_page():
             ).classes("text-sm text-gray-500")
 
 
-# ── Confirm New Case Handler ─────────────────────────────────
+# ───── Confirm New Case Handler ─────
 def confirm_new_case_handler():
     """Called when user clicks "Make New Case File".
 
@@ -488,7 +585,7 @@ def confirm_new_case_handler():
     dialog.open()
 
 
-# ── Error Check Page ─────────────────────────────────────────
+# ───── Error Check Page ─────
 @ui.page("/error_check")
 def error_check_page():
     if not is_authenticated():
@@ -671,7 +768,7 @@ def error_check_page():
                     pass
 
 
-# ── Saved Output Page ────────────────────────────────────────
+# ───── Saved Output Page ─────
 @ui.page("/saved_output")
 def saved_output_page():
     if not is_authenticated():
@@ -709,7 +806,7 @@ def saved_output_page():
             ).classes("text-sm text-gray-400")
 
 
-# ── Page Registration ────────────────────────────────────────
+# ── Page Registration ─────
 @ui.page("/")
 @ui.page("/home")
 def home():

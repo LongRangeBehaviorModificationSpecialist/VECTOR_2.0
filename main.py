@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-# ==============================================================================
-
 """
 main.py
 
@@ -27,20 +25,19 @@ app.add_static_files(
 )
 
 
-# ── Initialize Database ─────────────────────────────────────
+# ───── Initialize Database ─────
 from models import init_db, get_session, Users
 init_db()
 
 
-# ── Seed Default User ───────────────────────────────────────
+# ───── Seed Default User ─────
 def seed_default_user():
     """Reads user credentials from users.json and upserts into the
     Users table.
 
     The JSON stores hashes as Python byte-string literals.
     """
-    user_folder = "users"
-    json_path = Path(__file__).parent / f"{user_folder}\\users.json"
+    json_path = Path(__file__).parent / f"parts\\users.json"
     if not json_path.exists():
         print("WARNING → 'users.json' not found — no user seeded.")
         return
@@ -94,7 +91,7 @@ def seed_default_user():
 seed_default_user()
 
 
-# ── Theme Configuration ─────────────────────────────────────
+# ───── Theme Configuration ─────
 # Shrinks all textarea heights to match input/select field heights
 ui.add_css(
     """
@@ -158,103 +155,100 @@ textarea.q-field__native {
     shared=True,
 )
 
-# ── Import All Page Modules ───
+# ───── Import All Page Modules ─────
 # Each module registers its own @ui.page routes on import.
 # Order matters: shared utilities first, then pages.
 
 # Core infrastructure
 import navbar
-import main_page  # (/, /home, /about, /help, /export_db, /logout)
+import home_page  # (/, /home, /about, /help, /export_db, /logout)
 
-# ── Page Registrations ───
+# ───── Page Registrations ─────
 # Some page modules define their own @ui.page decorators internally.
 # The ones below are registered here for centralized control.
 
 
 @ui.page("/agents")
 def agents_route():
-    if not main_page.is_authenticated():
+    if not home_page.is_authenticated():
         ui.navigate.to("/")
         return
-    from agents.agents_page import build_agents_page
+    from parts.agents_page import build_agents_page
     build_agents_page()
 
 
 @ui.page("/cases")
 def cases_route():
-    if not main_page.is_authenticated():
+    if not home_page.is_authenticated():
         ui.navigate.to("/")
         return
-    from cases.cases_page import build_cases_page
+    from parts.cases_page import build_cases_page
     build_cases_page()
 
 
 @ui.page("/rooms")
 def rooms_route():
-    if not main_page.is_authenticated():
+    if not home_page.is_authenticated():
         ui.navigate.to("/")
         return
-    from rooms.rooms_page import build_rooms_page
+    from parts.rooms_page import build_rooms_page
     build_rooms_page()
 
 
 @ui.page("/evidence")
 def evidence_route():
-    if not main_page.is_authenticated():
+    if not home_page.is_authenticated():
         ui.navigate.to("/")
         return
-    from evidence.evidence_page import build_evidence_page
+    from parts.evidence_page import build_evidence_page
     build_evidence_page()
 
 
 @ui.page("/persons")
 def persons_route():
-    if not main_page.is_authenticated():
+    if not home_page.is_authenticated():
         ui.navigate.to("/")
         return
-    from persons.persons_page import build_persons_page
+    from parts.persons_page import build_persons_page
     build_persons_page()
 
 
 @ui.page("/notes")
 def notes_route():
-    if not main_page.is_authenticated():
+    if not home_page.is_authenticated():
         ui.navigate.to("/")
         return
-    from notes.notes_page import build_notes_page
+    from parts.notes_page import build_notes_page
     build_notes_page()
 
 
 @ui.page("/uploads")
 def uploads_route():
-    if not main_page.is_authenticated():
+    if not home_page.is_authenticated():
         ui.navigate.to("/")
         return
-    from files.files_page import build_uploads_page
+    from parts.files_page import build_uploads_page
     build_uploads_page()
 
 
 @ui.page("/links")
 def links_route():
-    if not main_page.is_authenticated():
+    if not home_page.is_authenticated():
         ui.navigate.to("/")
         return
-    from links.links_page import build_links_page
+    from parts.links_page import build_links_page
     build_links_page()
 
-
-# ── Startup Configuration ───
-# async def initialize_app():
-#     """Initialize app storage and verify database."""
-#     # Ensure storage keys exist
-#     if "authenticated" not in app.storage.user:
-#         app.storage.user["authenticated"] = False
-#     if "user_name" not in app.storage.user:
-#         app.storage.user["user_name"] = ""
-#     if "is_admin" not in app.storage.user:
-#         app.storage.user["is_admin"] = False
+@ui.page("/reports")
+def reports_route():
+    if not home_page.is_authenticated():
+        ui.navigate.to("/")
+        return
+    from parts.reports_page import build_reports_page
+    build_reports_page()
 
 
+# ───── Startup Configuration ─────
 def is_authenticated() -> bool:
     """Checks if user is authenticated (defaults to False)."""
     try:
@@ -262,14 +256,12 @@ def is_authenticated() -> bool:
     except Exception:
         return False
 
-
 def get_current_user_name() -> str:
     """Gets current username (defaults to empty)."""
     try:
         return app.storage.user.get("user_name", "")
     except Exception:
         return ""
-
 
 def get_is_admin() -> bool:
     """Checks if current user is admin (defaults to False)."""
@@ -279,7 +271,7 @@ def get_is_admin() -> bool:
         return False
 
 
-# ── Run ───
+# ───── Run ─────
 if __name__ in {"__main__", "__mp_main__"}:
 
     ui.add_head_html(
@@ -293,5 +285,4 @@ if __name__ in {"__main__", "__mp_main__"}:
         reload=True,
         dark=True,
         storage_secret="vector-secret-key-change-in-production-2024",
-        # favicon="/static/favicon.ico",
     )

@@ -25,7 +25,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from marshmallow import Schema, fields
 
 
-# ── Database Setup
+# ───── Database Setup ─────
 # To add the date to the database file name
 current_date = datetime.today().strftime("%Y-%m-%d")
 
@@ -42,19 +42,21 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
-# ── Password Hashing
+# ───── Password Hashing ─────
 def generate_password_hash(plain_text: str) -> str:
-    return bcrypt.hashpw(plain_text.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
+    return bcrypt.hashpw(
+        plain_text.encode("utf-8"),
+        bcrypt.gensalt(),
+    ).decode("utf-8")
 
 def check_password_hash(stored_hash: str, attempted: str) -> bool:
     return bcrypt.checkpw(
         attempted.encode("utf-8"),
-        stored_hash.encode("utf-8")
+        stored_hash.encode("utf-8"),
     )
 
 
-# --- MODELS ---
+# ───── MODELS ─────
 
 class Agents(Base):
     """Agents table — stores agent details."""
@@ -63,12 +65,12 @@ class Agents(Base):
 
     id = Column(Integer(), primary_key=True)
     agent_name = Column(String(), nullable=False, unique=True)
-    # agent_initials = Column(String(), nullable=False, unique=True)
     agent_parent_agency = Column(String(), nullable=False)
     agent_role = Column(String(), nullable=False)
     agent_role_secondary = Column(String())
     agent_phone = Column(String(), nullable=False, unique=True)
-    agent_notes = Column(Text())
+    agent_email = Column(String(), unique=True)
+    agent_note = Column(Text())
 
     def __repr__(self):
         return f"Agent {self.id}: {self.agent_name}"
@@ -80,12 +82,12 @@ class AgentsSchema(Schema):
     """Agent schema."""
 
     agent_name = fields.Str()
-    # agent_initials = fields.Str()
     agent_parent_agency = fields.Str()
     agent_role = fields.Str()
     agent_role_secondary = fields.Str()
     agent_phone = fields.Str()
-    agent_notes = fields.Str()
+    agent_email = fields.Str()
+    agent_note = fields.Str()
 
 agents_schema = AgentsSchema(many=True)
 
@@ -139,7 +141,7 @@ class Evidence(Base):
     evid_triaged = Column(String(), nullable=False)
     evid_triaged_by = Column(String(), nullable=False)
     evid_is_contraband = Column(String(), nullable=False)
-    evid_notes = Column(Text(), nullable=False)
+    evid_note = Column(Text(), nullable=False)
 
     def __repr__(self):
         return f"Item {self.id}: {self.evid_desc}"
@@ -163,7 +165,7 @@ class EvidenceSchema(Schema):
     evid_triaged = fields.Str()
     evid_triaged_by = fields.Str()
     evid_is_contraband = fields.Str()
-    evid_notes = fields.Str()
+    evid_note = fields.Str()
 
 evid_schema = EvidenceSchema(many=True)
 
@@ -206,7 +208,7 @@ class Persons(Base):
     sus_dob = Column(String())
     sus_address = Column(String())
     sus_phone = Column(String())
-    sus_notes = Column(Text())
+    sus_note = Column(Text())
 
     def __repr__(self):
         return f"Person {self.id}: {self.sus_name}"
@@ -221,7 +223,7 @@ class PersonSchema(Schema):
     sus_dob = fields.Str()
     sus_address = fields.Str()
     sus_phone = fields.Str()
-    sus_notes = fields.Str()
+    sus_note = fields.Str()
 
 person_schema = PersonSchema(many=True)
 
@@ -236,13 +238,13 @@ class Rooms(Base):
     room_desc = Column(String(), nullable=False, unique=True)
     room_first_agent = Column(String(), nullable=False)
     room_second_agent = Column(String(), nullable=False)
+    room_note = Column(Text())
 
     def __repr__(self):
         return f"Room {self.room_label}: {self.room_desc}"
 
     def __str__(self):
         return f"Room {self.room_label}: {self.room_desc}"
-
 
 class RoomsSchema(Schema):
     """Room schema."""
@@ -251,7 +253,7 @@ class RoomsSchema(Schema):
     room_desc = fields.Str()
     room_first_agent = fields.Str()
     room_second_agent = fields.Str()
-
+    room_note = fields.Str()
 
 rooms_schema = RoomsSchema(many=True)
 
@@ -268,13 +270,12 @@ class UploadedFiles(Base):
     upload_date = Column(DateTime(), default=datetime.utcnow)
     file_data = Column(LargeBinary(), nullable=False, unique=True)
     uploaded_by = Column(String(100), nullable=False)
-    file_notes = Column(Text())
 
     def __repr__(self):
-        return f"File Name: {self.file_name}, Uploaded at: {self.file_upload_date}, Notes: {self.file_notes}"
+        return f"File Name: {self.file_name}, Uploaded at: {self.upload_date}"
 
     def __str__(self):
-        return f"File Name: {self.file_name}, Uploaded at: {self.file_upload_date}, Notes: {self.file_notes}"
+        return f"File Name: {self.file_name}, Uploaded at: {self.upload_date}"
 
 
 class FileSchema(Schema):
@@ -283,7 +284,9 @@ class FileSchema(Schema):
     file_name = fields.Str()
     file_size = fields.Int()
     file_mime_type = fields.Str()
-    file_notes = fields.Str()
+    file_note = fields.Str()
+    upload_date = fields.Str()
+    uploaded_by = fields.Str()
 
 file_schema = FileSchema(many=True)
 

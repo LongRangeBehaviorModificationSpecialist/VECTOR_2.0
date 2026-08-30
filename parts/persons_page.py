@@ -14,7 +14,7 @@ from nicegui import ui
 
 from models import get_session, Persons
 from navbar import build_navbar
-from main_page import (
+from home_page import (
     is_authenticated,
     get_current_user_name,
     get_is_admin,
@@ -22,7 +22,6 @@ from main_page import (
 )
 from utils import (
     required_input,
-    required_textarea,
     MESSAGES,
     NOTIFICATION_TIMEOUT,
     POSITIVE_NOTIFICATION_TIMEOUT,
@@ -49,29 +48,24 @@ def build_persons_page():
 
             ui.label("Add Person").classes("text-lg font-semibold mb-4")
 
-            # sus_name — StringField (required, autofocused)
             sus_name_input = required_input(
                 label="Name"
             ).classes("w-full")
             sus_name_input.props("autofocus")
 
-            # sus_dob — StringField
             sus_dob_input = ui.input(
                 label="DOB"
             ).classes("w-full")
 
-            # sus_address — StringField
             sus_address_input = ui.input(
                 label="Address"
             ).classes("w-full")
 
-            # sus_phone — StringField
             sus_phone_input = ui.input(
                 label="Phone Number"
             ).classes("w-full")
 
-            # sus_notes — TextAreaField
-            sus_notes_input = required_textarea(
+            sus_note_input = required_input(
                 label="Notes"
             ).classes("w-full")
 
@@ -83,7 +77,7 @@ def build_persons_page():
                     sus_dob_input.value = ""
                     sus_address_input.value = ""
                     sus_phone_input.value = ""
-                    sus_notes_input.value = ""
+                    sus_note_input.value = ""
 
                 def on_submit():
                     # ─── Required field validation (DataRequired) ───
@@ -101,7 +95,7 @@ def build_persons_page():
                     sus_dob = sus_dob_input.value or ""
                     sus_address = sus_address_input.value or ""
                     sus_phone = sus_phone_input.value or ""
-                    sus_notes = sus_notes_input.value or ""
+                    sus_note = sus_note_input.value or ""
 
                     # ─── Duplicate name check (sus_name is unique) ───
                     with get_session() as session:
@@ -128,7 +122,7 @@ def build_persons_page():
                             sus_dob=sus_dob,
                             sus_address=sus_address,
                             sus_phone=sus_phone,
-                            sus_notes=sus_notes,
+                            sus_note=sus_note,
                         )
                         session.add(new_person)
 
@@ -188,7 +182,7 @@ def build_persons_page():
                         "sus_dob": r.sus_dob or "",
                         "sus_address": r.sus_address or "",
                         "sus_phone": r.sus_phone or "",
-                        "sus_notes": r.sus_notes or "",
+                        "sus_note": r.sus_note or "",
                     }
                     for r in persons
                 ]
@@ -224,9 +218,9 @@ def build_persons_page():
                         "align": "left",
                     },
                     {
-                        "name": "sus_notes",
+                        "name": "sus_note",
                         "label": "Notes",
-                        "field": "sus_notes",
+                        "field": "sus_note",
                         "sortable": False,
                         "align": "left",
                     },
@@ -296,9 +290,9 @@ def build_persons_page():
                             value=row["sus_phone"],
                         ).classes("w-full")
 
-                        edit_notes = required_textarea(
+                        edit_notes = required_input(
                             label="Notes",
-                            value=row["sus_notes"],
+                            value=row["sus_note"],
                         ).classes("w-full")
 
                         with ui.row().classes(
@@ -362,7 +356,7 @@ def build_persons_page():
                                         person.sus_phone = (
                                             edit_phone.value or ""
                                         )
-                                        person.sus_notes = (
+                                        person.sus_note = (
                                             edit_notes.value or ""
                                         )
 
