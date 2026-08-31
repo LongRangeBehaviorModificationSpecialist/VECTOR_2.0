@@ -26,11 +26,11 @@ from utils import (
     POSITIVE_NOTIFICATION_TIMEOUT,
 )
 
-# ─── Main Page Builder ───
+# ----- Main Page Builder -----
 def build_uploads_page():
     """Builds the full File Upload page UI."""
 
-    # ── Header / Navbar ───
+    # ----- Header / Navbar -----
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -41,7 +41,7 @@ def build_uploads_page():
 
         ui.label("File Upload & Management").classes("text-2xl font-bold m-4")
 
-        # ── Upload Section ───
+        # ----- Upload Section -----
         with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
 
             ui.label("Upload New File").classes("text-lg font-semibold mb-4")
@@ -65,7 +65,6 @@ def build_uploads_page():
                     )
                     # Determine MIME type using fallback
                     file_mime_type = get_mime_type(file_name, file_mime_type)
-
 
                     # Validate file type
                     if not is_allowed_file(file_mime_type):
@@ -124,7 +123,7 @@ def build_uploads_page():
                 ".zip, .7z, .tar, .tgz, .gz, .tar.gz, .rar, .bz2, .xz"
             ).classes("w-full")
 
-        # ── Existing Files Table ───
+        # ----- Existing Files Table -----
         ui.separator().classes("my-6")
 
         ui.label("Uploaded Files").classes("text-xl font-bold mb-3")
@@ -237,7 +236,7 @@ def build_uploads_page():
                     """,
                 )
 
-                # ── Download handler ───
+                # ----- Download handler -----
                 def on_download(e):
 
                     row = e.args
@@ -259,7 +258,7 @@ def build_uploads_page():
                                 f.write(file_record.file_data)
                             ui.download(temp_path)
 
-                # ── Delete confirmation dialog ───
+                # ----- Delete confirmation dialog -----
                 def open_delete_dialog(e):
                     """Confirms and deletes a file."""
                     row = e.args
@@ -316,11 +315,11 @@ def build_uploads_page():
                 table.on("download", on_download)
                 table.on("delete", open_delete_dialog)
 
-    # Initial render
+    # ----- Initial render -----
     refresh_files_table()
 
 
-# ── Page Registration ───
+# ----- Page Registration -----
 @ui.page("/uploads")
 def uploads_page():
     if not is_authenticated():

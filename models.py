@@ -25,7 +25,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from marshmallow import Schema, fields
 
 
-# ───── Database Setup ─────
+# ----- Database Setup -----
 # To add the date to the database file name
 current_date = datetime.today().strftime("%Y-%m-%d")
 
@@ -42,7 +42,7 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
-# ───── Password Hashing ─────
+# ----- Password Hashing -----
 def generate_password_hash(plain_text: str) -> str:
     return bcrypt.hashpw(
         plain_text.encode("utf-8"),
@@ -56,7 +56,7 @@ def check_password_hash(stored_hash: str, attempted: str) -> bool:
     )
 
 
-# ───── MODELS ─────
+# ----- MODELS -----
 
 class Agents(Base):
     """Agents table — stores agent details."""
@@ -131,17 +131,17 @@ class Evidence(Base):
     evid_num = Column(String(), nullable=False, unique=True)
     evid_qty = Column(String(), nullable=False)
     evid_desc = Column(String(), nullable=False)
-    evid_model_num = Column(String(), nullable=False)
-    evid_serial_num = Column(String(), nullable=False)
+    evid_model_num = Column(String())
+    evid_serial_num = Column(String())
     evid_loc_room = Column(String(), nullable=False)
     evid_loc_room_detail = Column(String(), nullable=False)
     evid_found_by = Column(String(), nullable=False)
     evid_found_by_witness = Column(String(), nullable=False)
-    evid_pic_taken = Column(String(), nullable=False)
-    evid_triaged = Column(String(), nullable=False)
-    evid_triaged_by = Column(String(), nullable=False)
-    evid_is_contraband = Column(String(), nullable=False)
-    evid_note = Column(Text(), nullable=False)
+    evid_pic_taken = Column(String())
+    evid_triaged = Column(String())
+    evid_triaged_by = Column(String())
+    evid_is_contraband = Column(String())
+    evid_note = Column(Text())
 
     def __repr__(self):
         return f"Item {self.id}: {self.evid_desc}"
@@ -329,13 +329,13 @@ class Users(Base):
             return False
 
 
-# ── Table Creation ──────────────────────────────────────────
+# ----- Table Creation -----
 def init_db():
     """Create all tables if they don't exist."""
     Base.metadata.create_all(engine)
 
 
-# ── Convenience Context Manager ─────────────────────────────
+# ----- Convenience Context Manager -----
 from contextlib import contextmanager
 
 @contextmanager

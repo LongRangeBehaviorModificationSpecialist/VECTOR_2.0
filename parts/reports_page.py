@@ -43,10 +43,10 @@ from home_page import (
 from utils import get_print_date_time, get_case_info
 
 
-# ───── Report Page Wrapper ─────
+# ----- Report Page Wrapper -----
 def build_reports_page():
 
-    # ───── Header / Navbar ─────
+    # ----- Header / Navbar -----
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -183,7 +183,7 @@ def show_validation_errors(errors: list[str]):
         )
 
 
-# ── Common Print Styles
+# ----- Common Print Styles -----
 COMMON_STYLES = """
 @media print {
     .no-print {
@@ -216,6 +216,8 @@ COMMON_STYLES = """
     .personTable tbody tr td.personTableData,
     .roomTable tbody tr td.roomTableData {
         font-family: "Times New Roman", Times, serif;
+        padding: 5px 0px 3px 0px;
+        vertical-align: "bottom";
     }
     .top-table .evidTable tr td.evidTableDataColOne,
     .top-table .evidTable tr td.evidTableDataColTwo {
@@ -226,6 +228,7 @@ COMMON_STYLES = """
     }
     .top-table .evidTable tr td.evidTableDataColTwo {
         font-size: 12pt;
+        padding: 0pt 6pt;
     }
     .top-table .headerTable tr td.header {
         font-size: 10pt;
@@ -264,6 +267,10 @@ body {
 .fs-5 {
     margin: 0 auto 2em auto;
     text-align: center;
+}
+
+td.px-6 {
+    padding: 0pt 6pt;
 }
 
 .top-table {
@@ -361,14 +368,13 @@ td.evidTableDataColOne {
 td.evidTableDataColTwo {
     border-bottom: 1px dashed black;
     height: 1.85em;
-    padding: 0 px 5px;
     width: 80%;
     vertical-align: bottom;
 }
 
 .evidTableRoomNameRow {
     border-bottom: 0px dashed black;
-    height: 1.75em;
+    height: 1.5em;
     text-align: center;
     font-size: 11 pt;
     padding: 2px 5px;
@@ -382,7 +388,7 @@ td.evidTableDataColTwo {
 """
 
 
-# ── Case Header Builder
+# ----- Case Header Builder -----
 def build_case_header_html(active_case: dict | None, page_title: str, sub_title: str) -> str:
     """Generates the standard report title + case info header HTML."""
     active_case = get_case_info()
@@ -447,7 +453,7 @@ def build_report_footer_html() -> str:
     </p>
     """
 
-# ── Agent List Report HTML Template
+# ----- Agent List Report HTML Template -----
 def build_agents_report_html(active_case: dict, agents: list) -> str:
     """Generates the complete HTML for the Agent List report."""
 
@@ -498,7 +504,7 @@ def build_agents_report_html(active_case: dict, agents: list) -> str:
 </body>
 </html>"""
 
-# ── Detailed Evidence Report HTML Template (AGENT COPY)
+# ----- Detailed Evidence Report HTML Template (AGENT COPY) -----
 def build_evidence_report_html(active_case: list, evidence: list) -> str:
     """Generates the complete HTML for the detailed Evidence report.
 
@@ -509,58 +515,80 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
 
     evid_rows = "".join([f"""
             <tr class="evidTableItemRow">
-                <td colspan="2" class="evidTableData">Item #:&ensp;{e["evid_num"]}</td>
+                <td colspan="2" class="evidTableData">
+                    Item #:&ensp;{e["evid_num"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
-                <td class="evidTableDataColTwo">{e["evid_qty"]}</td>
+                <td class="evidTableDataColTwo px-6">{e["evid_qty"]}</td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Description:</td>
-                <td class="evidTableDataColTwo">{e["evid_desc"]}</td>
+                <td class="evidTableDataColTwo px-6">{e["evid_desc"]}</td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Model #:</td>
-                <td class="evidTableDataColTwo">{e["evid_model_num"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_model_num"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Serial #:</td>
-                <td class="evidTableDataColTwo">{e["evid_serial_num"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_serial_num"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Location:</td>
-                <td class="evidTableDataColTwo">{e["evid_loc_room"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_loc_room"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Where Found:</td>
-                <td class="evidTableDataColTwo">{e["evid_loc_room_detail"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_loc_room_detail"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Located By:</td>
-                <td class="evidTableDataColTwo">{e["evid_found_by"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_found_by"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Witnessed By:</td>
-                <td class="evidTableDataColTwo">{e["evid_found_by_witness"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_found_by_witness"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Photographed:</td>
-                <td class="evidTableDataColTwo">{e["evid_pic_taken"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_pic_taken"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged:</td>
-                <td class="evidTableDataColTwo">{e["evid_triaged"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_triaged"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged By:</td>
-                <td class="evidTableDataColTwo">{e["evid_triaged_by"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_triaged_by"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Notes:</td>
-                <td class="evidTableDataColTwo">{e["evid_note"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_note"]}
+                </td>
             </tr>
             <tr>
-                <td colspan="2" style="height: 1.5em;"></td>
+                <td colspan="2" style="height: 1.25em;"></td>
             </tr>"""
             for e in evidence]
         )
@@ -592,7 +620,7 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
 </body>
 </html>"""
 
-# ── Evidence By Room Report HTML Template
+# ----- Evidence By Room Report HTML Template -----
 def build_evidence_by_room_report_html(
         active_case: list,
         evidence: list,
@@ -622,62 +650,86 @@ def build_evidence_by_room_report_html(
         evid_rows = "".join([f"""
             <tr>
                 <td class="evidTableDataColOne">Item No.:</td>
-                <td class="evidTableDataColTwo" style="font-weight:bold">
+                <td class="evidTableDataColTwo px-6" style="font-weight:bold">
                     {e["evid_num"]}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
-                <td class="evidTableDataColTwo">{e["evid_qty"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_qty"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Description:</td>
-                <td class="evidTableDataColTwo">{e["evid_desc"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_desc"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Model #:</td>
-                <td class="evidTableDataColTwo">{e["evid_model_num"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_model_num"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Serial #:</td>
-                <td class="evidTableDataColTwo">{e["evid_serial_num"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_serial_num"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Location:</td>
-                <td class="evidTableDataColTwo">Room {e["evid_loc_room"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    Room {e["evid_loc_room"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Where Found</td>
-                <td class="evidTableDataColTwo">
+                <td class="evidTableDataColTwo px-6">
                     {e["evid_loc_room_detail"]}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Located By:</td>
-                <td class="evidTableDataColTwo">{e["evid_found_by"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_found_by"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Witnessed By:</td>
-                <td class="evidTableDataColTwo">
+                <td class="evidTableDataColTwo px-6">
                     {e["evid_found_by_witness"]}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Photographed:</td>
-                <td class="evidTableDataColTwo">{e["evid_pic_taken"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_pic_taken"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged:</td>
-                <td class="evidTableDataColTwo">{e["evid_triaged"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_triaged"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged By:</td>
-                <td class="evidTableDataColTwo">{e["evid_triaged_by"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_triaged_by"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Notes:</td>
-                <td class="evidTableDataColTwo">{e["evid_note"]}</td>
-            </tr>"""
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_note"]}
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="height: 1.25em;"></td>
+            </tr>
+            """
             for e in room_items]
         )
 
@@ -720,7 +772,7 @@ def build_evidence_by_room_report_html(
 </body>
 </html>"""
 
-# ── Basic Evidence Report HTML Template (RETURN COPY)
+# ----- Basic Evidence Report HTML Template (RETURN COPY) -----
 def build_basic_evidence_report_html(
         active_case: list,
         evidence: list
@@ -740,19 +792,30 @@ def build_basic_evidence_report_html(
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
-                <td class="evidTableDataColTwo">{e["evid_qty"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_qty"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Description:</td>
-                <td class="evidTableDataColTwo">{e["evid_desc"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_desc"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Model #:</td>
-                <td class="evidTableDataColTwo">{e["evid_model_num"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_model_num"]}
+                </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Serial #:</td>
-                <td class="evidTableDataColTwo">{e["evid_serial_num"]}</td>
+                <td class="evidTableDataColTwo px-6">
+                    {e["evid_serial_num"]}
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="height: 1.25em;"></td>
             </tr>"""
         for e in evidence]
     )
@@ -784,7 +847,7 @@ def build_basic_evidence_report_html(
 </body>
 </html>"""
 
-# ── Room List Report HTML Template
+# ----- Room List Report HTML Template -----
 def build_rooms_report_html(active_case: list, rooms: list) -> str:
     """Generates the complete HTML for the Room List report."""
 
@@ -837,7 +900,7 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
 </body>
 </html>"""
 
-# ── Person List Report HTML Template
+# ----- Person List Report HTML Template -----
 def build_persons_report_html(active_case: list, persons: list) -> str:
     """Generates the complete HTML for the Person List report."""
 
@@ -886,7 +949,7 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 </body>
 </html>"""
 
-# ── Notes Report HTML Template
+# ----- Notes Report HTML Template -----
 def build_notes_report_html(active_case: list, notes: list) -> str:
     """Generates the complete HTML for the Notes report."""
 
@@ -934,7 +997,7 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 </body>
 </html>"""
 
-# ── Updated Agents Route
+# ----- Updated Agents Route -----
 @ui.page("/reports/agents")
 def print_agents_report():
 
@@ -965,7 +1028,7 @@ def print_agents_report():
 
     render_report_page(html_content=html)
 
-# ── Updated Evidence Routes
+# ----- Updated Evidence Routes -----
 @ui.page("/reports/evidence")
 def print_evidence_report():
 
@@ -1003,7 +1066,7 @@ def print_evidence_report():
 
     render_report_page(html_content=html)
 
-# ── Updated Evidence By Room Route
+# ----- Updated Evidence By Room Route -----
 @ui.page("/reports/evidence_by_room")
 def print_evidence_by_room_report():
 
@@ -1054,7 +1117,7 @@ def print_evidence_by_room_report():
 
     render_report_page(html_content=html)
 
-# ── Updated Basic Evidence Report Route
+# ----- Updated Basic Evidence Report Route -----
 @ui.page("/reports/evidence_basic")
 def print_basic_evidence_report():
 
@@ -1084,7 +1147,7 @@ def print_basic_evidence_report():
 
     render_report_page(html_content=html)
 
-# ── Updated Rooms Route
+# ----- Updated Rooms Route -----
 @ui.page("/reports/rooms")
 def print_rooms_report():
 
@@ -1112,7 +1175,7 @@ def print_rooms_report():
 
     render_report_page(html_content=html)
 
-# ── Updated Persons Route
+# ----- Updated Persons Route -----
 @ui.page("/reports/persons")
 def print_persons_report():
     if not is_authenticated():
@@ -1139,7 +1202,7 @@ def print_persons_report():
 
     render_report_page(html_content=html)
 
-# ── Updated Notes Route
+# ----- Updated Notes Route -----
 @ui.page("/reports/notes")
 def print_notes_report():
     if not is_authenticated():
@@ -1165,7 +1228,7 @@ def print_notes_report():
 
     render_report_page(html_content=html)
 
-# ── JSON Output
+# ----- JSON Output -----
 @ui.page("/reports/json")
 def json_output_page():
     if not is_authenticated():

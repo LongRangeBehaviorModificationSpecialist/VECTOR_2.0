@@ -12,9 +12,7 @@ Consolidates five Flask routes into one interactive page:
 """
 
 from nicegui import ui
-from sqlalchemy import inspect as sa_inspect
 from models import get_session, Agents
-
 
 from home_page import (
     is_authenticated,
@@ -43,10 +41,11 @@ from utils import (
 )
 
 
-# ─── Main Page Builder ───
+# ----- Main Page Builder -----
 def build_agents_page():
+    """Builds the Agents page UI."""
 
-    # ─── Header / Navbar ───
+    # ----- Header / Navbar -----
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -57,12 +56,9 @@ def build_agents_page():
 
         ui.label("Agents").classes("text-2xl font-bold m-4")
 
-        # ─── Add Agent Section ───
-        with ui.card().classes("w-full max-w-lg p-6 mx-auto"):
+        # ----- Add Agent Section -----
+        with ui.card().classes("w-full max-w-lg mx-auto p-6"):
 
-            ui.label("Add Agent").classes("text-lg font-semibold mb-4")
-
-            # Agent Name — dropdown populated from agents.json
             agent_name_input = required_select(
                 options=load_agent_names_for_page(),
                 label="Agent Name",
@@ -100,7 +96,7 @@ def build_agents_page():
 
             agent_note_input = ui.input(label="Notes").classes("w-full")
 
-            # ───── Auto-populate on name selection ─────
+            # ----- Auto-populate on name selection -----
             def on_name_change(e):
                 selected = e.value
                 if not selected:
@@ -126,7 +122,7 @@ def build_agents_page():
 
             agent_name_input.on_value_change(on_name_change)
 
-            # ─── Buttons ───
+            # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_agent_form():
@@ -155,7 +151,7 @@ def build_agents_page():
 
                     try:
                         with get_session() as session:
-                            # Uniqueness checks for data
+                            # ----- Uniqueness checks for data -----
                             if (
                                 session.query(Agents)
                                 .filter_by(agent_name=name)
@@ -175,15 +171,6 @@ def build_agents_page():
                                 role_secondary=role_secondary,
                             ):
                                 return
-
-                                # ui.notify(
-                                #     "An agent with this name, phone number, "
-                                #     "or email already exists in the JSON file.",
-                                #     type="negative",
-                                #     timeout=0,
-                                #     close_button="OK",
-                                # )
-                                # return
 
                             new_agent = Agents(
                                 agent_name=name,
@@ -247,14 +234,14 @@ def build_agents_page():
                 ui.button(
                     "Clear",
                     on_click=clear_agent_form,
-                ).props("outline")
+                ).props("flat")
 
                 ui.button(
                     "Add Agent",
                     on_click=on_submit,
                 ).props("unelevated")
 
-        # ─── Agent List Table ───
+        # ----- Agent List Table -----
         ui.separator().classes("mt-6 mb-3")
 
         with ui.column().classes("w-full items-center"):
@@ -304,7 +291,7 @@ def build_agents_page():
                         ]
 
                     with table_container:
-                        # Build columns for ui.table
+                        # ----- Build columns for ui.table -----
                         column_defs = [
                             {
                                 "name": "agent_name",
@@ -364,7 +351,7 @@ def build_agents_page():
                         )
                         table.props("dense flat")
 
-                        # ─── Slot: Actions column (Update / Delete) ───
+                        # ----- Slot: Actions column (Update / Delete) -----
                         table.add_slot(
                             "body-cell-actions",
                             """
@@ -383,7 +370,7 @@ def build_agents_page():
                         """,
                         )
 
-                        # ─── Edit dialog ───
+                        # ----- Edit dialog -----
                         def open_edit_dialog(e):
 
                             row = e.args
@@ -504,7 +491,7 @@ def build_agents_page():
 
                             edit_dialog.open()
 
-                        # ─── Delete confirmation dialog ───
+                        # ----- Delete confirmation dialog -----
                         def open_delete_dialog(e):
 
                             row = e.args
@@ -566,7 +553,8 @@ def build_agents_page():
                         table.on("delete", open_delete_dialog)
 
             with ui.row().classes("w-full justify-center my-2"):
-                # ─── CLEAR ALL BUTTON ───
+
+                # ----- CLEAR ALL BUTTON -----
                 def delete_all_agents():
                     with get_session() as session:
                         session.query(Agents).delete()
@@ -589,11 +577,11 @@ def build_agents_page():
                     color="#ef4444",
                 ).props("unelevated").classes("mb-2 items-center")
 
-    # Initial render
+    # ----- Initial render -----
     refresh_agent_table()
 
 
-# ─── Page Registration ───
+# ----- Page Registration -----
 @ui.page("/agents")
 def agents_page():
     if not is_authenticated():

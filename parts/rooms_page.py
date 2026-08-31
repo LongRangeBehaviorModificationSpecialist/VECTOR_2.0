@@ -32,11 +32,11 @@ from utils import (
 )
 
 
-# ───── Main Page Builder ─────
+# ----- Main Page Builder -----
 def build_rooms_page():
     """Builds the full Rooms page UI."""
 
-    # ───── Header / Navbar ─────
+    # ----- Header / Navbar -----
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -47,10 +47,8 @@ def build_rooms_page():
 
         ui.label("Rooms").classes("text-2xl font-bold m-4")
 
-        # ───── Add Room Form ─────
+        # ----- Add Room Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
-
-            ui.label("Add Room").classes("text-lg font-semibold mb-4")
 
             next_letter = get_next_room_ltr()
             agent_options = load_agent_names()
@@ -80,7 +78,7 @@ def build_rooms_page():
 
             room_note_input = ui.input(label="Notes").classes("w-full")
 
-            # ───── Buttons ─────
+            # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form():
@@ -91,7 +89,7 @@ def build_rooms_page():
                     room_note_input.value = ""
 
                 def on_submit():
-                    # ───── Required field validation ─────
+                    # ----- Required field validation -----
                     room_label = room_label_input.value
                     if not room_label:
                         ui.notify(
@@ -118,7 +116,7 @@ def build_rooms_page():
                     second_agent = room_second_agent_combo.value or ""
                     room_note = room_note_input.value or ""
 
-                    # ───── Duplicate label validation ─────
+                    # ----- Duplicate label validation -----
                     with get_session() as session:
                         existing_label = (
                             session.query(Rooms)
@@ -136,7 +134,7 @@ def build_rooms_page():
                             )
                             return
 
-                        # ───── Duplicate description validation ─────
+                        # ----- Duplicate description validation -----
                         existing_desc = (
                             session.query(Rooms)
                             .filter_by(room_desc=room_desc)
@@ -153,7 +151,7 @@ def build_rooms_page():
                             )
                             return
 
-                        # ───── Same agent checks ─────
+                        # ----- Same agent checks -----
                         if (
                             first_agent and
                             second_agent and
@@ -168,7 +166,7 @@ def build_rooms_page():
                             )
                             return
 
-                        # ───── Save to database ─────
+                        # ----- Save to database -----
                         new_room = Rooms(
                             room_label=room_label,
                             room_desc=room_desc,
@@ -192,14 +190,14 @@ def build_rooms_page():
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                ).props("outline")
+                ).props("flat")
 
                 ui.button(
                     "Add Room",
                     on_click=on_submit,
                 ).props("unelevated")
 
-        # ───── Existing Rooms Table ─────
+        # ----- Existing Rooms Table -----
         ui.separator().classes("my-6")
 
         with ui.column().classes("w-full items-center"):
@@ -295,7 +293,7 @@ def build_rooms_page():
                         )
                         table.props("dense flat")
 
-                        # ───── Slot: Actions column ─────
+                        # ----- Slot: Actions column -----
                         table.add_slot(
                             "body-cell-actions",
                             """
@@ -314,7 +312,7 @@ def build_rooms_page():
                         """,
                         )
 
-                        # ───── Edit dialog ─────
+                        # ----- Edit dialog -----
                         def open_edit_dialog(e):
                             row = e.args
 
@@ -365,7 +363,7 @@ def build_rooms_page():
                                     ).props("flat")
 
                                     def on_save_update():
-                                        # ───── Validate uniqueness ─────
+                                        # ----- Validate uniqueness -----
                                         # (excluding current record)
                                         new_label = edit_label.value or ""
                                         new_desc = edit_desc.value or ""
@@ -433,7 +431,7 @@ def build_rooms_page():
                                                 )
                                                 return
 
-                                            # ───── Save changes ─────
+                                            # ----- Save changes -----
                                             room = (
                                                 session.query(Rooms)
                                                 .filter_by(id=row["id"])
@@ -466,7 +464,7 @@ def build_rooms_page():
 
                             edit_dialog.open()
 
-                        # ───── Delete confirmation dialog ─────
+                        # ----- Delete confirmation dialog -----
                         def open_delete_dialog(e):
 
                             row = e.args
@@ -559,10 +557,10 @@ def build_rooms_page():
                     color="#ef4444",
                 ).props("unelevated").classes("mb-2 items-center")
 
-    # Initial render
+    # ----- Initial render -----
     refresh_rooms_table()
 
-# ───── Page Registration ─────
+# ----- Page Registration -----
 @ui.page("/rooms")
 def rooms_page():
     if not is_authenticated():

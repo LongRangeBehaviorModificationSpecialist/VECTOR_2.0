@@ -30,11 +30,11 @@ from utils import (
     POSITIVE_NOTIFICATION_TIMEOUT,
 )
 
-# ─── Main Page Builder ───
+# ----- Main Page Builder -----
 def build_notes_page():
     """Builds the full Notes page UI."""
 
-    # ─── Header / Navbar ───
+    # ----- Header / Navbar -----
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -43,12 +43,10 @@ def build_notes_page():
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label("Operational Notes").classes("text-2xl font-bold m-4")
+        ui.label("Notes").classes("text-2xl font-bold m-4")
 
-        # ─── Add Note Form ───
+        # ----- Add Note Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
-
-            ui.label("Add Note").classes("text-lg font-semibold mb-4")
 
             agent_options = load_agent_names()
             current_time = get_current_timestamp()
@@ -76,7 +74,7 @@ def build_notes_page():
                 label="Note"
             ).classes("w-full")
 
-            # ─── Buttons ───
+            # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form():
@@ -85,7 +83,7 @@ def build_notes_page():
                     note_text_input.value = ""
 
                 def on_submit():
-                    # ─── Required field validation ───
+                    # ----- Required field validation -----
                     note_author = note_author_combo.value
                     if not note_author:
                         ui.notify(
@@ -113,7 +111,7 @@ def build_notes_page():
                         get_current_timestamp()
                     )
 
-                    # ─── Save to database ───
+                    # ----- Save to database -----
                     with get_session() as session:
                         new_note = Notes(
                             note_date_time=note_date_time,
@@ -135,14 +133,14 @@ def build_notes_page():
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                ).props("outline")
+                ).props("flat")
 
                 ui.button(
                     "Add Note",
                     on_click=on_submit,
                 ).props("unelevated")
 
-        # ─── Existing Notes Table ───
+        # ----- Existing Notes Table -----
         ui.separator().classes("my-6")
 
         ui.label(
@@ -230,7 +228,7 @@ def build_notes_page():
                 )
                 table.props("dense flat")
 
-                # ─── Slot: Actions column ───
+                # ----- Slot: Actions column -----
                 table.add_slot(
                     "body-cell-actions",
                     """
@@ -247,7 +245,7 @@ def build_notes_page():
                 """,
                 )
 
-                # ─── Edit dialog ───
+                # ----- Edit dialog -----
                 def open_edit_dialog(e):
 
                     row = e.args
@@ -355,7 +353,7 @@ def build_notes_page():
 
                     edit_dialog.open()
 
-                # ─── Delete confirmation dialog ───
+                # ----- Delete confirmation dialog -----
                 def open_delete_dialog(e):
 
                     row = e.args
@@ -426,11 +424,11 @@ def build_notes_page():
                 table.on("edit", open_edit_dialog)
                 table.on("delete", open_delete_dialog)
 
-    # Initial render
+    # ----- Initial render -----
     refresh_notes_table()
 
 
-# ─── Page Registration ───
+# ----- Page Registration -----
 @ui.page("/notes")
 def notes_page():
     if not is_authenticated():

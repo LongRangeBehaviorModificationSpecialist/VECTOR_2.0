@@ -30,10 +30,14 @@ from models import (
 )
 from navbar import build_navbar
 from program.config import Config
-from utils import NOTIFICATION_TIMEOUT, POSITIVE_NOTIFICATION_TIMEOUT
+from utils import (
+    NOTIFICATION_TIMEOUT,
+    POSITIVE_NOTIFICATION_TIMEOUT,
+    delete_all_data,
+)
 
 
-# ───── Auth Helpers ─────
+# ----- Auth Helpers -----
 def is_authenticated() -> bool:
     """Stub — wire up to your session/auth logic."""
     from nicegui import app
@@ -52,7 +56,7 @@ def get_is_admin() -> bool:
     return app.storage.user.get("is_admin", False)
 
 
-# ───── Home Page ─────
+# ----- Home Page -----
 def build_home_page():
     """Home/login page — shows menu if authenticated, login
     form otherwise.
@@ -72,21 +76,29 @@ def build_home_page():
 
 
 def build_authenticated_home():
-    """Main menu for logged-in users."""
+    """Main menu shown to logged-in users."""
 
     with ui.column().classes("items-center w-full mt-8 mb-6"):
 
+        # ----- Page Title and Header -----
+
         ui.image(
             "/static/novadc_icac.png",
-        ).classes("w-[150px] h-[150px] mb-4")
+        ).classes("w-[150px] h-[150px] mb-2")
 
         ui.label(
-            "V·E·C·T·O·R Home Page"
-        ).classes("text-2xl font-normal text-center")
+            "V·E·C·T·O·R Home"
+        ).classes("text-2xl font-bold text-center")
 
-        ui.label("Main Menu").classes("text-xl font-semibold mb-6")
+        ui.label(
+            "The Virginia Evidence Collection, Tracking, "
+            "Organization, & Reporting Program"
+        ).classes("text-base text-gray-400 text-center max-w-xl")
 
-    # ───── Action Buttons ROW 1: Start New Case | Add Agent | Add Room ─────
+        ui.label("Main Menu").classes("text-xl font-normal mb-2")
+
+    # ----- Action Buttons ROW 1: Start New Case | Add Agent | Add Room -----
+
     with ui.row().classes(
         "flex justify-center items-center gap-6 mb-4 w-full"
     ):
@@ -94,38 +106,40 @@ def build_authenticated_home():
         ui.button(
             "Start New Case",
             on_click=lambda: ui.navigate.to("/cases"),
-        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Add Agent",
             on_click=lambda: ui.navigate.to("/agents"),
-        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Add Room",
             on_click=lambda: ui.navigate.to("/rooms"),
-        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
-    # ───── Action Buttons ROW 2: Add Evidence | Add Person | Add Note ─────
+    # ----- Action Buttons ROW 2: Add Evidence | Add Person | Add Note -----
+
     with ui.row().classes(
         "flex justify-center items-center gap-6 mb-4 w-full"
     ):
         ui.button(
             "Add Evidence",
             on_click=lambda: ui.navigate.to("/evidence"),
-        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Add Person",
             on_click=lambda: ui.navigate.to("/persons"),
-        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Add Note",
             on_click=lambda: ui.navigate.to("/notes"),
-        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
-    # ───── Action Buttons ROW 3: Add File | Useful Links ─────
+    # ----- Action Buttons ROW 3: Add File | Useful Links -----
+
     with ui.row().classes(
         "flex justify-center items-center gap-6 mb-4 w-full"
     ):
@@ -133,29 +147,31 @@ def build_authenticated_home():
         ui.button(
             "Add File",
             on_click=lambda: ui.navigate.to("/uploads"),
-        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Useful Links",
             on_click=lambda: ui.navigate.to("/links"),
-        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Reports",
             on_click=lambda: ui.navigate.to("/reports"),
-        ).props("unelevated").classes("flex-shrink-0 min-w-48 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
-    # ───── Import / Export ROW ─────
-    ui.separator().classes("my-6")
+    # ----- Import / Export ROW -----
+
+    ui.separator().classes("my-2")
 
     with ui.column().classes("items-center w-full"):
 
-        ui.label("Data Management").classes("text-lg font-bold mb-3")
+        ui.label("Data Management").classes("text-lg font-bold mb-2")
 
+        # ----- Row to hold the Data Management buttons -----
         with ui.row().classes("flex justify-center items-center gap-6 w-full"):
 
-            # ── EXPORT BUTTON ─────
-            def confirm_export():
+            # ----- EXPORT Button -----
+            def open_export_dialog():
                 with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
                     ui.label(
@@ -163,22 +179,54 @@ def build_authenticated_home():
                     ).classes("text-lg font-bold mb-2")
 
                     ui.label(
-                        "This will export all database tables to CSV files and "
-                        "any uploaded files to your home directory.\n\n"
-                        "The folder will be named:\n"
+                        "Export all database tables to CSV files and "
+                        "uploaded files into a single compresses ZIP "
+                        "archive saved to your home directory.\n\n"
+                        "The ZIP file will be named:\n"
                         "<case-number>_<datetime>_saved_results"
-                    ).classes("mb-4 text-sm")
+                    ).classes("mb-4 text-sm text-gray-400")
 
-                    with ui.row().classes("w-full justify-end gap-2"):
+                    # ----- Password option -----
+
+                    encrypt_checkbox = ui.checkbox(
+                        "Encrypt with password (AES-256)"
+                    ).classes("mb-2")
+
+                    password_input = ui.input(
+                        label="Password",
+                        password=True,
+                        ).classes("w-full")
+                    password_input.bind_visibility_from(
+                        encrypt_checkbox,
+                        "value",
+                    )
+
+                    def do_export():
+                        pwd = (
+                            password_input.value
+                            if encrypt_checkbox.value
+                            else None
+                        )
+                        if encrypt_checkbox.value and not pwd:
+                            ui.notify(
+                                "Please enter a password or uncheck "
+                                "encryption.",
+                                type="warning",
+                                timeout=0,
+                                position="center",
+                                close_button="OK",
+                                )
+                            return
+
+                        dialog.close()
+                        export_database(password=pwd)
+
+                    with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                         ui.button(
                             "Cancel",
                             on_click=dialog.close
                         ).props("flat")
-
-                        def do_export():
-                            dialog.close()
-                            export_database()
 
                         ui.button(
                             "Export Now",
@@ -187,37 +235,41 @@ def build_authenticated_home():
 
                 dialog.open()
 
-            ui.button(
-                "📤 Export All Data",
-                on_click=confirm_export,
-            ).props("unelevated").classes("w-56 py-3")
-
-            # ───── IMPORT BUTTON ─────
+            # ----- IMPORT Button -----
             def open_import_dialog():
                 with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
                     ui.label("Import Data").classes("text-lg font-bold mb-2")
 
                     ui.label(
-                        "Select a folder containing previously exported "
-                        "CSV files and a 'files' subfolder.\n\n"
-                        "⚠️ WARNING: This will REPLACE all existing data "
-                        "in the database!"
-                    ).classes("mb-4 text-sm")
+                        "Select a ZIP file previously exported from "
+                        "VECTOR.\n\n"
+                        "⚠️ WARNING: This will REPLACE all existing data!"
+                    ).classes("mb-4 text-sm text-gray-400")
 
-                    folder_path_input = ui.input(
-                        label="Folder Path",
-                        placeholder=(
-                            r"C:\Users\username\\"
-                            r"case-001_20260828_120000_saved_results",
-                        )
+                    zip_path_input = ui.input(
+                        label="ZIP File Path",
+                        placeholder=r"Enter\Path\To\ZIP\File"
                     ).classes("w-full")
 
+                    encrypt_checkbox = ui.checkbox(
+                        "ZIP is encrypted (requires password)"
+                    ).classes("mb-2 mt-2")
+
+                    password_input = ui.input(
+                        label="Password",
+                        password=True,
+                    ).classes("w-full")
+                    password_input.bind_visibility_from(
+                        encrypt_checkbox,
+                        "value",
+                    )
+
                     def do_import():
-                        path = folder_path_input.value.strip()
+                        path = zip_path_input.value.strip()
                         if not path:
                             ui.notify(
-                                "Please enter a folder path.",
+                                "Please enter file path to ZIP file.",
                                 type="warning",
                                 timeout=NOTIFICATION_TIMEOUT,
                                 close_button="OK",
@@ -226,17 +278,34 @@ def build_authenticated_home():
                             return
                         if not Path(path).exists():
                             ui.notify(
-                                "Directory not found.",
+                                "ZIP file not found.",
                                 type="negative",
                                 timeout=NOTIFICATION_TIMEOUT,
                                 close_button="OK",
                                 position="center",
                             )
                             return
-                        dialog.close()
-                        import_database(path)
 
-                    with ui.row().classes("w-full justify-end gap-2"):
+                        pwd = (
+                            password_input.value
+                            if encrypt_checkbox.value
+                            else None
+                        )
+
+                        if encrypt_checkbox.value and not pwd:
+                            ui.notify(
+                                "Please enter the password.",
+                                type="warning",
+                                timeout=0,
+                                position="center",
+                                close_button="OK",
+                            )
+                            return
+
+                        dialog.close()
+                        import_database(path, password=pwd)
+
+                    with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                         ui.button(
                             "Cancel",
@@ -250,9 +319,107 @@ def build_authenticated_home():
 
                 dialog.open()
 
+            # ----- DELETE ALL Button -----
+
+            def open_delete_all_dialog():
+                with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
+
+                    ui.label(
+                        "Delete All Data"
+                    ).classes("text-lg font-bold mb-2")
+
+                    ui.label(
+                        "Are you sure you want to delete all case data for "
+                        "this case? This CANNOT be undone!"
+                    ).classes("mb-4 text-sm text-gray-400")
+
+                    # ----- User verification of destructive activity -----
+
+                    affirm_checkbox = ui.checkbox(
+                        "I understand the current data cannot be recovered.",
+                        value=False,
+                    ).classes("mb-2")
+
+                    affirm_input = ui.input(
+                        label="Affirm by typing 'DELETE' on the line below",
+                        password=False,
+                        ).classes("w-full")
+                    affirm_input.bind_visibility_from(
+                        affirm_checkbox,
+                        "value",
+                    )
+
+                    def do_delete():
+                        if not affirm_checkbox.value:
+                            ui.notify(
+                                "Is it really that much trouble to click "
+                                "one simple box?  Let's try this again.",
+                                type="warning",
+                                timeout=0,
+                                position="center",
+                                close_button="OK",
+                            )
+                            return
+
+                        if affirm_input.value != "DELETE":
+                            ui.notify(
+                                "Seriously, how difficult is it to type "
+                                "the word 'DELETE'?  Noob!",
+                                type="warning",
+                                timeout=0,
+                                position="center",
+                                close_button="OK",
+                            )
+                            return
+                        affirm = (
+                            affirm_input.value
+                            if affirm_checkbox.value
+                            else None
+                        )
+                        if affirm_checkbox.value and not affirm:
+                            ui.notify(
+                                "Please indicate you understand...",
+                                type="warning",
+                                timeout=0,
+                                position="center",
+                                close_button="OK",
+                                )
+                            return
+
+                        dialog.close()
+                        delete_all_data()
+
+                    with ui.row().classes("w-full justify-end gap-2 mt-4"):
+
+                        ui.button(
+                            "Cancel",
+                            on_click=dialog.close
+                        ).props("flat")
+
+                        ui.button(
+                            "Delete all data",
+                            on_click=do_delete,
+                            color="#EF4444",
+                        ).props("unelevated negative")
+
+                dialog.open()
+
+            ui.button(
+                "📤 Export All Data",
+                on_click=open_export_dialog,
+                color="#22c55e"
+            ).props("unelevated").classes("w-56 py-3")
+
             ui.button(
                 "📥 Import Data",
                 on_click=open_import_dialog,
+                color="#22c55e"
+            ).props("unelevated").classes("w-56 py-3")
+
+            ui.button(
+                "Delete All Data",
+                on_click=open_delete_all_dialog,
+                color="#EF4444",
             ).props("unelevated").classes("w-56 py-3")
 
 
@@ -270,7 +437,7 @@ def build_login_home():
 
         ui.label(
             "The Virginia Evidence Collection, Tracking, "
-            "Organization, & Recording Program"
+            "Organization, & Reporting Program"
         ).classes("text-base text-gray-400 text-center max-w-xl mb-2")
 
         ui.label(
@@ -347,7 +514,7 @@ def build_login_home():
         ).props("unelevated").classes("mt-4 px-8 py-3")
 
 
-# ───── About Page ─────
+# ----- About Page -----
 @ui.page("/about")
 def about_page():
     if not is_authenticated():
@@ -365,16 +532,17 @@ def about_page():
             "About V·E·C·T·O·R"
         ).classes("text-2xl font-bold mb-6")
 
-        with ui.card().classes("max-w-md p-6"):
+        with ui.card().classes("p-6"):
             ui.label(f"Version  :  {Config.version}").classes("mb-2")
             ui.label(f"Author  :  {Config.author}").classes("mb-2")
             ui.label(f"Department  :  {Config.dept}").classes("mb-2")
+            ui.label(f"URL : {Config.url}").classes("mb-2")
             ui.label(
                 f"Last Updated  :  {Config.updated}"
-            ).classes("text-sm text-gray-500")
+            ).classes("mb-2")
 
 
-# ───── Help Page ─────
+# ----- Help Page -----
 @ui.page("/help")
 def help_page():
     if not is_authenticated():
@@ -401,7 +569,7 @@ def help_page():
 ---
 
 This application helps you manage evidence collection,
-tracking, organization, and recording for law
+tracking, organization, and reporting for law
 enforcement cases.
 
 #### Quick Start
@@ -428,7 +596,7 @@ Use the top menu to access different sections:\n
 """).classes("text-sm")
 
 
-# ───── Export Database Page ─────
+# ----- Export Database Page -----
 @ui.page("/export_db")
 def export_db_page():
     if not is_authenticated():
@@ -518,7 +686,7 @@ def export_db_page():
             ).classes("text-sm text-gray-500")
 
 
-# ───── Confirm New Case Handler ─────
+# ----- Confirm New Case Handler -----
 def confirm_new_case_handler():
     """Called when user clicks "Make New Case File".
 
@@ -585,7 +753,7 @@ def confirm_new_case_handler():
     dialog.open()
 
 
-# ───── Error Check Page ─────
+# ----- Error Check Page -----
 @ui.page("/error_check")
 def error_check_page():
     if not is_authenticated():
@@ -768,7 +936,7 @@ def error_check_page():
                     pass
 
 
-# ───── Saved Output Page ─────
+# ----- Saved Output Page -----
 @ui.page("/saved_output")
 def saved_output_page():
     if not is_authenticated():
@@ -806,7 +974,7 @@ def saved_output_page():
             ).classes("text-sm text-gray-400")
 
 
-# ── Page Registration ─────
+# ----- Page Registration -----
 @ui.page("/")
 @ui.page("/home")
 def home():
@@ -829,3 +997,16 @@ def logout_page():
         position="bottom",
     )
     ui.navigate.to("/")
+
+
+@ui.page("/shutdown")
+def shutdown_page():
+    """Shuts down the application."""
+    from nicegui import app
+
+    app.storage.user["authenticated"] = False
+    app.storage.user["user_name"] = ""
+    app.storage.user["is_admin"] = False
+
+    app.shutdown
+    ui.run(reload=False)

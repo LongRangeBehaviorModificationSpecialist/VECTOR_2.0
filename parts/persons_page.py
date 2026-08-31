@@ -28,11 +28,11 @@ from utils import (
 )
 
 
-# ─── Main Page Builder ───
+# ----- Main Page Builder -----
 def build_persons_page():
     """Builds the full Persons page UI."""
 
-    # ─── Header / Navbar ───
+    # ----- Header / Navbar -----
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -43,10 +43,8 @@ def build_persons_page():
 
         ui.label("Person List").classes("text-2xl font-bold m-4")
 
-        # ─── Add Person Form ───
+        # ----- Add Person Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
-
-            ui.label("Add Person").classes("text-lg font-semibold mb-4")
 
             sus_name_input = required_input(
                 label="Name"
@@ -69,7 +67,7 @@ def build_persons_page():
                 label="Notes"
             ).classes("w-full")
 
-            # ─── Buttons ───
+            # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form():
@@ -80,7 +78,7 @@ def build_persons_page():
                     sus_note_input.value = ""
 
                 def on_submit():
-                    # ─── Required field validation (DataRequired) ───
+                    # ----- Required field validation (DataRequired) -----
                     sus_name = sus_name_input.value
                     if not sus_name:
                         ui.notify(
@@ -97,7 +95,7 @@ def build_persons_page():
                     sus_phone = sus_phone_input.value or ""
                     sus_note = sus_note_input.value or ""
 
-                    # ─── Duplicate name check (sus_name is unique) ───
+                    # ----- Duplicate name check (sus_name is unique) -----
                     with get_session() as session:
                         existing = (
                             session.query(Persons)
@@ -116,7 +114,7 @@ def build_persons_page():
                             )
                             return
 
-                        # ─── Save to database ───
+                        # ----- Save to database -----
                         new_person = Persons(
                             sus_name=sus_name,
                             sus_dob=sus_dob,
@@ -139,14 +137,14 @@ def build_persons_page():
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                ).props("outline")
+                ).props("flat")
 
                 ui.button(
                     "Add Person",
                     on_click=on_submit,
                 ).props("unelevated")
 
-        # ─── Existing Persons Table ───
+        # ----- Existing Persons Table -----
         ui.separator().classes("my-6")
 
         ui.label(
@@ -240,7 +238,7 @@ def build_persons_page():
                 )
                 table.props("dense flat")
 
-                # ─── Slot: Actions column ───
+                # ----- Slot: Actions column -----
                 table.add_slot(
                     "body-cell-actions",
                     """
@@ -257,7 +255,7 @@ def build_persons_page():
                 """,
                 )
 
-                # ─── Edit dialog ───
+                # ----- Edit dialog -----
                 def open_edit_dialog(e):
 
                     row = e.args
@@ -377,7 +375,7 @@ def build_persons_page():
 
                     edit_dialog.open()
 
-                # ─── Delete confirmation dialog ───
+                # ----- Delete confirmation dialog -----
                 def open_delete_dialog(e):
 
                     row = e.args
@@ -437,11 +435,11 @@ def build_persons_page():
                 table.on("edit", open_edit_dialog)
                 table.on("delete", open_delete_dialog)
 
-    # Initial render
+    # -----Initial render -----
     refresh_persons_table()
 
 
-# ─── Page Registration ───
+# ----- Page Registration -----
 @ui.page("/persons")
 def persons_page():
     if not is_authenticated():

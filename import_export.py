@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
 
 """
-export_import.py — Database export and import functionality.
+import_export.py — Database export and import functionality.
 
-Export: Saves all tables to CSV files and file BLOBs to disk.
 Import: Restores tables from CSV files and file BLOBs from disk.
+Export: Saves all tables to CSV files and file BLOBs to disk.
 """
 
 import csv
-import os
-import json
-from pathlib import Path
 from datetime import datetime
-from typing import Optional
-
+import json
 from nicegui import ui
+from pathlib import Path
+import pyzipper
+import shutil
+import tempfile
+from typing import Optional
 
 from models import get_session
 
 
-# ─── MODEL REGISTRY ───
+# ----- MODEL REGISTRY -----
 # [Add or remove tables here as your app grows]
 def get_exportable_models():
     """Returns a list of (model_class, model_name) tuples for CSV export."""
@@ -50,7 +51,7 @@ def get_all_models():
     }
 
 
-# ─── HELPER FUNCTIONS ───
+# ----- HELPER FUNCTIONS -----
 
 def get_case_info_for_folder_name() -> str:
     """Builds the folder name from the active case info."""
@@ -59,7 +60,13 @@ def get_case_info_for_folder_name() -> str:
     with get_session() as session:
         case = session.query(Cases).first()
         if not case:
-            ui.notify("No case found. Cannot export.", type="negative")
+            ui.notify(
+                "No case found. Cannot export data.",
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
             return ""
 
         case_number = (
@@ -72,7 +79,7 @@ def get_case_info_for_folder_name() -> str:
 
         # Format the datetime
         if hasattr(begin_dt, "strftime"):
-            dt_str = begin_dt.strftime("%Y%m%d_%H%M%S")
+            dt_str = begin_dt.strftime("%Y-%m-%d_%H%M%S")
         else:
             # It's a string — sanitize it
             dt_str = (
@@ -134,39 +141,42 @@ def deserialize_value(value: str, column):
         return value
 
 
-# ─── EXPORT FUNCTION ───
+# ----- EXPORT FUNCTION -----
 
-def export_database():
+
+def export_database(password: Optional[str] = None):
     """Exports all database tables to CSV files and file BLOBs to disk.
 
     Saves to ~/case-number_datetime_saved_results/
     """
     from models import UploadedFiles
 
-    # ─── Build folder name ───
+    # ----- Build folder name -----
     folder_name = get_case_info_for_folder_name()
     if not folder_name:
         return
 
-    # ─── Create export directory ───
     home_dir = Path.home()
+
+    # ----- Create temporary dir for export before zipping -----
     export_dir = home_dir / folder_name
     files_dir = export_dir / "files"
+    zip_path = home_dir / f"{folder_name}.zip"
 
     try:
         export_dir.mkdir(parents=True, exist_ok=True)
         files_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as e:
+    except OSError as err:
         ui.notify(
-            f"Error creating export directory: {e}",
+            f"Error creating export directory: {err}",
             type="negative",
-            timeout=5000,
+            timeout=0,
             position="center",
             close_button="OK",
         )
         return
 
-    # ─── Export each table to CSV ───
+    # ----- Export each table to CSV -----
     exported_tables = {}
     total_records = 0
 
@@ -179,6 +189,7 @@ def export_database():
                 records = session.query(model_class).all()
 
                 with open(csv_path, "w", newline="", encoding="utf-8") as f:
+
                     writer = csv.writer(f)
                     writer.writerow(columns)  # Header row
 
@@ -195,15 +206,20 @@ def export_database():
                 total_records += count
                 exported_tables[table_name] = count
 
-        except Exception as e:
+        except Exception as err:
             ui.notify(
-                f"Error exporting {table_name}: {e}", type="negative", timeout=5000
+                f"Error exporting {table_name}: {err}",
+                type="negative",
+                timeout=5000,
+                position="center",
+                close_button="OK",
             )
             return
 
-    # ─── Export uploaded files ───
+    # ----- Export uploaded files -----
     files_list = []
     num_files = 0
+
     try:
         with get_session() as session:
             uploaded_files = session.query(UploadedFiles).all()
@@ -218,42 +234,92 @@ def export_database():
                     with open(file_path, "wb") as f:
                         f.write(uf.file_data)
 
-                    files_list.append(
-                        {
-                            "file_name": safe_name,
-                            "file_size": uf.file_size or len(uf.file_data),
-                        }
-                    )
+                    files_list.append({
+                        "file_name": safe_name,
+                        "file_size": uf.file_size or len(uf.file_data),
+                    })
 
                     num_files += 1
 
-    except Exception as e:
-        ui.notify(f"Error exporting files: {e}", type="warning", timeout=5000)
+    except Exception as err:
+        ui.notify(
+            f"Error exporting files: {err}",
+            type="warning",
+            timeout=5000,
+            position="center",
+            close_button="OK",
+        )
 
-    # ─── Write a manifest file ───
+    print(f"DEBUG: zip_path = {zip_path}")
+
+    # ----- Write a manifest file -----
     manifest = {
         "export_date": datetime.now().isoformat(),
-        "case_folder": folder_name,
+        "case_file": str(zip_path),
         "tables": [
-            {
-                "name": table_name,
-                "records": count
-            }
+            {"name": table_name, "records": count}
             for table_name, count in exported_tables.items()
         ],
         "total_records": total_records,
-        "files_exported": files_list,
-        "export_path": str(export_dir),
+        "files": files_list,
+        "encrypted": password is not None and len(password) > 0,
     }
 
     manifest_path = export_dir / "export_manifest.json"
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=4)
 
-    # ─── Success notification ───
+    # ----- Create the ZIP file -----
+    try:
+        if password:
+            with pyzipper.AESZipFile(
+                zip_path,
+                "w",
+                compression=pyzipper.ZIP_DEFLATED,
+                encryption=pyzipper.WZ_AES,
+            ) as zf:
+                zf.setpassword(password.encode("utf-8"))
+                zf.setencryption(pyzipper.WZ_AES, nbits=256)
+
+                # Walk the export directory and add all files
+                for file_path in export_dir.rglob("*"):
+                    if file_path.is_file():
+                        arcname = file_path.relative_to(export_dir)
+                        zf.write(file_path, arcname)
+
+        else:
+            # ----- Unencrypted ZIP -----
+            with pyzipper.AESZipFile(
+                zip_path,
+                "w",
+                compression=pyzipper.ZIP_DEFLATED,
+            ) as zf:
+                for file_path in export_dir.rglob("*"):
+                    if file_path.is_file():
+                        arcname = file_path.relative_to(export_dir)
+                        zf.write(file_path, arcname)
+
+    except Exception as err:
+        ui.notify(
+            f"Error creating zip file: {err}",
+            type="negative",
+            timeout=5000,
+            position="center",
+            close_button="OK",
+        )
+        shutil.rmtree(export_dir, ignore_errors=True)
+        return
+
+    # ----- Delete the temporary directory -----
+    shutil.rmtree(export_dir, ignore_errors=True)
+
+    enc_text = " (AES-256 encrypted)" if password else ""
+
+    # ----- Success notification -----
     ui.notify(
-        f"Export complete!\n"
-        f"Tables: {', '.join(exported_tables)}\n"
+        f"Export complete!{enc_text}\n"
+        f"Tables: {', '.join(f'{n} ({c})' for n, c in exported_tables.items())}\n"
+        # f"Tables: {', '.join(exported_tables)}\n"
         f"Files: {num_files}\n"
         f"Saved to: {export_dir}",
         type="positive",
@@ -271,29 +337,114 @@ def export_database():
     print(f"{'='*60}\n")
 
 
-# ─── IMPORT FUNCTION ───
+# ----- IMPORT FUNCTION -----
 
-def import_database(import_dir: str):
-    """
-    Imports database tables from CSV files and file BLOBs from disk.
+
+def import_database(zip_path: str, password: Optional[str] = None):
+    """Imports database tables from a .zip file.
+
+    If the zip is encrypted, decrypts it with the provided password.
+
     Clears existing data before importing.
     """
-    import_dir = Path(import_dir)
 
-    if not import_dir.exists():
-        ui.notify("Import directory not found.", type="negative")
+    zip_file = Path(zip_path)
+
+    if not zip_file.exists():
+        ui.notify(
+            "ZIP file not found.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return
 
-    # ─── Check for manifest ───
-    manifest_path = import_dir / "export_manifest.json"
+    if not zip_file.suffix == ".zip":
+        ui.notify(
+            "Please select a .zip file.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
+        return
+
+    # ----- Extract the zip to a temporary directory -----
+    temp_dir = Path(tempfile.mkdtemp(prefix="vector_import_"))
+
+    try:
+        if password:
+            # ----- Decrypt and extract -----
+            try:
+                with pyzipper.AESZipFile(zip_file, "r") as zf:
+                    zf.setpassword(password.encode("utf-8"))
+                    zf.extractall(temp_dir)
+            except RuntimeError as err:
+                ui.notify(
+                    f"Failed to decrypt ZIP file: {err}.\n"
+                    "Check your password and try again.",
+                    type="negative",
+                    timeout=0,
+                    position="center",
+                    close_button="OK",
+                )
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return
+        else:
+            # ----- Extract without password -----
+            try:
+                with pyzipper.AESZipFile(zip_file, "r") as zf:
+                    zf.extractall(temp_dir)
+            except RuntimeError:
+                # This zip requires a password
+                ui.notify(
+                    "This ZIP file is encrypted. Please provide a password.",
+                    type="warning",
+                    timeout=0,
+                    position="center",
+                    close_button="OK",
+                )
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return
+
+    except Exception as e:
+        ui.notify(
+            f"Error extracting ZIP: {e}",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return
+
+    # ----- Check for manifest -----
+    manifest_path = temp_dir / "export_manifest.json"
+
+    # If manifest not at root, look for it in subdirectories
+    if not manifest_path.exists():
+        manifests = list(temp_dir.rglob("export_manifest.json"))
+        if manifests:
+            manifest_path = manifests[0]
+            # Set the import directory to the folder containing the manifest
+            import_dir = manifest_path.parent
+        else:
+            import_dir = temp_dir
+    else:
+        import_dir = temp_dir
+
     if manifest_path.exists():
         with open(manifest_path, "r", encoding="utf-8") as f:
             manifest = json.load(f)
-        print(f"Importing from export dated: {manifest.get('export_date', 'unknown')}")
+        print(
+            f"Importing from export dated: "
+            f"{manifest.get('export_date', 'unknown')}"
+        )
     else:
         manifest = {}
 
-    # ─── Verify CSV files exist ───
+    # ----- Verify CSV files exist -----
     models = get_all_models()
     found_tables = []
 
@@ -303,20 +454,29 @@ def import_database(import_dir: str):
             found_tables.append((table_name, model_class, csv_path))
 
     if not found_tables:
-        ui.notify("No CSV files found in the selected directory.", type="negative")
+        ui.notify(
+            "No CSV files found in the selected ZIP archive.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
-    # ─── Import each table ───
+    # ----- Import each table -----
     imported_tables = []
     total_records = 0
 
     for table_name, model_class, csv_path in found_tables:
         columns = get_column_names(model_class)
-        column_objects = {col.name: col for col in model_class.__table__.columns}
+        column_objects = (
+            {col.name: col for col in model_class.__table__.columns}
+        )
 
         try:
             with get_session() as session:
-                # Clear existing data
+                # ----- Clear existing data -----
                 session.query(model_class).delete()
 
                 with open(csv_path, "r", newline="", encoding="utf-8") as f:
@@ -330,13 +490,12 @@ def import_database(import_dir: str):
                                 if raw_value == "[BINARY_DATA]":
                                     continue  # Skip binary columns
                                 record_data[col_name] = deserialize_value(
-                                    raw_value, column_objects[col_name]
+                                    raw_value,
+                                    column_objects[col_name],
                                 )
 
-                        # Create new record (let autoincrement handle ID)
-                        if "id" in record_data:
-                            del record_data["id"]
-
+                        # Preserve original IDs for relational integrity
+                        # (don't delete the id field — keep it)
                         new_record = model_class(**record_data)
                         session.add(new_record)
 
@@ -347,15 +506,18 @@ def import_database(import_dir: str):
             imported_tables.append(f"{table_name} ({count})")
             total_records += count
 
-        except Exception as e:
+        except Exception as err:
             ui.notify(
-                f"Error importing {table_name}: {e}",
+                f"Error importing {table_name}: {err}",
                 type="negative",
-                timeout=5000,
+                timeout=0,
+                position="center",
+                close_button="OK",
             )
+            shutil.rmtree(temp_dir, ignore_errors=True)
             return
 
-    # ─── Import files ───
+    # ----- Import files -----
     from models import UploadedFiles
 
     files_dir = import_dir / "files"
@@ -375,16 +537,25 @@ def import_database(import_dir: str):
                             file_name=file_path.name,
                             file_data=file_data,
                             file_size=len(file_data),
-                            file_type="application/octet-stream",
+                            file_mime_type="application/octet-stream",
                             uploaded_by="import",
                         )
                         session.add(new_file)
                         files_imported += 1
 
-        except Exception as e:
-            ui.notify(f"Error importing files: {e}", type="warning", timeout=5000)
+        except Exception as err:
+            ui.notify(
+                f"Error importing files: {err}",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+                )
 
-    # ─── Success notification ───
+    # ----- Clean up temporary directory -----
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+    # ----- Success notification -----
     ui.notify(
         f"Import complete!\n"
         f"Tables: {', '.join(imported_tables)}\n"
@@ -392,6 +563,7 @@ def import_database(import_dir: str):
         f"Total records: {total_records}",
         type="positive",
         timeout=0,
+        position="bottom",
         close_button="OK",
     )
 

@@ -33,11 +33,11 @@ from utils import (
 )
 
 
-# ─── Main Page Builder ───
+# ----- Main Page Builder -----
 def build_evidence_page():
     """Builds the full Evidence page UI."""
 
-    # ─── Header / Navbar ───
+    # ----- Header / Navbar -----
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -48,14 +48,12 @@ def build_evidence_page():
 
         ui.label("Evidence Management").classes("text-2xl font-bold m-4")
 
-        ui.label("Add Evidence Item").classes("text-lg font-semibold mb-4")
-
-        # ─── TWO-COLUMN GRID LAYOUT ───
+        # ----- TWO-COLUMN GRID LAYOUT -----
         with ui.card().classes("w-full max-w-6xl mx-auto p-6"):
 
             with ui.grid(columns=2).classes("w-full gap-6 items-start"):
 
-                # ─── LEFT COLUMN (Fields 1-7) ───
+                # ----- LEFT COLUMN (Fields 1-7) -----
                 with ui.column().classes("gap-4"):
 
                     next_evid = get_next_evid_num()
@@ -95,7 +93,7 @@ def build_evidence_page():
                         label="Where Located"
                     ).classes("w-full")
 
-                # ─── RIGHT COLUMN (Fields 8-14) ───
+                # ----- RIGHT COLUMN (Fields 8-14) -----
                 with ui.column().classes("gap-4"):
 
                     evid_found_by_combo = required_select(
@@ -136,7 +134,7 @@ def build_evidence_page():
                         label="Notes"
                     ).classes("w-full")
 
-            # ─── Triaged toggle logic ───
+            # ----- Triaged toggle logic -----
             def on_triage_change(e):
 
                 if e.value == "Yes":
@@ -147,7 +145,7 @@ def build_evidence_page():
 
             evid_triaged_combo.on_value_change(on_triage_change)
 
-            # ─── Buttons ───
+            # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form():
@@ -168,7 +166,7 @@ def build_evidence_page():
                     evid_note_input.value = ""
 
                 def on_submit():
-                    # ─── Required field validation ───
+                    # ----- Required field validation -----
                     evid_num = evid_num_input.value
 
                     if not evid_num:
@@ -253,7 +251,7 @@ def build_evidence_page():
                         )
                         return
 
-                    # ─── Cross-field validation ───
+                    # ----- Cross-field validation -----
                     # Same agent check
                     if evid_found_by == evid_witness:
                         ui.notify(
@@ -278,7 +276,7 @@ def build_evidence_page():
                         )
                         return
 
-                    # ─── Duplicate evidence number check ───
+                    # ----- Duplicate evidence number check -----
                     with get_session() as session:
                         existing = (
                             session.query(Evidence)
@@ -297,7 +295,7 @@ def build_evidence_page():
                             )
                             return
 
-                        # ─── Save to database ───
+                        # ----- Save to database -----
                         new_evid = Evidence(
                             evid_num=evid_num,
                             evid_qty=evid_qty,
@@ -332,14 +330,14 @@ def build_evidence_page():
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                ).props("outline")
+                ).props("flat")
 
                 ui.button(
                     "Add Evidence Item",
                     on_click=on_submit,
                 ).props("unelevated")
 
-        # ─── Existing Evidence Table ───
+        # ----- Existing Evidence Table -----
         ui.separator().classes("my-6")
 
         with ui.column().classes("w-full items-center"):
@@ -473,7 +471,7 @@ def build_evidence_page():
 
                         table.props("dense flat")
 
-                        # ─── Slot: Actions column ───
+                        # ----- Slot: Actions column -----
                         table.add_slot(
                             "body-cell-actions",
                             """
@@ -492,7 +490,7 @@ def build_evidence_page():
                         """,
                         )
 
-                        # ─── Edit dialog ───
+                        # ----- Edit dialog -----
                         def open_edit_dialog(e):
 
                             row = e.args
@@ -764,7 +762,7 @@ def build_evidence_page():
 
                             edit_dialog.open()
 
-                        # ─── Delete confirmation dialog ───
+                        # ----- Delete confirmation dialog -----
                         def open_delete_dialog(e):
 
                             row = e.args
@@ -854,11 +852,11 @@ def build_evidence_page():
                     color="#ef4444",
                 ).props("unelevated").classes("mb-2 items-center")
 
-    # Initial render
+    # ----- Initial render -----
     refresh_evidence_table()
 
 
-# ─── Page Registration ───
+# ----- Page Registration -----
 @ui.page("/evidence")
 def evidence_page():
     if not is_authenticated():

@@ -4,7 +4,7 @@
 main.py
 
 V·E·C·T·O·R —
-Virginia Evidence Collection, Tracking, Organization, & Recording Program
+Virginia Evidence Collection, Tracking, Organization, & Reporting Program
 
 Usage:
     python main.py
@@ -16,7 +16,10 @@ import json
 from nicegui import ui, app
 import os
 from pathlib import Path
+import sys
 
+
+DEBUG_MODE = "--dev" in sys.argv
 
 # Explicitly tell NiceGUI where the static folder is
 app.add_static_files(
@@ -25,12 +28,12 @@ app.add_static_files(
 )
 
 
-# ───── Initialize Database ─────
+# ----- Initialize Database -----
 from models import init_db, get_session, Users
 init_db()
 
 
-# ───── Seed Default User ─────
+# ----- Seed Default User -----
 def seed_default_user():
     """Reads user credentials from users.json and upserts into the
     Users table.
@@ -91,11 +94,11 @@ def seed_default_user():
 seed_default_user()
 
 
-# ───── Theme Configuration ─────
+# ----- Theme Configuration -----
 # Shrinks all textarea heights to match input/select field heights
 ui.add_css(
     """
-/* ── Theme Colors (replaces ui.colors) ── */
+/* ----- Theme Colors (replaces ui.colors) ----- */
 :root {
     --q-primary: #6d4aff;
     --q-secondary: #264653;
@@ -155,15 +158,14 @@ textarea.q-field__native {
     shared=True,
 )
 
-# ───── Import All Page Modules ─────
+# ----- Import All Page Modules -----
 # Each module registers its own @ui.page routes on import.
 # Order matters: shared utilities first, then pages.
 
 # Core infrastructure
-import navbar
 import home_page  # (/, /home, /about, /help, /export_db, /logout)
 
-# ───── Page Registrations ─────
+# ----- Page Registrations -----
 # Some page modules define their own @ui.page decorators internally.
 # The ones below are registered here for centralized control.
 
@@ -239,6 +241,7 @@ def links_route():
     from parts.links_page import build_links_page
     build_links_page()
 
+
 @ui.page("/reports")
 def reports_route():
     if not home_page.is_authenticated():
@@ -248,7 +251,7 @@ def reports_route():
     build_reports_page()
 
 
-# ───── Startup Configuration ─────
+# ----- Startup Configuration -----
 def is_authenticated() -> bool:
     """Checks if user is authenticated (defaults to False)."""
     try:
@@ -271,7 +274,7 @@ def get_is_admin() -> bool:
         return False
 
 
-# ───── Run ─────
+# ----- Run -----
 if __name__ in {"__main__", "__mp_main__"}:
 
     ui.add_head_html(
@@ -282,7 +285,7 @@ if __name__ in {"__main__", "__mp_main__"}:
     ui.run(
         title="V·E·C·T·O·R",
         port=8080,
-        reload=True,
+        reload=DEBUG_MODE,
         dark=True,
         storage_secret="vector-secret-key-change-in-production-2024",
     )

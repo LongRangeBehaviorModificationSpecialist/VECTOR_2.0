@@ -17,7 +17,7 @@ from home_page import (
     confirm_new_case_handler,
 )
 
-# ── Link Data ───────────────────────────────────────────────
+# ----- Link Data -----
 starter_links = {
     "Mike's Useful Links": "https://start.me/p/w9JeoX/useful-links",
     "ICACCOPS": "https://www.icaccops.com/users/Login",
@@ -75,7 +75,7 @@ osint_links = {
 }
 
 
-# ─── Link Section Builder ───
+# ----- Link Section Builder -----
 def build_link_section(title: str, icon: str, links: dict[str, str]):
     """Builds a collapsible section of links using an expansion panel.
 
@@ -96,11 +96,11 @@ def build_link_section(title: str, icon: str, links: dict[str, str]):
                 ).props("outline no-caps").classes("text-left text-sm")
 
 
-# ─── Main Page Builder ───
+# ----- Main Page Builder -----
 def build_links_page():
     """Builds the full Useful Links page UI."""
 
-    # ─── Header / Navbar ───
+    # ----- Header / Navbar -----
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -116,28 +116,28 @@ def build_links_page():
             "Click any link to open it in a new tab."
         ).classes("text-sm text-gray-400 mb-4")
 
-        # ─── Starter Links ───
+        # ----- Starter Links -----
         build_link_section(
             title=f"Starter Links ({len(starter_links)})",
             icon="rocket_launch",
             links=starter_links,
         )
 
-        # ─── Forensic Software Downloads ───
+        # ----- Forensic Software Downloads -----
         build_link_section(
             title=f"Forensic Software ({len(software_links)})",
             icon="download",
             links=software_links,
         )
 
-        # ─── DFIR Resources ───
+        # ----- DFIR Resources -----
         build_link_section(
             title=f"DFIR Resources ({len(DFIR_links)})",
             icon="search",
             links=DFIR_links,
         )
 
-        # ─── OSINT Resources ───
+        # ----- OSINT Resources -----
         build_link_section(
             title=f"OSINT Resources ({len(osint_links)})",
             icon="travel_explore",
@@ -145,7 +145,7 @@ def build_links_page():
         )
 
 
-# ─── Page Registration ───
+# ----- Page Registration -----
 @ui.page("/links")
 def links_page():
     if not is_authenticated():

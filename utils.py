@@ -7,7 +7,16 @@ from datetime import datetime
 import json
 from nicegui import ui
 import mimetypes
-from models import get_session, Agents, Cases, Evidence, Rooms
+from models import (
+    get_session,
+    Agents,
+    Cases,
+    Evidence,
+    Rooms,
+    Persons,
+    Notes,
+    UploadedFiles,
+)
 from pathlib import Path
 from program.inc.agent_role import AGENT_ROLE_LIST
 from program.inc.agency_list import AGENCY_LIST
@@ -461,3 +470,57 @@ def check_if_agent_role(role: str | None):
             position="center",
         )
         return
+
+
+def delete_all_data() -> None:
+    with get_session() as session:
+
+        try:
+
+            session.query(Cases).delete()
+            session.query(Agents).delete()
+            session.query(Rooms).delete()
+            session.query(Evidence).delete()
+            session.query(Persons).delete()
+            session.query(Notes).delete()
+            session.query(UploadedFiles).delete()
+
+            session.commit()
+
+        except Exception as err:
+            ui.notify(
+                f"An error occured while trying to delete the data → {err}",
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="Dismiss",
+            )
+
+
+def validate_case_data(
+        case_number: str,
+        location: str,
+        jurisdiction: str,
+        datetime_start: str
+) -> bool:
+    if not case_number:
+        ui.notify(MESSAGES["case_1"], type="warning",
+            timeout=NOTIFICATION_TIMEOUT, close_button="OK", position="center")
+        return False
+
+    if not location:
+        ui.notify(MESSAGES["case_2"], type="warning",
+            timeout=NOTIFICATION_TIMEOUT, close_button="OK", position="center")
+        return False
+
+    if not jurisdiction:
+        ui.notify(MESSAGES["case_3"], type="warning",
+            timeout=NOTIFICATION_TIMEOUT, close_button="OK", position="center")
+        return False
+
+    if not datetime_start:
+        ui.notify(MESSAGES["case_4"], type="warning",
+            timeout=NOTIFICATION_TIMEOUT, close_button="OK", position="center")
+        return False
+
+    return True
