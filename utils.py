@@ -23,24 +23,11 @@ from program.inc.agency_list import AGENCY_LIST
 from program.inc.jurisdictions import JURISDICTIONS
 
 NOTIFICATION_TIMEOUT = 0
-POSITIVE_NOTIFICATION_TIMEOUT = 1000
+POSITIVE_NOTIFICATION_TIMEOUT = 2000
 
 AGENTS_JSON_PATH = Path(__file__).parent / "parts/agents.json"
 
 MESSAGES = {
-    "agent_1": "The 'Agent's Name' field is required",
-    "agent_2": "The 'Agent's Role' field is required.",
-    "agent_3": "That Agent's Name is already in the case database. Please "
-        "check the name and try again.",
-    "agent_5": "That phone number is already assigned to another agent.",
-
-    "case_1": "The 'Case Number' field is required.",
-    "case_2": "The 'Location' field is required.",
-    "case_3": "The 'Jurisdiction' field is required.",
-    "case_4": "The 'Date/Time Started' field is required.",
-    "case_err": "An error occurred while creating the case. Please check "
-        "the information and try again.",
-
     "evid_1": "The 'Triaged By' field is required if the 'Item Triaged?' "
         "field is set to 'Yes'.",
     "evid_2": "The same agent cannot be listed in the 'Found By' and "
@@ -275,11 +262,18 @@ def load_agency_options() -> list[str]:
     return []
 
 
-def is_duplicate_agent(name: str, phone: str, email: str = "") -> bool:
+def is_duplicate_agent_in_json(
+        name: str,
+        phone: str,
+        email: str = ""
+) -> bool:
+    """Checks if an agent with the same name, phone, or email already
+    exists in agents.json.
+
+    Returns:
+        True if duplicate found, False otherwise.
     """
-    Checks if an agent with the same name, phone, or email already exists in agents.json.
-    Returns True if duplicate found, False otherwise.
-    """
+
     agents = load_agents_from_json()
 
     name_lower = name.strip().lower()
@@ -316,21 +310,6 @@ def is_duplicate_agent(name: str, phone: str, email: str = "") -> bool:
                 return True
 
     return False
-
-
-def check_agent_dup_role(agent: str, role: str, role_secondary: str) -> bool:
-    if role and role_secondary:
-        if role.strip().lower() == role_secondary.strip().lower():
-            ui.notify(
-                f"The 'Primary Role' field and the 'Secondary Role' field "
-                f"for {agent} cannot be the same.",
-                type="warning",
-                timeout=NOTIFICATION_TIMEOUT,
-                close_button="OK",
-                position="center",
-                )
-            return True
-        return False
 
 
 def confirm_delete_all(action: str, callback):
@@ -448,30 +427,6 @@ def format_file_size(size_bytes: int) -> str:
         return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
 
 
-def check_if_agent_name(name: str | None):
-    if not name:
-        ui.notify(
-            MESSAGES["agent_1"],
-            type="warning",
-            timeout=NOTIFICATION_TIMEOUT,
-            close_button="OK",
-            position="center",
-        )
-        return
-
-
-def check_if_agent_role(role: str | None):
-    if not role:
-        ui.notify(
-            MESSAGES["agent_2"],
-            type="warning",
-            timeout=NOTIFICATION_TIMEOUT,
-            close_button="OK",
-            position="center",
-        )
-        return
-
-
 def delete_all_data() -> None:
     with get_session() as session:
 
@@ -503,24 +458,66 @@ def validate_case_data(
         jurisdiction: str,
         datetime_start: str
 ) -> bool:
+
     if not case_number:
-        ui.notify(MESSAGES["case_1"], type="warning",
-            timeout=NOTIFICATION_TIMEOUT, close_button="OK", position="center")
+        ui.notify(
+            "The 'Case Number' field is required.", type="warning",
+            timeout=0, close_button="OK", position="center")
         return False
 
     if not location:
-        ui.notify(MESSAGES["case_2"], type="warning",
-            timeout=NOTIFICATION_TIMEOUT, close_button="OK", position="center")
+        ui.notify(
+            "The 'Location' field is required.", type="warning",
+            timeout=0, close_button="OK", position="center")
         return False
 
     if not jurisdiction:
-        ui.notify(MESSAGES["case_3"], type="warning",
-            timeout=NOTIFICATION_TIMEOUT, close_button="OK", position="center")
+        ui.notify(
+            "The 'Jurisdiction' field is required.", type="warning",
+            timeout=0, close_button="OK", position="center")
         return False
 
     if not datetime_start:
-        ui.notify(MESSAGES["case_4"], type="warning",
-            timeout=NOTIFICATION_TIMEOUT, close_button="OK", position="center")
+        ui.notify(
+            "The 'Date/Time Started' field is required.", type="warning",
+            timeout=0, close_button="OK", position="center")
         return False
+
+    return True
+
+
+def validate_agent_data(
+        name: str | None,
+        agency: str | None,
+        role: str | None,
+        role_secondary: str | None
+) -> bool:
+
+    if not name:
+        ui.notify(
+            "The 'Agent Name' field is required", type="warning",
+            timeout=0, close_button="OK", position="center")
+        return False
+
+    if not agency:
+        ui.notify(
+            "The 'Agency' field is required.", type="warning",
+            timeout=0, close_button="OK", position="center")
+        return False
+
+    if not role:
+        ui.notify(
+            "The 'Agent Role' field is required.", type="warning",
+            timeout=0, close_button="OK", position="center")
+        return False
+
+    if role and role_secondary:
+            if role.strip().lower() == role_secondary.strip().lower():
+                ui.notify(
+                    f"The 'Primary Role' field and the 'Secondary Role' field "
+                    f"for {name} cannot be the same.", type="warning",
+                    timeout=0, close_button="OK", position="center")
+                return True
+            return False
 
     return True

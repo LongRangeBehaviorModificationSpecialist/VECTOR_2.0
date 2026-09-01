@@ -23,7 +23,7 @@ from home_page import (
 from navbar import build_navbar
 from utils import (
     load_agents_from_json,
-    is_duplicate_agent,
+    is_duplicate_agent_in_json,
     save_agent_to_json,
     get_agent_dict,
     load_agent_names_for_page,
@@ -31,13 +31,8 @@ from utils import (
     load_agency_options,
     required_input,
     required_select,
-    check_agent_dup_role,
     confirm_delete_all,
-    check_if_agent_name,
-    check_if_agent_role,
-    MESSAGES,
-    NOTIFICATION_TIMEOUT,
-    POSITIVE_NOTIFICATION_TIMEOUT,
+    validate_agent_data,
 )
 
 
@@ -86,7 +81,7 @@ def build_agents_page():
                 with_input=True,
             ).classes("w-full")
 
-            agent_phone_input = required_input(
+            agent_phone_input = ui.input(
                 label="Agent Phone Number"
             ).classes("w-full")
 
@@ -108,11 +103,17 @@ def build_agents_page():
                 if selected in agent_lookup:
                     info = agent_lookup[selected]
                     agent_parent_agency_input.value = info.get(
-                        "agency", "") or ""
+                        "agency",
+                        "",
+                    ) or ""
                     agent_phone_input.value = info.get(
-                        "phone", "") or ""
+                        "phone",
+                        "",
+                    ) or ""
                     agent_email_input.value = info.get(
-                        "email", "") or ""
+                        "email",
+                        "",
+                    ) or ""
 
                 else:
                     # New name typed — clear the fields for manual entry
@@ -137,17 +138,20 @@ def build_agents_page():
                 def on_submit():
                     """Handles form submission for new agents."""
                     name = agent_name_input.value
-                    check_if_agent_name(name=name)
-
                     agency = agent_parent_agency_input.value or ""
-
                     role = agent_role_input.value
-                    check_if_agent_role(role=role)
-
                     role_secondary = agent_role_secondary_input.value or ""
                     phone = agent_phone_input.value or ""
                     email = agent_email_input.value or ""
                     notes = agent_note_input.value or ""
+
+                    # ----- Required field validation -----
+                    if not validate_agent_data(
+                        name=name,
+                        agency=agency,
+                        role=role
+                    ):
+                        return
 
                     try:
                         with get_session() as session:
@@ -158,18 +162,11 @@ def build_agents_page():
                                 .first()
                             ):
                                 ui.notify(
-                                    MESSAGES["agent_3"],
-                                    type="warning",
-                                    timeout=NOTIFICATION_TIMEOUT,
-                                    close_button="OK",
-                                    position="center",
-                                )
-                                return
-                            if check_agent_dup_role(
-                                agent=name,
-                                role=role,
-                                role_secondary=role_secondary,
-                            ):
+                                    "That Agent's Name is already in the case "
+                                    "database. Please check the name and try "
+                                    "again.", type="warning",
+                                    timeout=0,
+                                    close_button="OK", position="center")
                                 return
 
                             new_agent = Agents(
@@ -183,7 +180,7 @@ def build_agents_page():
                             )
                             session.add(new_agent)
 
-                        if not is_duplicate_agent(
+                        if not is_duplicate_agent_in_json(
                                 name=name,
                                 phone=phone,
                                 email=email,
@@ -203,18 +200,14 @@ def build_agents_page():
 
                             ui.notify(
                                 "New agent saved to the JSON file.",
-                                type="positive",
-                                timeout=POSITIVE_NOTIFICATION_TIMEOUT,
-                                close_button="OK",
-                                position="bottom",
+                                type="positive", timeout=2000,
+                                close_button="OK", position="bottom",
                             )
                         else:
                             ui.notify(
                                 f"{name} added to the case dataabse.",
-                                type="positive",
-                                timeout=POSITIVE_NOTIFICATION_TIMEOUT,
-                                close_button="OK",
-                                position="bottom",
+                                type="positive", timeout=2000,
+                                close_button="OK", position="bottom",
                             )
                         refresh_agent_table()
                         clear_agent_form()
@@ -225,10 +218,8 @@ def build_agents_page():
                             "just tried to enter/update — You may "
                             "have entered a duplicate value. The "
                             "changes were not successful.",
-                            type="negative",
-                            timeout=NOTIFICATION_TIMEOUT,
-                            close_button="OK",
-                            position="center",
+                            type="negative", timeout=0,
+                            close_button="OK", position="center",
                         )
 
                 ui.button(
@@ -445,8 +436,9 @@ def build_agents_page():
                                             if not agent:
                                                 ui.notify(
                                                     "Agent not found",
-                                                    type="warning",
-                                                    close_button="OK"
+                                                    type="warning", timeout=0,
+                                                    position="center",
+                                                    close_button="OK",
                                                 )
                                                 return
 
@@ -462,21 +454,18 @@ def build_agents_page():
                                             agent.agent_email = agent_email
                                             agent.agent_note = agent_note
 
-                                            if check_agent_dup_role(
-                                                agent=agent_name,
+                                            # ----- Required field
+                                            # validation -----
+                                            if not validate_agent_data(
+                                                name=agent_name,
+                                                agency=agent_parent_agency,
                                                 role=agent_role,
-                                                role_secondary=(
-                                                    agent_role_secondary
-                                                ),
                                             ):
                                                 return
 
                                         ui.notify(
                                             f"{agent_name.value} was updated "
-                                            "successfully.",
-                                            timeout=(
-                                                POSITIVE_NOTIFICATION_TIMEOUT
-                                            ),
+                                            "successfully.", timeout=2000,
                                             close_button="OK",
                                             position="bottom",
                                         )
@@ -532,10 +521,7 @@ def build_agents_page():
                                         ui.notify(
                                             f"{agent_name} has been removed "
                                             "from the case file.",
-                                            timeout=(
-                                                POSITIVE_NOTIFICATION_TIMEOUT
-                                            ),
-                                            close_button="OK",
+                                            timeout=2000, close_button="OK",
                                             position="bottom",
                                         )
                                         delete_dialog.close()
@@ -560,11 +546,8 @@ def build_agents_page():
                         session.query(Agents).delete()
                         session.commit()
                     ui.notify(
-                        "All agents have been deleted.",
-                        type="positive",
-                        timeout=POSITIVE_NOTIFICATION_TIMEOUT,
-                        close_button="OK",
-                        position="bottom",
+                        "All agents have been deleted.", type="positive",
+                        timeout=2000, close_button="OK", position="bottom",
                     )
                     refresh_agent_table()
 
