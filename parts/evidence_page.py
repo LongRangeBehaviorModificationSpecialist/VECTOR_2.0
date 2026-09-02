@@ -177,6 +177,7 @@ def build_evidence_page():
                     evid_witness = evid_witness_combo.value
                     evid_triaged = evid_triaged_combo.value or ""
                     evid_triaged_by = evid_triaged_by_combo.value or ""
+                    evid_note = evid_note_input.value or ""
 
                     # ----- Required field validation -----
                     if not validate_initial_evidence(
