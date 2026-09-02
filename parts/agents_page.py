@@ -138,7 +138,8 @@ def build_agents_page():
                     if not validate_agent_data(
                         name=name,
                         agency=agency,
-                        role=role):
+                        role=role
+                    ):
 
                         return
 
@@ -147,16 +148,21 @@ def build_agents_page():
                         with get_session() as session:
 
                             # ----- Uniqueness checks for data -----
-                            if (session.query(Agents)
+                            if (
+                                session.query(Agents)
                                 .filter_by(agent_name=name)
-                                .first()):
+                                .first()
+                            ):
 
                                 ui.notify(
                                     "That Agent's Name is already in the case "
                                     "database. Please check the name and try "
                                     "again.",
-                                    type="warning", timeout=0,
-                                    close_button="OK", position="center")
+                                    type="warning",
+                                    timeout=0,
+                                    close_button="OK",
+                                    position="center"
+                                )
 
                                 return
 
@@ -167,38 +173,49 @@ def build_agents_page():
                                 agent_role_secondary=role_secondary,
                                 agent_phone=phone,
                                 agent_email=email,
-                                agent_note=notes)
+                                agent_note=notes
+                            )
 
                             session.add(new_agent)
 
                         if not is_duplicate_agent_in_json(
-                                name=name,
-                                phone=phone,
-                                email=email):
+                            name=name,
+                            phone=phone,
+                            email=email
+                        ):
 
                             # RIGHT — Load → Append → Save
                             # Save to JSON file
                             agents = load_agents_from_json()
 
-                            agents.append({
+                            agents.append(
+                                {
                                     "name": name,
                                     "agency": agency,
                                     "phone": phone,
-                                    "email": email})
+                                    "email": email
+                                }
+                            )
 
                             save_agent_to_json(agents=agents)
 
                             ui.notify(
                                 "New agent saved to the JSON file.",
-                                type="positive", timeout=2000,
-                                close_button="OK", position="bottom")
+                                type="positive",
+                                timeout=2000,
+                                close_button="OK",
+                                position="bottom"
+                            )
 
                         else:
 
                             ui.notify(
                                 f"{name} added to the case dataabse.",
-                                type="positive", timeout=2000,
-                                close_button="OK", position="bottom")
+                                type="positive",
+                                timeout=2000,
+                                close_button="OK",
+                                position="bottom"
+                            )
 
                         refresh_agent_table()
                         clear_agent_form()
@@ -210,16 +227,17 @@ def build_agents_page():
                             "just tried to enter/update — You may "
                             "have entered a duplicate value. The "
                             "changes were not successful.",
-                            type="negative", timeout=0,
-                            close_button="OK", position="center")
+                            type="negative",
+                            timeout=0,
+                            close_button="OK",
+                            position="center"
+                        )
 
-                ui.button(
-                    "Clear", on_click=clear_agent_form
-                ).props("flat")
+                ui.button("Clear", on_click=clear_agent_form
+                    ).props("flat")
 
-                ui.button(
-                    "Add Agent", on_click=on_submit
-                ).props("unelevated")
+                ui.button("Add Agent", on_click=on_submit
+                    ).props("unelevated")
 
         # ----- Agent List Table -----
         ui.separator().classes("mt-6 mb-3")

@@ -18,6 +18,8 @@ import os
 from pathlib import Path
 import sys
 
+from models import get_users_session
+import parts.admin_page
 
 DEBUG_MODE = "--dev" in sys.argv
 
@@ -29,6 +31,7 @@ app.add_static_files(
 
 # ----- Initialize Database -----
 from models import init_db, get_session, Users
+
 init_db()
 
 
@@ -39,7 +42,7 @@ def seed_default_user():
 
     The JSON stores hashes as Python byte-string literals.
     """
-    json_path = Path(__file__).parent / f"parts\\users.json"
+    json_path = Path(__file__).parent / f"db\\users.json"
 
     if not json_path.exists():
 
@@ -79,11 +82,13 @@ def seed_default_user():
     user_name = user_data.get("user_name", "")
     is_admin = user_data.get("is_admin", False)
 
-    with get_session() as session:
+    with get_users_session() as session:
 
-        existing = (session.query(Users)
-            .filter_by(user_name=user_name)
-            .first())
+        existing = (
+            session.query(Users)
+            .filter_by(user_name="novaicac")
+            .first()
+        )
 
         if existing:
             # Update existing user with latest hash from JSON
@@ -262,6 +267,87 @@ def reports_route():
         return
     from parts.reports_page import build_reports_page
     build_reports_page()
+
+
+@ui.page("/change-password")
+def change_password_page():
+    from models import get_users_session, Users, DEFAULT_USER_PASSWORD
+
+    if not is_authenticated():
+        ui.navigate.to("/")
+        return
+
+    username = get_current_user_name()
+
+    with ui.column().classes("items-center w-full mt-12"):
+
+        ui.label("Change Password").classes("text-2xl font-bold mb-2")
+
+        ui.label("You must set a new password before continuing."
+            ).classes("text-gray-400 mb-6")
+
+        with ui.card().classes("w-full max-w-sm p-6"):
+
+            ui.label(f"User: {username}").classes("mb-4 font-semibold")
+
+            new_pass = ui.input(
+                label="New Password",
+                password=True
+                ).classes("w-full")
+
+            confirm_pass = ui.input(
+                label="Confirm Password",
+                password=True
+                ).classes("w-full")
+
+            def save_new_password():
+
+                if not new_pass.value or len(new_pass.value) < 8:
+
+                    ui.notify(
+                        "Password must be at least 8 characters.",
+                        type="negative",
+                        timeout=0,
+                        position="center",
+                        close_button="OK",
+                    )
+
+                    return
+
+                if new_pass.value != confirm_pass.value:
+
+                    ui.notify(
+                        "Passwords do not match.",
+                        type="negative",
+                        timeout=0,
+                        position="center",
+                        close_button="OK",
+                    )
+
+                    return
+
+                if new_pass.value == DEFAULT_USER_PASSWORD:
+                    ui.notify(
+                        "You cannot use the default password.",
+                        type="negative",
+                        timeout=0,
+                        close_button="Dismiss",
+                    )
+                    return
+
+                with get_users_session() as session:
+                    user = session.query(Users).filter_by(user_name=username).first()
+                    if user:
+                        user.set_password(new_pass.value)
+                        user.must_change_password = False
+
+                ui.notify("Password changed successfully!", type="positive")
+                ui.navigate.to("/")
+
+            confirm_pass.on("keydown.enter", save_new_password)
+            ui.button("Save Password", on_click=save_new_password).props(
+                "unelevated"
+            ).classes("w-full mt-4")
 
 
 # ----- Startup Configuration -----

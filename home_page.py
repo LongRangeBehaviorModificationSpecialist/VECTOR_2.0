@@ -21,6 +21,7 @@ import shutil
 from import_export import export_database, import_database
 from models import (
     get_session,
+    get_users_session,
     Agents,
     Cases,
     Evidence,
@@ -419,7 +420,7 @@ def build_login_home():
 
                 return
 
-            with get_session() as session:
+            with get_users_session() as session:
 
                 user = (session.query(Users)
                     .filter_by(user_name=entered_user, is_active=True)
@@ -432,11 +433,25 @@ def build_login_home():
                     app.storage.user["authenticated"] = True
                     app.storage.user["user_name"] = user.user_name
                     app.storage.user["is_admin"] = user.is_admin
+                    app.storage.user["session_generation"] = (
+                        app.storage.general.get("session_generation", 0)
+                        )
 
-                    ui.notify(f"Welcome, {user.user_name}!",
-                        timeout=2000, close_button="OK", position="bottom")
+                    if user.must_change_password:
 
-                    ui.navigate.to("/")
+                        ui.navigate.to("/change-password")
+
+                    else:
+
+                        ui.notify(
+                            f"Welcome, {user.user_name}!",
+                            type="positive",
+                            timeout=2000,
+                            close_button="OK",
+                            position="bottom",
+                            )
+
+                        ui.navigate.to("/")
 
                 else:
 

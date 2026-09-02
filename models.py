@@ -30,31 +30,33 @@ from marshmallow import Schema, fields
 current_date = datetime.today().strftime("%Y-%m-%d")
 
 
-# For SQLite databases, use the below syntax
-DATABASE_URL = f"sqlite:///app_data.db"
-engine = create_engine(DATABASE_URL, echo=False, future=True)
-SessionLocal = sessionmaker(
+# ----- Main database -----
+DATABASE_URL = f"sqlite:///db/app_data.db"
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    future=True,
+    connect_args={"check_same_thread": False}
+)
+Session = sessionmaker(
     bind=engine,
-    expire_on_commit=False,
-    autoflush=False,
+    # expire_on_commit=False,
+    # autoflush=False,
 )
 
+# ----- Users database -----
+USERS_DATABASE_URL = "sqlite:///db/users.db"
+users_engine = create_engine(
+    USERS_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+UsersSession = sessionmaker(bind=users_engine)
+
+
+# Main modles -> app_data.db
 Base = declarative_base()
 
-
-# ----- Password Hashing -----
-def generate_password_hash(plain_text: str) -> str:
-    return bcrypt.hashpw(
-        plain_text.encode("utf-8"),
-        bcrypt.gensalt(),
-    ).decode("utf-8")
-
-def check_password_hash(stored_hash: str, attempted: str) -> bool:
-    return bcrypt.checkpw(
-        attempted.encode("utf-8"),
-        stored_hash.encode("utf-8"),
-    )
-
+# Users model -> users.db
+UsersBase = declarative_base()
 
 # ----- MODELS -----
 
@@ -291,7 +293,7 @@ class FileSchema(Schema):
 file_schema = FileSchema(many=True)
 
 
-class Users(Base):
+class Users(UsersBase):
     """Users table — authentication and user management."""
 
     __tablename__ = "users"
@@ -300,8 +302,9 @@ class Users(Base):
     user_name = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     is_admin = Column(Boolean(), default=False)
-    is_active = Column(Boolean(), default=False)
-    created_at = Column(DateTime(), default=datetime.utcnow)
+    is_active = Column(Boolean(), default=True)
+    must_change_password = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return f"User Name: {self.user_name}"
@@ -314,8 +317,7 @@ class Users(Base):
         password_bytes = password.encode("utf-8")
         salt = bcrypt.gensalt()
         self.password_hash = bcrypt.hashpw(
-            password_bytes,
-            salt,
+            password_bytes, salt
         ).decode("utf-8")
 
     def check_password_correction(self, attempted_password: str) -> bool:
@@ -329,10 +331,16 @@ class Users(Base):
             return False
 
 
+DEFAULT_USER_PASSWORD = "Vector2026!"
+
+
 # ----- Table Creation -----
 def init_db():
-    """Create all tables if they don't exist."""
+    """Initialize both databases."""
     Base.metadata.create_all(engine)
+
+    # Create ONLY the Users table in users.db
+    UsersBase.metadata.create_all(users_engine)
 
 
 # ----- Convenience Context Manager -----
@@ -347,7 +355,27 @@ def get_session():
             session.add(new_record)
             # commit happens automatically on exit
     """
-    session = SessionLocal()
+    session = Session()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+@contextmanager
+def get_users_session():
+    """Provides a transactional session scope for the users database.
+
+    Usage:
+        with get_users_session() as session:
+            session.add(new_user)
+            # commit happens automatically on exit
+    """
+    session = UsersSession()
     try:
         yield session
         session.commit()
