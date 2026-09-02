@@ -138,19 +138,19 @@ def build_agents_page():
                 def on_submit():
                     """Handles form submission for new agents."""
 
-                    name = agent_name_input.value
+                    agent_name = agent_name_input.value
                     agency = agent_parent_agency_input.value or ""
-                    role = agent_role_input.value
-                    role_secondary = agent_role_secondary_input.value or ""
+                    agent_role = agent_role_input.value
+                    agent_role_sec = agent_role_secondary_input.value or ""
                     phone = agent_phone_input.value or ""
                     email = agent_email_input.value or ""
                     notes = agent_note_input.value or ""
 
                     # ----- Required field validation -----
                     if not validate_agent_data(
-                        name=name,
+                        agent_name=agent_name,
                         agency=agency,
-                        role=role,
+                        role=agent_role,
                         ):
 
                         return
@@ -162,7 +162,7 @@ def build_agents_page():
                             # ----- Uniqueness checks for data -----
                             if (
                                 session.query(Agents)
-                                .filter_by(agent_name=name)
+                                .filter_by(agent_name=agent_name)
                                 .first()
                                 ):
 
@@ -179,10 +179,10 @@ def build_agents_page():
                                 return
 
                             new_agent = Agents(
-                                agent_name=name,
+                                agent_name=agent_name,
                                 agent_parent_agency=agency,
-                                agent_role=role,
-                                agent_role_secondary=role_secondary,
+                                agent_role=agent_role,
+                                agent_role_secondary=agent_role_sec,
                                 agent_phone=phone,
                                 agent_email=email,
                                 agent_note=notes,
@@ -191,10 +191,10 @@ def build_agents_page():
                             session.add(new_agent)
 
                         if not is_duplicate_agent_in_json(
-                            name=name,
+                            agent_name=agent_name,
                             phone=phone,
                             email=email,
-                            ):
+                        ):
 
                             # RIGHT — Load → Append → Save
                             # Save to JSON file
@@ -202,11 +202,12 @@ def build_agents_page():
 
                             agents.append(
                                 {
-                                    "name": name,
+                                    "name": agent_name,
                                     "agency": agency,
                                     "phone": phone,
-                                    "email": email
-                                })
+                                    "email": email,
+                                }
+                            )
 
                             save_agent_to_json(agents=agents)
 
@@ -221,17 +222,20 @@ def build_agents_page():
                         else:
 
                             ui.notify(
-                                f"{name} added to the case dataabse.",
+                                f"{agent_name} added to the case databse.",
                                 type="positive",
                                 timeout=2000,
                                 position="bottom",
                                 close_button="OK",
-                                )
+                            )
 
                         refresh_agent_table()
                         clear_agent_form()
 
                     except Exception:
+
+                        import traceback
+                        traceback.print_exc()
 
                         ui.notify(
                             "Please check the Agent Information you "
@@ -460,27 +464,31 @@ def build_agents_page():
 
                                                 ui.notify(
                                                     "Agent not found",
-                                                    type="warning", timeout=0,
+                                                    type="warning",
+                                                    timeout=0,
                                                     position="center",
                                                     close_button="OK",
                                                     )
 
                                                 return
 
-                                            agent.agent_name = agent_name
+                                            agent.agent_name = agent_name.value
                                             agent.agent_parent_agency = (
-                                                agent_parent_agency)
-                                            agent.agent_role = agent_role
+                                                agent_parent_agency.value
+                                                )
+                                            agent.agent_role = agent_role.value
                                             agent.agent_role_secondary = (
-                                                agent_role_secondary)
-                                            agent.agent_phone = agent_phone
-                                            agent.agent_email = agent_email
-                                            agent.agent_note = agent_note
+                                                agent_role_secondary.value
+                                                or ""
+                                                )
+                                            agent.agent_phone = agent_phone.value
+                                            agent.agent_email = agent_email.value or ""
+                                            agent.agent_note = agent_note.value or ""
 
                                             # ----- Required field
                                             # validation -----
                                             if not validate_agent_data(
-                                                name=agent_name,
+                                                agent_name=agent_name,
                                                 agency=agent_parent_agency,
                                                 role=agent_role,
                                                 ):

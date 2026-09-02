@@ -186,7 +186,7 @@ def build_evidence_page():
                         evid_loc_room=evid_loc_room,
                         evid_room_detail=evid_room_detail,
                         evid_found_by=evid_found_by,
-                        evid_witness=evid_witness,
+                        evid_found_by_witness=evid_witness,
                         evid_triaged=evid_triaged,
                         evid_triaged_by=evid_triaged_by
                         ):
@@ -402,70 +402,70 @@ def build_evidence_page():
                                     f"Edit Evidence: {row['evid_num']}"
                                     ).classes("text-lg font-semibold mb-4")
 
-                                new_evid_num = required_input(
+                                evid_num = required_input(
                                     label="Evidence Item Number",
                                     value=row["evid_num"],
                                     ).classes("w-full")
 
-                                new_evid_qty = required_input(
+                                evid_qty = required_input(
                                     label="Quantity",
                                     value=row["evid_qty"],
                                     ).classes("w-full")
 
-                                new_evid_desc = required_input(
+                                evid_desc = required_input(
                                     label="Evidence Description",
                                     value=row["evid_desc"],
                                     ).classes("w-full")
 
-                                new_evid_model_num = ui.input(
+                                evid_model_num = ui.input(
                                     label="Model Number",
                                     value=row["evid_model_num"],
                                     ).classes("w-full")
 
-                                new_evid_serial_num = ui.input(
+                                evid_serial_num = ui.input(
                                     label="Serial Number",
                                     value=row["evid_serial_num"],
                                     ).classes("w-full")
 
-                                new_evid_loc_room = required_select(
+                                evid_loc_room = required_select(
                                     options=current_rooms,
                                     label="Room Located",
                                     value=row["evid_loc_room"] or None,
                                     with_input=True,
                                     ).classes("w-full")
 
-                                new_evid_loc_room_detail = required_input(
+                                evid_loc_room_detail = required_input(
                                     label="Where Located",
                                     value=row["evid_loc_room_detail"],
                                     ).classes("w-full")
 
-                                new_evid_found_by = required_select(
+                                evid_found_by = required_select(
                                     options=current_agents,
                                     label="Found By",
                                     value=row["evid_found_by"] or None,
                                     with_input=True,
                                     ).classes("w-full")
 
-                                new_evid_found_by_witness = required_select(
+                                evid_found_by_witness = required_select(
                                     options=current_agents,
                                     label="Witnessed By",
                                     value=row["evid_found_by_witness"] or None,
                                     with_input=True,
                                     ).classes("w-full")
 
-                                new_evid_pic_taken = ui.select(
+                                evid_pic_taken = ui.select(
                                     options=["Yes", "No"],
                                     label="Item Photographed",
                                     value=row["evid_pic_taken"] or None,
                                     ).classes("w-full")
 
-                                new_evid_triaged = ui.select(
+                                evid_triaged = ui.select(
                                     options=["", "Yes", "No"],
                                     label="Item Triaged?",
                                     value=row["evid_triaged"] or None,
                                     ).classes("w-full")
 
-                                new_evid_triaged_by = ui.select(
+                                evid_triaged_by = ui.select(
                                     options=current_agents,
                                     label="Triaged By",
                                     value=row["evid_triaged_by"] or None,
@@ -475,23 +475,23 @@ def build_evidence_page():
                                 # Enable/disable triaged_by based on
                                 # current triaged value
                                 if row["evid_triaged"] != "Yes":
-                                    new_evid_triaged_by.disable()
+                                    evid_triaged_by.disable()
 
                                 def on_edit_triage_change(ev):
 
                                     if ev.value == "Yes":
 
-                                        new_evid_triaged_by.enable()
+                                        evid_triaged_by.enable()
 
                                     else:
 
-                                        new_evid_triaged_by.disable()
-                                        new_evid_triaged_by.value = None
+                                        evid_triaged_by.disable()
+                                        evid_triaged_by.value = None
 
-                                new_evid_triaged.on_value_change(
+                                evid_triaged.on_value_change(
                                     on_edit_triage_change)
 
-                                new_evid_contraband = ui.select(
+                                evid_contraband = ui.select(
                                     options=["","Yes","No","Unknown","N/A"],
                                     label="Contains Contraband?",
                                     value=(
@@ -499,7 +499,7 @@ def build_evidence_page():
                                         ),
                                     ).classes("w-full")
 
-                                new_evid_note = ui.input(
+                                evid_note = ui.input(
                                     label="Notes",
                                     value=row["evid_note"],
                                     ).classes("w-full")
@@ -508,7 +508,8 @@ def build_evidence_page():
                                     "w-full justify-end gap-2 mt-4"
                                     ):
 
-                                    ui.button("Cancel",
+                                    ui.button(
+                                        "Cancel",
                                         on_click=edit_dialog.close,
                                         ).props("flat")
 
@@ -516,6 +517,7 @@ def build_evidence_page():
                                         """Handles form submission for
                                         updating existing evidence item.
                                         """
+
                                         with get_session() as session:
 
                                             evid = (
@@ -524,72 +526,93 @@ def build_evidence_page():
                                                 .first()
                                                 )
 
-                                            if evid:
-                                                evid.evid_num = new_evid_num
-                                                evid.evid_qty = (
-                                                    new_evid_qty.value
-                                                    or ""
+                                            if not evid:
+
+                                                ui.notify(
+                                                    "Evidence item not found",
+                                                    type="warning",
+                                                    timeout=0,
+                                                    position="center",
+                                                    close_button="OK",
                                                     )
-                                                evid.evid_desc = (
-                                                    new_evid_desc.value
-                                                    or ""
-                                                    )
-                                                evid.evid_model_num = (
-                                                    new_evid_model_num.value
-                                                    or ""
-                                                    )
-                                                evid.evid_serial_num = (
-                                                    new_evid_serial_num.value
-                                                    or ""
-                                                    )
-                                                evid.evid_loc_room = (
-                                                    new_evid_loc_room.value
-                                                    or ""
-                                                    )
-                                                evid.evid_loc_room_detail = (
-                                                    new_evid_loc_room_detail.value
-                                                    or ""
-                                                    )
-                                                evid.evid_found_by = (
-                                                    new_evid_found_by.value
-                                                    )
-                                                evid.evid_found_by_witness = (
-                                                    new_evid_found_by_witness.value
-                                                    )
-                                                evid.evid_pic_taken = (
-                                                    new_evid_pic_taken.value
-                                                    or ""
-                                                    )
-                                                evid.evid_triaged = (
-                                                    new_evid_triaged.value
-                                                    )
-                                                evid.evid_triaged_by = (
-                                                    new_evid_triaged_by.value
-                                                    )
-                                                evid.evid_is_contraband = (
-                                                    new_evid_contraband.value
-                                                    or ""
-                                                    )
-                                                evid.evid_note = (
-                                                    new_evid_note.value
-                                                    or ""
-                                                    )
+
+                                                return
+
+                                                # print(f"DEBUG: evid_found_by.value == {evid_found_by.value}")
+
+                                                # print(f"DEBUG: evid_found_by_witness.value == {evid_found_by_witness.value}")
+
+                                                # if evid_found_by.value == evid_found_by_witness.value:
+                                                #     print(f"DEBUG: Values are the same.")
+
+                                            print(f"DEBUG: evid_num == {evid_num!r}")
+                                            print(f"DEBUG: evid_desc == {evid_desc!r}")
+
+                                            evid.evid_num = evid_num.value
+                                            evid.evid_qty = (
+                                                evid_qty.value
+                                                or ""
+                                                )
+                                            evid.evid_desc = (
+                                                evid_desc.value
+                                                or ""
+                                                )
+                                            evid.evid_model_num = (
+                                                evid_model_num.value
+                                                or ""
+                                                )
+                                            evid.evid_serial_num = (
+                                                evid_serial_num.value
+                                                or ""
+                                                )
+                                            evid.evid_loc_room = (
+                                                evid_loc_room.value
+                                                or ""
+                                                )
+                                            evid.evid_loc_room_detail = (
+                                                evid_loc_room_detail.value
+                                                or ""
+                                                )
+                                            evid.evid_found_by = (
+                                                evid_found_by.value
+                                                )
+                                            evid.evid_found_by_witness = (
+                                                evid_found_by_witness.value
+                                                )
+                                            evid.evid_pic_taken = (
+                                                evid_pic_taken.value
+                                                or ""
+                                                )
+                                            evid.evid_triaged = (
+                                                evid_triaged.value
+                                                )
+                                            evid.evid_triaged_by = (
+                                                evid_triaged_by.value
+                                                )
+                                            evid.evid_is_contraband = (
+                                                evid_contraband.value
+                                                or ""
+                                                )
+                                            evid.evid_note = (
+                                                evid_note.value
+                                                or ""
+                                                )
 
                                             # ----- Required field validation -----
                                             if not validate_update_evidence(
-                                                new_evid_num=new_evid_num,
-                                                new_evid_found_by=new_evid_found_by,
-                                                new_evid_found_by_witness=new_evid_found_by_witness,
-                                                new_evid_triaged=new_evid_triaged,
-                                                new_evid_triaged_by=new_evid_triaged_by,
+                                                evid_num=evid_num.value,
+                                                evid_found_by=evid_found_by.value,
+                                                evid_found_by_witness=evid_found_by_witness.value,
+                                                evid_triaged=evid_triaged.value,
+                                                evid_triaged_by=evid_triaged_by.value,
                                                 row=row,
                                                 ):
 
                                                 return
 
                                         ui.notify(
-                                            f"Item {new_evid_num} was "
-                                            "successfully updated.",
+                                            f"Item {evid_num.value} was "
+                                            "updated.",
                                             type="positive",
                                             timeout=2000,
                                             position="bottom",
@@ -626,7 +649,8 @@ def build_evidence_page():
                                     "w-full justify-end gap-2"
                                     ):
 
-                                    ui.button("Cancel",
+                                    ui.button(
+                                        "Cancel",
                                         on_click=delete_dialog.close,
                                         ).props("flat")
 
@@ -653,7 +677,7 @@ def build_evidence_page():
 
                                         ui.notify(
                                             f"Item {evid_num} ({evid_desc}) "
-                                            "was deleted successfully.",
+                                            "was deleted.",
                                             type="positive",
                                             timeout=2000,
                                             position="bottom",

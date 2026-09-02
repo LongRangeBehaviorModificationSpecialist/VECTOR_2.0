@@ -27,11 +27,10 @@ POSITIVE_NOTIFICATION_TIMEOUT = 2000
 
 AGENTS_JSON_PATH = Path(__file__).parent / "parts/agents.json"
 
-MESSAGES = {
-    "room_4": "That room description is already assigned to another room.",
-    "room_5": "The same agent cannot be listed in the 'First Agent Name' and "
-        "'Second Agent Name' fields.",
-}
+# MESSAGES = {
+#     "room_4": ,
+#     "room_5": ,
+# }
 
 # Allowed MIME types for images, videos, and documents
 ALLOWED_MIME_TYPES = {
@@ -242,11 +241,7 @@ def load_agency_options() -> list[str]:
     return []
 
 
-def is_duplicate_agent_in_json(
-        name: str,
-        phone: str,
-        email: str = ""
-) -> bool:
+def is_duplicate_agent_in_json(agent_name: str, phone: str, email: str = "") -> bool:
     """Checks if an agent with the same name, phone, or email already
     exists in agents.json.
 
@@ -256,7 +251,7 @@ def is_duplicate_agent_in_json(
 
     agents = load_agents_from_json()
 
-    name_lower = name.strip().lower()
+    name_lower = agent_name.strip().lower()
     phone_clean = (
         phone.strip()
         .replace("-", "")
@@ -265,13 +260,13 @@ def is_duplicate_agent_in_json(
         .replace(" ", "")
     )
 
-    for agent in agents:
+    for agent_name in agents:
         # Check name match
-        if agent.get("name", "").strip().lower() == name_lower:
+        if agent_name.get("name", "").strip().lower() == name_lower:
             return True
 
         # Check phone match (normalize format first)
-        existing_phone = agent.get("phone", "").strip()
+        existing_phone = agent_name.get("phone", "").strip()
         existing_phone_clean = (
             existing_phone.replace("-", "")
             .replace("(", "")
@@ -285,7 +280,7 @@ def is_duplicate_agent_in_json(
         # Check email match (if applicable)
         if email:
             email_lower = email.strip().lower()
-            existing_email = agent.get("email", "").strip().lower()
+            existing_email = agent_name.get("email", "").strip().lower()
             if email_lower and existing_email and existing_email == email_lower:
                 return True
 
@@ -467,52 +462,67 @@ def validate_case_data(
 
 
 def validate_agent_data(
-        name: str | None,
+        agent_name: str | None,
         agency: str | None,
         role: str | None,
-        role_secondary: str | None
+        role_secondary: str = ""
 ) -> bool:
 
-    if not name:
+    if not agent_name:
         ui.notify(
-            "The 'Agent Name' field is required", type="warning",
-            timeout=0, close_button="OK", position="center")
+            "The 'Agent Name' field is required",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
         return False
 
     if not agency:
         ui.notify(
-            "The 'Agency' field is required.", type="warning",
-            timeout=0, close_button="OK", position="center")
+            "The 'Agency' field is required.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
         return False
 
     if not role:
         ui.notify(
-            "The 'Agent Role' field is required.", type="warning",
-            timeout=0, close_button="OK", position="center")
+            "The 'Agent Role' field is required.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
         return False
 
     if role and role_secondary:
         if role.strip().lower() == role_secondary.strip().lower():
             ui.notify(
                     f"The 'Primary Role' field and the 'Secondary Role' field "
-                    f"for {name} cannot be the same.", type="warning",
-                    timeout=0, close_button="OK", position="center")
-            return True
-        return False
+                    f"for {agent_name} cannot be the same.",
+                    type="warning",
+                    timeout=0,
+                    position="center",
+                    close_button="OK",
+                    )
+            return False
 
     return True
 
 
 def validate_initial_evidence(
-        evid_num: str | None,
-        evid_qty: str | None,
-        evid_desc: str | None,
-        evid_loc_room: str | None,
-        evid_room_detail: str | None,
-        evid_found_by: str | None,
-        evid_found_by_witness: str | None,
-        evid_triaged: str | None,
-        evid_triaged_by: str | None
+    evid_num: str,
+    evid_qty: str,
+    evid_desc: str,
+    evid_loc_room: str,
+    evid_room_detail: str,
+    evid_found_by: str,
+    evid_found_by_witness: str,
+    evid_triaged: str = "",
+    evid_triaged_by: str = "",
 ) -> bool:
 
     if not evid_num:
@@ -599,47 +609,131 @@ def validate_initial_evidence(
 
 
 def validate_update_evidence(
-        new_evid_num: str,
-        new_evid_found_by: str,
-        new_evid_found_by_witness: str,
-        new_evid_triaged: str,
-        new_evid_triaged_by: str,
+        evid_num: str,
+        evid_found_by: str,
+        evid_found_by_witness: str,
+        evid_triaged: str,
+        evid_triaged_by: str,
         row
 ) -> bool:
 
     if (
-        new_evid_found_by and new_evid_found_by_witness
-        and new_evid_found_by == new_evid_found_by_witness
+        evid_found_by and evid_found_by_witness
+        and evid_found_by == evid_found_by_witness
     ):
         ui.notify(
             "The same agent cannot be listed in the 'Found By' and "
             "'Witnessed By' fields.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
         return False
 
-    if new_evid_triaged == "Yes" and not new_evid_triaged_by:
+    if evid_triaged == "Yes" and not evid_triaged_by:
         ui.notify(
             "The 'Triaged By' field is required if the 'Item Triaged?' "
             "field is set to 'Yes'.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
         return False
 
     with get_session() as session:
         dup = (
             session.query(Evidence)
             .filter(
-                Evidence.evid_num == (new_evid_num),
+                Evidence.evid_num == (evid_num),
                 Evidence.id != row["id"])
             .first()
         )
 
         if dup:
             ui.notify(
-                f"Evidence number {new_evid_num} is already used",
-                type="warning", timeout=0,
-                close_button="OK", position="center")
+                f"Evidence number {evid_num} is already used",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+                )
+            return False
+
+    return True
+
+
+def validate_room_data(
+        room_label: str,
+        room_desc: str,
+        first_agent: str = "",
+        second_agent: str = ""
+) -> bool:
+    if not room_label:
+        ui.notify(
+            "The 'Room Label' field is required.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
+        return False
+
+    if not room_desc:
+        ui.notify(
+            "The 'Room Description' field is required.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
+        return False
+
+    with get_session() as session:
+        if (
+            session.query(Rooms)
+            .filter_by(room_label=room_label)
+            .first()
+            ):
+
+            ui.notify(
+                "That label is currently assigned to another room.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+                )
+            return False
+
+        # ----- Duplicate description validation -----
+        if (
+            session.query(Rooms)
+            .filter_by(room_desc=room_desc)
+            .first()
+            ):
+            ui.notify(
+                "That room description is already assigned to another room.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+                )
+            return False
+
+        # ----- Same agent checks -----
+        if (
+            first_agent and second_agent and
+            first_agent == second_agent):
+
+            ui.notify(
+                "The same agent cannot be listed in the 'First Agent Name' "
+                "and 'Second Agent Name' fields.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+                )
             return False
 
     return True

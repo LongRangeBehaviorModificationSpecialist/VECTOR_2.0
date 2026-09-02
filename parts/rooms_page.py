@@ -21,8 +21,8 @@ from utils import (
     required_input,
     load_agent_names,
     get_next_room_ltr,
+    validate_room_data,
     confirm_delete_all,
-    MESSAGES
 )
 
 
@@ -48,7 +48,8 @@ def build_rooms_page():
             agent_options = load_agent_names()
 
             room_label_input = ui.input(
-                label="Room Label", value=next_letter
+                label="Room Label",
+                value=next_letter,
                 ).classes("w-full")
 
             room_label_input.props("readonly")
@@ -85,80 +86,24 @@ def build_rooms_page():
                     room_note_input.value = ""
 
                 def on_submit():
+                    """Handles form submission for new rooms."""
 
-                    # ----- Required field validation -----
                     room_label = room_label_input.value
-
-                    if not room_label:
-
-                        ui.notify(
-                            "The 'Room Label' field is required.",
-                            type="warning",
-                            timeout=0,
-                            position="center",
-                            close_button="OK",
-                            )
-
-                        return
-
                     room_desc = room_desc_input.value
-
-                    if not room_desc:
-
-                        ui.notify(
-                            "The 'Room Description' field is required.",
-                            type="warning",
-                            timeout=0,
-                            position="center",
-                            close_button="OK",
-                            )
-
-                        return
-
                     first_agent = room_first_agent_combo.value or ""
                     second_agent = room_second_agent_combo.value or ""
                     room_note = room_note_input.value or ""
 
+                    # ----- Required field validation -----
+                    if not validate_room_data(
+                        room_label=room_label,
+                        room_desc=room_desc,
+                        ):
+
+                        return
+
                     # ----- Duplicate label validation -----
                     with get_session() as session:
-
-                        existing_label = (
-                            session.query(Rooms)
-                            .filter_by(room_label=room_label)
-                            .first()
-                            )
-
-                        if existing_label:
-
-                            ui.notify(
-                                "That label is currently assigned to another "
-                                "room.",
-                                type="warning",
-                                timeout=0,
-                                position="center",
-                                close_button="OK",
-                                )
-
-                            return
-
-                        # ----- Duplicate description validation -----
-                        existing_desc = (
-                            session.query(Rooms)
-                            .filter_by(room_desc=room_desc)
-                            .first()
-                            )
-
-                        if existing_desc:
-
-                            ui.notify(
-                                MESSAGES["room_4"],
-                                type="warning",
-                                timeout=0,
-                                position="center",
-                                close_button="OK",
-                                )
-
-                            return
 
                         # ----- Same agent checks -----
                         if (
@@ -166,7 +111,9 @@ def build_rooms_page():
                             first_agent == second_agent):
 
                             ui.notify(
-                                MESSAGES["room_5"],
+                                "The same agent cannot be listed in the "
+                                "'First Agent Name' and 'Second Agent "
+                                "Name' fields.",
                                 type="warning",
                                 timeout=0,
                                 position="center",
@@ -423,7 +370,7 @@ def build_rooms_page():
 
                                             if dup_desc:
                                                 ui.notify(
-                                                    MESSAGES["room_4"],
+                                                    "That room description is already assigned to another room.",
                                                     type="warning",
                                                     timeout=0,
                                                     position="center",
@@ -439,7 +386,8 @@ def build_rooms_page():
                                             if a1 and a2 and a1 == a2:
 
                                                 ui.notify(
-                                                    MESSAGES["room_5"],
+                                                    "The same agent cannot be listed in the 'First Agent Name' "
+                                                                    "and 'Second Agent Name' fields.",
                                                     type="warning",
                                                     timeout=0,
                                                     position="center",
