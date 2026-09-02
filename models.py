@@ -19,7 +19,6 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     LargeBinary,
-    select,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 from marshmallow import Schema, fields
@@ -32,23 +31,24 @@ current_date = datetime.today().strftime("%Y-%m-%d")
 
 # ----- Main database -----
 DATABASE_URL = f"sqlite:///db/app_data.db"
+
 engine = create_engine(
     DATABASE_URL,
     echo=False,
     future=True,
     connect_args={"check_same_thread": False}
 )
-Session = sessionmaker(
-    bind=engine,
-    # expire_on_commit=False,
-    # autoflush=False,
-)
+
+Session = sessionmaker(bind=engine)
 
 # ----- Users database -----
 USERS_DATABASE_URL = "sqlite:///db/users.db"
+
 users_engine = create_engine(
-    USERS_DATABASE_URL, connect_args={"check_same_thread": False}
+    USERS_DATABASE_URL,
+    connect_args={"check_same_thread": False}
 )
+
 UsersSession = sessionmaker(bind=users_engine)
 
 

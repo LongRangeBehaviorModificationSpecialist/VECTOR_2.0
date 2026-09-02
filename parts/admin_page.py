@@ -24,7 +24,7 @@ def build_admin_page():
         is_admin=get_is_admin(),
         username=get_current_user_name(),
         on_new_case=None,
-        )
+    )
 
     with ui.column().classes("w-full items-center"):
 
@@ -38,7 +38,7 @@ def build_admin_page():
             ui.label(
                 "New users are created with the default password and must "
                 "change it on first login. New users are never admins."
-                ).classes("text-sm text-gray-400 mb-4")
+            ).classes("text-sm text-gray-400 mb-4")
 
             new_username = ui.input(label="Username").classes("w-full")
 
@@ -55,7 +55,7 @@ def build_admin_page():
                         timeout=0,
                         position="center",
                         close_button="OK",
-                        )
+                    )
 
                     return
 
@@ -69,7 +69,7 @@ def build_admin_page():
                             timeout=0,
                             position="center",
                             close_button="OK",
-                            )
+                        )
 
                         return
 
@@ -78,7 +78,7 @@ def build_admin_page():
                         is_admin=False,
                         is_active=True,
                         must_change_password=True,
-                        )
+                    )
 
                     new_user.set_password(DEFAULT_USER_PASSWORD)
                     session.add(new_user)
@@ -91,15 +91,17 @@ def build_admin_page():
                     timeout=0,
                     position="bottom",
                     close_button="OK",
-                    )
+                )
 
                 new_username.value = ""
                 refresh_users_table()
 
             new_username.on("keydown.enter", create_user)
 
-            ui.button("Create User", on_click=create_user).props("unelevated"
-                ).classes("mt-2")
+            ui.button(
+                "Create User",
+                on_click=create_user,
+            ).props("unelevated").classes("mt-2")
 
         # ----- Existing Users Table -----
         ui.separator().classes("my-6")
@@ -132,7 +134,7 @@ def build_admin_page():
                                 )
                             }
                             for u in users
-                            ]
+                        ]
 
                     with table_container:
 
@@ -174,7 +176,7 @@ def build_admin_page():
                             columns=columns,
                             rows=rows,
                             row_key="id",
-                            )
+                        )
 
                         table.props("dense flat")
 
@@ -197,7 +199,7 @@ def build_admin_page():
                                 </div>
                             </q-td>
                             """,
-                            )
+                        )
 
                         # ----- Reset password handler -----
                         def reset_password(e):
@@ -215,14 +217,14 @@ def build_admin_page():
                                     f"{row['username']} "
                                     f"to the default? They will be prompted "
                                     f"to change it on next login."
-                                    ).classes("mb-4")
+                                ).classes("mb-4")
 
                                 with ui.row().classes(
                                     "w-full justify-end gap-2"):
 
                                     ui.button("Cancel",
                                         on_click=reset_dialog.close
-                                        ).props("flat")
+                                    ).props("flat")
 
                                     def on_confirm_reset():
 
@@ -232,13 +234,13 @@ def build_admin_page():
                                                 session.query(Users)
                                                 .filter_by(id=row["id"])
                                                 .first()
-                                                )
+                                            )
 
                                             if user:
 
                                                 user.set_password(
                                                     DEFAULT_USER_PASSWORD
-                                                    )
+                                                )
                                                 user.must_change_password = True
 
                                         ui.notify(
@@ -250,15 +252,15 @@ def build_admin_page():
                                             timeout=0,
                                             position="center",
                                             close_button="OK",
-                                            )
+                                        )
 
                                         reset_dialog.close()
                                         refresh_users_table()
 
-                                    ui.button("Reset",
-                                        on_click=on_confirm_reset).props(
-                                        "negative unelevated"
-                                    )
+                                    ui.button(
+                                        "Reset",
+                                        on_click=on_confirm_reset,
+                                    ).props("negative unelevated")
 
                             reset_dialog.open()
 
@@ -275,29 +277,31 @@ def build_admin_page():
                                     timeout=0,
                                     position="center",
                                     close_button="OK",
-                                    )
+                                )
 
                                 return
 
                             with ui.dialog() as delete_dialog, ui.card(
                                 ).classes("max-w-sm p-6"):
 
-                                ui.label("Confirm Deletion").classes(
-                                    "text-lg font-semibold mb-2")
+                                ui.label(
+                                    "Confirm Deletion"
+                                ).classes("text-lg font-semibold mb-2")
 
                                 ui.label(
                                     f"Are you sure you want to delete user "
                                     f"'{row['username']}'? This cannot be "
                                     "undone."
-                                    ).classes("mb-4")
+                                ).classes("mb-4")
 
                                 with ui.row().classes(
                                     "w-full justify-end gap-2"
-                                    ):
+                                ):
 
-                                    ui.button("Cancel",
-                                        on_click=delete_dialog.close
-                                        ).props("flat")
+                                    ui.button(
+                                        "Cancel",
+                                        on_click=delete_dialog.close,
+                                    ).props("flat")
 
                                     def on_confirm_delete():
 
@@ -307,7 +311,7 @@ def build_admin_page():
                                                 session.query(Users)
                                                 .filter_by(id=row["id"])
                                                 .first()
-                                                )
+                                            )
 
                                             if user:
 
@@ -320,14 +324,15 @@ def build_admin_page():
                                             timeout=0,
                                             position="bottom",
                                             close_button="OK",
-                                            )
+                                        )
 
                                         delete_dialog.close()
                                         refresh_users_table()
 
-                                    ui.button("Delete",
-                                        on_click=on_confirm_delete).props(
-                                        "negative unelevated")
+                                    ui.button(
+                                        "Delete",
+                                        on_click=on_confirm_delete,
+                                    ).props("negative unelevated")
 
                             delete_dialog.open()
 
@@ -336,27 +341,3 @@ def build_admin_page():
 
         # Initial render
         refresh_users_table()
-
-
-# ----- ROUTE REGISTRATION -----
-@ui.page("/admin")
-def admin_page():
-
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-
-    if not get_is_admin():
-
-        ui.notify(
-            "Admin access required.",
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-            )
-
-        ui.navigate.to("/")
-        return
-
-    build_admin_page()

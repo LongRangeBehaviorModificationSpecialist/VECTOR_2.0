@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 reports_page.py
 
@@ -28,7 +30,6 @@ Workflow for report creation:
 """
 
 from nicegui import ui
-from datetime import datetime
 from sqlalchemy import func
 import json
 
@@ -165,8 +166,8 @@ def show_validation_errors(errors: list[str]):
             errors[0],
             type="negative",
             timeout=0,
+            position="center",
             close_button="OK",
-            position="center"
         )
     else:
         error_text = "\n".join(f"• {err}" for err in errors)
@@ -174,8 +175,8 @@ def show_validation_errors(errors: list[str]):
             f"Cannot generate report — missing information:\n\n{error_text}.",
             type="negative",
             timeout=0,
+            position="center",
             close_button="OK",
-            position="center"
         )
 
 
@@ -440,6 +441,7 @@ def build_case_header_html(active_case: dict | None, page_title: str, sub_title:
     {report_header_table}
     """
 
+
 def build_report_footer_html() -> str:
     """Generates the standard END OF REPORT footer."""
 
@@ -448,6 +450,7 @@ def build_report_footer_html() -> str:
         &ndash;&ensp;&ndash;&ensp;END OF REPORT&ensp;&ndash;&ensp;&ndash;
     </p>
     """
+
 
 # ----- Agent List Report HTML Template -----
 def build_agents_report_html(active_case: dict, agents: list) -> str:
@@ -499,6 +502,7 @@ def build_agents_report_html(active_case: dict, agents: list) -> str:
     {footer}
 </body>
 </html>"""
+
 
 # ----- Detailed Evidence Report HTML Template (AGENT COPY) -----
 def build_evidence_report_html(active_case: list, evidence: list) -> str:
@@ -586,8 +590,9 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
             <tr>
                 <td colspan="2" style="height: 1.25em;"></td>
             </tr>"""
-            for e in evidence]
-        )
+            for e in evidence
+        ]
+    )
 
     header = build_case_header_html(
         active_case,
@@ -615,6 +620,7 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
     {footer}
 </body>
 </html>"""
+
 
 # ----- Evidence By Room Report HTML Template -----
 def build_evidence_by_room_report_html(
@@ -726,8 +732,9 @@ def build_evidence_by_room_report_html(
                 <td colspan="2" style="height: 1.25em;"></td>
             </tr>
             """
-            for e in room_items]
-        )
+            for e in room_items
+        ]
+    )
 
         room_tables += f"""
         <div class="top-table">
@@ -767,6 +774,7 @@ def build_evidence_by_room_report_html(
     {footer}
 </body>
 </html>"""
+
 
 # ----- Basic Evidence Report HTML Template (RETURN COPY) -----
 def build_basic_evidence_report_html(
@@ -813,7 +821,8 @@ def build_basic_evidence_report_html(
             <tr>
                 <td colspan="2" style="height: 1.25em;"></td>
             </tr>"""
-        for e in evidence]
+            for e in evidence
+        ]
     )
 
     header = build_case_header_html(
@@ -843,6 +852,7 @@ def build_basic_evidence_report_html(
 </body>
 </html>"""
 
+
 # ----- Room List Report HTML Template -----
 def build_rooms_report_html(active_case: list, rooms: list) -> str:
     """Generates the complete HTML for the Room List report."""
@@ -857,8 +867,9 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
                 <td class="roomTableData">{r["room_second_agent"]}</td>
                 <td class="roomTableData">{r["room_note"]}</td>
             </tr>"""
-            for r in rooms]
-        )
+            for r in rooms
+        ]
+    )
 
     header = build_case_header_html(
         active_case,
@@ -896,6 +907,7 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
 </body>
 </html>"""
 
+
 # ----- Person List Report HTML Template -----
 def build_persons_report_html(active_case: list, persons: list) -> str:
     """Generates the complete HTML for the Person List report."""
@@ -907,7 +919,10 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
             <td class="personTableData">{p["sus_address"]}</td>
             <td class="personTableData">{p["sus_phone"]}</td>
             <td class="personTableData">{p["sus_note"]}</td>
-        </tr>""" for p in persons])
+        </tr>"""
+        for p in persons
+        ]
+    )
 
     header = build_case_header_html(
         active_case,
@@ -945,6 +960,7 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 </body>
 </html>"""
 
+
 # ----- Notes Report HTML Template -----
 def build_notes_report_html(active_case: list, notes: list) -> str:
     """Generates the complete HTML for the Notes report."""
@@ -956,7 +972,10 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
             <td class="noteTableData">{n["note_author"]}</td>
             <td class="noteTableData">{n["note_text"]}</td>
         </tr>
-    """ for n in notes])
+        """
+        for n in notes
+        ]
+    )
 
     header = build_case_header_html(
         active_case,
@@ -993,6 +1012,7 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 </body>
 </html>"""
 
+
 # ----- Updated Agents Route -----
 @ui.page("/reports/agents")
 def print_agents_report():
@@ -1023,6 +1043,7 @@ def print_agents_report():
     )
 
     render_report_page(html_content=html)
+
 
 # ----- Updated Evidence Routes -----
 @ui.page("/reports/evidence")
@@ -1061,6 +1082,7 @@ def print_evidence_report():
     )
 
     render_report_page(html_content=html)
+
 
 # ----- Updated Evidence By Room Route -----
 @ui.page("/reports/evidence_by_room")
@@ -1113,6 +1135,7 @@ def print_evidence_by_room_report():
 
     render_report_page(html_content=html)
 
+
 # ----- Updated Basic Evidence Report Route -----
 @ui.page("/reports/evidence_basic")
 def print_basic_evidence_report():
@@ -1143,6 +1166,7 @@ def print_basic_evidence_report():
 
     render_report_page(html_content=html)
 
+
 # ----- Updated Rooms Route -----
 @ui.page("/reports/rooms")
 def print_rooms_report():
@@ -1171,6 +1195,7 @@ def print_rooms_report():
 
     render_report_page(html_content=html)
 
+
 # ----- Updated Persons Route -----
 @ui.page("/reports/persons")
 def print_persons_report():
@@ -1198,6 +1223,7 @@ def print_persons_report():
 
     render_report_page(html_content=html)
 
+
 # ----- Updated Notes Route -----
 @ui.page("/reports/notes")
 def print_notes_report():
@@ -1223,6 +1249,7 @@ def print_notes_report():
     )
 
     render_report_page(html_content=html)
+
 
 # ----- JSON Output -----
 @ui.page("/reports/json")
@@ -1324,6 +1351,7 @@ def json_output_page():
 
         ui.code(json_str, language="json").classes("w-full")
 
+
 def open_report_window():
     """Extracts the report innerHTML and opens it in a clean new tab.
 
@@ -1380,4 +1408,5 @@ def open_report_window():
 
         newWindow.document.write(fullHtml);
         newWindow.document.close();
-    """)
+        """
+    )

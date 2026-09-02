@@ -30,36 +30,38 @@ def build_persons_page():
         is_admin=get_is_admin(),
         username=get_current_user_name(),
         on_new_case=confirm_new_case_handler,
-        )
+    )
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label("Person List").classes("text-2xl font-bold m-4")
+        ui.label(
+            "Person List"
+        ).classes("text-2xl font-bold m-4")
 
         # ----- Add Person Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
 
             sus_name_input = required_input(
                 label="Name"
-                ).classes("w-full")
+            ).classes("w-full")
 
             sus_name_input.props("autofocus")
 
             sus_dob_input = ui.input(
                 label="DOB"
-                ).classes("w-full")
+            ).classes("w-full")
 
             sus_address_input = ui.input(
                 label="Address"
-                ).classes("w-full")
+            ).classes("w-full")
 
             sus_phone_input = ui.input(
                 label="Phone Number"
-                ).classes("w-full")
+            ).classes("w-full")
 
             sus_note_input = required_input(
                 label="Notes"
-                ).classes("w-full")
+            ).classes("w-full")
 
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
@@ -83,7 +85,7 @@ def build_persons_page():
                             timeout=0,
                             position="center",
                             close_button="OK",
-                            )
+                        )
 
                         return
 
@@ -99,7 +101,7 @@ def build_persons_page():
                             session.query(Persons)
                             .filter_by(sus_name=sus_name)
                             .first()
-                            )
+                        )
 
                         if existing:
 
@@ -110,7 +112,7 @@ def build_persons_page():
                                 timeout=0,
                                 position="center",
                                 close_button="OK",
-                                )
+                            )
 
                             return
 
@@ -121,7 +123,7 @@ def build_persons_page():
                             sus_address=sus_address,
                             sus_phone=sus_phone,
                             sus_note=sus_note,
-                            )
+                        )
 
                         session.add(new_person)
 
@@ -131,7 +133,7 @@ def build_persons_page():
                         timeout=2000,
                         position="bottom",
                         close_button="OK",
-                        )
+                    )
 
                     clear_form()
                     refresh_persons_table()
@@ -139,12 +141,12 @@ def build_persons_page():
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                    ).props("flat")
+                ).props("flat")
 
                 ui.button(
                     "Add Person",
                     on_click=on_submit,
-                    ).props("unelevated")
+                ).props("unelevated")
 
         # ----- Existing Persons Table -----
         ui.separator().classes("my-6")
@@ -174,7 +176,7 @@ def build_persons_page():
 
                         ui.label(
                             "No persons in the database yet"
-                            ).classes("text-gray-500 italic")
+                        ).classes("text-gray-500 italic")
 
                     return
 
@@ -259,34 +261,35 @@ def build_persons_page():
                         </div>
                     </q-td>
                     """
-                    )
+                )
 
                 # ----- Edit dialog -----
                 def open_edit_dialog(e):
 
                     row = e.args
 
-                    with ui.dialog() as edit_dialog, ui.card().classes(
-                        "w-full max-w-lg p-6"):
+                    with ui.dialog() as edit_dialog, ui.card(
+                        ).classes("w-full max-w-lg p-6"
+                    ):
 
                         ui.label(
                             f"Edit Person: {row['sus_name']}"
-                            ).classes("text-lg font-semibold mb-4")
+                        ).classes("text-lg font-semibold mb-4")
 
                         edit_name = required_input(
                             label="Name",
                             value=row["sus_name"],
-                            ).classes("w-full")
+                        ).classes("w-full")
 
                         edit_dob = ui.input(
                             label="DOB",
                             value=row["sus_dob"],
-                            ).classes("w-full")
+                        ).classes("w-full")
 
                         edit_address = ui.input(
                             label="Address",
                             value=row["sus_address"],
-                            ).classes("w-full")
+                        ).classes("w-full")
 
                         edit_phone = ui.input(
                             label="Phone Number",
@@ -296,16 +299,16 @@ def build_persons_page():
                         edit_notes = required_input(
                             label="Notes",
                             value=row["sus_note"],
-                            ).classes("w-full")
+                        ).classes("w-full")
 
                         with ui.row().classes(
                             "w-full justify-end gap-2 mt-4"
-                            ):
+                        ):
 
                             ui.button(
                                 "Cancel",
                                 on_click=edit_dialog.close,
-                                ).props("flat")
+                            ).props("flat")
 
                             def on_save_update():
 
@@ -319,7 +322,7 @@ def build_persons_page():
                                         timeout=0,
                                         position="center",
                                         close_button="OK",
-                                        )
+                                    )
 
                                     return
 
@@ -330,9 +333,9 @@ def build_persons_page():
                                         .filter(
                                             Persons.sus_name == new_name,
                                             Persons.id != row["id"],
-                                            )
-                                        .first()
                                         )
+                                        .first()
+                                    )
 
                                     if dup:
 
@@ -344,7 +347,7 @@ def build_persons_page():
                                             timeout=0,
                                             position="center",
                                             close_button="OK",
-                                            )
+                                        )
 
                                         return
 
@@ -359,16 +362,16 @@ def build_persons_page():
                                         person.sus_name = new_name
                                         person.sus_dob = (
                                             edit_dob.value or ""
-                                            )
+                                        )
                                         person.sus_address = (
                                             edit_address.value or ""
-                                            )
+                                        )
                                         person.sus_phone = (
                                             edit_phone.value or ""
-                                            )
+                                        )
                                         person.sus_note = (
                                             edit_notes.value or ""
-                                            )
+                                        )
 
                                 ui.notify(
                                     f"'{new_name}' was updated.",
@@ -376,7 +379,7 @@ def build_persons_page():
                                     timeout=2000,
                                     position="bottom",
                                     close_button="OK",
-                                    )
+                                )
 
                                 edit_dialog.close()
                                 refresh_persons_table()
@@ -384,7 +387,7 @@ def build_persons_page():
                                 ui.button(
                                     "Save",
                                     on_click=on_save_update,
-                                    ).props("unelevated")
+                                ).props("unelevated")
 
                     edit_dialog.open()
 
@@ -394,23 +397,24 @@ def build_persons_page():
                     row = e.args
 
                     with ui.dialog() as delete_dialog, ui.card(
-                        ).classes("max-w-sm p-6"):
+                        ).classes("max-w-sm p-6"
+                    ):
 
                         ui.label(
                             "Confirm Deletion"
-                            ).classes("text-lg font-semibold mb-2")
+                        ).classes("text-lg font-semibold mb-2")
 
                         ui.label(
                             f"Are you sure you want to remove "
                             f"{row['sus_name']} from the case file?"
-                            ).classes("mb-4")
+                        ).classes("mb-4")
 
                         with ui.row().classes("w-full justify-end gap-2"):
 
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                                ).props("flat")
+                            ).props("flat")
 
                             def on_confirm_delete():
 
@@ -438,7 +442,7 @@ def build_persons_page():
                                     timeout=2000,
                                     position="bottom",
                                     close_button="OK",
-                                    )
+                                )
 
                                 delete_dialog.close()
                                 refresh_persons_table()
@@ -447,7 +451,7 @@ def build_persons_page():
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                                ).props("negative unelevated")
+                            ).props("negative unelevated")
 
                     delete_dialog.open()
 

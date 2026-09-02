@@ -33,7 +33,7 @@ def get_exportable_models():
         (Evidence, "evidence"),
         (Persons, "persons"),
         (Notes, "notes")
-        ]
+    ]
 
 
 def get_all_models():
@@ -48,7 +48,7 @@ def get_all_models():
         "persons": Persons,
         "notes": Notes,
         "uploaded_files": UploadedFiles
-        }
+    }
 
 
 # ----- HELPER FUNCTIONS -----
@@ -69,7 +69,7 @@ def get_case_info_for_folder_name() -> str:
                 timeout=0,
                 position="center",
                 close_button="OK",
-                )
+            )
 
             return ""
 
@@ -78,7 +78,7 @@ def get_case_info_for_folder_name() -> str:
             .replace("/", "_")
             .replace("\\", "_")
             .replace(" ", "_")
-            )
+        )
 
         begin_dt = case.case_date_time_begin or "UNKNOWN"
 
@@ -94,7 +94,7 @@ def get_case_info_for_folder_name() -> str:
                 .replace(":", "")
                 .replace(" ", "_")
                 .replace("/", "")
-                )
+            )
 
         return f"{case_number}_{dt_str}_saved_results"
 
@@ -208,7 +208,7 @@ def export_database(password: Optional[str] = None):
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
 
         return
 
@@ -238,8 +238,8 @@ def export_database(password: Optional[str] = None):
                             [
                                 serialize_value(getattr(record, col))
                                 for col in columns
-                                ]
-                            )
+                            ]
+                        )
 
                         writer.writerow(row)
 
@@ -249,12 +249,13 @@ def export_database(password: Optional[str] = None):
 
         except Exception as err:
 
-            ui.notify(f"Error exporting {table_name}: {err}",
+            ui.notify(
+                f"Error exporting {table_name}: {err}",
                 type="negative",
                 timeout=0,
                 position="center",
                 close_button="OK",
-                )
+            )
 
             return
 
@@ -284,18 +285,20 @@ def export_database(password: Optional[str] = None):
                         {
                             "file_name": safe_name,
                             "file_size": uf.file_size or len(uf.file_data)
-                        })
+                        }
+                    )
 
                     num_files += 1
 
     except Exception as err:
 
-        ui.notify(f"Error exporting files: {err}",
+        ui.notify(
+            f"Error exporting files: {err}",
             type="warning",
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
 
     print(f"DEBUG: zip_path = {zip_path}")
 
@@ -310,7 +313,7 @@ def export_database(password: Optional[str] = None):
         "total_records": total_records,
         "files": files_list,
         "encrypted": password is not None and len(password) > 0,
-        }
+    }
 
     manifest_path = export_dir / "export_manifest.json"
 
@@ -323,9 +326,12 @@ def export_database(password: Optional[str] = None):
 
         if password:
 
-            with pyzipper.AESZipFile(zip_path, "w",
+            with pyzipper.AESZipFile(
+                zip_path,
+                "w",
                 compression=pyzipper.ZIP_DEFLATED,
-                encryption=pyzipper.WZ_AES) as zf:
+                encryption=pyzipper.WZ_AES
+            ) as zf:
 
                 zf.setpassword(password.encode("utf-8"))
                 zf.setencryption(pyzipper.WZ_AES, nbits=256)
@@ -345,7 +351,7 @@ def export_database(password: Optional[str] = None):
                 zip_path,
                 "w",
                 compression=pyzipper.ZIP_DEFLATED
-                ) as zf:
+            ) as zf:
 
                 for file_path in export_dir.rglob("*"):
 
@@ -362,7 +368,7 @@ def export_database(password: Optional[str] = None):
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
 
         shutil.rmtree(export_dir, ignore_errors=True)
         return
@@ -380,7 +386,9 @@ def export_database(password: Optional[str] = None):
         f"Saved to: {export_dir}",
         type="positive",
         timeout=0,
-        close_button="OK")
+        position="bottom",
+        close_button="OK",
+    )
 
     # Also show in terminal
     print(f"\n{'='*60}")
@@ -413,7 +421,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
 
         return
 
@@ -425,7 +433,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
 
         return
 
@@ -453,7 +461,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
                     timeout=0,
                     position="center",
                     close_button="OK",
-                    )
+                )
 
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -475,7 +483,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
                     timeout=0,
                     position="center",
                     close_button="OK",
-                    )
+                )
 
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -489,7 +497,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
 
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -526,7 +534,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
         print(
             f"Importing from export dated: "
             f"{manifest.get('export_date', 'unknown')}"
-            )
+        )
 
     else:
 
@@ -552,7 +560,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
 
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -568,7 +576,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
 
         column_objects = (
             {col.name: col for col in model_class.__table__.columns}
-            )
+        )
 
         try:
 
@@ -598,7 +606,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
                                 record_data[col_name] = deserialize_value(
                                     raw_value,
                                     column_objects[col_name],
-                                    )
+                                )
 
                         # Preserve original IDs for relational integrity
                         # (don't delete the id field — keep it)
@@ -621,7 +629,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
                 timeout=0,
                 position="center",
                 close_button="OK",
-                )
+            )
 
             shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -655,7 +663,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
                             file_size=len(file_data),
                             file_mime_type="application/octet-stream",
                             uploaded_by="import",
-                            )
+                        )
 
                         session.add(new_file)
                         files_imported += 1
@@ -668,7 +676,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
                 timeout=0,
                 position="center",
                 close_button="OK",
-                )
+            )
 
     # ----- Clean up temporary directory -----
     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -683,7 +691,7 @@ def import_database(zip_path: str, password: Optional[str] = None):
         timeout=0,
         position="bottom",
         close_button="OK",
-        )
+    )
 
     print(f"\n{'='*60}")
     print(f"  IMPORT COMPLETE")

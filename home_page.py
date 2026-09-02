@@ -64,20 +64,20 @@ def build_authenticated_home():
 
         ui.image(
             "/static/novadc_icac.png",
-            ).classes("w-[150px] h-[150px] mb-2")
+        ).classes("w-[150px] h-[150px] mb-2")
 
         ui.label(
             "V·E·C·T·O·R Home"
-            ).classes("text-2xl font-bold text-center")
+        ).classes("text-2xl font-bold text-center")
 
         ui.label(
             "The Virginia Evidence Collection, Tracking, "
             "Organization, & Reporting Program"
-            ).classes("text-base text-gray-400 text-center max-w-xl")
+        ).classes("text-base text-gray-400 text-center max-w-xl")
 
         ui.label(
             "Main Menu"
-            ).classes("text-xl font-normal mb-2")
+        ).classes("text-xl font-normal mb-2")
 
     # ----- Action Buttons ROW 1: Start New Case | Add Agent | Add Room -----
 
@@ -87,17 +87,17 @@ def build_authenticated_home():
         ui.button(
             "Start New Case",
             on_click=lambda: ui.navigate.to("/cases"),
-            ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Add Agent",
             on_click=lambda: ui.navigate.to("/agents"),
-            ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Add Room",
             on_click=lambda: ui.navigate.to("/rooms"),
-            ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
     # ----- Action Buttons ROW 2: Add Evidence | Add Person | Add Note -----
 
@@ -107,17 +107,17 @@ def build_authenticated_home():
         ui.button(
             "Add Evidence",
             on_click=lambda: ui.navigate.to("/evidence"),
-            ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Add Person",
             on_click=lambda: ui.navigate.to("/persons"),
-            ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Add Note",
             on_click=lambda: ui.navigate.to("/notes"),
-            ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
     # ----- Action Buttons ROW 3: Add File | Useful Links -----
 
@@ -127,17 +127,17 @@ def build_authenticated_home():
         ui.button(
             "Add File",
             on_click=lambda: ui.navigate.to("/uploads"),
-            ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Useful Links",
             on_click=lambda: ui.navigate.to("/links"),
-            ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
         ui.button(
             "Reports",
             on_click=lambda: ui.navigate.to("/reports"),
-            ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
+        ).props("unelevated").classes("flex-shrink-0 min-w-56 py-3")
 
     # ----- Import / Export ROW -----
 
@@ -147,7 +147,7 @@ def build_authenticated_home():
 
         ui.label(
             "Data Management"
-            ).classes("text-lg font-bold mb-2")
+        ).classes("text-lg font-bold mb-2")
 
         # ----- Row to hold the Data Management buttons -----
         with ui.row().classes("flex justify-center items-center gap-6 w-full"):
@@ -159,7 +159,7 @@ def build_authenticated_home():
 
                     ui.label(
                         "Export All Data"
-                        ).classes("text-lg font-bold mb-2")
+                    ).classes("text-lg font-bold mb-2")
 
                     ui.label(
                         "Export all database tables to CSV files and "
@@ -167,23 +167,23 @@ def build_authenticated_home():
                         "archive saved to your home directory.\n\n"
                         "The ZIP file will be named:\n"
                         "<case-number>_<datetime>_saved_results"
-                        ).classes("mb-4 text-sm text-gray-400")
+                    ).classes("mb-4 text-sm text-gray-400")
 
                     # ----- Password option -----
 
                     encrypt_checkbox = ui.checkbox(
                         "Encrypt with password (AES-256)"
-                        ).classes("mb-2")
+                    ).classes("mb-2")
 
                     password_input = ui.input(
                         label="Password",
                         password=True,
-                        ).classes("w-full")
+                    ).classes("w-full")
 
                     password_input.bind_visibility_from(
                         encrypt_checkbox,
                         "value",
-                        )
+                    )
 
                     def do_export():
 
@@ -191,7 +191,7 @@ def build_authenticated_home():
                             password_input.value
                             if encrypt_checkbox.value
                             else None
-                            )
+                        )
 
                         if encrypt_checkbox.value and not pwd:
 
@@ -202,7 +202,7 @@ def build_authenticated_home():
                                 timeout=0,
                                 position="center",
                                 close_button="OK",
-                                )
+                            )
 
                             return
 
@@ -214,12 +214,12 @@ def build_authenticated_home():
                         ui.button(
                             "Cancel",
                             on_click=dialog.close,
-                            ).props("flat")
+                        ).props("flat")
 
                         ui.button(
                             "Export Now",
                             on_click=do_export,
-                            ).props("unelevated primary")
+                        ).props("unelevated primary")
 
                 dialog.open()
 
@@ -230,32 +230,32 @@ def build_authenticated_home():
 
                     ui.label(
                         "Import Data"
-                        ).classes("text-lg font-bold mb-2")
+                    ).classes("text-lg font-bold mb-2")
 
                     ui.label(
                         "Select a ZIP file previously exported from "
                         "VECTOR.\n\n"
                         "⚠️ WARNING: This will REPLACE all existing data!"
-                        ).classes("mb-4 text-sm text-gray-400")
+                    ).classes("mb-4 text-sm text-gray-400")
 
                     zip_path_input = ui.input(
                         label="ZIP File Path",
                         placeholder=r"Enter\Path\To\ZIP\File",
-                        ).classes("w-full")
+                    ).classes("w-full")
 
                     encrypt_checkbox = ui.checkbox(
                         "ZIP is encrypted (requires password)"
-                        ).classes("mb-2 mt-2")
+                    ).classes("mb-2 mt-2")
 
                     password_input = ui.input(
                         label="Password",
                         password=True,
-                        ).classes("w-full")
+                    ).classes("w-full")
 
                     password_input.bind_visibility_from(
                         encrypt_checkbox,
                         "value",
-                        )
+                    )
 
                     def do_import():
 
@@ -269,7 +269,7 @@ def build_authenticated_home():
                                 timeout=0,
                                 position="center",
                                 close_button="OK",
-                                )
+                            )
 
                             return
 
@@ -281,7 +281,7 @@ def build_authenticated_home():
                                 timeout=0,
                                 position="center",
                                 close_button="OK",
-                                )
+                            )
 
                             return
 
@@ -289,7 +289,7 @@ def build_authenticated_home():
                             password_input.value
                             if encrypt_checkbox.value
                             else None
-                            )
+                        )
 
                         if encrypt_checkbox.value and not pwd:
 
@@ -299,7 +299,7 @@ def build_authenticated_home():
                                 timeout=0,
                                 position="center",
                                 close_button="OK",
-                                )
+                            )
 
                             return
 
@@ -311,12 +311,12 @@ def build_authenticated_home():
                         ui.button(
                             "Cancel",
                             on_click=dialog.close
-                            ).props("flat")
+                        ).props("flat")
 
                         ui.button(
                             "Import Now",
                             on_click=do_import
-                            ).props("unelevated warning")
+                        ).props("unelevated warning")
 
                 dialog.open()
 
@@ -328,29 +328,29 @@ def build_authenticated_home():
 
                     ui.label(
                         "Delete All Data"
-                        ).classes("text-lg font-bold mb-2")
+                    ).classes("text-lg font-bold mb-2")
 
                     ui.label(
                         "Are you sure you want to delete all case "
                         "data for this case? This CANNOT be undone!"
-                        ).classes("mb-4 text-sm text-gray-400")
+                    ).classes("mb-4 text-sm text-gray-400")
 
                     # ----- User verification of destructive activity -----
 
                     affirm_checkbox = ui.checkbox(
                         "I understand the current data cannot be recovered.",
                         value=False,
-                        ).classes("mb-2")
+                    ).classes("mb-2")
 
                     affirm_input = ui.input(
                         label="Affirm by typing 'DELETE' on the line below",
                         password=False,
-                        ).classes("w-full")
+                    ).classes("w-full")
 
                     affirm_input.bind_visibility_from(
                         affirm_checkbox,
                         "value",
-                        )
+                    )
 
                     def do_delete():
 
@@ -363,7 +363,7 @@ def build_authenticated_home():
                                 timeout=0,
                                 position="center",
                                 close_button="OK",
-                                )
+                            )
 
                             return
 
@@ -376,7 +376,7 @@ def build_authenticated_home():
                                 timeout=0,
                                 position="center",
                                 close_button="OK",
-                                )
+                            )
 
                             return
 
@@ -384,7 +384,7 @@ def build_authenticated_home():
                             affirm_input.value
                             if affirm_checkbox.value
                             else None
-                            )
+                        )
 
                         if affirm_checkbox.value and not affirm:
 
@@ -394,7 +394,7 @@ def build_authenticated_home():
                                 timeout=0,
                                 position="center",
                                 close_button="OK",
-                                )
+                            )
 
                             return
 
@@ -406,13 +406,13 @@ def build_authenticated_home():
                         ui.button(
                             "Cancel",
                             on_click=dialog.close,
-                            ).props("flat")
+                        ).props("flat")
 
                         ui.button(
                             "Delete all data",
                             on_click=do_delete,
                             color="#EF4444",
-                            ).props("unelevated negative")
+                        ).props("unelevated negative")
 
                 dialog.open()
 
@@ -420,19 +420,19 @@ def build_authenticated_home():
                 "📤 Export All Data",
                 on_click=open_export_dialog,
                 color="#22c55e",
-                ).props("unelevated").classes("w-56 py-3")
+            ).props("unelevated").classes("w-56 py-3")
 
             ui.button(
                 "📥 Import Data",
                 on_click=open_import_dialog,
                 color="#22c55e",
-                ).props("unelevated").classes("w-56 py-3")
+            ).props("unelevated").classes("w-56 py-3")
 
             ui.button(
                 "Delete All Data",
                 on_click=open_delete_all_dialog,
                 color="#EF4444",
-                ).props("unelevated").classes("w-56 py-3")
+            ).props("unelevated").classes("w-56 py-3")
 
 
 def build_login_home():
@@ -442,24 +442,24 @@ def build_login_home():
 
         ui.image(
             "/static/novadc_icac.png",
-            ).classes("w-[150px] h-[150px] mb-4")
+        ).classes("w-[150px] h-[150px] mb-4")
 
         ui.label(
             "-- V·E·C·T·O·R --"
-            ).classes("text-3xl font-bold tracking-widest mb-6")
+        ).classes("text-3xl font-bold tracking-widest mb-6")
 
         ui.label(
             "The Virginia Evidence Collection, Tracking, "
             "Organization, & Reporting Program"
-            ).classes("text-base text-gray-400 text-center max-w-xl mb-2")
+        ).classes("text-base text-gray-400 text-center max-w-xl mb-2")
 
         ui.label(
             "Please log in below"
-            ).classes("text-lg mb-6")
+        ).classes("text-lg mb-6")
 
         username_input = ui.input(
             label="Username"
-            ).classes("w-full max-w-xs")
+        ).classes("w-full max-w-xs")
 
         username_input.props("autofocus")
 
@@ -467,7 +467,7 @@ def build_login_home():
             label="Password",
             password=True,
             password_toggle_button=True,
-            ).classes("w-full max-w-xs")
+        ).classes("w-full max-w-xs")
 
         def attempt_login():
             # Wire this to your Users model authentication
@@ -484,7 +484,7 @@ def build_login_home():
                     timeout=0,
                     position="center",
                     close_button="OK",
-                    )
+                )
 
                 return
 
@@ -494,10 +494,10 @@ def build_login_home():
                     session.query(Users)
                     .filter_by(
                         user_name=entered_user,
-                        is_active=True
-                        )
-                    .first()
+                        is_active=True,
                     )
+                    .first()
+                )
 
                 if user and user.check_password_correction(entered_pass):
 
@@ -508,7 +508,7 @@ def build_login_home():
                     app.storage.user["is_admin"] = user.is_admin
                     app.storage.user["session_generation"] = (
                         app.storage.general.get("session_generation", 0)
-                        )
+                    )
 
                     if user.must_change_password:
 
@@ -522,7 +522,7 @@ def build_login_home():
                             timeout=2000,
                             position="bottom",
                             close_button="OK",
-                            )
+                        )
 
                         ui.navigate.to("/")
 
@@ -534,7 +534,7 @@ def build_login_home():
                         timeout=0,
                         position="center",
                         close_button="OK",
-                        )
+                    )
 
                     password_input.value = ""
 
@@ -544,7 +544,7 @@ def build_login_home():
         ui.button(
             "Login",
             on_click=attempt_login,
-            ).props("unelevated").classes("mt-4 px-8 py-3")
+        ).props("unelevated").classes("mt-4 px-8 py-3")
 
 
 # ----- About Page -----
@@ -558,13 +558,13 @@ def about_page():
         is_admin=get_is_admin(),
         username=get_current_user_name(),
         on_new_case=confirm_new_case_handler,
-        )
+    )
 
     with ui.column().classes("items-center w-full mt-8"):
 
         ui.label(
             "About V·E·C·T·O·R"
-            ).classes("text-2xl font-bold mb-6")
+        ).classes("text-2xl font-bold mb-6")
 
         with ui.card().classes("p-6"):
 
@@ -586,13 +586,15 @@ def help_page():
         is_admin=get_is_admin(),
         username=get_current_user_name(),
         on_new_case=confirm_new_case_handler,
-        )
+    )
 
     with ui.column().classes("w-full items-center"):
 
         with ui.column().classes("items-center w-full mt-8 max-w-3xl"):
 
-            ui.label("Help").classes("text-2xl font-bold mb-6")
+            ui.label(
+                "Help"
+            ).classes("text-2xl font-bold mb-6")
 
             with ui.card().classes("p-6"):
 
@@ -627,7 +629,7 @@ Use the top menu to access different sections:\n
 7.&ensp;**Files**&ensp;→&ensp;Upload a file to case\n
 8.&ensp;**Reports**&ensp;→&ensp;Print various reports\n
 """
-                            ).classes("text-sm")
+                ).classes("text-sm")
 
 
 # ----- Confirm New Case Handler -----
@@ -640,21 +642,21 @@ def confirm_new_case_handler():
 
         ui.label(
             "⚠️ WARNING: Delete All Data"
-            ).classes("text-red-400 text-lg font-bold mb-2")
+        ).classes("text-red-400 text-lg font-bold mb-2")
 
         ui.label(
             "This will DELETE ALL DATA from all database tables:\n"
             "- Agents\n- Cases\n- Evidence\n- Notes\n- Persons\n"
             "- Rooms\n\n. This action CANNOT be undone. Are you "
             "absolutely sure?"
-            ).classes("text-sm mb-4")
+        ).classes("text-sm mb-4")
 
         with ui.row().classes("w-full justify-end gap-2"):
 
             ui.button(
                 "Cancel",
                 on_click=dialog.close,
-                ).props("flat")
+            ).props("flat")
 
             def on_confirm_delete_all():
 
@@ -678,7 +680,7 @@ def confirm_new_case_handler():
                         timeout=0,
                         position="center",
                         close_button="OK",
-                        )
+                    )
 
                     ui.navigate.to("/")
 
@@ -692,7 +694,7 @@ def confirm_new_case_handler():
                         timeout=2000,
                         position="bottom",
                         close_button="OK",
-                        )
+                    )
 
                 finally:
 
@@ -701,7 +703,7 @@ def confirm_new_case_handler():
             ui.button(
                 "DELETE ALL",
                 on_click=on_confirm_delete_all,
-                ).props("negative unelevated")
+            ).props("negative unelevated")
 
     dialog.open()
 
@@ -721,7 +723,7 @@ def logout_page():
         timeout=2000,
         position="bottom",
         close_button="OK",
-        )
+    )
 
     ui.navigate.to("/")
 

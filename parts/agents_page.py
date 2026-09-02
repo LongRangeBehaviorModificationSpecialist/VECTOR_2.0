@@ -41,11 +41,13 @@ def build_agents_page():
         is_admin=get_is_admin(),
         username=get_current_user_name(),
         on_new_case=confirm_new_case_handler,
-        )
+    )
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label("Agents").classes("text-2xl font-bold m-4")
+        ui.label(
+            "Agents"
+        ).classes("text-2xl font-bold m-4")
 
         # ----- Add Agent Section -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
@@ -55,7 +57,7 @@ def build_agents_page():
                 label="Agent Name",
                 with_input=True,
                 new_value_mode="add",
-                ).classes("w-full")
+            ).classes("w-full")
 
             agent_name_input.props("autofocus")
 
@@ -64,31 +66,31 @@ def build_agents_page():
                 label="Parent Agency",
                 with_input=True,
                 new_value_mode="add",
-                ).classes("w-full")
+            ).classes("w-full")
 
             agent_role_input = required_select(
                 options=load_role_options(),
                 label="Agent Role",
                 with_input=True,
-                ).classes("w-full")
+            ).classes("w-full")
 
             agent_role_secondary_input = ui.select(
                 options=load_role_options(),
                 label="Agent Secondary Role (if applicable)",
                 with_input=True,
-                ).classes("w-full")
+            ).classes("w-full")
 
             agent_phone_input = ui.input(
                 label="Agent Phone Number"
-                ).classes("w-full")
+            ).classes("w-full")
 
             agent_email_input = ui.input(
                 label="Agent Email"
-                ).classes("w-full")
+            ).classes("w-full")
 
             agent_note_input = ui.input(
                 label="Notes"
-                ).classes("w-full")
+            ).classes("w-full")
 
             # ----- Auto-populate on name selection -----
             def on_name_change(e):
@@ -107,13 +109,13 @@ def build_agents_page():
                     info = agent_lookup[selected]
                     agent_parent_agency_input.value = info.get(
                         "agency", ""
-                        ) or ""
+                    ) or ""
                     agent_phone_input.value = info.get(
                         "phone", ""
-                        ) or ""
+                    ) or ""
                     agent_email_input.value = info.get(
                         "email", ""
-                        ) or ""
+                    ) or ""
 
                 else:
                     agent_parent_agency_input.value = None
@@ -151,7 +153,7 @@ def build_agents_page():
                         agent_name=agent_name,
                         agency=agency,
                         role=agent_role,
-                        ):
+                    ):
 
                         return
 
@@ -164,7 +166,7 @@ def build_agents_page():
                                 session.query(Agents)
                                 .filter_by(agent_name=agent_name)
                                 .first()
-                                ):
+                            ):
 
                                 ui.notify(
                                     "That Agent's Name is already in the case "
@@ -174,7 +176,7 @@ def build_agents_page():
                                     timeout=0,
                                     position="center",
                                     close_button="OK",
-                                    )
+                                )
 
                                 return
 
@@ -186,7 +188,7 @@ def build_agents_page():
                                 agent_phone=phone,
                                 agent_email=email,
                                 agent_note=notes,
-                                )
+                            )
 
                             session.add(new_agent)
 
@@ -217,7 +219,7 @@ def build_agents_page():
                                 timeout=2000,
                                 position="bottom",
                                 close_button="OK",
-                                )
+                            )
 
                         else:
 
@@ -246,20 +248,26 @@ def build_agents_page():
                             timeout=0,
                             position="center",
                             close_button="OK",
-                            )
+                        )
 
-                ui.button("Clear", on_click=clear_agent_form
-                    ).props("flat")
+                ui.button(
+                    "Clear",
+                    on_click=clear_agent_form,
+                ).props("flat")
 
-                ui.button("Add Agent", on_click=on_submit
-                    ).props("unelevated")
+                ui.button(
+                    "Add Agent",
+                    on_click=on_submit,
+                ).props("unelevated")
 
         # ----- Agent List Table -----
         ui.separator().classes("mt-6 mb-3")
 
         with ui.column().classes("w-full items-center"):
 
-            ui.label("Current Agents").classes("text-xl font-bold mb-3")
+            ui.label(
+                "Current Agents"
+            ).classes("text-xl font-bold mb-3")
 
             with ui.row().classes("w-full max-w-6xl items-center"):
 
@@ -276,14 +284,16 @@ def build_agents_page():
                         agents = (
                             session.query(Agents)
                             .order_by(Agents.agent_name)
-                            .all())
+                            .all()
+                        )
 
                         if not agents:
 
                             with table_container:
 
-                                ui.label("No agents in the database yet"
-                                    ).classes("text-gray-500 italic")
+                                ui.label(
+                                    "No agents in the database yet"
+                                ).classes("text-gray-500 italic")
 
                             return
 
@@ -293,11 +303,11 @@ def build_agents_page():
                                 "agent_name": r.agent_name or "",
                                 "agent_parent_agency": (
                                     r.agent_parent_agency or ""
-                                    ),
+                                ),
                                 "agent_role": r.agent_role or "",
                                 "agent_role_secondary": (
                                     r.agent_role_secondary or ""
-                                    ),
+                                ),
                                 "agent_phone": r.agent_phone or "",
                                 "agent_email": r.agent_email or "",
                                 "agent_note": r.agent_note or ""
@@ -363,7 +373,7 @@ def build_agents_page():
                             columns=column_defs,
                             rows=row_data,
                             row_key="id",
-                            )
+                        )
 
                         table.props("dense flat")
 
@@ -384,7 +394,7 @@ def build_agents_page():
                                 </div>
                             </q-td>
                             """,
-                            )
+                        )
 
                         # ----- Edit dialog -----
                         def open_edit_dialog(e):
@@ -396,12 +406,12 @@ def build_agents_page():
 
                                 ui.label(
                                     f"Edit Agent: {row['agent_name']}"
-                                    ).classes("text-lg font-semibold mb-4")
+                                ).classes("text-lg font-semibold mb-4")
 
                                 agent_name = required_input(
                                     label="Agent's Name",
                                     value=row["agent_name"],
-                                    ).classes("w-full")
+                                ).classes("w-full")
 
                                 agent_parent_agency = required_select(
                                     options=load_agency_options(),
@@ -409,43 +419,44 @@ def build_agents_page():
                                     value=row["agent_parent_agency"],
                                     with_input=True,
                                     new_value_mode="add",
-                                    ).classes("w-full")
+                                ).classes("w-full")
 
                                 agent_role = required_select(
                                     options=load_role_options(),
                                     label="Agent's Role",
                                     value=row["agent_role"],
                                     with_input=True,
-                                    ).classes("w-full")
+                                ).classes("w-full")
 
                                 agent_role_secondary = ui.select(
                                     options=load_role_options(),
                                     label="Agent's Secondary Role",
                                     value=row["agent_role_secondary"] or None,
                                     with_input=True,
-                                    ).classes("w-full")
+                                ).classes("w-full")
 
                                 agent_phone = required_input(
                                     label="Agent's Phone Number",
                                     value=row["agent_phone"],
-                                    ).classes("w-full")
+                                ).classes("w-full")
 
                                 agent_email = ui.input(
                                     label="Agent's Email",
                                     value=row["agent_email"],
-                                    ).classes("w-full")
+                                ).classes("w-full")
 
                                 agent_note = ui.input(
                                     label="Notes",
                                     value=row["agent_note"],
-                                    ).classes("w-full")
+                                ).classes("w-full")
 
                                 with ui.row().classes(
                                     "w-full justify-end gap-2 mt-4"):
 
-                                    ui.button("Cancel",
-                                        on_click=edit_dialog.close
-                                        ).props("flat")
+                                    ui.button(
+                                        "Cancel",
+                                        on_click=edit_dialog.close,
+                                    ).props("flat")
 
                                     def on_save_update():
                                         """Handles form submission for
@@ -458,7 +469,7 @@ def build_agents_page():
                                                 session.query(Agents)
                                                 .filter_by(id=row["id"])
                                                 .first()
-                                                )
+                                            )
 
                                             if not agent:
 
@@ -468,22 +479,28 @@ def build_agents_page():
                                                     timeout=0,
                                                     position="center",
                                                     close_button="OK",
-                                                    )
+                                                )
 
                                                 return
 
                                             agent.agent_name = agent_name.value
                                             agent.agent_parent_agency = (
                                                 agent_parent_agency.value
-                                                )
+                                            )
                                             agent.agent_role = agent_role.value
                                             agent.agent_role_secondary = (
                                                 agent_role_secondary.value
                                                 or ""
-                                                )
-                                            agent.agent_phone = agent_phone.value
-                                            agent.agent_email = agent_email.value or ""
-                                            agent.agent_note = agent_note.value or ""
+                                            )
+                                            agent.agent_phone = (
+                                                agent_phone.value
+                                            )
+                                            agent.agent_email = (
+                                                agent_email.value or ""
+                                            )
+                                            agent.agent_note = (
+                                                agent_note.value or ""
+                                            )
 
                                             # ----- Required field
                                             # validation -----
@@ -491,7 +508,7 @@ def build_agents_page():
                                                 agent_name=agent_name,
                                                 agency=agent_parent_agency,
                                                 role=agent_role,
-                                                ):
+                                            ):
 
                                                 return
 
@@ -501,13 +518,15 @@ def build_agents_page():
                                             timeout=2000,
                                             position="bottom",
                                             close_button="OK",
-                                            )
+                                        )
 
                                         edit_dialog.close()
                                         refresh_agent_table()
 
-                                    ui.button("Save", on_click=on_save_update
-                                        ).props("unelevated")
+                                    ui.button(
+                                        "Save",
+                                        on_click=on_save_update,
+                                    ).props("unelevated")
 
                             edit_dialog.open()
 
@@ -519,20 +538,23 @@ def build_agents_page():
                             with ui.dialog() as delete_dialog, ui.card(
                                 ).classes("max-w-sm p-6"):
 
-                                ui.label("Confirm Deletion").classes(
-                                    "text-lg font-semibold mb-2")
+                                ui.label(
+                                    "Confirm Deletion"
+                                ).classes("text-lg font-semibold mb-2")
 
                                 ui.label(
                                     f"Are you sure you want to remove "
                                     f"{row['agent_name']} from the case file?"
-                                    ).classes("mb-4")
+                                ).classes("mb-4")
 
                                 with ui.row().classes(
-                                    "w-full justify-end gap-2"):
+                                    "w-full justify-end gap-2"
+                                ):
 
                                     ui.button(
-                                        "Cancel", on_click=delete_dialog.close,
-                                        ).props("flat")
+                                        "Cancel",
+                                        on_click=delete_dialog.close,
+                                    ).props("flat")
 
                                     def confirm_agent_delete():
 
@@ -542,7 +564,7 @@ def build_agents_page():
                                                 session.query(Agents)
                                                 .filter_by(id=row["id"])
                                                 .first()
-                                                )
+                                            )
 
                                             if agent:
 
@@ -559,7 +581,7 @@ def build_agents_page():
                                             timeout=2000,
                                             position="bottom",
                                             close_button="OK",
-                                            )
+                                        )
 
                                         delete_dialog.close()
                                         refresh_agent_table()
@@ -568,7 +590,7 @@ def build_agents_page():
                                         "Delete",
                                         on_click=confirm_agent_delete,
                                         color="#ef4444",
-                                        ).props("negative unelevated")
+                                    ).props("negative unelevated")
 
                             delete_dialog.open()
 
@@ -591,7 +613,7 @@ def build_agents_page():
                         timeout=2000,
                         position="bottom",
                         close_button="OK",
-                        )
+                    )
 
                     refresh_agent_table()
 
@@ -600,9 +622,9 @@ def build_agents_page():
                     on_click=lambda: confirm_delete_all(
                         "agents",
                         delete_all_agents
-                        ),
-                        color="#ef4444",
-                    ).props("unelevated").classes("mb-2 items-center")
+                    ),
+                    color="#ef4444",
+                ).props("unelevated").classes("mb-2 items-center")
 
     # ----- Initial render -----
     refresh_agent_table()

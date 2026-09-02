@@ -13,7 +13,7 @@ Consolidates four Flask routes into one interactive page:
 from nicegui import ui
 
 from home_page import confirm_new_case_handler
-from main import is_authenticated, get_current_user_name, get_is_admin
+from main import get_current_user_name, get_is_admin
 from models import get_session, Cases
 from navbar import build_navbar
 from utils import (
@@ -33,11 +33,13 @@ def build_cases_page():
         is_admin=get_is_admin(),
         username=get_current_user_name(),
         on_new_case=confirm_new_case_handler,
-        )
+    )
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label("Case Management").classes("text-2xl font-bold mb-4")
+        ui.label(
+            "Case Management"
+        ).classes("text-2xl font-bold mb-4")
 
         # ----- Input Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
@@ -46,34 +48,34 @@ def build_cases_page():
 
             case_number_input = required_input(
                 label="Case Number"
-                ).classes("w-full")
+            ).classes("w-full")
 
             case_number_input.props("autofocus")
 
             location_input =required_input(
                 label="Location"
-                ).classes("w-full")
+            ).classes("w-full")
 
             jurisdiction_combo = required_select(
                 options=load_jurisdiction_options(),
                 label="Jurisdiction",
                 with_input=True,
                 new_value_mode="add",
-                ).classes("w-full")
+            ).classes("w-full")
 
             # ----- Date/Time Started -----
             date_time_start = required_input(
                 label="Date/Time Started",
                 placeholder="YYYY-MM-DD HH:MM",
                 ).props('mask="####-##-## ##:##"'
-                ).classes("w-full")
+            ).classes("w-full")
 
             # ----- Date/Time Ended -----
             date_time_end = ui.input(
                 label="Date/Time Ended",
                 placeholder="YYYY-MM-DD HH:MM"
                 ).props('mask="####-##-## ##:##"'
-                ).classes("w-full")
+            ).classes("w-full")
 
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
@@ -100,7 +102,7 @@ def build_cases_page():
                         location=location,
                         jurisdiction=jurisdiction,
                         datetime_start=datetime_start,
-                        ):
+                    ):
 
                         return
 
@@ -113,7 +115,7 @@ def build_cases_page():
                                 session.query(Cases)
                                 .filter_by(case_number=case_number)
                                 .first()
-                                )
+                            )
 
                             if existing:
 
@@ -124,7 +126,7 @@ def build_cases_page():
                                     timeout=0,
                                     position="center",
                                     close_button="OK",
-                                    )
+                                )
 
                                 return
 
@@ -134,7 +136,7 @@ def build_cases_page():
                                 jurisdiction=jurisdiction,
                                 case_date_time_begin=datetime_start,
                                 case_date_time_end=datetime_end,
-                                )
+                            )
 
                             session.add(new_case)
 
@@ -144,7 +146,7 @@ def build_cases_page():
                             timeout=2000,
                             position="bottom",
                             close_button="OK",
-                            )
+                        )
 
                         clear_form()
                         refresh_cases_table()
@@ -158,17 +160,24 @@ def build_cases_page():
                             timeout=0,
                             position="center",
                             close_button="OK",
-                            )
+                        )
 
-                ui.button("Clear", on_click=clear_form).props("flat")
+                ui.button(
+                    "Clear",
+                    on_click=clear_form,
+                ).props("flat")
 
-                ui.button("Open New Case", on_click=on_submit
-                    ).props("unelevated")
+                ui.button(
+                    "Open New Case",
+                    on_click=on_submit,
+                ).props("unelevated")
 
         # ----- Existing Cases Table -----
         ui.separator().classes("my-6")
 
-        ui.label("Current Case").classes("text-xl font-bold mb-3")
+        ui.label(
+            "Current Case"
+        ).classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2")
@@ -255,7 +264,7 @@ def build_cases_page():
                     columns=column_defs,
                     rows=row_data,
                     row_key="id",
-                    )
+                )
 
                 table.props("dense flat")
 
@@ -274,7 +283,7 @@ def build_cases_page():
                         </div>
                     </q-td>
                     """
-                    )
+                )
 
                 # ----- Edit dialog -----
                 def open_edit_dialog(e):
@@ -290,12 +299,12 @@ def build_cases_page():
                         edit_case_number = required_input(
                             label="Case Number",
                             value=row["case_number"],
-                            ).classes("w-full")
+                        ).classes("w-full")
 
                         edit_location = required_input(
                             label="Location",
                             value=row["location"],
-                            ).classes("w-full")
+                        ).classes("w-full")
 
                         edit_jurisdiction = required_select(
                             options=load_jurisdiction_options(),
@@ -303,7 +312,7 @@ def build_cases_page():
                             value=row["jurisdiction"],
                             with_input=True,
                             new_value_mode="add",
-                            ).classes("w-full")
+                        ).classes("w-full")
 
                         edit_datetime_begin = (required_input(
                             label="Begin Date/Time",
@@ -312,7 +321,7 @@ def build_cases_page():
                             )
                             .props('mask="####-##-## ##:##"')
                             .classes("w-full")
-                            )
+                        )
 
                         edit_datetime_end = (ui.input(
                             label="End Date/Time",
@@ -321,7 +330,7 @@ def build_cases_page():
                             )
                             .props('mask="####-##-## ##:##"')
                             .classes("w-full")
-                            )
+                        )
 
                         with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -336,25 +345,25 @@ def build_cases_page():
                                         session.query(Cases)
                                         .filter_by(id=row["id"])
                                         .first()
-                                        )
+                                    )
 
                                     if case:
 
                                         case.case_number = (
                                             edit_case_number.value or ""
-                                            )
+                                        )
                                         case.location = (
                                             edit_location.value or ""
-                                            )
+                                        )
                                         case.jurisdiction = (
                                             edit_jurisdiction.value or ""
-                                            )
+                                        )
                                         case.case_date_time_begin = (
                                             edit_datetime_begin.value or ""
-                                            )
+                                        )
                                         case.case_date_time_end = (
                                             edit_datetime_end.value or ""
-                                            )
+                                        )
 
                                 ui.notify(
                                     f"Case {edit_case_number.value} "
@@ -364,13 +373,15 @@ def build_cases_page():
                                     timeout=2000,
                                     position="bottom",
                                     close_button="OK",
-                                    )
+                                )
 
                                 edit_dialog.close()
                                 refresh_cases_table()
 
-                            ui.button("Save", on_click=on_save_update,
-                                ).props("unelevated")
+                            ui.button(
+                                "Save",
+                                on_click=on_save_update,
+                            ).props("unelevated")
 
                     edit_dialog.open()
 
@@ -380,20 +391,24 @@ def build_cases_page():
                     row = e.args
 
                     with ui.dialog() as delete_dialog, ui.card(
-                        ).classes("max-w-sm p-6"):
+                        ).classes("max-w-sm p-6"
+                    ):
 
-                        ui.label("Confirm Deletion"
-                            ).classes("text-lg font-semibold mb-2")
+                        ui.label(
+                            "Confirm Deletion"
+                        ).classes("text-lg font-semibold mb-2")
 
                         ui.label(
                             f"Are you sure you want to delete "
                             f"case {row['case_number']}?"
-                            ).classes("mb-4")
+                        ).classes("mb-4")
 
                         with ui.row().classes("w-full justify-end gap-2"):
 
-                            ui.button("Cancel", on_click=delete_dialog.close
-                                ).props("flat")
+                            ui.button(
+                                "Cancel",
+                                on_click=delete_dialog.close,
+                            ).props("flat")
 
                             def on_confirm_delete():
 
@@ -403,7 +418,7 @@ def build_cases_page():
                                         session.query(Cases)
                                         .filter_by(id=row["id"])
                                         .first()
-                                        )
+                                    )
 
                                     if case:
 
@@ -420,14 +435,16 @@ def build_cases_page():
                                     timeout=2000,
                                     position="bottom",
                                     close_button="OK",
-                                    )
+                                )
 
                                 delete_dialog.close()
                                 refresh_cases_table()
 
-                            ui.button("Delete", on_click=on_confirm_delete,
+                            ui.button(
+                                "Delete",
+                                on_click=on_confirm_delete,
                                 color="#ef4444",
-                                ).props("negative unelevated")
+                            ).props("negative unelevated")
 
                     delete_dialog.open()
 

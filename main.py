@@ -26,11 +26,11 @@ DEBUG_MODE = "--dev" in sys.argv
 app.add_static_files(
     "/static",
     os.path.join(os.path.dirname(__file__), "static"),
-    )
+)
 
 
 # ----- Initialize Database -----
-from models import init_db, get_session, Users
+from models import init_db, Users
 
 init_db()
 
@@ -89,7 +89,7 @@ def seed_default_user():
             session.query(Users)
             .filter_by(user_name="novaicac")
             .first()
-            )
+        )
 
         if existing:
             # Update existing user with latest hash from JSON
@@ -105,7 +105,7 @@ def seed_default_user():
                 password_hash=clean_hash,
                 is_admin=is_admin,
                 is_active=True,
-                )
+            )
 
             session.add(new_user)
             print(f"✓ Created user '{user_name}' from users.json")
@@ -275,6 +275,17 @@ def admin_route():
     if not is_authenticated():
         ui.navigate.to("/")
         return
+
+    if not get_is_admin():
+
+        ui.notify(
+            "Admin access required.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+
     from parts.admin_page import build_admin_page
     build_admin_page()
 
@@ -293,24 +304,29 @@ def change_password_page():
 
     with ui.column().classes("items-center w-full mt-12"):
 
-        ui.label("Change Password").classes("text-2xl font-bold mb-2")
+        ui.label(
+            "Change Password"
+        ).classes("text-2xl font-bold mb-2")
 
-        ui.label("You must set a new password before continuing."
-            ).classes("text-gray-400 mb-6")
+        ui.label(
+            "You must set a new password before continuing."
+        ).classes("text-gray-400 mb-6")
 
         with ui.card().classes("w-full max-w-sm p-6"):
 
-            ui.label(f"User: {username}").classes("mb-4 font-semibold")
+            ui.label(
+                f"User: {username}"
+            ).classes("mb-4 font-semibold")
 
             new_pass = ui.input(
                 label="New Password",
                 password=True,
-                ).classes("w-full")
+            ).classes("w-full")
 
             confirm_pass = ui.input(
                 label="Confirm Password",
                 password=True,
-                ).classes("w-full")
+            ).classes("w-full")
 
             def save_new_password():
 
@@ -322,7 +338,7 @@ def change_password_page():
                         timeout=0,
                         position="center",
                         close_button="OK",
-                        )
+                    )
 
                     return
 
@@ -345,29 +361,40 @@ def change_password_page():
                         type="negative",
                         timeout=0,
                         position="center",
-                        close_button="Dismiss",
-                        )
+                        close_button="OK",
+                    )
 
                     return
 
                 with get_users_session() as session:
 
-                    user = session.query(Users).filter_by(
-                        user_name=username).first()
+                    user = (
+                        session.query(Users)
+                        .filter_by(user_name=username)
+                        .first()
+                    )
 
                     if user:
 
                         user.set_password(new_pass.value)
                         user.must_change_password = False
 
-                ui.notify("Password changed successfully!", type="positive")
+                ui.notify(
+                    "Password changed successfully!",
+                    type="positive",
+                    timeout=2000,
+                    position="bottom",
+                    close_button="OK",
+                )
+
                 ui.navigate.to("/")
 
             confirm_pass.on("keydown.enter", save_new_password)
 
-            ui.button("Save Password", on_click=save_new_password).props(
-                "unelevated"
-                ).classes("w-full mt-4")
+            ui.button(
+                "Save Password",
+                on_click=save_new_password,
+            ).props("unelevated").classes("w-full mt-4")
 
 
 # ----- Startup Configuration -----
@@ -400,8 +427,8 @@ if __name__ in {"__main__", "__mp_main__"}:
 
     ui.add_head_html(
         '<link rel="icon" type="image/x-icon" href="/static/favicon.ico">',
-        shared=True
-        )
+        shared=True,
+    )
 
     ui.run(
         title="V·E·C·T·O·R",
@@ -409,4 +436,4 @@ if __name__ in {"__main__", "__mp_main__"}:
         reload=DEBUG_MODE,
         dark=True,
         storage_secret="vector-secret-key-change-in-production-2024",
-        )
+    )

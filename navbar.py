@@ -130,8 +130,7 @@ def build_navbar(
         ui.link(
             "V·E·C·T·O·R",
             "https://novadcicac.vsp.virginia.gov/"
-        ).classes(
-            "text-white font-bold mr-6 no-underline"
+            ).classes("text-white font-bold mr-6 no-underline"
         ).props("target=_blank")
 
         # ----- Home Button -----
@@ -234,4 +233,7 @@ def build_navbar(
             )
         )
 
-        _nav_dropdown(f"Welcome, {username}", welcome_items)
+        _nav_dropdown(
+            f"Welcome, {username}",
+            welcome_items
+        )

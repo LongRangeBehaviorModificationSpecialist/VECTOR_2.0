@@ -27,10 +27,6 @@ POSITIVE_NOTIFICATION_TIMEOUT = 2000
 
 AGENTS_JSON_PATH = Path(__file__).parent / "parts/agents.json"
 
-# MESSAGES = {
-#     "room_4": ,
-#     "room_5": ,
-# }
 
 # Allowed MIME types for images, videos, and documents
 ALLOWED_MIME_TYPES = {
@@ -423,7 +419,7 @@ def delete_all_data() -> None:
                 type="negative",
                 timeout=0,
                 position="center",
-                close_button="Dismiss",
+                close_button="OK",
             )
 
 
@@ -436,26 +432,42 @@ def validate_case_data(
 
     if not case_number:
         ui.notify(
-            "The 'Case Number' field is required.", type="warning",
-            timeout=0, close_button="OK", position="center")
+            "The 'Case Number' field is required.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     if not location:
         ui.notify(
-            "The 'Location' field is required.", type="warning",
-            timeout=0, close_button="OK", position="center")
+            "The 'Location' field is required.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     if not jurisdiction:
         ui.notify(
-            "The 'Jurisdiction' field is required.", type="warning",
-            timeout=0, close_button="OK", position="center")
+            "The 'Jurisdiction' field is required.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     if not datetime_start:
         ui.notify(
-            "The 'Date/Time Started' field is required.", type="warning",
-            timeout=0, close_button="OK", position="center")
+            "The 'Date/Time Started' field is required.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     return True
@@ -514,80 +526,107 @@ def validate_agent_data(
 
 
 def validate_initial_evidence(
-    evid_num: str,
-    evid_qty: str,
-    evid_desc: str,
-    evid_loc_room: str,
-    evid_room_detail: str,
-    evid_found_by: str,
-    evid_found_by_witness: str,
-    evid_triaged: str = "",
-    evid_triaged_by: str = "",
+        evid_num: str,
+        evid_qty: str,
+        evid_desc: str,
+        evid_loc_room: str,
+        evid_loc_room_detail: str,
+        evid_found_by: str,
+        evid_found_by_witness: str,
+        evid_triaged: str = "",
+        evid_triaged_by: str = "",
 ) -> bool:
 
     if not evid_num:
         ui.notify(
             "The 'Evidence Item Number' field is required.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     if not evid_qty:
         ui.notify(
             "The 'Quantity' field is required.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     if not evid_desc:
         ui.notify(
             "The 'Evidence Description' field is required.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     if not evid_loc_room:
         ui.notify(
             "The 'Room Located' field is required.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
-    if not evid_room_detail:
+    if not evid_loc_room_detail:
         ui.notify(
             "The 'Where Located' field is required.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     if not evid_found_by:
         ui.notify(
             "The 'Found By' field is required.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     if not evid_found_by_witness:
         ui.notify(
             "The 'Witnessed By' field is required.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     if evid_found_by == evid_found_by_witness:
         ui.notify(
             "The same agent cannot be listed in the 'Found By' and "
             "'Witnessed By' fields.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     if evid_triaged == "Yes" and not evid_triaged_by:
         ui.notify(
             "The 'Triaged By' field is required if the 'Item Triaged?' "
             "field is set to 'Yes'.",
-            type="warning", timeout=0,
-            close_button="OK", position="center")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return False
 
     with get_session() as session:
@@ -601,8 +640,11 @@ def validate_initial_evidence(
             ui.notify(
                 f"Evidence Item Number '{evid_num}' is "
                 "already used.",
-                type="negative", timeout=0,
-                close_button="OK", position="center")
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
             return False
 
     return True
@@ -628,7 +670,7 @@ def validate_update_evidence(
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
         return False
 
     if evid_triaged == "Yes" and not evid_triaged_by:
@@ -639,7 +681,7 @@ def validate_update_evidence(
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
         return False
 
     with get_session() as session:
@@ -658,7 +700,7 @@ def validate_update_evidence(
                 timeout=0,
                 position="center",
                 close_button="OK",
-                )
+            )
             return False
 
     return True
@@ -670,14 +712,16 @@ def validate_room_data(
         first_agent: str = "",
         second_agent: str = ""
 ) -> bool:
+
     if not room_label:
+
         ui.notify(
             "The 'Room Label' field is required.",
             type="warning",
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
         return False
 
     if not room_desc:
@@ -687,7 +731,7 @@ def validate_room_data(
             timeout=0,
             position="center",
             close_button="OK",
-            )
+        )
         return False
 
     with get_session() as session:
@@ -695,7 +739,7 @@ def validate_room_data(
             session.query(Rooms)
             .filter_by(room_label=room_label)
             .first()
-            ):
+        ):
 
             ui.notify(
                 "That label is currently assigned to another room.",
@@ -703,7 +747,7 @@ def validate_room_data(
                 timeout=0,
                 position="center",
                 close_button="OK",
-                )
+            )
             return False
 
         # ----- Duplicate description validation -----
@@ -711,20 +755,21 @@ def validate_room_data(
             session.query(Rooms)
             .filter_by(room_desc=room_desc)
             .first()
-            ):
+        ):
             ui.notify(
                 "That room description is already assigned to another room.",
                 type="warning",
                 timeout=0,
                 position="center",
                 close_button="OK",
-                )
+            )
             return False
 
         # ----- Same agent checks -----
         if (
             first_agent and second_agent and
-            first_agent == second_agent):
+            first_agent == second_agent
+        ):
 
             ui.notify(
                 "The same agent cannot be listed in the 'First Agent Name' "
@@ -733,7 +778,7 @@ def validate_room_data(
                 timeout=0,
                 position="center",
                 close_button="OK",
-                )
+            )
             return False
 
     return True

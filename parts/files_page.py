@@ -29,21 +29,25 @@ def build_uploads_page():
         is_admin=get_is_admin(),
         username=get_current_user_name(),
         on_new_case=confirm_new_case_handler,
-        )
+    )
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label("File Upload & Management").classes("text-2xl font-bold m-4")
+        ui.label(
+            "File Upload & Management"
+        ).classes("text-2xl font-bold m-4")
 
         # ----- Upload Section -----
         with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
 
-            ui.label("Upload New File").classes("text-lg font-semibold mb-4")
+            ui.label(
+                "Upload New File"
+            ).classes("text-lg font-semibold mb-4")
 
             ui.label(
                 "Allowed file types → (1) Images, (2) Videos, (3) Documents, "
                 "and (4) Archive files."
-                ).classes("text-sm text-gray-400 mb-4")
+            ).classes("text-sm text-gray-400 mb-4")
 
             async def handle_upload(e):
                 """Handles file upload from ui.upload component."""
@@ -58,7 +62,7 @@ def build_uploads_page():
                     file_mime_type = (
                         uploaded_file.content_type
                         or "application/octet-stream"
-                        )
+                    )
                     # Determine MIME type using fallback
                     file_mime_type = get_mime_type(file_name, file_mime_type)
 
@@ -74,7 +78,7 @@ def build_uploads_page():
                             timeout=0,
                             position="center",
                             close_button="OK",
-                            )
+                        )
 
                         return
 
@@ -88,7 +92,7 @@ def build_uploads_page():
                             file_size=file_size,
                             file_mime_type=file_mime_type,
                             uploaded_by=uploader,
-                            )
+                        )
 
                         session.add(new_file)
 
@@ -99,7 +103,7 @@ def build_uploads_page():
                         timeout=2000,
                         position="bottom",
                         close_button="OK",
-                        )
+                    )
 
                     refresh_files_table()
 
@@ -111,7 +115,7 @@ def build_uploads_page():
                         timeout=0,
                         position="center",
                         close_button="OK",
-                        )
+                    )
 
                     import traceback
                     traceback.print_exc()
@@ -124,12 +128,14 @@ def build_uploads_page():
                 ).props("accept=image/*, video/*,"
                     ".pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, .txt, .rtf,"
                     ".zip, .7z, .tar, .tgz, .gz, .tar.gz, .rar, .bz2, .xz"
-                ).classes("w-full")
+            ).classes("w-full")
 
         # ----- Existing Files Table -----
         ui.separator().classes("my-6")
 
-        ui.label("Uploaded Files").classes("text-xl font-bold mb-3")
+        ui.label(
+            "Uploaded Files"
+        ).classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2")
@@ -145,14 +151,15 @@ def build_uploads_page():
                     session.query(UploadedFiles)
                     .order_by(UploadedFiles.upload_date.desc())
                     .all()
-                    )
+                )
 
                 if not files:
 
                     with table_container:
 
-                        ui.label("No files uploaded yet"
-                            ).classes("text-gray-500 italic")
+                        ui.label(
+                            "No files uploaded yet"
+                        ).classes("text-gray-500 italic")
 
                     return
 
@@ -224,7 +231,7 @@ def build_uploads_page():
                     columns=column_defs,
                     rows=row_data,
                     row_key="id",
-                    )
+                )
 
                 table.props("dense flat")
 
@@ -244,7 +251,7 @@ def build_uploads_page():
                         </div>
                     </q-td>
                     """
-                    )
+                )
 
                 # ----- Download handler -----
                 def on_download(e):
@@ -257,7 +264,7 @@ def build_uploads_page():
                             session.query(UploadedFiles)
                             .filter_by(id=row["id"])
                             .first()
-                            )
+                        )
 
                         if file_record:
 
@@ -265,7 +272,7 @@ def build_uploads_page():
                             temp_path = os.join.path(
                                 temp_dir,
                                 file_record.file_name
-                                )
+                            )
 
                             with open(temp_path, "wb") as f:
 
@@ -280,7 +287,8 @@ def build_uploads_page():
                     row = e.args
 
                     with ui.dialog() as delete_dialog, ui.card(
-                        ).classes("max-w-sm p-6"):
+                        ).classes("max-w-sm p-6"
+                    ):
 
                         ui.label("Confirm Deletion"
                             ).classes("text-lg font-semibold mb-2")
@@ -288,14 +296,14 @@ def build_uploads_page():
                         ui.label(
                             f"Are you sure you want to delete "
                             f"'{row['file_name']}'? This cannot be undone!"
-                            ).classes("mb-4")
+                        ).classes("mb-4")
 
                         with ui.row().classes("w-full justify-end gap-2"):
 
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                                ).props("flat")
+                            ).props("flat")
 
                             def on_confirm_delete():
 
@@ -305,7 +313,7 @@ def build_uploads_page():
                                         session.query(UploadedFiles)
                                         .filter_by(id=row["id"])
                                         .first()
-                                        )
+                                    )
 
                                     if file_record:
 
@@ -318,7 +326,7 @@ def build_uploads_page():
                                     timeout=2000,
                                     position="bottom",
                                     close_button="OK",
-                                    )
+                                )
 
                                 delete_dialog.close()
                                 refresh_files_table()
@@ -327,7 +335,7 @@ def build_uploads_page():
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                                ).props("negative unelevated")
+                            ).props("negative unelevated")
 
                     delete_dialog.open()
 
