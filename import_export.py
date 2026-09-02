@@ -32,7 +32,8 @@ def get_exportable_models():
         (Rooms, "rooms"),
         (Evidence, "evidence"),
         (Persons, "persons"),
-        (Notes, "notes")]
+        (Notes, "notes")
+        ]
 
 
 def get_all_models():
@@ -46,7 +47,8 @@ def get_all_models():
         "evidence": Evidence,
         "persons": Persons,
         "notes": Notes,
-        "uploaded_files": UploadedFiles}
+        "uploaded_files": UploadedFiles
+        }
 
 
 # ----- HELPER FUNCTIONS -----
@@ -63,15 +65,20 @@ def get_case_info_for_folder_name() -> str:
 
             ui.notify(
                 "No case found. Cannot export data.",
-                type="negative", timeout=0,
-                position="center", close_button="OK")
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+                )
 
             return ""
 
-        case_number = ((case.case_number or "UNKNOWN")
+        case_number = (
+            (case.case_number or "UNKNOWN")
             .replace("/", "_")
             .replace("\\", "_")
-            .replace(" ", "_"))
+            .replace(" ", "_")
+            )
 
         begin_dt = case.case_date_time_begin or "UNKNOWN"
 
@@ -82,10 +89,12 @@ def get_case_info_for_folder_name() -> str:
 
         else:
             # It's a string — sanitize it
-            dt_str = (str(begin_dt)
+            dt_str = (
+                str(begin_dt)
                 .replace(":", "")
                 .replace(" ", "_")
-                .replace("/", ""))
+                .replace("/", "")
+                )
 
         return f"{case_number}_{dt_str}_saved_results"
 
@@ -193,9 +202,13 @@ def export_database(password: Optional[str] = None):
 
     except OSError as err:
 
-        ui.notify(f"Error creating export directory: {err}",
-            type="negative", timeout=0,
-            position="center", close_button="OK")
+        ui.notify(
+            f"Error creating export directory: {err}",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
 
         return
 
@@ -221,9 +234,12 @@ def export_database(password: Optional[str] = None):
 
                     for record in records:
 
-                        row = ([
-                            serialize_value(getattr(record, col))
-                            for col in columns])
+                        row = (
+                            [
+                                serialize_value(getattr(record, col))
+                                for col in columns
+                                ]
+                            )
 
                         writer.writerow(row)
 
@@ -234,8 +250,12 @@ def export_database(password: Optional[str] = None):
         except Exception as err:
 
             ui.notify(f"Error exporting {table_name}: {err}",
-                type="negative", timeout=0,
-                position="center", close_button="OK")
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+                )
+
             return
 
     # ----- Export uploaded files -----
@@ -260,18 +280,22 @@ def export_database(password: Optional[str] = None):
 
                         f.write(uf.file_data)
 
-                    files_list.append({
-                        "file_name": safe_name,
-                        "file_size": uf.file_size or len(uf.file_data)
-                    })
+                    files_list.append(
+                        {
+                            "file_name": safe_name,
+                            "file_size": uf.file_size or len(uf.file_data)
+                        })
 
                     num_files += 1
 
     except Exception as err:
 
         ui.notify(f"Error exporting files: {err}",
-            type="warning", timeout=0,
-            position="center", close_button="OK")
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
 
     print(f"DEBUG: zip_path = {zip_path}")
 
@@ -286,7 +310,7 @@ def export_database(password: Optional[str] = None):
         "total_records": total_records,
         "files": files_list,
         "encrypted": password is not None and len(password) > 0,
-    }
+        }
 
     manifest_path = export_dir / "export_manifest.json"
 
@@ -317,8 +341,11 @@ def export_database(password: Optional[str] = None):
         else:
 
             # ----- Unencrypted ZIP -----
-            with pyzipper.AESZipFile(zip_path, "w",
-                compression=pyzipper.ZIP_DEFLATED) as zf:
+            with pyzipper.AESZipFile(
+                zip_path,
+                "w",
+                compression=pyzipper.ZIP_DEFLATED
+                ) as zf:
 
                 for file_path in export_dir.rglob("*"):
 
@@ -329,9 +356,13 @@ def export_database(password: Optional[str] = None):
 
     except Exception as err:
 
-        ui.notify(f"Error creating zip file: {err}",
-            type="negative", timeout=0,
-            position="center", close_button="OK")
+        ui.notify(
+            f"Error creating zip file: {err}",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
 
         shutil.rmtree(export_dir, ignore_errors=True)
         return
@@ -376,17 +407,25 @@ def import_database(zip_path: str, password: Optional[str] = None):
 
     if not zip_file.exists():
 
-        ui.notify("ZIP file not found.",
-            type="negative", timeout=0,
-            position="center", close_button="OK")
+        ui.notify(
+            "ZIP file not found.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
 
         return
 
     if not zip_file.suffix == ".zip":
 
-        ui.notify("Please select a .zip file.",
-            type="warning", timeout=0,
-            position="center", close_button="OK")
+        ui.notify(
+            "Please select a .zip file.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
 
         return
 
@@ -407,10 +446,14 @@ def import_database(zip_path: str, password: Optional[str] = None):
 
             except RuntimeError as err:
 
-                ui.notify(f"Failed to decrypt ZIP file: {err}.\n"
+                ui.notify(
+                    f"Failed to decrypt ZIP file: {err}.\n"
                     "Check your password and try again.",
-                    type="negative", timeout=0,
-                    position="center", close_button="OK")
+                    type="negative",
+                    timeout=0,
+                    position="center",
+                    close_button="OK",
+                    )
 
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -428,8 +471,11 @@ def import_database(zip_path: str, password: Optional[str] = None):
                 # This zip requires a password
                 ui.notify(
                     "This ZIP file is encrypted. Please provide a password.",
-                    type="warning", timeout=0,
-                    position="center", close_button="OK")
+                    type="warning",
+                    timeout=0,
+                    position="center",
+                    close_button="OK",
+                    )
 
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -437,9 +483,13 @@ def import_database(zip_path: str, password: Optional[str] = None):
 
     except Exception as e:
 
-        ui.notify(f"Error extracting ZIP: {e}",
-            type="negative", timeout=0,
-            position="center", close_button="OK")
+        ui.notify(
+            f"Error extracting ZIP: {e}",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
 
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -473,8 +523,10 @@ def import_database(zip_path: str, password: Optional[str] = None):
 
             manifest = json.load(f)
 
-        print(f"Importing from export dated: "
-            f"{manifest.get('export_date', 'unknown')}")
+        print(
+            f"Importing from export dated: "
+            f"{manifest.get('export_date', 'unknown')}"
+            )
 
     else:
 
@@ -494,9 +546,13 @@ def import_database(zip_path: str, password: Optional[str] = None):
 
     if not found_tables:
 
-        ui.notify("No CSV files found in the selected ZIP archive.",
-            type="negative", timeout=0,
-            position="center", close_button="OK")
+        ui.notify(
+            "No CSV files found in the selected ZIP archive.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+            )
 
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -509,8 +565,10 @@ def import_database(zip_path: str, password: Optional[str] = None):
     for table_name, model_class, csv_path in found_tables:
 
         columns = get_column_names(model_class)
+
         column_objects = (
-            {col.name: col for col in model_class.__table__.columns})
+            {col.name: col for col in model_class.__table__.columns}
+            )
 
         try:
 
@@ -539,7 +597,8 @@ def import_database(zip_path: str, password: Optional[str] = None):
 
                                 record_data[col_name] = deserialize_value(
                                     raw_value,
-                                    column_objects[col_name])
+                                    column_objects[col_name],
+                                    )
 
                         # Preserve original IDs for relational integrity
                         # (don't delete the id field — keep it)
@@ -556,9 +615,13 @@ def import_database(zip_path: str, password: Optional[str] = None):
 
         except Exception as err:
 
-            ui.notify(f"Error importing {table_name}: {err}",
-                type="negative", timeout=0,
-                position="center", close_button="OK")
+            ui.notify(
+                f"Error importing {table_name}: {err}",
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+                )
 
             shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -591,16 +654,21 @@ def import_database(zip_path: str, password: Optional[str] = None):
                             file_data=file_data,
                             file_size=len(file_data),
                             file_mime_type="application/octet-stream",
-                            uploaded_by="import")
+                            uploaded_by="import",
+                            )
 
                         session.add(new_file)
                         files_imported += 1
 
         except Exception as err:
 
-            ui.notify(f"Error importing files: {err}",
-                type="warning", timeout=0,
-                position="center", close_button="OK")
+            ui.notify(
+                f"Error importing files: {err}",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+                )
 
     # ----- Clean up temporary directory -----
     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -614,7 +682,8 @@ def import_database(zip_path: str, password: Optional[str] = None):
         type="positive",
         timeout=0,
         position="bottom",
-        close_button="OK")
+        close_button="OK",
+        )
 
     print(f"\n{'='*60}")
     print(f"  IMPORT COMPLETE")

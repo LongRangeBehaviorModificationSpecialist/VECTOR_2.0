@@ -14,12 +14,8 @@ from nicegui import ui
 
 from models import get_session, Notes
 from navbar import build_navbar
-from home_page import (
-    is_authenticated,
-    get_current_user_name,
-    get_is_admin,
-    confirm_new_case_handler
-)
+from home_page import confirm_new_case_handler
+from main import get_current_user_name, get_is_admin
 from utils import (
     required_select,
     required_input,
@@ -35,7 +31,8 @@ def build_notes_page():
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler)
+        on_new_case=confirm_new_case_handler,
+        )
 
     with ui.column().classes("w-full items-center"):
 
@@ -47,24 +44,25 @@ def build_notes_page():
             agent_options = load_agent_names()
             current_time = get_current_timestamp()
 
-            # note_date_time — auto-populated, read-only
             note_date_time_input = ui.input(
-                label="Date/Time Added", value=current_time
-            ).classes("w-full")
+                label="Date/Time Added",
+                value=current_time,
+                ).classes("w-full")
+
             note_date_time_input.props("readonly")
 
-            # note_date_time_updated — hidden/auto, not shown on add form
-            # (will be set when the note is updated via the edit dialog)
-
-            # note_author — SelectField (required), populated from Agents
             note_author_combo = required_select(
-                options=agent_options, label="Agent Name", with_input=True
-            ).classes("w-full")
+                options=agent_options,
+                label="Agent Name",
+                with_input=True,
+                ).classes("w-full")
+
             note_author_combo.props("autofocus")
 
             # note_text — TextAreaField
             note_text_input = required_input(
-                label="Note").classes("w-full")
+                label="Note"
+                ).classes("w-full")
 
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
@@ -84,8 +82,11 @@ def build_notes_page():
 
                         ui.notify(
                             "The 'Agent Name' field is required.",
-                            type="warning", timeout=0,
-                            close_button="OK", position="center")
+                            type="warning",
+                            timeout=0,
+                            position="center",
+                            close_button="OK",
+                            )
 
                         return
 
@@ -95,14 +96,18 @@ def build_notes_page():
 
                         ui.notify(
                             "The 'Note Text' field is required.",
-                            type="warning", timeout=0,
-                            close_button="OK", position="center")
+                            type="warning",
+                            timeout=0,
+                            position="center",
+                            close_button="OK",
+                            )
 
                         return
 
                     note_date_time = (
                         note_date_time_input.value or
-                        get_current_timestamp())
+                        get_current_timestamp()
+                        )
 
                     # ----- Save to database -----
                     with get_session() as session:
@@ -111,29 +116,38 @@ def build_notes_page():
                             note_date_time=note_date_time,
                             note_date_time_updated="",
                             note_author=note_author,
-                            note_text=note_text)
+                            note_text=note_text,
+                            )
 
                         session.add(new_note)
 
                     ui.notify(
                         f"Note from {note_author} was added.",
-                        timeout=2000, close_button="OK", position="bottom")
+                        type="positive",
+                        timeout=2000,
+                        position="bottom",
+                        close_button="OK",
+                        )
 
                     clear_form()
                     refresh_notes_table()
 
                 ui.button(
-                    "Clear", on_click=clear_form,
-                ).props("flat")
+                    "Clear",
+                    on_click=clear_form,
+                    ).props("flat")
 
                 ui.button(
-                    "Add Note", on_click=on_submit,
-                ).props("unelevated")
+                    "Add Note",
+                    on_click=on_submit,
+                    ).props("unelevated")
 
         # ----- Existing Notes Table -----
         ui.separator().classes("my-6")
 
-        ui.label("Current Notes").classes("text-xl font-bold mb-3")
+        ui.label(
+            "Current Notes"
+            ).classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2")
@@ -145,26 +159,33 @@ def build_notes_page():
 
             with get_session() as session:
 
-                notes = (session.query(Notes)
+                notes = (
+                    session.query(Notes)
                     .order_by(Notes.id.desc())
-                    .all())
+                    .all()
+                    )
 
                 if not notes:
 
                     with table_container:
 
                         ui.label("No notes in the database yet"
-                        ).classes("text-gray-500 italic")
+                            ).classes("text-gray-500 italic")
 
                     return
 
-                row_data = [{
-                    "id": r.id,
-                    "note_date_time": r.note_date_time or "",
-                    "note_date_time_updated": (
-                        r.note_date_time_updated or ""),
-                    "note_author": r.note_author or "",
-                    "note_text": r.note_text or ""} for r in notes]
+                row_data = [
+                    {
+                        "id": r.id,
+                        "note_date_time": r.note_date_time or "",
+                        "note_date_time_updated": (
+                            r.note_date_time_updated or ""
+                            ),
+                        "note_author": r.note_author or "",
+                        "note_text": r.note_text or "",
+                    }
+                    for r in notes
+                ]
 
             with table_container:
                 column_defs = [
@@ -173,42 +194,43 @@ def build_notes_page():
                         "label": "Date Added",
                         "field": "note_date_time",
                         "sortable": True,
-                        "align": "left"
+                        "align": "left",
                     },
                     {
                         "name": "note_updated",
                         "label": "Date Updated",
                         "field": "note_date_time_updated",
                         "sortable": True,
-                        "align": "left"
+                        "align": "left",
                     },
                     {
                         "name": "note_author",
                         "label": "Author",
                         "field": "note_author",
                         "sortable": True,
-                        "align": "left"
+                        "align": "left",
                     },
                     {
                         "name": "note_text",
                         "label": "Note",
                         "field": "note_text",
                         "sortable": False,
-                        "align": "left"
+                        "align": "left",
                     },
                     {
                         "name": "actions",
                         "label": "Actions",
                         "field": "actions",
                         "sortable": False,
-                        "align": "center"
-                    }
+                        "align": "center",
+                    },
                 ]
 
                 table = ui.table(
                     columns=column_defs,
                     rows=row_data,
-                    row_key="id")
+                    row_key="id",
+                    )
 
                 table.props("dense flat")
 
@@ -226,7 +248,8 @@ def build_notes_page():
                                 @click="$parent.$emit('delete', props.row)" />
                         </div>
                     </q-td>
-                """)
+                    """
+                    )
 
                 # ----- Edit dialog -----
                 def open_edit_dialog(e):
@@ -235,40 +258,45 @@ def build_notes_page():
 
                     current_agents = load_agent_names()
 
-                    with ui.dialog() as edit_dialog, ui.card().classes(
-                        "w-full max-w-lg p-6"):
+                    with ui.dialog() as edit_dialog, ui.card(
+                        ).classes("w-full max-w-lg p-6"):
 
                         ui.label(
                             f"Edit Note #{row['id']}"
-                        ).classes("text-lg font-semibold mb-4")
+                            ).classes("text-lg font-semibold mb-4")
 
                         edit_date_added = ui.input(
                             label="Date/Time Added",
-                            value=row["note_date_time"]
-                        ).classes("w-full")
+                            value=row["note_date_time"],
+                            ).classes("w-full")
+
                         edit_date_added.props("readonly")
 
                         edit_date_updated = ui.input(
                             label="Date/Time Updated",
-                            value=get_current_timestamp()
-                        ).classes("w-full")
+                            value=get_current_timestamp(),
+                            ).classes("w-full")
+
                         edit_date_updated.props("readonly")
 
                         edit_author = ui.select(
-                            options=current_agents, label="Agent Name",
+                            options=current_agents,
+                            label="Agent Name",
                             value=row["note_author"] or None,
-                            with_input=True
-                        ).classes("w-full")
+                            with_input=True,
+                            ).classes("w-full")
 
                         edit_text = required_input(
-                            label="Note", value=row["note_text"],
-                        ).classes("w-full")
+                            label="Note",
+                            value=row["note_text"],
+                            ).classes("w-full")
 
                         with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                             ui.button(
-                                "Cancel", on_click=edit_dialog.close,
-                            ).props("flat")
+                                "Cancel",
+                                on_click=edit_dialog.close,
+                                ).props("flat")
 
                             def on_save_update():
 
@@ -278,8 +306,11 @@ def build_notes_page():
 
                                     ui.notify(
                                         "The 'Agent Name' field is required.",
-                                        type="warning", timeout=0,
-                                        close_button="OK", position="center")
+                                        type="warning",
+                                        timeout=0,
+                                        position="center",
+                                        close_button="OK",
+                                        )
 
                                     return
 
@@ -289,8 +320,11 @@ def build_notes_page():
 
                                     ui.notify(
                                         "The 'Note Text' field is required.",
-                                        type="warning", timeout=0,
-                                        close_button="OK", position="center")
+                                        type="warning",
+                                        timeout=0,
+                                        position="center",
+                                        close_button="OK",
+                                        )
 
                                     return
 
@@ -299,26 +333,32 @@ def build_notes_page():
                                     note = (
                                         session.query(Notes)
                                         .filter_by(id=row["id"])
-                                        .first())
+                                        .first()
+                                        )
 
                                     if note:
                                         # Only update these fields
                                         note.note_date_time_updated = (
-                                            edit_date_updated.value)
+                                            edit_date_updated.value
+                                            )
                                         note.note_author = new_author
                                         note.note_text = new_text
 
                                 ui.notify(
-                                    f"Note from {new_author} was updated "
-                                    "successfully.", timeout=2000,
-                                    close_button="OK", position="bottom")
+                                    f"Note from {new_author} was updated.",
+                                    type="positive",
+                                    timeout=2000,
+                                    position="bottom",
+                                    close_button="OK",
+                                    )
 
                                 edit_dialog.close()
                                 refresh_notes_table()
 
                             ui.button(
-                                "Update Note", on_click=on_save_update,
-                            ).props("unelevated")
+                                "Update Note",
+                                on_click=on_save_update,
+                                ).props("unelevated")
 
                     edit_dialog.open()
 
@@ -327,22 +367,24 @@ def build_notes_page():
 
                     row = e.args
 
-                    with ui.dialog() as delete_dialog, ui.card().classes(
-                        "max-w-sm p-6"):
+                    with ui.dialog() as delete_dialog, ui.card(
+                        ).classes("max-w-sm p-6"):
 
-                        ui.label("Confirm Deletion"
-                        ).classes("text-lg font-semibold mb-2")
+                        ui.label(
+                            "Confirm Deletion"
+                            ).classes("text-lg font-semibold mb-2")
 
                         ui.label(
                             f"Are you sure you want to delete "
                             f"Note #{row['id']}?"
-                        ).classes("mb-4")
+                            ).classes("mb-4")
 
                         # Show a preview of the note text (truncated)
                         preview = (
                             row["note_text"][:100] + "..."
                             if len(row["note_text"]) > 100
-                            else row["note_text"])
+                            else row["note_text"]
+                            )
 
                         ui.label(f"'{preview}'").classes(
                             "text-sm text-gray-500 italic mb-4")
@@ -350,16 +392,19 @@ def build_notes_page():
                         with ui.row().classes("w-full justify-end gap-2"):
 
                             ui.button(
-                                "Cancel", on_click=delete_dialog.close,
-                            ).props("flat")
+                                "Cancel",
+                                on_click=delete_dialog.close,
+                                ).props("flat")
 
                             def on_confirm_delete():
 
                                 with get_session() as session:
 
-                                    note = (session.query(Notes)
+                                    note = (
+                                        session.query(Notes)
                                         .filter_by(id=row["id"])
-                                        .first())
+                                        .first()
+                                        )
 
                                     if note:
 
@@ -371,9 +416,12 @@ def build_notes_page():
                                         note_id = row["id"]
 
                                 ui.notify(
-                                    f"Note {note_id} was successfully "
-                                    "deleted.", timeout=2000,
-                                    close_button="OK", position="bottom")
+                                    f"Note {note_id} was deleted.",
+                                    type="positive",
+                                    timeout=2000,
+                                    position="bottom",
+                                    close_button="OK",
+                                )
 
                                 delete_dialog.close()
                                 refresh_notes_table()
@@ -382,7 +430,7 @@ def build_notes_page():
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                            ).props("negative unelevated")
+                                ).props("negative unelevated")
 
                     delete_dialog.open()
 
@@ -391,12 +439,3 @@ def build_notes_page():
 
     # ----- Initial render -----
     refresh_notes_table()
-
-
-# ----- Page Registration -----
-@ui.page("/notes")
-def notes_page():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    build_notes_page()

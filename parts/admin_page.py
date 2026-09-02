@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 """
-admin_page.py — Admin panel for user management.
+admin_page.py
+
+Admin panel for user management.
 
 Only accessible to admin accounts. Manages users stored in
 the separate users.db database file.
@@ -11,8 +13,7 @@ from nicegui import ui
 
 from models import get_users_session, Users, DEFAULT_USER_PASSWORD
 from navbar import build_navbar
-from home_page import is_authenticated, get_current_user_name, get_is_admin
-
+from main import is_authenticated, get_current_user_name, get_is_admin
 
 # ----- PAGE BUILDER -----
 def build_admin_page():
@@ -172,8 +173,9 @@ def build_admin_page():
                         table = ui.table(
                             columns=columns,
                             rows=rows,
-                            row_key="id"
+                            row_key="id",
                             )
+
                         table.props("dense flat")
 
                         table.add_slot(
@@ -341,7 +343,6 @@ def build_admin_page():
 def admin_page():
 
     if not is_authenticated():
-
         ui.navigate.to("/")
         return
 

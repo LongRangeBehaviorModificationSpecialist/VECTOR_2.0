@@ -14,12 +14,8 @@ from nicegui import ui
 
 from models import get_session, Persons
 from navbar import build_navbar
-from home_page import (
-    is_authenticated,
-    get_current_user_name,
-    get_is_admin,
-    confirm_new_case_handler
-)
+from home_page import confirm_new_case_handler
+from main import get_current_user_name, get_is_admin
 from utils import (
     required_input
 )
@@ -34,7 +30,7 @@ def build_persons_page():
         is_admin=get_is_admin(),
         username=get_current_user_name(),
         on_new_case=confirm_new_case_handler,
-    )
+        )
 
     with ui.column().classes("w-full items-center"):
 
@@ -45,24 +41,25 @@ def build_persons_page():
 
             sus_name_input = required_input(
                 label="Name"
-            ).classes("w-full")
+                ).classes("w-full")
+
             sus_name_input.props("autofocus")
 
             sus_dob_input = ui.input(
                 label="DOB"
-            ).classes("w-full")
+                ).classes("w-full")
 
             sus_address_input = ui.input(
                 label="Address"
-            ).classes("w-full")
+                ).classes("w-full")
 
             sus_phone_input = ui.input(
                 label="Phone Number"
-            ).classes("w-full")
+                ).classes("w-full")
 
             sus_note_input = required_input(
                 label="Notes"
-            ).classes("w-full")
+                ).classes("w-full")
 
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
@@ -77,11 +74,17 @@ def build_persons_page():
                 def on_submit():
                     # ----- Required field validation (DataRequired) -----
                     sus_name = sus_name_input.value
+
                     if not sus_name:
+
                         ui.notify(
                             "The 'Name' field is required.",
-                            type="warning", timeout=0,
-                            close_button="OK", position="center")
+                            type="warning",
+                            timeout=0,
+                            position="center",
+                            close_button="OK",
+                            )
+
                         return
 
                     sus_dob = sus_dob_input.value or ""
@@ -91,18 +94,24 @@ def build_persons_page():
 
                     # ----- Duplicate name check (sus_name is unique) -----
                     with get_session() as session:
+
                         existing = (
                             session.query(Persons)
                             .filter_by(sus_name=sus_name)
                             .first()
-                        )
+                            )
 
                         if existing:
+
                             ui.notify(
                                 f"'{sus_name}' is already in the "
                                 "database. Person names must be unique.",
-                                type="warning", timeout=0,
-                                close_button="OK", position="center")
+                                type="warning",
+                                timeout=0,
+                                position="center",
+                                close_button="OK",
+                                )
+
                             return
 
                         # ----- Save to database -----
@@ -112,12 +121,17 @@ def build_persons_page():
                             sus_address=sus_address,
                             sus_phone=sus_phone,
                             sus_note=sus_note,
-                        )
+                            )
+
                         session.add(new_person)
 
                     ui.notify(
-                        f"'{sus_name}' was added successfully.",
-                        timeout=2000, close_button="OK", position="bottom")
+                        f"'{sus_name}' was added.",
+                        type="positive",
+                        timeout=2000,
+                        position="bottom",
+                        close_button="OK",
+                        )
 
                     clear_form()
                     refresh_persons_table()
@@ -125,29 +139,29 @@ def build_persons_page():
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                ).props("flat")
+                    ).props("flat")
 
                 ui.button(
                     "Add Person",
                     on_click=on_submit,
-                ).props("unelevated")
+                    ).props("unelevated")
 
         # ----- Existing Persons Table -----
         ui.separator().classes("my-6")
 
         ui.label(
             "Current Persons"
-        ).classes("text-xl font-bold mb-3")
+            ).classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
-            "w-full max-w-5xl mx-auto items-center gap-2"
-        )
+            "w-full max-w-5xl mx-auto items-center gap-2")
 
         def refresh_persons_table():
             """Re-renders the persons table from the database."""
             table_container.clear()
 
             with get_session() as session:
+
                 persons = (
                     session.query(Persons)
                     .order_by(Persons.sus_name)
@@ -155,10 +169,13 @@ def build_persons_page():
                 )
 
                 if not persons:
+
                     with table_container:
+
                         ui.label(
                             "No persons in the database yet"
-                        ).classes("text-gray-500 italic")
+                            ).classes("text-gray-500 italic")
+
                     return
 
                 row_data = [
@@ -224,6 +241,7 @@ def build_persons_page():
                     rows=row_data,
                     row_key="id",
                 )
+
                 table.props("dense flat")
 
                 # ----- Slot: Actions column -----
@@ -240,8 +258,8 @@ def build_persons_page():
                                 @click="$parent.$emit('delete', props.row)" />
                         </div>
                     </q-td>
-                """,
-                )
+                    """
+                    )
 
                 # ----- Edit dialog -----
                 def open_edit_dialog(e):
@@ -249,54 +267,60 @@ def build_persons_page():
                     row = e.args
 
                     with ui.dialog() as edit_dialog, ui.card().classes(
-                        "w-full max-w-lg p-6"
-                    ):
+                        "w-full max-w-lg p-6"):
 
                         ui.label(
                             f"Edit Person: {row['sus_name']}"
-                        ).classes("text-lg font-semibold mb-4")
+                            ).classes("text-lg font-semibold mb-4")
 
                         edit_name = required_input(
                             label="Name",
                             value=row["sus_name"],
-                        ).classes("w-full")
+                            ).classes("w-full")
 
                         edit_dob = ui.input(
                             label="DOB",
                             value=row["sus_dob"],
-                        ).classes("w-full")
+                            ).classes("w-full")
 
                         edit_address = ui.input(
                             label="Address",
                             value=row["sus_address"],
-                        ).classes("w-full")
+                            ).classes("w-full")
 
                         edit_phone = ui.input(
                             label="Phone Number",
                             value=row["sus_phone"],
-                        ).classes("w-full")
+                            ).classes("w-full")
 
                         edit_notes = required_input(
                             label="Notes",
                             value=row["sus_note"],
-                        ).classes("w-full")
+                            ).classes("w-full")
 
                         with ui.row().classes(
                             "w-full justify-end gap-2 mt-4"
-                        ):
+                            ):
+
                             ui.button(
                                 "Cancel",
                                 on_click=edit_dialog.close,
-                            ).props("flat")
+                                ).props("flat")
 
                             def on_save_update():
+
                                 new_name = edit_name.value or ""
 
                                 if not new_name:
+
                                     ui.notify(
                                         "The 'Name' field is required.",
-                                        type="warning", timeout=0,
-                                        close_button="OK", position="center")
+                                        type="warning",
+                                        timeout=0,
+                                        position="center",
+                                        close_button="OK",
+                                        )
+
                                     return
 
                                 with get_session() as session:
@@ -306,18 +330,22 @@ def build_persons_page():
                                         .filter(
                                             Persons.sus_name == new_name,
                                             Persons.id != row["id"],
-                                        )
+                                            )
                                         .first()
-                                    )
+                                        )
 
                                     if dup:
+
                                         ui.notify(
-                                            f"'{new_name}' is already in "
-                                            "the database. Person names "
-                                            "must be unique.",
-                                            type="warning", timeout=0,
+                                            f"'{new_name}' is already in the "
+                                            "database. Person names must "
+                                            "be unique.",
+                                            type="warning",
+                                            timeout=0,
+                                            position="center",
                                             close_button="OK",
-                                            position="center")
+                                            )
+
                                         return
 
                                     person = (
@@ -327,24 +355,28 @@ def build_persons_page():
                                     )
 
                                     if person:
+
                                         person.sus_name = new_name
                                         person.sus_dob = (
                                             edit_dob.value or ""
-                                        )
+                                            )
                                         person.sus_address = (
                                             edit_address.value or ""
-                                        )
+                                            )
                                         person.sus_phone = (
                                             edit_phone.value or ""
-                                        )
+                                            )
                                         person.sus_note = (
                                             edit_notes.value or ""
-                                        )
+                                            )
 
                                 ui.notify(
-                                    f"'{new_name}' was updated successfully.",
-                                    timeout=2000, close_button="OK",
-                                    position="bottom")
+                                    f"'{new_name}' was updated.",
+                                    type="positive",
+                                    timeout=2000,
+                                    position="bottom",
+                                    close_button="OK",
+                                    )
 
                                 edit_dialog.close()
                                 refresh_persons_table()
@@ -352,7 +384,7 @@ def build_persons_page():
                                 ui.button(
                                     "Save",
                                     on_click=on_save_update,
-                                ).props("unelevated")
+                                    ).props("unelevated")
 
                     edit_dialog.open()
 
@@ -361,27 +393,29 @@ def build_persons_page():
 
                     row = e.args
 
-                    with ui.dialog() as delete_dialog, ui.card().classes(
-                        "max-w-sm p-6"
-                    ):
+                    with ui.dialog() as delete_dialog, ui.card(
+                        ).classes("max-w-sm p-6"):
 
                         ui.label(
                             "Confirm Deletion"
-                        ).classes("text-lg font-semibold mb-2")
+                            ).classes("text-lg font-semibold mb-2")
 
                         ui.label(
                             f"Are you sure you want to remove "
                             f"{row['sus_name']} from the case file?"
-                        ).classes("mb-4")
+                            ).classes("mb-4")
 
                         with ui.row().classes("w-full justify-end gap-2"):
+
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                            ).props("flat")
+                                ).props("flat")
 
                             def on_confirm_delete():
+
                                 with get_session() as session:
+
                                     person = (
                                         session.query(Persons)
                                         .filter_by(id=row["id"])
@@ -389,15 +423,22 @@ def build_persons_page():
                                     )
 
                                     if person:
+
                                         sus_name = person.sus_name
                                         session.delete(person)
+
                                     else:
+
                                         sus_name = row["sus_name"]
 
                                 ui.notify(
-                                    f"'{sus_name}' has been successfully "
-                                    "removed from the file.", timeout=2000,
-                                    close_button="OK", position="bottom")
+                                    f"'{sus_name}' has been removed from "
+                                    "the file.",
+                                    type="positive",
+                                    timeout=2000,
+                                    position="bottom",
+                                    close_button="OK",
+                                    )
 
                                 delete_dialog.close()
                                 refresh_persons_table()
@@ -406,7 +447,7 @@ def build_persons_page():
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                            ).props("negative unelevated")
+                                ).props("negative unelevated")
 
                     delete_dialog.open()
 
@@ -415,12 +456,3 @@ def build_persons_page():
 
     # -----Initial render -----
     refresh_persons_table()
-
-
-# ----- Page Registration -----
-@ui.page("/persons")
-def persons_page():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    build_persons_page()

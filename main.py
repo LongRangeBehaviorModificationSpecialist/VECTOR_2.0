@@ -7,7 +7,7 @@ V·E·C·T·O·R —
 Virginia Evidence Collection, Tracking, Organization, & Reporting Program
 
 Usage:
-    python main.py
+    python main.py [--dev]
     Open browser to http://localhost:8080
 """
 
@@ -19,14 +19,14 @@ from pathlib import Path
 import sys
 
 from models import get_users_session
-import parts.admin_page
 
 DEBUG_MODE = "--dev" in sys.argv
 
 # Explicitly tell NiceGUI where the static folder is
 app.add_static_files(
     "/static",
-    os.path.join(os.path.dirname(__file__), "static"))
+    os.path.join(os.path.dirname(__file__), "static"),
+    )
 
 
 # ----- Initialize Database -----
@@ -47,6 +47,7 @@ def seed_default_user():
     if not json_path.exists():
 
         print("WARNING → 'users.json' not found — no user seeded.")
+
         return
 
     with open(json_path, "r", encoding="utf-8") as f:
@@ -88,14 +89,13 @@ def seed_default_user():
             session.query(Users)
             .filter_by(user_name="novaicac")
             .first()
-        )
+            )
 
         if existing:
             # Update existing user with latest hash from JSON
             existing.password_hash = clean_hash
             existing.is_admin = is_admin
             existing.is_active = True
-            print(f"✓ Updated user '{user_name}' from users.json")
 
         else:
 
@@ -104,7 +104,8 @@ def seed_default_user():
                 user_name=user_name,
                 password_hash=clean_hash,
                 is_admin=is_admin,
-                is_active=True)
+                is_active=True,
+                )
 
             session.add(new_user)
             print(f"✓ Created user '{user_name}' from users.json")
@@ -115,7 +116,7 @@ seed_default_user()
 # ----- Theme Configuration -----
 # Shrinks all textarea heights to match input/select field heights
 ui.add_css(
-    """
+"""
 /* ----- Theme Colors (replaces ui.colors) ----- */
 :root {
     --q-primary: #6d4aff;
@@ -181,7 +182,7 @@ textarea.q-field__native {
 # Order matters: shared utilities first, then pages.
 
 # Core infrastructure
-import home_page  # (/, /home, /about, /help, /export_db, /logout)
+import home_page  # (/, /home, /about, /help, /logout)
 
 # ----- Page Registrations -----
 # Some page modules define their own @ui.page decorators internally.
@@ -190,7 +191,7 @@ import home_page  # (/, /home, /about, /help, /export_db, /logout)
 
 @ui.page("/agents")
 def agents_route():
-    if not home_page.is_authenticated():
+    if not is_authenticated():
         ui.navigate.to("/")
         return
     from parts.agents_page import build_agents_page
@@ -199,7 +200,7 @@ def agents_route():
 
 @ui.page("/cases")
 def cases_route():
-    if not home_page.is_authenticated():
+    if not is_authenticated():
         ui.navigate.to("/")
         return
     from parts.cases_page import build_cases_page
@@ -208,7 +209,7 @@ def cases_route():
 
 @ui.page("/rooms")
 def rooms_route():
-    if not home_page.is_authenticated():
+    if not is_authenticated():
         ui.navigate.to("/")
         return
     from parts.rooms_page import build_rooms_page
@@ -217,7 +218,7 @@ def rooms_route():
 
 @ui.page("/evidence")
 def evidence_route():
-    if not home_page.is_authenticated():
+    if not is_authenticated():
         ui.navigate.to("/")
         return
     from parts.evidence_page import build_evidence_page
@@ -226,7 +227,7 @@ def evidence_route():
 
 @ui.page("/persons")
 def persons_route():
-    if not home_page.is_authenticated():
+    if not is_authenticated():
         ui.navigate.to("/")
         return
     from parts.persons_page import build_persons_page
@@ -235,7 +236,7 @@ def persons_route():
 
 @ui.page("/notes")
 def notes_route():
-    if not home_page.is_authenticated():
+    if not is_authenticated():
         ui.navigate.to("/")
         return
     from parts.notes_page import build_notes_page
@@ -244,7 +245,7 @@ def notes_route():
 
 @ui.page("/uploads")
 def uploads_route():
-    if not home_page.is_authenticated():
+    if not is_authenticated():
         ui.navigate.to("/")
         return
     from parts.files_page import build_uploads_page
@@ -253,7 +254,7 @@ def uploads_route():
 
 @ui.page("/links")
 def links_route():
-    if not home_page.is_authenticated():
+    if not is_authenticated():
         ui.navigate.to("/")
         return
     from parts.links_page import build_links_page
@@ -262,18 +263,29 @@ def links_route():
 
 @ui.page("/reports")
 def reports_route():
-    if not home_page.is_authenticated():
+    if not is_authenticated():
         ui.navigate.to("/")
         return
     from parts.reports_page import build_reports_page
     build_reports_page()
 
 
+@ui.page("/admin")
+def admin_route():
+    if not is_authenticated():
+        ui.navigate.to("/")
+        return
+    from parts.admin_page import build_admin_page
+    build_admin_page()
+
+
 @ui.page("/change-password")
 def change_password_page():
+
     from models import get_users_session, Users, DEFAULT_USER_PASSWORD
 
     if not is_authenticated():
+
         ui.navigate.to("/")
         return
 
@@ -292,12 +304,12 @@ def change_password_page():
 
             new_pass = ui.input(
                 label="New Password",
-                password=True
+                password=True,
                 ).classes("w-full")
 
             confirm_pass = ui.input(
                 label="Confirm Password",
-                password=True
+                password=True,
                 ).classes("w-full")
 
             def save_new_password():
@@ -310,7 +322,7 @@ def change_password_page():
                         timeout=0,
                         position="center",
                         close_button="OK",
-                    )
+                        )
 
                     return
 
@@ -327,17 +339,24 @@ def change_password_page():
                     return
 
                 if new_pass.value == DEFAULT_USER_PASSWORD:
+
                     ui.notify(
                         "You cannot use the default password.",
                         type="negative",
                         timeout=0,
+                        position="center",
                         close_button="Dismiss",
-                    )
+                        )
+
                     return
 
                 with get_users_session() as session:
-                    user = session.query(Users).filter_by(user_name=username).first()
+
+                    user = session.query(Users).filter_by(
+                        user_name=username).first()
+
                     if user:
+
                         user.set_password(new_pass.value)
                         user.must_change_password = False
 
@@ -345,9 +364,10 @@ def change_password_page():
                 ui.navigate.to("/")
 
             confirm_pass.on("keydown.enter", save_new_password)
+
             ui.button("Save Password", on_click=save_new_password).props(
                 "unelevated"
-            ).classes("w-full mt-4")
+                ).classes("w-full mt-4")
 
 
 # ----- Startup Configuration -----
@@ -380,11 +400,13 @@ if __name__ in {"__main__", "__mp_main__"}:
 
     ui.add_head_html(
         '<link rel="icon" type="image/x-icon" href="/static/favicon.ico">',
-        shared=True)
+        shared=True
+        )
 
     ui.run(
         title="V·E·C·T·O·R",
         port=8080,
         reload=DEBUG_MODE,
         dark=True,
-        storage_secret="vector-secret-key-change-in-production-2024")
+        storage_secret="vector-secret-key-change-in-production-2024",
+        )
