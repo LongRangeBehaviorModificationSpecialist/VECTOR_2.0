@@ -16,7 +16,7 @@ from home_page import (
     is_authenticated,
     get_current_user_name,
     get_is_admin,
-    confirm_new_case_handler,
+    confirm_new_case_handler
 )
 from models import get_session, Cases
 from navbar import build_navbar
@@ -24,7 +24,7 @@ from utils import (
     required_input,
     required_select,
     load_jurisdiction_options,
-    validate_case_data,
+    validate_case_data
 )
 
 
@@ -36,8 +36,7 @@ def build_cases_page():
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
-    )
+        on_new_case=confirm_new_case_handler)
 
     with ui.column().classes("w-full items-center"):
 
@@ -80,6 +79,7 @@ def build_cases_page():
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form():
+
                     case_number_input.value = ""
                     location_input.value = ""
                     jurisdiction_combo.value = None
@@ -87,6 +87,7 @@ def build_cases_page():
                     date_time_end.value = None
 
                 def on_submit():
+
                     case_number = case_number_input.value
                     location = location_input.value
                     jurisdiction = jurisdiction_combo.value
@@ -98,28 +99,27 @@ def build_cases_page():
                         case_number=case_number,
                         location=location,
                         jurisdiction=jurisdiction,
-                        datetime_start=datetime_start
-                    ):
+                        datetime_start=datetime_start):
+
                         return
 
                     try:
+
                         with get_session() as session:
 
                             # Check for duplicate case number
                             existing = (
                                 session.query(Cases)
                                 .filter_by(case_number=case_number)
-                                .first()
-                            )
+                                .first())
 
                             if existing:
+
                                 ui.notify(
-                                    f"Case '{case_number}' already "
-                                    "exists. Please use a unique case "
-                                    "number.", type="warning",
-                                    timeout=0, close_button="OK",
-                                    position="center"
-                                )
+                                    f"Case '{case_number}' already exists. "
+                                    "Please use a unique case number.",
+                                    type="warning", timeout=0,
+                                    close_button="OK", position="center")
                                 return
 
                             new_case = Cases(
@@ -127,48 +127,41 @@ def build_cases_page():
                                 location=location,
                                 jurisdiction=jurisdiction,
                                 case_date_time_begin=datetime_start,
-                                case_date_time_end=datetime_end
-                            )
+                                case_date_time_end=datetime_end)
 
                             session.add(new_case)
 
                         ui.notify(
                             f"Case {case_number} was added successfully.",
                             type="positive", timeout=2000,
-                            close_button="OK", position="bottom"
-                        )
+                            close_button="OK", position="bottom")
 
                         clear_form()
                         refresh_cases_table()
 
                     except Exception:
+
                         ui.notify(
                             "An error occurred while creating the case. "
                             "Please check the information and try again.",
                             type="negative", timeout=0,
-                            close_button="OK", position="center"
-                        )
+                            close_button="OK", position="center")
 
                 ui.button(
-                    "Clear",
-                    on_click=clear_form
+                    "Clear", on_click=clear_form
                 ).props("flat")
 
                 ui.button(
-                    "Open New Case",
-                    on_click=on_submit
+                    "Open New Case", on_click=on_submit
                 ).props("unelevated")
 
         # ----- Existing Cases Table -----
         ui.separator().classes("my-6")
 
-        ui.label(
-            "Current Case"
-        ).classes("text-xl font-bold mb-3")
+        ui.label("Current Case").classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
-            "w-full max-w-5xl mx-auto items-center gap-2"
-        )
+            "w-full max-w-5xl mx-auto items-center gap-2")
 
         def refresh_cases_table():
             """Re-renders the cases table from the database."""
@@ -176,9 +169,11 @@ def build_cases_page():
             table_container.clear()
 
             with get_session() as session:
+
                 cases = session.query(Cases).all()
 
                 if not cases:
+
                     with table_container:
 
                         ui.label(
@@ -188,17 +183,14 @@ def build_cases_page():
                     return
 
                 # Build row_data INSIDE the session — BEFORE it closes
-                row_data = [
-                    {
-                        "id": r.id,
-                        "case_number": r.case_number or "",
-                        "location": r.location or "",
-                        "jurisdiction": r.jurisdiction or "",
-                        "datetime_start": r.case_date_time_begin or "",
-                        "datetime_end": r.case_date_time_end or ""
-                    }
-                    for r in cases
-                ]
+                row_data = [{
+                    "id": r.id,
+                    "case_number": r.case_number or "",
+                    "location": r.location or "",
+                    "jurisdiction": r.jurisdiction or "",
+                    "datetime_start": r.case_date_time_begin or "",
+                    "datetime_end": r.case_date_time_end or ""}
+                    for r in cases]
 
             # Now safe to create the table outside the session
             with table_container:
@@ -244,14 +236,14 @@ def build_cases_page():
                         "field": "actions",
                         "sortable": False,
                         "align": "center"
-                    },
+                    }
                 ]
 
                 table = ui.table(
                     columns=column_defs,
                     rows=row_data,
-                    row_key="id"
-                )
+                    row_key="id")
+
                 table.props("dense flat")
 
                 # ----- Slot: Actions column -----
@@ -268,8 +260,7 @@ def build_cases_page():
                                 @click="$parent.$emit('delete', props.row)" />
                         </div>
                     </q-td>
-                """,
-                )
+                """)
 
                 # ----- Edit dialog -----
                 def open_edit_dialog(e):
@@ -277,8 +268,7 @@ def build_cases_page():
                     row = e.args
 
                     with ui.dialog() as edit_dialog, ui.card().classes(
-                        "w-full max-w-lg p-6"
-                    ):
+                        "w-full max-w-lg p-6"):
 
                         ui.label(
                             f"Edit Case: {row['case_number']}"
@@ -302,33 +292,26 @@ def build_cases_page():
                             new_value_mode="add"
                         ).classes("w-full")
 
-                        edit_datetime_begin = (
-                            required_input(
+                        edit_datetime_begin = (required_input(
                                 label="Begin Date/Time",
                                 value=row["datetime_start"],
-                                placeholder="YYYY-MM-DD HH:MM"
-                            )
+                                placeholder="YYYY-MM-DD HH:MM")
                             .props('mask="####-##-## ##:##"')
-                            .classes("w-full")
-                        )
+                            .classes("w-full"))
 
                         edit_datetime_end = (
                             ui.input(
                                 label="End Date/Time",
                                 value=row["datetime_end"],
-                                placeholder="YYYY-MM-DD HH:MM"
-                            )
+                                placeholder="YYYY-MM-DD HH:MM")
                             .props('mask="####-##-## ##:##"')
-                            .classes("w-full")
-                        )
+                            .classes("w-full"))
 
                         with ui.row().classes(
-                            "w-full justify-end gap-2 mt-4"
-                        ):
+                            "w-full justify-end gap-2 mt-4"):
 
                             ui.button(
-                                "Cancel",
-                                on_click=edit_dialog.close,
+                                "Cancel", on_click=edit_dialog.close,
                             ).props("flat")
 
                             def on_save_update():
@@ -338,45 +321,33 @@ def build_cases_page():
                                     case = (
                                         session.query(Cases)
                                         .filter_by(id=row["id"])
-                                        .first()
-                                    )
+                                        .first())
 
                                     if case:
+
                                         case.case_number = (
-                                            edit_case_number.value
-                                            or ""
-                                        )
+                                            edit_case_number.value or "")
                                         case.location = (
-                                            edit_location.value
-                                            or ""
-                                        )
+                                            edit_location.value or "")
                                         case.jurisdiction = (
-                                            edit_jurisdiction.value
-                                            or ""
-                                        )
+                                            edit_jurisdiction.value or "")
                                         case.case_date_time_begin = (
-                                            edit_datetime_begin.value
-                                            or ""
-                                        )
+                                            edit_datetime_begin.value or "")
                                         case.case_date_time_end = (
-                                            edit_datetime_end.value
-                                            or ""
-                                        )
+                                            edit_datetime_end.value or "")
 
                                 ui.notify(
                                     f"Case {edit_case_number.value} "
                                     "information was updated "
                                     "successfully.",
                                     type="positive", timeout=2000,
-                                    close_button="OK", position="bottom"
-                                )
+                                    close_button="OK", position="bottom")
 
                                 edit_dialog.close()
                                 refresh_cases_table()
 
                             ui.button(
-                                "Save",
-                                on_click=on_save_update,
+                                "Save", on_click=on_save_update,
                             ).props("unelevated")
 
                     edit_dialog.open()
@@ -386,9 +357,8 @@ def build_cases_page():
 
                     row = e.args
 
-                    with ui.dialog() as delete_dialog, ui.card().classes(
-                        "max-w-sm p-6"
-                    ):
+                    with ui.dialog() as delete_dialog, ui.card(
+                        ).classes("max-w-sm p-6"):
 
                         ui.label(
                             "Confirm Deletion"
@@ -402,31 +372,32 @@ def build_cases_page():
                         with ui.row().classes("w-full justify-end gap-2"):
 
                             ui.button(
-                                "Cancel",
-                                on_click=delete_dialog.close
+                                "Cancel", on_click=delete_dialog.close
                             ).props("flat")
 
                             def on_confirm_delete():
+
                                 with get_session() as session:
 
                                     case = (
                                         session.query(Cases)
                                         .filter_by(id=row["id"])
-                                        .first()
-                                    )
+                                        .first())
 
                                     if case:
+
                                         case_number = case.case_number
                                         session.delete(case)
+
                                     else:
+
                                         case_number = row["case_number"]
 
                                 ui.notify(
                                     f"{case_number} has been deleted "
-                                    "successfully.", type="positive",
-                                    timeout=2000, close_button="OK",
-                                    position="bottom"
-                                )
+                                    "successfully.",
+                                    type="positive", timeout=2000,
+                                    close_button="OK", position="bottom")
 
                                 delete_dialog.close()
                                 refresh_cases_table()

@@ -24,8 +24,7 @@ DEBUG_MODE = "--dev" in sys.argv
 # Explicitly tell NiceGUI where the static folder is
 app.add_static_files(
     "/static",
-    os.path.join(os.path.dirname(__file__), "static")
-)
+    os.path.join(os.path.dirname(__file__), "static"))
 
 
 # ----- Initialize Database -----
@@ -41,11 +40,14 @@ def seed_default_user():
     The JSON stores hashes as Python byte-string literals.
     """
     json_path = Path(__file__).parent / f"parts\\users.json"
+
     if not json_path.exists():
+
         print("WARNING → 'users.json' not found — no user seeded.")
         return
 
     with open(json_path, "r", encoding="utf-8") as f:
+
         user_data = json.load(f)
 
     # Extract the password hash from the byte-string representation
@@ -54,40 +56,51 @@ def seed_default_user():
     # The JSON stores it as "b'$2b$12$...'"
     # parse it back to bytes, then decode to str
     try:
+
         hash_bytes = ast.literal_eval(raw_hash)
+
         if isinstance(hash_bytes, bytes):
+
             clean_hash = hash_bytes.decode("utf-8")
+
         else:
+
             clean_hash = str(hash_bytes)
+
     except (ValueError, SyntaxError):
+
         # If ast.literal_eval fails, try stripping the b'' wrapper manually
         clean_hash = raw_hash
+
         if clean_hash.startswith("b'") and clean_hash.endswith("'"):
+
             clean_hash = clean_hash[2:-1]
 
     user_name = user_data.get("user_name", "")
     is_admin = user_data.get("is_admin", False)
 
     with get_session() as session:
-        existing = (
-            session.query(Users)
+
+        existing = (session.query(Users)
             .filter_by(user_name=user_name)
-            .first()
-        )
+            .first())
+
         if existing:
             # Update existing user with latest hash from JSON
             existing.password_hash = clean_hash
             existing.is_admin = is_admin
             existing.is_active = True
             print(f"✓ Updated user '{user_name}' from users.json")
+
         else:
+
             # Create new user
             new_user = Users(
                 user_name=user_name,
                 password_hash=clean_hash,
                 is_admin=is_admin,
-                is_active=True,
-            )
+                is_active=True)
+
             session.add(new_user)
             print(f"✓ Created user '{user_name}' from users.json")
 
@@ -259,12 +272,14 @@ def is_authenticated() -> bool:
     except Exception:
         return False
 
+
 def get_current_user_name() -> str:
     """Gets current username (defaults to empty)."""
     try:
         return app.storage.user.get("user_name", "")
     except Exception:
         return ""
+
 
 def get_is_admin() -> bool:
     """Checks if current user is admin (defaults to False)."""
@@ -279,13 +294,11 @@ if __name__ in {"__main__", "__mp_main__"}:
 
     ui.add_head_html(
         '<link rel="icon" type="image/x-icon" href="/static/favicon.ico">',
-        shared=True
-    )
+        shared=True)
 
     ui.run(
         title="V·E·C·T·O·R",
         port=8080,
         reload=DEBUG_MODE,
         dark=True,
-        storage_secret="vector-secret-key-change-in-production-2024",
-    )
+        storage_secret="vector-secret-key-change-in-production-2024")

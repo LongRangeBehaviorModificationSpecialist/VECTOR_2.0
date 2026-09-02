@@ -28,29 +28,9 @@ POSITIVE_NOTIFICATION_TIMEOUT = 2000
 AGENTS_JSON_PATH = Path(__file__).parent / "parts/agents.json"
 
 MESSAGES = {
-    "evid_1": "The 'Triaged By' field is required if the 'Item Triaged?' "
-        "field is set to 'Yes'.",
-    "evid_2": "The same agent cannot be listed in the 'Found By' and "
-        "'Witnessed By' fields.",
-    "evid_3": "The 'Evidence Item Number' field is required.",
-    "evid_4": "The 'Quantity' field is required.",
-    "evid_5": "The 'Evidence Description' field is required.",
-    "evid_6": "The 'Room Located' field is required.",
-    "evid_7": "The 'Where Located' field is required.",
-    "evid_8": "The 'Found By' field is required.",
-    "evid_9": "The 'Witnessed By' field is required.",
-
-    "note_1": "The 'Agent Name' field is required.",
-    "note_2": "The 'Note Text' field is required.",
-
-    "room_1": "A Room Label is required.",
-    "room_2": "The 'Room Description' field is required.",
-    "room_3": "That label is currently assigned to another room.",
     "room_4": "That room description is already assigned to another room.",
     "room_5": "The same agent cannot be listed in the 'First Agent Name' and "
         "'Second Agent Name' fields.",
-
-    "person_1": "The 'Name' field is required.",
 }
 
 # Allowed MIME types for images, videos, and documents
@@ -512,12 +492,154 @@ def validate_agent_data(
         return False
 
     if role and role_secondary:
-            if role.strip().lower() == role_secondary.strip().lower():
-                ui.notify(
+        if role.strip().lower() == role_secondary.strip().lower():
+            ui.notify(
                     f"The 'Primary Role' field and the 'Secondary Role' field "
                     f"for {name} cannot be the same.", type="warning",
                     timeout=0, close_button="OK", position="center")
-                return True
+            return True
+        return False
+
+    return True
+
+
+def validate_initial_evidence(
+        evid_num: str | None,
+        evid_qty: str | None,
+        evid_desc: str | None,
+        evid_loc_room: str | None,
+        evid_room_detail: str | None,
+        evid_found_by: str | None,
+        evid_found_by_witness: str | None,
+        evid_triaged: str | None,
+        evid_triaged_by: str | None
+) -> bool:
+
+    if not evid_num:
+        ui.notify(
+            "The 'Evidence Item Number' field is required.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    if not evid_qty:
+        ui.notify(
+            "The 'Quantity' field is required.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    if not evid_desc:
+        ui.notify(
+            "The 'Evidence Description' field is required.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    if not evid_loc_room:
+        ui.notify(
+            "The 'Room Located' field is required.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    if not evid_room_detail:
+        ui.notify(
+            "The 'Where Located' field is required.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    if not evid_found_by:
+        ui.notify(
+            "The 'Found By' field is required.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    if not evid_found_by_witness:
+        ui.notify(
+            "The 'Witnessed By' field is required.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    if evid_found_by == evid_found_by_witness:
+        ui.notify(
+            "The same agent cannot be listed in the 'Found By' and "
+            "'Witnessed By' fields.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    if evid_triaged == "Yes" and not evid_triaged_by:
+        ui.notify(
+            "The 'Triaged By' field is required if the 'Item Triaged?' "
+            "field is set to 'Yes'.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    with get_session() as session:
+        existing = (
+            session.query(Evidence)
+            .filter_by(evid_num=evid_num)
+            .first()
+        )
+
+        if existing:
+            ui.notify(
+                f"Evidence Item Number '{evid_num}' is "
+                "already used.",
+                type="negative", timeout=0,
+                close_button="OK", position="center")
+            return False
+
+    return True
+
+
+def validate_update_evidence(
+        new_evid_num: str,
+        new_evid_found_by: str,
+        new_evid_found_by_witness: str,
+        new_evid_triaged: str,
+        new_evid_triaged_by: str,
+        row
+) -> bool:
+
+    if (
+        new_evid_found_by and new_evid_found_by_witness
+        and new_evid_found_by == new_evid_found_by_witness
+    ):
+        ui.notify(
+            "The same agent cannot be listed in the 'Found By' and "
+            "'Witnessed By' fields.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    if new_evid_triaged == "Yes" and not new_evid_triaged_by:
+        ui.notify(
+            "The 'Triaged By' field is required if the 'Item Triaged?' "
+            "field is set to 'Yes'.",
+            type="warning", timeout=0,
+            close_button="OK", position="center")
+        return False
+
+    with get_session() as session:
+        dup = (
+            session.query(Evidence)
+            .filter(
+                Evidence.evid_num == (new_evid_num),
+                Evidence.id != row["id"])
+            .first()
+        )
+
+        if dup:
+            ui.notify(
+                f"Evidence number {new_evid_num} is already used",
+                type="warning", timeout=0,
+                close_button="OK", position="center")
             return False
 
     return True

@@ -18,13 +18,10 @@ from home_page import (
     is_authenticated,
     get_current_user_name,
     get_is_admin,
-    confirm_new_case_handler,
+    confirm_new_case_handler
 )
 from utils import (
-    required_input,
-    MESSAGES,
-    NOTIFICATION_TIMEOUT,
-    POSITIVE_NOTIFICATION_TIMEOUT,
+    required_input
 )
 
 
@@ -82,12 +79,9 @@ def build_persons_page():
                     sus_name = sus_name_input.value
                     if not sus_name:
                         ui.notify(
-                            MESSAGES["person_1"],
-                            type="warning",
-                            timeout=NOTIFICATION_TIMEOUT,
-                            close_button="OK",
-                            position="center",
-                        )
+                            "The 'Name' field is required.",
+                            type="warning", timeout=0,
+                            close_button="OK", position="center")
                         return
 
                     sus_dob = sus_dob_input.value or ""
@@ -107,11 +101,8 @@ def build_persons_page():
                             ui.notify(
                                 f"'{sus_name}' is already in the "
                                 "database. Person names must be unique.",
-                                type="warning",
-                                timeout=NOTIFICATION_TIMEOUT,
-                                close_button="OK",
-                                position="center",
-                            )
+                                type="warning", timeout=0,
+                                close_button="OK", position="center")
                             return
 
                         # ----- Save to database -----
@@ -126,10 +117,7 @@ def build_persons_page():
 
                     ui.notify(
                         f"'{sus_name}' was added successfully.",
-                        timeout=POSITIVE_NOTIFICATION_TIMEOUT,
-                        close_button="OK",
-                        position="bottom",
-                    )
+                        timeout=2000, close_button="OK", position="bottom")
 
                     clear_form()
                     refresh_persons_table()
@@ -306,12 +294,9 @@ def build_persons_page():
 
                                 if not new_name:
                                     ui.notify(
-                                        MESSAGES["person_1"],
-                                        type="warning",
-                                        timeout=NOTIFICATION_TIMEOUT,
-                                        close_button="OK",
-                                        position="center",
-                                    )
+                                        "The 'Name' field is required.",
+                                        type="warning", timeout=0,
+                                        close_button="OK", position="center")
                                     return
 
                                 with get_session() as session:
@@ -330,11 +315,9 @@ def build_persons_page():
                                             f"'{new_name}' is already in "
                                             "the database. Person names "
                                             "must be unique.",
-                                            type="warning",
-                                            timeout=NOTIFICATION_TIMEOUT,
+                                            type="warning", timeout=0,
                                             close_button="OK",
-                                            position="center",
-                                        )
+                                            position="center")
                                         return
 
                                     person = (
@@ -360,10 +343,8 @@ def build_persons_page():
 
                                 ui.notify(
                                     f"'{new_name}' was updated successfully.",
-                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
-                                    close_button="OK",
-                                    position="bottom",
-                                )
+                                    timeout=2000, close_button="OK",
+                                    position="bottom")
 
                                 edit_dialog.close()
                                 refresh_persons_table()
@@ -415,11 +396,8 @@ def build_persons_page():
 
                                 ui.notify(
                                     f"'{sus_name}' has been successfully "
-                                    "removed from the file.",
-                                    timeout=POSITIVE_NOTIFICATION_TIMEOUT,
-                                    close_button="OK",
-                                    position="bottom",
-                                )
+                                    "removed from the file.", timeout=2000,
+                                    close_button="OK", position="bottom")
 
                                 delete_dialog.close()
                                 refresh_persons_table()
