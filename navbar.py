@@ -141,7 +141,7 @@ def build_navbar(
 
         # ----- Case Info Button -----
         ui.button(
-            "Case Info",
+            "Case",
             on_click=lambda: ui.navigate.to("/cases"),
         ).props("flat color=white")
 

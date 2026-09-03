@@ -58,7 +58,7 @@ def home():
 def build_authenticated_home():
     """Main menu shown to logged-in users."""
 
-    with ui.column().classes("items-center w-full mt-8 mb-6"):
+    with ui.column().classes("items-center w-full mt-8 py-2"):
 
         # ----- Page Title and Header -----
 
@@ -68,21 +68,24 @@ def build_authenticated_home():
 
         ui.label(
             "V·E·C·T·O·R Home"
-        ).classes("text-2xl font-bold text-center")
+        ).classes("text-2xl font-bold text-center mx-2")
 
         ui.label(
             "The Virginia Evidence Collection, Tracking, "
             "Organization, & Reporting Program"
         ).classes("text-base text-gray-400 text-center max-w-xl")
 
+    with ui.row().classes(
+        "flex justify-center items-center gap-6 w-full"):
+
         ui.label(
             "Main Menu"
-        ).classes("text-xl font-normal mb-2")
+        ).classes("text-xl items-center font-semibold py-1")
 
     # ----- Action Buttons ROW 1: Start New Case | Add Agent | Add Room -----
 
     with ui.row().classes(
-        "flex justify-center items-center gap-6 mb-4 w-full"):
+        "flex justify-center items-center gap-6 py-1 w-full"):
 
         ui.button(
             "Start New Case",
@@ -102,7 +105,7 @@ def build_authenticated_home():
     # ----- Action Buttons ROW 2: Add Evidence | Add Person | Add Note -----
 
     with ui.row().classes(
-        "flex justify-center items-center gap-6 mb-4 w-full"):
+        "flex justify-center items-center gap-6 py-1 w-full"):
 
         ui.button(
             "Add Evidence",
@@ -122,7 +125,7 @@ def build_authenticated_home():
     # ----- Action Buttons ROW 3: Add File | Useful Links -----
 
     with ui.row().classes(
-        "flex justify-center items-center gap-6 mb-4 w-full"):
+        "flex justify-center items-center gap-6 py-1 w-full"):
 
         ui.button(
             "Add File",
@@ -141,13 +144,16 @@ def build_authenticated_home():
 
     # ----- Import / Export ROW -----
 
-    ui.separator().classes("my-2")
+    # ui.separator().classes("my-2")
 
-    with ui.column().classes("items-center w-full"):
+    with ui.column().classes("items-center w-full py-2"):
 
-        ui.label(
-            "Data Management"
-        ).classes("text-lg font-bold mb-2")
+        with ui.row().classes(
+                "flex justify-center items-center gap-6 w-full"):
+
+            ui.label(
+                "Data Management"
+            ).classes("text-lg font-bold py-1")
 
         # ----- Row to hold the Data Management buttons -----
         with ui.row().classes("flex justify-center items-center gap-6 w-full"):

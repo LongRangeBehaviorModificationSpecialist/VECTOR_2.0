@@ -190,30 +190,40 @@ COMMON_STYLES = """
         background: white !important;
         color: black !important;
     }
-    .agentTable thead tr th.agentTableHeader,
-    .noteTable thead tr th.noteTableHeader,
-    .personTable thead tr th.personTableHeader,
-    .roomTable thead tr th.roomTableHeader,
-    .evidTableItemRow {
+    .top-table .agentTable thead tr th.agentTableHeader,
+    .top-table .noteTable thead tr th.noteTableHeader,
+    .top-table .personTable thead tr th.personTableHeader,
+    .top-table .roomTable thead tr th.roomTableHeader,
+    .top-table .evidTableItemRow {
         border-collapse: collapse;
         font-weight: lighter;
+        padding: 0pt 0pt 3pt 5pt;
     }
     .headerTable tr td.data,
-    .evidTableRoomNameRow {
+    .evidTableRoomNameRow,
+    .top-table .evidTable tr td.evidTableData {
         font-family: "Times New Roman", Times, serif;
         font-size: 11pt;
     }
+
+    .evidTableRoomNameRow,
+    .top-table .evidTable tr td.evidTableData {
+        font-weight: bold;
+    }
+
+
     .headerTable tr td.header,
     .headerTable tr td.data {
         vertical-align: "bottom";
     }
-    .agentTable tbody tr td.agentTableData,
-    .evidTable tr td.evidTableDataColTwo,
-    .noteTable tbody tr td.noteTableData,
-    .personTable tbody tr td.personTableData,
-    .roomTable tbody tr td.roomTableData {
+    .top-table .agentTable tbody tr td.agentTableData,
+    .top-table .evidTable tr td.evidTableDataColTwo,
+    .top-table .noteTable tbody tr td.noteTableData,
+    .top-table .personTable tbody tr td.personTableData,
+    .top-table .roomTable tbody tr td.roomTableData {
         font-family: "Times New Roman", Times, serif;
-        padding: 5px 0px 3px 0px;
+        font-size: 11pt;
+        padding: 5px 5px 3px 5px;
         vertical-align: "bottom";
     }
     .top-table .evidTable tr td.evidTableDataColOne,
@@ -319,7 +329,7 @@ td.data {
 .personTableHeader {
     border-collapse: collapse;
     font-weight: 650;
-    padding: 5px;
+    padding: 0pt 5pt;
     text-align: left;
 }
 
@@ -337,7 +347,7 @@ td.data {
 .personTableData {
     border-bottom: 1px dashed black;
     height: 1.85em;
-    padding: 0px 5px;
+    padding: 0pt 5pt;
     vertical-align: bottom;
 }
 
@@ -386,7 +396,11 @@ td.evidTableDataColTwo {
 
 
 # ----- Case Header Builder -----
-def build_case_header_html(active_case: dict | None, page_title: str, sub_title: str) -> str:
+def build_case_header_html(
+        active_case: dict | None,
+        page_title: str,
+        sub_title: str
+) -> str:
     """Generates the standard report title + case info header HTML."""
     active_case = get_case_info()
 
@@ -485,20 +499,22 @@ def build_agents_report_html(active_case: dict, agents: list) -> str:
 </head>
 <body>
     {header}
-    <table class="agentTable">
-        <thead>
-            <tr>
-                <th class="agentTableHeader font-10">Agent Name</th>
-                <th class="agentTableHeader font-10">Agency</th>
-                <th class="agentTableHeader font-10">Primary Role</th>
-                <th class="agentTableHeader font-10">Phone Number</th>
-                <th class="agentTableHeader font-10">Email</th>
-            </tr>
-        </thead>
-        <tbody>
-            {agent_rows}
-        </tbody>
-    </table>
+    <div class="top-table">
+        <table class="agentTable">
+            <thead>
+                <tr>
+                    <th class="agentTableHeader font-10">Agent Name</th>
+                    <th class="agentTableHeader font-10">Agency</th>
+                    <th class="agentTableHeader font-10">Primary Role</th>
+                    <th class="agentTableHeader font-10">Phone Number</th>
+                    <th class="agentTableHeader font-10">Email</th>
+                </tr>
+            </thead>
+            <tbody>
+                {agent_rows}
+            </tbody>
+        </table>
+    </div>
     {footer}
 </body>
 </html>"""
@@ -862,10 +878,10 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
                 <td class="roomTableData" style="padding-left:25px;">
                     {r["room_label"]}
                 </td>
-                <td class="roomTableData">{r["room_desc"]}</td>
-                <td class="roomTableData">{r["room_first_agent"]}</td>
-                <td class="roomTableData">{r["room_second_agent"]}</td>
-                <td class="roomTableData">{r["room_note"]}</td>
+                <td class="roomTableData font-10">{r["room_desc"]}</td>
+                <td class="roomTableData font-10">{r["room_first_agent"]}</td>
+                <td class="roomTableData font-10">{r["room_second_agent"]}</td>
+                <td class="roomTableData font-10">{r["room_note"]}</td>
             </tr>"""
             for r in rooms
         ]
@@ -889,20 +905,22 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
 </head>
 <body>
     {header}
-    <table class="roomTable">
-        <thead>
-            <tr>
-                <th class="roomTableHeader font-10">Room ID</th>
-                <th class="roomTableHeader font-10">Room Name</th>
-                <th class="roomTableHeader font-10">Searched By (1)</th>
-                <th class="roomTableHeader font-10">Searched By (2)</th>
-                <th class="roomTableHeader font-10">Notes</th>
-            </tr>
-        </thead>
-        <tbody>
-            {room_rows}
-        </tbody>
-    </table>
+    <div class="top-table">
+        <table class="roomTable">
+            <thead>
+                <tr>
+                    <th class="roomTableHeader font-10">Room ID</th>
+                    <th class="roomTableHeader font-10">Room Name</th>
+                    <th class="roomTableHeader font-10">Searched By (1)</th>
+                    <th class="roomTableHeader font-10">Searched By (2)</th>
+                    <th class="roomTableHeader font-10">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {room_rows}
+            </tbody>
+        </table>
+    </div>
     {footer}
 </body>
 </html>"""
@@ -914,11 +932,11 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 
     person_rows = "".join([f"""
         <tr>
-            <td class="personTableData">{p["sus_name"]}</td>
-            <td class="personTableData">{p["sus_dob"]}</td>
-            <td class="personTableData">{p["sus_address"]}</td>
-            <td class="personTableData">{p["sus_phone"]}</td>
-            <td class="personTableData">{p["sus_note"]}</td>
+            <td class="personTableData font-10">{p["sus_name"]}</td>
+            <td class="personTableData font-10">{p["sus_dob"]}</td>
+            <td class="personTableData font-10">{p["sus_address"]}</td>
+            <td class="personTableData font-10">{p["sus_phone"]}</td>
+            <td class="personTableData font-10">{p["sus_note"]}</td>
         </tr>"""
         for p in persons
         ]
@@ -942,20 +960,22 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 </head>
 <body>
     {header}
-    <table class="personTable">
-        <thead>
-            <tr>
-                <th class="personTableHeader">Person Name</th>
-                <th class="personTableHeader">DOB</th>
-                <th class="personTableHeader">Address</th>
-                <th class="personTableHeader">Phone #</th>
-                <th class="personTableHeader">Notes</th>
-            </tr>
-        </thead>
-        <tbody>
-            {person_rows}
-        </tbody>
-    </table>
+    <div class="top-table">
+        <table class="personTable">
+            <thead>
+                <tr>
+                    <th class="personTableHeader font-10">Person Name</th>
+                    <th class="personTableHeader font-10">DOB</th>
+                    <th class="personTableHeader font-10">Address</th>
+                    <th class="personTableHeader font-10">Phone #</th>
+                    <th class="personTableHeader font-10">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {person_rows}
+            </tbody>
+        </table>
+    </div>
     {footer}
 </body>
 </html>"""
@@ -967,10 +987,10 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 
     note_rows = "".join([f"""
         <tr>
-            <td class="noteTableData">{n["note_date_time"]}</td>
-            <td class="noteTableData">{n["note_date_time_updated"]}</td>
-            <td class="noteTableData">{n["note_author"]}</td>
-            <td class="noteTableData">{n["note_text"]}</td>
+            <td class="noteTableData font-10">{n["note_date_time"]}</td>
+            <td class="noteTableData font-10">{n["note_date_time_updated"]}</td>
+            <td class="noteTableData font-10">{n["note_author"]}</td>
+            <td class="noteTableData font-10">{n["note_text"]}</td>
         </tr>
         """
         for n in notes
@@ -995,19 +1015,21 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 </head>
 <body>
     {header}
-    <table class="noteTable">
-        <thead>
-            <tr>
-                <th class="noteTableHeader">Date/Time Added</th>
-                <th class="noteTableHeader">Date/Time Updated</th>
-                <th class="noteTableHeader">Author</th>
-                <th class="noteTableHeader">Text</th>
-            </tr>
-        </thead>
-        <tbody>
-            {note_rows}
-        </tbody>
-    </table>
+    <div class="top-table">
+        <table class="noteTable">
+            <thead>
+                <tr>
+                    <th class="noteTableHeader font-10">Date/Time Added</th>
+                    <th class="noteTableHeader font-10">Date/Time Updated</th>
+                    <th class="noteTableHeader font-10">Author</th>
+                    <th class="noteTableHeader font-10">Text</th>
+                </tr>
+            </thead>
+            <tbody>
+                {note_rows}
+            </tbody>
+        </table>
+    </div>
     {footer}
 </body>
 </html>"""
