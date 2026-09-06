@@ -20,11 +20,12 @@ from utils import (
     required_select,
     required_input,
     load_agent_names,
-    get_current_timestamp
+    get_current_timestamp,
 )
 
+
 # ----- Main Page Builder -----
-def build_notes_page():
+def build_notes_page() -> None:
     """Builds the full Notes page UI."""
 
     # ----- Header / Navbar -----
@@ -69,19 +70,16 @@ def build_notes_page():
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
-                def clear_form():
-
+                def clear_form() -> None:
                     note_date_time_input.value = get_current_timestamp()
                     note_author_combo.value = None
                     note_text_input.value = ""
 
-                def on_submit():
-
+                def on_submit() -> None:
                     # ----- Required field validation -----
                     note_author = note_author_combo.value
 
                     if not note_author:
-
                         ui.notify(
                             "The 'Agent Name' field is required.",
                             type="warning",
@@ -89,13 +87,11 @@ def build_notes_page():
                             position="center",
                             close_button="OK",
                         )
-
                         return
 
                     note_text = note_text_input.value or ""
 
                     if not note_text:
-
                         ui.notify(
                             "The 'Note Text' field is required.",
                             type="warning",
@@ -103,7 +99,6 @@ def build_notes_page():
                             position="center",
                             close_button="OK",
                         )
-
                         return
 
                     note_date_time = (
@@ -113,14 +108,12 @@ def build_notes_page():
 
                     # ----- Save to database -----
                     with get_session() as session:
-
                         new_note = Notes(
                             note_date_time=note_date_time,
                             note_date_time_updated="",
                             note_author=note_author,
                             note_text=note_text,
                         )
-
                         session.add(new_note)
 
                     ui.notify(
@@ -154,26 +147,21 @@ def build_notes_page():
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2")
 
-        def refresh_notes_table():
+        def refresh_notes_table() -> None:
             """Re-renders the notes table from the database."""
 
             table_container.clear()
 
             with get_session() as session:
-
                 notes = (
                     session.query(Notes)
                     .order_by(Notes.id.desc())
                     .all()
                 )
-
                 if not notes:
-
                     with table_container:
-
                         ui.label("No notes in the database yet"
                             ).classes("text-gray-500 italic")
-
                     return
 
                 row_data = [
@@ -254,10 +242,8 @@ def build_notes_page():
                 )
 
                 # ----- Edit dialog -----
-                def open_edit_dialog(e):
-
+                def open_edit_dialog(e) -> None:
                     row = e.args
-
                     current_agents = load_agent_names()
 
                     with ui.dialog() as edit_dialog, ui.card(
@@ -301,12 +287,9 @@ def build_notes_page():
                                 on_click=edit_dialog.close,
                             ).props("flat")
 
-                            def on_save_update():
-
+                            def on_save_update() -> None:
                                 new_author = edit_author.value or ""
-
                                 if not new_author:
-
                                     ui.notify(
                                         "The 'Agent Name' field is required.",
                                         type="warning",
@@ -314,13 +297,11 @@ def build_notes_page():
                                         position="center",
                                         close_button="OK",
                                     )
-
                                     return
 
                                 new_text = edit_text.value or ""
 
                                 if not new_text:
-
                                     ui.notify(
                                         "The 'Note Text' field is required.",
                                         type="warning",
@@ -328,17 +309,14 @@ def build_notes_page():
                                         position="center",
                                         close_button="OK",
                                     )
-
                                     return
 
                                 with get_session() as session:
-
                                     note = (
                                         session.query(Notes)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
-
                                     if note:
                                         # Only update these fields
                                         note.note_date_time_updated = (
@@ -366,10 +344,8 @@ def build_notes_page():
                     edit_dialog.open()
 
                 # ----- Delete confirmation dialog -----
-                def open_delete_dialog(e):
-
+                def open_delete_dialog(e) -> None:
                     row = e.args
-
                     with ui.dialog() as delete_dialog, ui.card(
                         ).classes("max-w-sm p-6"
                     ):
@@ -400,23 +376,17 @@ def build_notes_page():
                                 on_click=delete_dialog.close,
                             ).props("flat")
 
-                            def on_confirm_delete():
-
+                            def on_confirm_delete() -> None:
                                 with get_session() as session:
-
                                     note = (
                                         session.query(Notes)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
-
                                     if note:
-
                                         note_id = note.id
                                         session.delete(note)
-
                                     else:
-
                                         note_id = row["id"]
 
                                 ui.notify(

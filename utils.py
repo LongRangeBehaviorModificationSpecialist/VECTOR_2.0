@@ -2,6 +2,8 @@
 
 """
 utils.py
+
+File containing various functions used throughout the application.
 """
 from datetime import datetime
 import json
@@ -81,7 +83,10 @@ mimetypes.add_type("application/x-xz", ".xz")
 
 
 def get_current_timestamp() -> str:
-    """Returns current date/time formatted as MM-DD-YYYY HH:MM:SS."""
+    """Gets the current date and time.
+
+    Returns:
+        [str] current date/time formatted as MM-DD-YYYY HH:MM:SS."""
     return datetime.now().strftime("%m-%d-%Y %H:%M:%S")
 
 
@@ -152,9 +157,12 @@ def get_case_info() -> dict | None:
 
 
 def load_jurisdiction_options() -> list[str]:
-    """Returns jurisdiction choices from JURISDICTIONS.
+    """Reads values from the JURISDICTIONS list.
 
     Handles both plain-string and (value, label) tuple formats.
+
+    Returns:
+        jurisdiction choices from JURISDICTIONS.
     """
     if not JURISDICTIONS:
         return []
@@ -183,7 +191,8 @@ def save_agent_to_json(agents: list) -> None:
 def get_agent_dict() -> list[dict]:
     """Loads agent data from agents.json file.
 
-    Returns rows as dicts for auto-population.
+    Returns:
+        rows as dicts for auto-population.
     """
     data = load_agents_from_json()
 
@@ -237,7 +246,11 @@ def load_agency_options() -> list[str]:
     return []
 
 
-def is_duplicate_agent_in_json(agent_name: str, phone: str, email: str = "") -> bool:
+def is_duplicate_agent_in_json(
+        agent_name: str,
+        phone: str,
+        email: str = ""
+) -> bool:
     """Checks if an agent with the same name, phone, or email already
     exists in agents.json.
 
@@ -270,7 +283,11 @@ def is_duplicate_agent_in_json(agent_name: str, phone: str, email: str = "") -> 
             .replace(" ", "")
         )
 
-        if existing_phone_clean and phone_clean and existing_phone_clean == phone_clean:
+        if (
+            existing_phone_clean
+            and phone_clean
+            and existing_phone_clean == phone_clean
+        ):
             return True
 
         # Check email match (if applicable)
@@ -324,7 +341,8 @@ def get_next_evid_num() -> str:
     """Gets the highest evidence number from the database and
     increments it.
 
-    Returns "1" if no evidence exists yet.
+    Returns:
+        "1" if no evidence exists yet.
     """
     with get_session() as session:
         evid_query = (
@@ -360,14 +378,14 @@ def get_next_room_ltr() -> str:
     """Gets the label of the last room in the database and
     increments it to the next letter.
 
-    Returns "A" if no rooms exist yet.
+    Returns:
+        "A" if no rooms exist yet.
     """
     with get_session() as session:
         rooms = session.query(Rooms).order_by(Rooms.room_label).all()
         if rooms:
             last_label = rooms[-1].room_label
-            # Increment the ASCII value by 1,
-            # then convert back to char
+            # Increment the ASCII value by 1, then convert back to char
             return chr(ord(last_label) + 1)
         else:
             return "A"
@@ -399,10 +417,9 @@ def format_file_size(size_bytes: int) -> str:
 
 
 def delete_all_data() -> None:
+    """Delete all data from the app_data.db file."""
     with get_session() as session:
-
         try:
-
             session.query(Cases).delete()
             session.query(Agents).delete()
             session.query(Rooms).delete()
@@ -513,13 +530,13 @@ def validate_agent_data(
     if role and role_secondary:
         if role.strip().lower() == role_secondary.strip().lower():
             ui.notify(
-                    f"The 'Primary Role' field and the 'Secondary Role' field "
-                    f"for {agent_name} cannot be the same.",
-                    type="warning",
-                    timeout=0,
-                    position="center",
-                    close_button="OK",
-                    )
+                f"The 'Primary Role' field and the 'Secondary Role' "
+                f"field for {agent_name} cannot be the same.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+                )
             return False
 
     return True
@@ -714,7 +731,6 @@ def validate_room_data(
 ) -> bool:
 
     if not room_label:
-
         ui.notify(
             "The 'Room Label' field is required.",
             type="warning",
@@ -740,7 +756,6 @@ def validate_room_data(
             .filter_by(room_label=room_label)
             .first()
         ):
-
             ui.notify(
                 "That label is currently assigned to another room.",
                 type="warning",
@@ -770,7 +785,6 @@ def validate_room_data(
             first_agent and second_agent and
             first_agent == second_agent
         ):
-
             ui.notify(
                 "The same agent cannot be listed in the 'First Agent Name' "
                 "and 'Second Agent Name' fields.",

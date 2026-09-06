@@ -13,7 +13,7 @@ from nicegui import ui
 
 from models import get_users_session, Users, DEFAULT_USER_PASSWORD
 from navbar import build_navbar
-from main import is_authenticated, get_current_user_name, get_is_admin
+from main import get_current_user_name, get_is_admin
 
 # ----- PAGE BUILDER -----
 def build_admin_page():
@@ -43,12 +43,10 @@ def build_admin_page():
             new_username = ui.input(label="Username").classes("w-full")
 
             def create_user():
-
                 uname = new_username.value.strip()
 
                 # ----- Validation -----
                 if not uname:
-
                     ui.notify(
                         "Username is required.",
                         type="negative",
@@ -56,13 +54,10 @@ def build_admin_page():
                         position="center",
                         close_button="OK",
                     )
-
                     return
 
                 with get_users_session() as session:
-
                     if session.query(Users).filter_by(user_name=uname).first():
-
                         ui.notify(
                             "That username already exists.",
                             type="negative",
@@ -70,7 +65,6 @@ def build_admin_page():
                             position="center",
                             close_button="OK",
                         )
-
                         return
 
                     new_user = Users(
@@ -119,7 +113,6 @@ def build_admin_page():
                     table_container.clear()
 
                     with get_users_session() as session:
-
                         users = session.query(Users).order_by(
                             Users.user_name).all()
 
@@ -137,7 +130,6 @@ def build_admin_page():
                         ]
 
                     with table_container:
-
                         columns = [
                             {
                                 "name": "username",
@@ -203,9 +195,7 @@ def build_admin_page():
 
                         # ----- Reset password handler -----
                         def reset_password(e):
-
                             row = e.args
-
                             with ui.dialog() as reset_dialog, ui.card(
                                 ).classes("max-w-sm p-6"):
 
@@ -227,17 +217,13 @@ def build_admin_page():
                                     ).props("flat")
 
                                     def on_confirm_reset():
-
                                         with get_users_session() as session:
-
                                             user = (
                                                 session.query(Users)
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
-
                                             if user:
-
                                                 user.set_password(
                                                     DEFAULT_USER_PASSWORD
                                                 )
@@ -266,11 +252,8 @@ def build_admin_page():
 
                         # ----- Delete user handler -----
                         def delete_user(e):
-
                             row = e.args
-
                             if row["is_admin"] == "Yes":
-
                                 ui.notify(
                                     "Cannot delete the admin account.",
                                     type="negative",
@@ -278,11 +261,11 @@ def build_admin_page():
                                     position="center",
                                     close_button="OK",
                                 )
-
                                 return
 
                             with ui.dialog() as delete_dialog, ui.card(
-                                ).classes("max-w-sm p-6"):
+                                ).classes("max-w-sm p-6"
+                            ):
 
                                 ui.label(
                                     "Confirm Deletion"
@@ -304,21 +287,17 @@ def build_admin_page():
                                     ).props("flat")
 
                                     def on_confirm_delete():
-
                                         with get_users_session() as session:
-
                                             user = (
                                                 session.query(Users)
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
-
                                             if user:
-
                                                 session.delete(user)
 
                                         ui.notify(
-                                            f"User '{row['username']}' "
+                                            f"User '{row["username"]}' "
                                             "deleted.",
                                             type="positive",
                                             timeout=0,
@@ -339,5 +318,5 @@ def build_admin_page():
                         table.on("reset", reset_password)
                         table.on("delete", delete_user)
 
-        # Initial render
-        refresh_users_table()
+    # Initial render
+    refresh_users_table()

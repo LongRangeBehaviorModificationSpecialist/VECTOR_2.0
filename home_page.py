@@ -47,11 +47,8 @@ def home():
     )
 
     if authenticated:
-
         build_authenticated_home()
-
     else:
-
         build_login_home()
 
 
@@ -192,7 +189,6 @@ def build_authenticated_home():
                     )
 
                     def do_export():
-
                         pwd = (
                             password_input.value
                             if encrypt_checkbox.value
@@ -200,7 +196,6 @@ def build_authenticated_home():
                         )
 
                         if encrypt_checkbox.value and not pwd:
-
                             ui.notify(
                                 "Please enter a password or uncheck "
                                 "encryption.",
@@ -209,7 +204,6 @@ def build_authenticated_home():
                                 position="center",
                                 close_button="OK",
                             )
-
                             return
 
                         dialog.close()
@@ -264,11 +258,8 @@ def build_authenticated_home():
                     )
 
                     def do_import():
-
                         path = zip_path_input.value.strip()
-
                         if not path:
-
                             ui.notify(
                                 "Please enter file path to ZIP file.",
                                 type="warning",
@@ -276,11 +267,9 @@ def build_authenticated_home():
                                 position="center",
                                 close_button="OK",
                             )
-
                             return
 
                         if not Path(path).exists():
-
                             ui.notify(
                                 "ZIP file not found.",
                                 type="negative",
@@ -288,7 +277,6 @@ def build_authenticated_home():
                                 position="center",
                                 close_button="OK",
                             )
-
                             return
 
                         pwd = (
@@ -298,7 +286,6 @@ def build_authenticated_home():
                         )
 
                         if encrypt_checkbox.value and not pwd:
-
                             ui.notify(
                                 "Please enter the password.",
                                 type="warning",
@@ -306,7 +293,6 @@ def build_authenticated_home():
                                 position="center",
                                 close_button="OK",
                             )
-
                             return
 
                         dialog.close()
@@ -359,9 +345,7 @@ def build_authenticated_home():
                     )
 
                     def do_delete():
-
                         if not affirm_checkbox.value:
-
                             ui.notify(
                                 "Is it really that much trouble to click "
                                 "one simple box?  Let's try this again.",
@@ -370,11 +354,9 @@ def build_authenticated_home():
                                 position="center",
                                 close_button="OK",
                             )
-
                             return
 
                         if affirm_input.value != "DELETE":
-
                             ui.notify(
                                 "Seriously, how difficult is it to type "
                                 "the word 'DELETE'?  Noob!",
@@ -383,7 +365,6 @@ def build_authenticated_home():
                                 position="center",
                                 close_button="OK",
                             )
-
                             return
 
                         affirm = (
@@ -393,7 +374,6 @@ def build_authenticated_home():
                         )
 
                         if affirm_checkbox.value and not affirm:
-
                             ui.notify(
                                 "Please indicate you understand...",
                                 type="warning",
@@ -401,7 +381,6 @@ def build_authenticated_home():
                                 position="center",
                                 close_button="OK",
                             )
-
                             return
 
                         dialog.close()
@@ -483,7 +462,6 @@ def build_login_home():
             entered_pass = password_input.value
 
             if not entered_user or not entered_pass:
-
                 ui.notify(
                     "Both a username and password are required.",
                     type="warning",
@@ -491,11 +469,9 @@ def build_login_home():
                     position="center",
                     close_button="OK",
                 )
-
                 return
 
             with get_users_session() as session:
-
                 user = (
                     session.query(Users)
                     .filter_by(
@@ -506,9 +482,7 @@ def build_login_home():
                 )
 
                 if user and user.check_password_correction(entered_pass):
-
                     from nicegui import app
-
                     app.storage.user["authenticated"] = True
                     app.storage.user["user_name"] = user.user_name
                     app.storage.user["is_admin"] = user.is_admin
@@ -517,11 +491,8 @@ def build_login_home():
                     )
 
                     if user.must_change_password:
-
                         ui.navigate.to("/change-password")
-
                     else:
-
                         ui.notify(
                             f"Welcome, {user.user_name}!",
                             type="positive",
@@ -529,11 +500,8 @@ def build_login_home():
                             position="bottom",
                             close_button="OK",
                         )
-
                         ui.navigate.to("/")
-
                 else:
-
                     ui.notify(
                         "Invalid username or password.",
                         type="warning",
@@ -541,7 +509,6 @@ def build_login_home():
                         position="center",
                         close_button="OK",
                     )
-
                     password_input.value = ""
 
         # Submit on Enter key
@@ -665,11 +632,8 @@ def confirm_new_case_handler():
             ).props("flat")
 
             def on_confirm_delete_all():
-
                 try:
-
                     with get_session() as session:
-
                         # Delete in order to avoid foreign key issues
                         session.query(Evidence).delete()
                         session.query(Notes).delete()
@@ -677,9 +641,7 @@ def confirm_new_case_handler():
                         session.query(Rooms).delete()
                         session.query(Agents).delete()
                         session.query(Cases).delete()
-
                         session.commit()
-
                     ui.notify("Data in the app database tables has "
                         "been deleted.",
                         type="positive",
@@ -687,13 +649,9 @@ def confirm_new_case_handler():
                         position="center",
                         close_button="OK",
                     )
-
                     ui.navigate.to("/")
-
                 except Exception as e:
-
                     session.rollback()
-
                     ui.notify(
                         "The database information was rolled back.",
                         type="positive",
@@ -701,9 +659,7 @@ def confirm_new_case_handler():
                         position="bottom",
                         close_button="OK",
                     )
-
                 finally:
-
                     dialog.close()
 
             ui.button(

@@ -33,7 +33,7 @@ from utils import (
 
 
 # ----- Main Page Builder -----
-def build_agents_page():
+def build_agents_page() -> None:
     """Builds the Agents page UI."""
 
     # ----- Header / Navbar -----
@@ -93,19 +93,15 @@ def build_agents_page():
             ).classes("w-full")
 
             # ----- Auto-populate on name selection -----
-            def on_name_change(e):
-
+            def on_name_change(e) -> None:
                 selected = e.value
-
                 if not selected:
-
                     return
 
                 agents_list = get_agent_dict()
                 agent_lookup = {a["name"]: a for a in agents_list}
 
                 if selected in agent_lookup:
-
                     info = agent_lookup[selected]
                     agent_parent_agency_input.value = info.get(
                         "agency", ""
@@ -116,7 +112,6 @@ def build_agents_page():
                     agent_email_input.value = info.get(
                         "email", ""
                     ) or ""
-
                 else:
                     agent_parent_agency_input.value = None
                     agent_phone_input.value = ""
@@ -127,8 +122,7 @@ def build_agents_page():
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
-                def clear_agent_form():
-
+                def clear_agent_form() -> None:
                     agent_name_input.value = None
                     agent_parent_agency_input.value = None
                     agent_role_input.value = None
@@ -137,9 +131,8 @@ def build_agents_page():
                     agent_email_input.value = ""
                     agent_note_input.value = ""
 
-                def on_submit():
+                def on_submit() -> None:
                     """Handles form submission for new agents."""
-
                     agent_name = agent_name_input.value
                     agency = agent_parent_agency_input.value or ""
                     agent_role = agent_role_input.value
@@ -154,20 +147,16 @@ def build_agents_page():
                         agency=agency,
                         role=agent_role,
                     ):
-
                         return
 
                     try:
-
                         with get_session() as session:
-
                             # ----- Uniqueness checks for data -----
                             if (
                                 session.query(Agents)
                                 .filter_by(agent_name=agent_name)
                                 .first()
                             ):
-
                                 ui.notify(
                                     "That Agent's Name is already in the case "
                                     "database. Please check the name and try "
@@ -177,7 +166,6 @@ def build_agents_page():
                                     position="center",
                                     close_button="OK",
                                 )
-
                                 return
 
                             new_agent = Agents(
@@ -189,7 +177,6 @@ def build_agents_page():
                                 agent_email=email,
                                 agent_note=notes,
                             )
-
                             session.add(new_agent)
 
                         if not is_duplicate_agent_in_json(
@@ -197,11 +184,7 @@ def build_agents_page():
                             phone=phone,
                             email=email,
                         ):
-
-                            # RIGHT — Load → Append → Save
-                            # Save to JSON file
                             agents = load_agents_from_json()
-
                             agents.append(
                                 {
                                     "name": agent_name,
@@ -210,9 +193,7 @@ def build_agents_page():
                                     "email": email,
                                 }
                             )
-
                             save_agent_to_json(agents=agents)
-
                             ui.notify(
                                 "New agent saved to the JSON file.",
                                 type="positive",
@@ -220,9 +201,7 @@ def build_agents_page():
                                 position="bottom",
                                 close_button="OK",
                             )
-
                         else:
-
                             ui.notify(
                                 f"{agent_name} added to the case databse.",
                                 type="positive",
@@ -230,15 +209,12 @@ def build_agents_page():
                                 position="bottom",
                                 close_button="OK",
                             )
-
                         refresh_agent_table()
                         clear_agent_form()
 
                     except Exception:
-
                         import traceback
                         traceback.print_exc()
-
                         ui.notify(
                             "Please check the Agent Information you "
                             "just tried to enter/update — You may "
@@ -272,29 +248,24 @@ def build_agents_page():
             with ui.row().classes("w-full max-w-6xl items-center"):
 
                 table_container = ui.column().classes(
-                    "w-full max-w-5xl mx-auto items-center gap-2")
+                    "w-full max-w-5xl mx-auto items-center gap-2"
+                )
 
-                def refresh_agent_table():
+                def refresh_agent_table() -> None:
                     """Re-renders the agents table from the database."""
-
                     table_container.clear()
 
                     with get_session() as session:
-
                         agents = (
                             session.query(Agents)
                             .order_by(Agents.agent_name)
                             .all()
                         )
-
                         if not agents:
-
                             with table_container:
-
                                 ui.label(
                                     "No agents in the database yet"
                                 ).classes("text-gray-500 italic")
-
                             return
 
                         row_data = [
@@ -316,7 +287,6 @@ def build_agents_page():
                         ]
 
                     with table_container:
-
                         column_defs = [
                             {
                                 "name": "agent_name",
@@ -374,7 +344,6 @@ def build_agents_page():
                             rows=row_data,
                             row_key="id",
                         )
-
                         table.props("dense flat")
 
                         # ----- Slot: Actions column (Update / Delete) -----
@@ -397,12 +366,11 @@ def build_agents_page():
                         )
 
                         # ----- Edit dialog -----
-                        def open_edit_dialog(e):
-
+                        def open_edit_dialog(e) -> None:
                             row = e.args
-
                             with ui.dialog() as edit_dialog, ui.card(
-                                ).classes("w-full max-w-lg p-6"):
+                                ).classes("w-full max-w-lg p-6"
+                            ):
 
                                 ui.label(
                                     f"Edit Agent: {row['agent_name']}"
@@ -458,21 +426,17 @@ def build_agents_page():
                                         on_click=edit_dialog.close,
                                     ).props("flat")
 
-                                    def on_save_update():
+                                    def on_save_update() -> None:
                                         """Handles form submission for
                                         updating existing agents.
                                         """
-
                                         with get_session() as session:
-
                                             agent = (
                                                 session.query(Agents)
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
-
                                             if not agent:
-
                                                 ui.notify(
                                                     "Agent not found",
                                                     type="warning",
@@ -480,7 +444,6 @@ def build_agents_page():
                                                     position="center",
                                                     close_button="OK",
                                                 )
-
                                                 return
 
                                             agent.agent_name = agent_name.value
@@ -502,14 +465,12 @@ def build_agents_page():
                                                 agent_note.value or ""
                                             )
 
-                                            # ----- Required field
-                                            # validation -----
+                                            # ----- Validate req fields -----
                                             if not validate_agent_data(
                                                 agent_name=agent_name,
                                                 agency=agent_parent_agency,
                                                 role=agent_role,
                                             ):
-
                                                 return
 
                                         ui.notify(
@@ -531,8 +492,7 @@ def build_agents_page():
                             edit_dialog.open()
 
                         # ----- Delete confirmation dialog -----
-                        def open_delete_dialog(e):
-
+                        def open_delete_dialog(e) -> None:
                             row = e.args
 
                             with ui.dialog() as delete_dialog, ui.card(
@@ -550,29 +510,22 @@ def build_agents_page():
                                 with ui.row().classes(
                                     "w-full justify-end gap-2"
                                 ):
-
                                     ui.button(
                                         "Cancel",
                                         on_click=delete_dialog.close,
                                     ).props("flat")
 
-                                    def confirm_agent_delete():
-
+                                    def confirm_agent_delete() -> None:
                                         with get_session() as session:
-
                                             agent = (
                                                 session.query(Agents)
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
-
                                             if agent:
-
                                                 agent_name = agent.agent_name
                                                 session.delete(agent)
-
                                             else:
-
                                                 agent_name = row["agent_name"]
 
                                         ui.notify(
@@ -600,10 +553,9 @@ def build_agents_page():
             with ui.row().classes("w-full justify-center my-2"):
 
                 # ----- CLEAR ALL BUTTON -----
-                def delete_all_agents():
+                def delete_all_agents() -> None:
 
                     with get_session() as session:
-
                         session.query(Agents).delete()
                         session.commit()
 

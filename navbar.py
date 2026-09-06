@@ -15,7 +15,7 @@ from nicegui import ui
 
 
 # ----- Modal Dialog Builders -----
-def confirm_new_case_dialog(on_confirm: callable):
+def confirm_new_case_dialog(on_confirm: callable) -> None:
     """Replacement for _new_case_confirm.html.
 
     Shows a confirmation dialog before creating a new case file.
@@ -23,7 +23,7 @@ def confirm_new_case_dialog(on_confirm: callable):
     Call the returned function to open it.
     """
 
-    def open_dialog():
+    def open_dialog() -> None:
         with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
             ui.label(
@@ -52,16 +52,13 @@ def confirm_new_case_dialog(on_confirm: callable):
     return open_dialog
 
 
-def confirm_delete_dialog(
-        on_confirm: callable,
-        item_name: str = "this item"
-):
+def confirm_delete_dialog(on_confirm: callable, item_name: str = "this item"):
     """Replacement for _confirm_data_delete.html.
 
     Shows a confirmation dialog before deleting data.
     """
 
-    def open_dialog():
+    def open_dialog() -> None:
         with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
             ui.label(
@@ -91,7 +88,7 @@ def confirm_delete_dialog(
 
 
 # ----- Dropdown Helper -----
-def _nav_dropdown(label: str, items: list[tuple[str, callable]]):
+def _nav_dropdown(label: str, items: list[tuple[str, callable]]) -> None:
     """Creates a dropdown button in the navbar.
 
     Each item is a (label, callback) tuple.
@@ -107,10 +104,10 @@ def _nav_dropdown(label: str, items: list[tuple[str, callable]]):
 
 # ----- Main Navbar -----
 def build_navbar(
-        is_admin: bool = False,
-        username: str = "Guest",
-        on_new_case: callable = None,
-):
+    is_admin: bool = False,
+    username: str = "Guest",
+    on_new_case: callable = None,
+) -> None:
     """Builds the top navigation bar for authenticated users.
 
     Args:

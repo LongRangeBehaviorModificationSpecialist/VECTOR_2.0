@@ -16,11 +16,32 @@ import json
 from nicegui import ui, app
 import os
 from pathlib import Path
+import secrets
 import sys
 
 from models import get_users_session
 
 DEBUG_MODE = "--dev" in sys.argv
+
+
+def get_storage_secret() -> str:
+    """Loads the storage secret from a hidden file.
+
+    Generates a new secret and saves it if the file doesn't exist.
+    """
+
+    secret_file = Path(__file__).parent / ".secret"
+
+    if secret_file.exists():
+        secret = secret_file.read_text(encoding="utf-8").strip()
+        if secret:
+            return secret
+
+    # ----- Generate a new secret and save it -----
+    secret = secrets.token_hex(32)
+    secret_file.write_text(secret, encoding="utf-8")
+    return secret
+
 
 # Explicitly tell NiceGUI where the static folder is
 app.add_static_files(
@@ -45,60 +66,41 @@ def seed_default_user():
     json_path = Path(__file__).parent / f"db\\users.json"
 
     if not json_path.exists():
-
         print("WARNING → 'users.json' not found — no user seeded.")
-
         return
 
     with open(json_path, "r", encoding="utf-8") as f:
-
         user_data = json.load(f)
 
-    # Extract the password hash from the byte-string representation
     raw_hash = user_data.get("password_hash", "")
 
-    # The JSON stores it as "b'$2b$12$...'"
-    # parse it back to bytes, then decode to str
     try:
-
         hash_bytes = ast.literal_eval(raw_hash)
-
         if isinstance(hash_bytes, bytes):
-
             clean_hash = hash_bytes.decode("utf-8")
-
         else:
-
             clean_hash = str(hash_bytes)
 
     except (ValueError, SyntaxError):
-
-        # If ast.literal_eval fails, try stripping the b'' wrapper manually
         clean_hash = raw_hash
-
         if clean_hash.startswith("b'") and clean_hash.endswith("'"):
-
             clean_hash = clean_hash[2:-1]
 
     user_name = user_data.get("user_name", "")
     is_admin = user_data.get("is_admin", False)
 
     with get_users_session() as session:
-
         existing = (
             session.query(Users)
             .filter_by(user_name="novaicac")
             .first()
         )
-
         if existing:
             # Update existing user with latest hash from JSON
             existing.password_hash = clean_hash
             existing.is_admin = is_admin
             existing.is_active = True
-
         else:
-
             # Create new user
             new_user = Users(
                 user_name=user_name,
@@ -106,7 +108,6 @@ def seed_default_user():
                 is_admin=is_admin,
                 is_active=True,
             )
-
             session.add(new_user)
             print(f"✓ Created user '{user_name}' from users.json")
 
@@ -114,7 +115,6 @@ seed_default_user()
 
 
 # ----- Theme Configuration -----
-# Shrinks all textarea heights to match input/select field heights
 ui.add_css(
 """
 /* ----- Theme Colors (replaces ui.colors) ----- */
@@ -177,12 +177,6 @@ textarea.q-field__native {
     shared=True,
 )
 
-# ----- Import All Page Modules -----
-# Each module registers its own @ui.page routes on import.
-# Order matters: shared utilities first, then pages.
-
-# Core infrastructure
-import home_page  # (/, /home, /about, /help, /logout)
 
 # ----- Page Registrations -----
 # Some page modules define their own @ui.page decorators internally.
@@ -277,7 +271,6 @@ def admin_route():
         return
 
     if not get_is_admin():
-
         ui.notify(
             "Admin access required.",
             type="negative",
@@ -296,7 +289,6 @@ def change_password_page():
     from models import get_users_session, Users, DEFAULT_USER_PASSWORD
 
     if not is_authenticated():
-
         ui.navigate.to("/")
         return
 
@@ -313,7 +305,6 @@ def change_password_page():
         ).classes("text-gray-400 mb-6")
 
         with ui.card().classes("w-full max-w-sm p-6"):
-
             ui.label(
                 f"User: {username}"
             ).classes("mb-4 font-semibold")
@@ -329,9 +320,7 @@ def change_password_page():
             ).classes("w-full")
 
             def save_new_password():
-
                 if not new_pass.value or len(new_pass.value) < 8:
-
                     ui.notify(
                         "Password must be at least 8 characters.",
                         type="negative",
@@ -339,11 +328,9 @@ def change_password_page():
                         position="center",
                         close_button="OK",
                     )
-
                     return
 
                 if new_pass.value != confirm_pass.value:
-
                     ui.notify(
                         "Passwords do not match.",
                         type="negative",
@@ -351,11 +338,9 @@ def change_password_page():
                         position="center",
                         close_button="OK",
                     )
-
                     return
 
                 if new_pass.value == DEFAULT_USER_PASSWORD:
-
                     ui.notify(
                         "You cannot use the default password.",
                         type="negative",
@@ -363,22 +348,17 @@ def change_password_page():
                         position="center",
                         close_button="OK",
                     )
-
                     return
 
                 with get_users_session() as session:
-
                     user = (
                         session.query(Users)
                         .filter_by(user_name=username)
                         .first()
                     )
-
                     if user:
-
                         user.set_password(new_pass.value)
                         user.must_change_password = False
-
                 ui.notify(
                     "Password changed successfully!",
                     type="positive",
@@ -386,7 +366,6 @@ def change_password_page():
                     position="bottom",
                     close_button="OK",
                 )
-
                 ui.navigate.to("/")
 
             confirm_pass.on("keydown.enter", save_new_password)
@@ -433,7 +412,7 @@ if __name__ in {"__main__", "__mp_main__"}:
     ui.run(
         title="V·E·C·T·O·R",
         port=8080,
-        reload=DEBUG_MODE,
+        reload=DEBUG_MODE,  # or "False"
         dark=True,
-        storage_secret="vector-secret-key-change-in-production-2024",
+        storage_secret=get_storage_secret(),
     )

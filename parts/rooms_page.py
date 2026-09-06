@@ -27,7 +27,7 @@ from utils import (
 
 
 # ----- Main Page Builder -----
-def build_rooms_page():
+def build_rooms_page() -> None:
     """Builds the full Rooms page UI."""
 
     # ----- Header / Navbar -----
@@ -79,17 +79,15 @@ def build_rooms_page():
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
-                def clear_form():
-
+                def clear_form() -> None:
                     room_label_input.value = get_next_room_ltr()
                     room_desc_input.value = ""
                     room_first_agent_combo.value = None
                     room_second_agent_combo.value = None
                     room_note_input.value = ""
 
-                def on_submit():
+                def on_submit() -> None:
                     """Handles form submission for new rooms."""
-
                     room_label = room_label_input.value
                     room_desc = room_desc_input.value
                     first_agent = room_first_agent_combo.value or ""
@@ -101,18 +99,15 @@ def build_rooms_page():
                         room_label=room_label,
                         room_desc=room_desc,
                     ):
-
                         return
 
                     # ----- Duplicate label validation -----
                     with get_session() as session:
-
                         # ----- Same agent checks -----
                         if (
                             first_agent and second_agent and
                             first_agent == second_agent
                         ):
-
                             ui.notify(
                                 "The same agent cannot be listed in the "
                                 "'First Agent Name' and 'Second Agent "
@@ -122,7 +117,6 @@ def build_rooms_page():
                                 position="center",
                                 close_button="OK",
                             )
-
                             return
 
                         # ----- Save to database -----
@@ -133,7 +127,6 @@ def build_rooms_page():
                             room_second_agent=second_agent,
                             room_note=room_note,
                         )
-
                         session.add(new_room)
 
                     ui.notify(
@@ -172,26 +165,21 @@ def build_rooms_page():
                     "w-full max-w-5xl mx-auto items-center gap-2"
                 )
 
-                def refresh_rooms_table():
+                def refresh_rooms_table() -> None:
                     """Re-renders the rooms table from the database."""
                     table_container.clear()
 
                     with get_session() as session:
-
                         rooms = (
                             session.query(Rooms)
                             .order_by(Rooms.room_label)
                             .all()
                         )
-
                         if not rooms:
-
                             with table_container:
-
                                 ui.label(
                                     "No rooms in the database yet."
                                 ).classes("text-gray-500 italic")
-
                             return
 
                         row_data = [
@@ -207,7 +195,6 @@ def build_rooms_page():
                         ]
 
                     with table_container:
-
                         column_defs = [
                             {
                                 "name": "room_label",
@@ -281,10 +268,8 @@ def build_rooms_page():
                         )
 
                         # ----- Edit dialog -----
-                        def open_edit_dialog(e):
-
+                        def open_edit_dialog(e) -> None:
                             row = e.args
-
                             current_agents = load_agent_names()
 
                             with ui.dialog() as edit_dialog, ui.card(
@@ -332,8 +317,7 @@ def build_rooms_page():
                                         on_click=edit_dialog.close,
                                     ).props("flat")
 
-                                    def on_save_update():
-
+                                    def on_save_update() -> None:
                                         # ----- Validate uniqueness -----
                                         # (excluding current record)
                                         new_label = edit_label.value or ""
@@ -341,7 +325,6 @@ def build_rooms_page():
                                         new_note = edit_note.value or ""
 
                                         with get_session() as session:
-
                                             dup_label = (
                                                 session.query(Rooms)
                                                 .filter(
@@ -352,9 +335,7 @@ def build_rooms_page():
                                                 )
                                                 .first()
                                             )
-
                                             if dup_label:
-
                                                 ui.notify(
                                                     "That label is currently "
                                                     "assigned to another room.",
@@ -363,7 +344,6 @@ def build_rooms_page():
                                                     position="center",
                                                     close_button="OK",
                                                 )
-
                                                 return
 
                                             # Check duplicate description
@@ -376,7 +356,6 @@ def build_rooms_page():
                                                 )
                                                 .first()
                                             )
-
                                             if dup_desc:
                                                 ui.notify(
                                                     "That room description is "
@@ -387,7 +366,6 @@ def build_rooms_page():
                                                     position="center",
                                                     close_button="OK",
                                                 )
-
                                                 return
 
                                             # Check if same agent listed in both
@@ -395,7 +373,6 @@ def build_rooms_page():
                                             a2 = edit_second_agent.value or ""
 
                                             if a1 and a2 and a1 == a2:
-
                                                 ui.notify(
                                                     "The same agent cannot "
                                                     "be listed in the 'First "
@@ -407,7 +384,6 @@ def build_rooms_page():
                                                     position="center",
                                                     close_button="OK",
                                                     )
-
                                                 return
 
                                             # ----- Save changes -----
@@ -416,7 +392,6 @@ def build_rooms_page():
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
-
                                             if room:
                                                 room.room_label = new_label
                                                 room.room_desc = new_desc
@@ -443,7 +418,7 @@ def build_rooms_page():
                             edit_dialog.open()
 
                         # ----- Delete confirmation dialog -----
-                        def open_delete_dialog(e):
+                        def open_delete_dialog(e) -> None:
 
                             row = e.args
 
@@ -469,24 +444,18 @@ def build_rooms_page():
                                         on_click=delete_dialog.close,
                                     ).props("flat")
 
-                                    def on_confirm_delete():
-
+                                    def on_confirm_delete() -> None:
                                         with get_session() as session:
-
                                             room = (
                                                 session.query(Rooms)
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
-
                                             if room:
-
                                                 room_label = room.room_label
                                                 room_desc = room.room_desc
                                                 session.delete(room)
-
                                             else:
-
                                                 room_label = row["room_label"]
                                                 room_desc = row["room_desc"]
 
@@ -516,13 +485,10 @@ def build_rooms_page():
 
             with ui.row().classes("w-full justify-center my-2"):
 
-                def delete_all_rooms():
-
+                def delete_all_rooms() -> None:
                     with get_session() as session:
-
                         session.query(Rooms).delete()
                         session.commit()
-
                     ui.notify(
                         "All rooms have been deleted.",
                         type="positive",
@@ -530,7 +496,6 @@ def build_rooms_page():
                         position="bottom",
                         close_button="OK",
                     )
-
                     refresh_rooms_table()
 
                 ui.button(

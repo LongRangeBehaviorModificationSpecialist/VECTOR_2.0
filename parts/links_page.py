@@ -72,7 +72,7 @@ osint_links = {
 
 
 # ----- Link Section Builder -----
-def build_link_section(title: str, icon: str, links: dict[str, str]):
+def build_link_section(title: str, icon: str, links: dict[str, str]) -> None:
     """Builds a collapsible section of links using an expansion panel.
 
     Each link opens in a new tab.
@@ -96,7 +96,7 @@ def build_link_section(title: str, icon: str, links: dict[str, str]):
 
 
 # ----- Main Page Builder -----
-def build_links_page():
+def build_links_page() -> None:
     """Builds the full Useful Links page UI."""
 
     # ----- Header / Navbar -----

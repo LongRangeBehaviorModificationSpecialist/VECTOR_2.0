@@ -17,11 +17,12 @@ from main import get_current_user_name, get_is_admin
 from utils import (
     get_mime_type,
     is_allowed_file,
-    format_file_size
+    format_file_size,
 )
 
+
 # ----- Main Page Builder -----
-def build_uploads_page():
+def build_uploads_page() -> None:
     """Builds the full File Upload page UI."""
 
     # ----- Header / Navbar -----
@@ -49,11 +50,10 @@ def build_uploads_page():
                 "and (4) Archive files."
             ).classes("text-sm text-gray-400 mb-4")
 
-            async def handle_upload(e):
+            async def handle_upload(e) -> None:
                 """Handles file upload from ui.upload component."""
 
                 try:
-
                     uploaded_file = e.file
                     file_name = uploaded_file.name
                     # SmallFileUpload stores the data as bytes in _data
@@ -68,7 +68,6 @@ def build_uploads_page():
 
                     # Validate file type
                     if not is_allowed_file(file_mime_type):
-
                         ui.notify(
                             f"'{file_name}' is not an allowed file type "
                             f"({file_mime_type}). "
@@ -79,13 +78,11 @@ def build_uploads_page():
                             position="center",
                             close_button="OK",
                         )
-
                         return
 
                     uploader = get_current_user_name()
 
                     with get_session() as session:
-
                         new_file = UploadedFiles(
                             file_name=file_name,
                             file_data=file_data,
@@ -93,7 +90,6 @@ def build_uploads_page():
                             file_mime_type=file_mime_type,
                             uploaded_by=uploader,
                         )
-
                         session.add(new_file)
 
                     ui.notify(
@@ -108,7 +104,6 @@ def build_uploads_page():
                     refresh_files_table()
 
                 except Exception as err:
-
                     ui.notify(
                         f"Error uploading file → {str(err)}.",
                         type="negative",
@@ -116,7 +111,6 @@ def build_uploads_page():
                         position="center",
                         close_button="OK",
                     )
-
                     import traceback
                     traceback.print_exc()
 
@@ -140,27 +134,22 @@ def build_uploads_page():
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2")
 
-        def refresh_files_table():
+        def refresh_files_table() -> None:
             """Re-renders the files table from the database."""
 
             table_container.clear()
 
             with get_session() as session:
-
                 files = (
                     session.query(UploadedFiles)
                     .order_by(UploadedFiles.upload_date.desc())
                     .all()
                 )
-
                 if not files:
-
                     with table_container:
-
                         ui.label(
                             "No files uploaded yet"
                         ).classes("text-gray-500 italic")
-
                     return
 
                 row_data = [
@@ -181,7 +170,6 @@ def build_uploads_page():
                 ]
 
             with table_container:
-
                 column_defs = [
                     {
                         "name": "file_name",
@@ -254,42 +242,31 @@ def build_uploads_page():
                 )
 
                 # ----- Download handler -----
-                def on_download(e):
-
+                def on_download(e) -> None:
                     row = e.args
-
                     with get_session() as session:
-
                         file_record = (
                             session.query(UploadedFiles)
                             .filter_by(id=row["id"])
                             .first()
                         )
-
                         if file_record:
-
                             temp_dir = tempfile.gettempdir()
                             temp_path = os.join.path(
                                 temp_dir,
                                 file_record.file_name
                             )
-
                             with open(temp_path, "wb") as f:
-
                                 f.write(file_record.file_data)
-
                             ui.download(temp_path)
 
                 # ----- Delete confirmation dialog -----
-                def open_delete_dialog(e):
+                def open_delete_dialog(e) -> None:
                     """Confirms and deletes a file."""
-
                     row = e.args
-
                     with ui.dialog() as delete_dialog, ui.card(
                         ).classes("max-w-sm p-6"
                     ):
-
                         ui.label("Confirm Deletion"
                             ).classes("text-lg font-semibold mb-2")
 
@@ -305,18 +282,14 @@ def build_uploads_page():
                                 on_click=delete_dialog.close,
                             ).props("flat")
 
-                            def on_confirm_delete():
-
+                            def on_confirm_delete() -> None:
                                 with get_session() as session:
-
                                     file_record = (
                                         session.query(UploadedFiles)
                                         .filter_by(id=row["id"])
                                         .first()
                                     )
-
                                     if file_record:
-
                                         session.delete(file_record)
 
                                 ui.notify(

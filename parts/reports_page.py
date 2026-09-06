@@ -41,7 +41,7 @@ from utils import get_print_date_time, get_case_info
 
 
 # ----- Report Page Wrapper -----
-def build_reports_page():
+def build_reports_page() -> None:
 
     # ----- Header / Navbar -----
     build_navbar(
@@ -99,7 +99,7 @@ def build_reports_page():
             ).props("unelevated").classes("w-full py-3")
 
 
-def render_report_page(html_content: str):
+def render_report_page(html_content: str) -> None:
     """Wraps report HTML with navigation and print button."""
     build_navbar(
         is_admin=get_is_admin(),
@@ -159,7 +159,7 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
     return (len(errors) == 0, errors)
 
 
-def show_validation_errors(errors: list[str]):
+def show_validation_errors(errors: list[str]) -> None:
     """Displays validation errors as a NiceGUI notification."""
     if len(errors) == 1:
         ui.notify(

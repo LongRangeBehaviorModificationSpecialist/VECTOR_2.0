@@ -24,12 +24,12 @@ from utils import (
     get_next_evid_num,
     confirm_delete_all,
     validate_initial_evidence,
-    validate_update_evidence
+    validate_update_evidence,
 )
 
 
 # ----- Main Page Builder -----
-def build_evidence_page():
+def build_evidence_page() -> None:
     """Builds the full Evidence page UI."""
 
     # ----- Header / Navbar -----
@@ -135,14 +135,11 @@ def build_evidence_page():
                     ).classes("w-full")
 
             # ----- Triaged toggle logic -----
-            def on_triage_change(e):
+            def on_triage_change(e) -> None:
 
                 if e.value == "Yes":
-
                     evid_triaged_by_combo.enable()
-
                 else:
-
                     evid_triaged_by_combo.disable()
                     evid_triaged_by_combo.value = None
 
@@ -151,7 +148,7 @@ def build_evidence_page():
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
-                def clear_form():
+                def clear_form() -> None:
                     evid_num_input.value = get_next_evid_num()
                     evid_qty_input.value = ""
                     evid_desc_input.value = ""
@@ -168,7 +165,7 @@ def build_evidence_page():
                     evid_is_contraband_combo.value = None
                     evid_note_input.value = ""
 
-                def on_submit():
+                def on_submit() -> None:
                     """Handles form submission for new evidence items."""
                     evid_num = evid_num_input.value
                     evid_qty = evid_qty_input.value
@@ -192,11 +189,9 @@ def build_evidence_page():
                         evid_triaged=evid_triaged,
                         evid_triaged_by=evid_triaged_by
                     ):
-
                         return
 
                     with get_session() as session:
-
                         # ----- Save to database -----
                         new_evid = Evidence(
                             evid_num=evid_num,
@@ -216,7 +211,6 @@ def build_evidence_page():
                             ),
                             evid_note=evid_note_input.value or ""
                         )
-
                         session.add(new_evid)
 
                     ui.notify(
@@ -255,26 +249,21 @@ def build_evidence_page():
                 table_container = ui.column().classes(
                     "w-full max-w-5xl mx-auto items-center gap-2")
 
-                def refresh_evidence_table():
+                def refresh_evidence_table() -> None:
                     """Re-renders the evidence table from the database."""
                     table_container.clear()
 
                     with get_session() as session:
-
                         evidence = (
                             session.query(Evidence)
                             .order_by(Evidence.evid_num)
                             .all()
                         )
-
                         if not evidence:
-
                             with table_container:
-
                                 ui.label(
                                     "No evidence items in the database yet."
                                 ).classes("text-gray-500 italic")
-
                             return
 
                         row_data = [
@@ -403,8 +392,7 @@ def build_evidence_page():
                         )
 
                         # ----- Edit dialog -----
-                        def open_edit_dialog(e):
-
+                        def open_edit_dialog(e) -> None:
                             row = e.args
 
                             current_agents = load_agent_names()
@@ -493,14 +481,10 @@ def build_evidence_page():
                                 if row["evid_triaged"] != "Yes":
                                     evid_triaged_by.disable()
 
-                                def on_edit_triage_change(ev):
-
+                                def on_edit_triage_change(ev) -> None:
                                     if ev.value == "Yes":
-
                                         evid_triaged_by.enable()
-
                                     else:
-
                                         evid_triaged_by.disable()
                                         evid_triaged_by.value = None
 
@@ -530,21 +514,17 @@ def build_evidence_page():
                                         on_click=edit_dialog.close,
                                     ).props("flat")
 
-                                    def on_save_update():
+                                    def on_save_update() -> None:
                                         """Handles form submission for
                                         updating existing evidence item.
                                         """
-
                                         with get_session() as session:
-
                                             evid = (
                                                 session.query(Evidence)
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
-
                                             if not evid:
-
                                                 ui.notify(
                                                     "Evidence item not found.",
                                                     type="warning",
@@ -552,7 +532,6 @@ def build_evidence_page():
                                                     position="center",
                                                     close_button="OK",
                                                 )
-
                                                 return
 
                                             evid.evid_num = evid_num.value
@@ -605,8 +584,7 @@ def build_evidence_page():
                                                 or ""
                                             )
 
-                                            # ----- Required field
-                                            # validation -----
+                                            # ----- Validate req fields -----
                                             if not validate_update_evidence(
                                                 evid_num=evid_num.value,
                                                 evid_found_by=(
@@ -621,7 +599,6 @@ def build_evidence_page():
                                                 ),
                                                 row=row,
                                             ):
-
                                                 return
 
                                         ui.notify(
@@ -644,10 +621,8 @@ def build_evidence_page():
                             edit_dialog.open()
 
                         # ----- Delete confirmation dialog -----
-                        def open_delete_dialog(e):
-
+                        def open_delete_dialog(e) -> None:
                             row = e.args
-
                             with ui.dialog() as delete_dialog, ui.card(
                                 ).classes("max-w-sm p-6"
                             ):
@@ -671,24 +646,18 @@ def build_evidence_page():
                                         on_click=delete_dialog.close,
                                     ).props("flat")
 
-                                    def on_confirm_delete():
-
+                                    def on_confirm_delete() -> None:
                                         with get_session() as session:
-
                                             evid = (
                                                 session.query(Evidence)
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
-
                                             if evid:
-
                                                 evid_num = evid.evid_num
                                                 evid_desc = evid.evid_desc
                                                 session.delete(evid)
-
                                             else:
-
                                                 evid_num = row["evid_num"]
                                                 evid_desc = row["evid_desc"]
 
@@ -717,10 +686,8 @@ def build_evidence_page():
 
             with ui.row().classes("w-full justify-center my-2"):
 
-                def delete_all_evidence():
-
+                def delete_all_evidence() -> None:
                     with get_session() as session:
-
                         session.query(Evidence).delete()
                         session.commit()
 
