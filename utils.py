@@ -5,7 +5,7 @@ utils.py
 
 File containing various functions used throughout the application.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from nicegui import ui
 import mimetypes
@@ -82,12 +82,15 @@ mimetypes.add_type("application/x-bzip2", ".bz2")
 mimetypes.add_type("application/x-xz", ".xz")
 
 
-def get_current_timestamp() -> str:
+def get_current_timestamp(format: str) -> str:
     """Gets the current date and time.
 
     Returns:
-        [str] current date/time formatted as MM-DD-YYYY HH:MM:SS."""
-    return datetime.now().strftime("%m-%d-%Y %H:%M:%S")
+        [str] current UTC date/time formatted as MM-DD-YYYY HH:MM:SS."""
+    if format == "entry":
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        return datetime.now(timezone.utc).strftime("%m-%d-%Y %H:%M:%S")
 
 
 def get_print_date_time() -> str:
@@ -140,18 +143,14 @@ def get_case_info() -> dict | None:
             return None
 
         return {
-            "case_number": case.case_number or "",
-            "location": case.location or "",
-            "jurisdiction": case.jurisdiction or "",
-            "case_date_time_begin": (
-                str(case.case_date_time_begin)
-                if case.case_date_time_begin
-                else ""
+            "CASENUMBER": case.CASENUMBER or "",
+            "LOCATION": case.LOCATION or "",
+            "JURISDICTION": case.JURISDICTION or "",
+            "CASEDATETIMEBEGIN": (
+                str(case.CASEDATETIMEBEGIN) if case.CASEDATETIMEBEGIN else ""
             ),
-            "case_date_time_end": (
-                str(case.case_date_time_end)
-                if case.case_date_time_end
-                else ""
+            "CASEDATETIMEEND": (
+                str(case.CASEDATETIMEEND) if case.CASEDATETIMEEND else ""
             ),
         }
 
@@ -202,10 +201,10 @@ def get_agent_dict() -> list[dict]:
 
     return [
         {
-            "name": a.get("name", ""),
-            "agency": a.get("agency", "") or "",
-            "phone": a.get("phone", "") or "",
-            "email": a.get("email", "") or "",
+            "AGENTNAME": a.get("AGENTNAME", ""),
+            "AGENTPARENTAGENCY": a.get("AGENTPARENTAGENCY", "") or "",
+            "AGENTPHONE": a.get("AGENTPHONE", "") or "",
+            "AGENTEMAIL": a.get("AGENTEMAIL", "") or "",
         }
         for a in data
         if isinstance(a, dict)
@@ -218,9 +217,9 @@ def load_agent_names_for_page() -> list[str]:
     seen = set()
     unique_names = []
     for a in all_agents:
-        if a["name"] not in seen:
-            seen.add(a["name"])
-            unique_names.append(a["name"])
+        if a["AGENTNAME"] not in seen:
+            seen.add(a["AGENTNAME"])
+            unique_names.append(a["AGENTNAME"])
     return sorted(unique_names)
 
 
@@ -247,9 +246,9 @@ def load_agency_options() -> list[str]:
 
 
 def is_duplicate_agent_in_json(
-        agent_name: str,
-        phone: str,
-        email: str = ""
+        AGENTNAME: str,
+        AGENTPHONE: str,
+        AGENTEMAIL: str = ""
 ) -> bool:
     """Checks if an agent with the same name, phone, or email already
     exists in agents.json.
@@ -260,22 +259,22 @@ def is_duplicate_agent_in_json(
 
     agents = load_agents_from_json()
 
-    name_lower = agent_name.strip().lower()
+    name_lower = AGENTNAME.strip().lower()
     phone_clean = (
-        phone.strip()
+        AGENTPHONE.strip()
         .replace("-", "")
         .replace("(", "")
         .replace(")", "")
         .replace(" ", "")
     )
 
-    for agent_name in agents:
+    for AGENTNAME in agents:
         # Check name match
-        if agent_name.get("name", "").strip().lower() == name_lower:
+        if AGENTNAME.get("AGENTNAME", "").strip().lower() == name_lower:
             return True
 
         # Check phone match (normalize format first)
-        existing_phone = agent_name.get("phone", "").strip()
+        existing_phone = AGENTNAME.get("AGENTPHONE", "").strip()
         existing_phone_clean = (
             existing_phone.replace("-", "")
             .replace("(", "")
@@ -291,9 +290,9 @@ def is_duplicate_agent_in_json(
             return True
 
         # Check email match (if applicable)
-        if email:
-            email_lower = email.strip().lower()
-            existing_email = agent_name.get("email", "").strip().lower()
+        if AGENTEMAIL:
+            email_lower = AGENTEMAIL.strip().lower()
+            existing_email = AGENTNAME.get("AGENTEMAIL", "").strip().lower()
             if email_lower and existing_email and existing_email == email_lower:
                 return True
 
@@ -304,12 +303,12 @@ def confirm_delete_all(action: str, callback):
     """Shows a confirmation dialog before executing a destructive action."""
     with ui.dialog() as dialog, ui.card().classes("max-w-sm p-6"):
 
-        ui.label(f"Warning!").classes("text-lg font-bold mb-2 text-red-500")
+        ui.label(f"Warning!").classes("text-lg font-bold mb-2 text-[#1C69A8]")
 
         ui.label(
             f"This will permanently delete ALL {action} from the database. "
             "This action cannot be undone."
-        ).classes("mb-4")
+        ).classes("mb-4 text-[#D4D4D8]")
 
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button("Cancel", on_click=dialog.close).props("flat")
@@ -320,7 +319,8 @@ def confirm_delete_all(action: str, callback):
 
             ui.button(
                 "Delete All",
-                on_click=on_confirm
+                on_click=on_confirm,
+                color="#1C69A8",
             ).props("negative unelevated")
 
     dialog.open()
@@ -330,8 +330,8 @@ def load_room_labels() -> list[str]:
     """Returns a list of all room labels from the Rooms table."""
     with get_session() as session:
         rows = (
-            session.query(Rooms.room_label, Rooms.room_desc)
-            .order_by(Rooms.room_label)
+            session.query(Rooms.ROOMLABEL, Rooms.ROOMDESC)
+            .order_by(Rooms.ROOMLABEL)
             .all()
         )
         return [f"Room {r[0]} ({r[1]})" for r in rows]
@@ -347,14 +347,14 @@ def get_next_evid_num() -> str:
     with get_session() as session:
         evid_query = (
             session.query(Evidence)
-            .order_by(Evidence.evid_num)
+            .order_by(Evidence.EVIDNUM)
             .all()
         )
 
         if evid_query:
             last_evid = evid_query[-1]
             try:
-                last_id = int(last_evid.evid_num)
+                last_id = int(last_evid.EVIDNUM)
                 next_id = last_id + 1
                 return str(next_id)
             except ValueError:
@@ -367,8 +367,8 @@ def load_agent_names() -> list[str]:
     """Returns a list of all agent names from the Agents table."""
     with get_session() as session:
         rows = (
-            session.query(Agents.agent_name)
-            .order_by(Agents.agent_name)
+            session.query(Agents.AGENTNAME)
+            .order_by(Agents.AGENTNAME)
             .all()
         )
         return [r[0] for r in rows]
@@ -382,9 +382,9 @@ def get_next_room_ltr() -> str:
         "A" if no rooms exist yet.
     """
     with get_session() as session:
-        rooms = session.query(Rooms).order_by(Rooms.room_label).all()
+        rooms = session.query(Rooms).order_by(Rooms.ROOMLABEL).all()
         if rooms:
-            last_label = rooms[-1].room_label
+            last_label = rooms[-1].ROOMLABEL
             # Increment the ASCII value by 1, then convert back to char
             return chr(ord(last_label) + 1)
         else:
@@ -441,13 +441,10 @@ def delete_all_data() -> None:
 
 
 def validate_case_data(
-        case_number: str,
-        location: str,
-        jurisdiction: str,
-        datetime_start: str
+    CASENUMBER: str, LOCATION: str, JURISDICTION: str, CASEDATETIMEBEGIN: str
 ) -> bool:
 
-    if not case_number:
+    if not CASENUMBER:
         ui.notify(
             "The 'Case Number' field is required.",
             type="warning",
@@ -457,7 +454,7 @@ def validate_case_data(
         )
         return False
 
-    if not location:
+    if not LOCATION:
         ui.notify(
             "The 'Location' field is required.",
             type="warning",
@@ -467,7 +464,7 @@ def validate_case_data(
         )
         return False
 
-    if not jurisdiction:
+    if not JURISDICTION:
         ui.notify(
             "The 'Jurisdiction' field is required.",
             type="warning",
@@ -477,7 +474,7 @@ def validate_case_data(
         )
         return False
 
-    if not datetime_start:
+    if not CASEDATETIMEBEGIN:
         ui.notify(
             "The 'Date/Time Started' field is required.",
             type="warning",
@@ -491,13 +488,13 @@ def validate_case_data(
 
 
 def validate_agent_data(
-        agent_name: str | None,
-        agency: str | None,
-        role: str | None,
-        role_secondary: str = ""
+        AGENTNAME: str | None,
+        AGENTPARENTAGENCY: str | None,
+        AGENTPRIMARYROLE: str | None,
+        AGENTROLESECONDARY: str = ""
 ) -> bool:
 
-    if not agent_name:
+    if not AGENTNAME:
         ui.notify(
             "The 'Agent Name' field is required",
             type="warning",
@@ -507,7 +504,7 @@ def validate_agent_data(
             )
         return False
 
-    if not agency:
+    if not AGENTPARENTAGENCY:
         ui.notify(
             "The 'Agency' field is required.",
             type="warning",
@@ -517,7 +514,7 @@ def validate_agent_data(
             )
         return False
 
-    if not role:
+    if not AGENTPRIMARYROLE:
         ui.notify(
             "The 'Agent Role' field is required.",
             type="warning",
@@ -527,34 +524,34 @@ def validate_agent_data(
             )
         return False
 
-    if role and role_secondary:
-        if role.strip().lower() == role_secondary.strip().lower():
+    if AGENTPRIMARYROLE and AGENTROLESECONDARY:
+        if AGENTPRIMARYROLE.strip().lower() == AGENTROLESECONDARY.strip().lower():
             ui.notify(
                 f"The 'Primary Role' field and the 'Secondary Role' "
-                f"field for {agent_name} cannot be the same.",
+                f"field for {AGENTNAME} cannot be the same.",
                 type="warning",
                 timeout=0,
                 position="center",
                 close_button="OK",
-                )
+            )
             return False
 
     return True
 
 
 def validate_initial_evidence(
-        evid_num: str,
-        evid_qty: str,
-        evid_desc: str,
-        evid_loc_room: str,
-        evid_loc_room_detail: str,
-        evid_found_by: str,
-        evid_found_by_witness: str,
-        evid_triaged: str = "",
-        evid_triaged_by: str = "",
+        EVIDNUM: str,
+        EVIDQTY: str,
+        EVIDDESC: str,
+        EVIDLOCROOM: str,
+        EVIDLOCROOMDETAIL: str,
+        EVIDFOUNDBY: str,
+        EVIDFOUNDBYWITNESS: str,
+        EVIDTRIAGED: str = "",
+        EVIDTRIAGEDBY: str = "",
 ) -> bool:
 
-    if not evid_num:
+    if not EVIDNUM:
         ui.notify(
             "The 'Evidence Item Number' field is required.",
             type="warning",
@@ -564,7 +561,7 @@ def validate_initial_evidence(
         )
         return False
 
-    if not evid_qty:
+    if not EVIDQTY:
         ui.notify(
             "The 'Quantity' field is required.",
             type="warning",
@@ -574,7 +571,7 @@ def validate_initial_evidence(
         )
         return False
 
-    if not evid_desc:
+    if not EVIDDESC:
         ui.notify(
             "The 'Evidence Description' field is required.",
             type="warning",
@@ -584,7 +581,7 @@ def validate_initial_evidence(
         )
         return False
 
-    if not evid_loc_room:
+    if not EVIDLOCROOM:
         ui.notify(
             "The 'Room Located' field is required.",
             type="warning",
@@ -594,7 +591,7 @@ def validate_initial_evidence(
         )
         return False
 
-    if not evid_loc_room_detail:
+    if not EVIDLOCROOMDETAIL:
         ui.notify(
             "The 'Where Located' field is required.",
             type="warning",
@@ -604,7 +601,7 @@ def validate_initial_evidence(
         )
         return False
 
-    if not evid_found_by:
+    if not EVIDFOUNDBY:
         ui.notify(
             "The 'Found By' field is required.",
             type="warning",
@@ -614,7 +611,7 @@ def validate_initial_evidence(
         )
         return False
 
-    if not evid_found_by_witness:
+    if not EVIDFOUNDBYWITNESS:
         ui.notify(
             "The 'Witnessed By' field is required.",
             type="warning",
@@ -624,7 +621,7 @@ def validate_initial_evidence(
         )
         return False
 
-    if evid_found_by == evid_found_by_witness:
+    if EVIDFOUNDBY == EVIDFOUNDBYWITNESS:
         ui.notify(
             "The same agent cannot be listed in the 'Found By' and "
             "'Witnessed By' fields.",
@@ -635,7 +632,7 @@ def validate_initial_evidence(
         )
         return False
 
-    if evid_triaged == "Yes" and not evid_triaged_by:
+    if EVIDTRIAGED == "Yes" and not EVIDTRIAGEDBY:
         ui.notify(
             "The 'Triaged By' field is required if the 'Item Triaged?' "
             "field is set to 'Yes'.",
@@ -649,13 +646,13 @@ def validate_initial_evidence(
     with get_session() as session:
         existing = (
             session.query(Evidence)
-            .filter_by(evid_num=evid_num)
+            .filter_by(EVIDNUM=EVIDNUM)
             .first()
         )
 
         if existing:
             ui.notify(
-                f"Evidence Item Number '{evid_num}' is "
+                f"Evidence Item Number '{EVIDNUM}' is "
                 "already used.",
                 type="negative",
                 timeout=0,
@@ -668,17 +665,17 @@ def validate_initial_evidence(
 
 
 def validate_update_evidence(
-        evid_num: str,
-        evid_found_by: str,
-        evid_found_by_witness: str,
-        evid_triaged: str,
-        evid_triaged_by: str,
+        EVIDNUM: str,
+        EVIDFOUNDBY: str,
+        EVIDFOUNDBYWITNESS: str,
+        EVIDTRIAGED: str,
+        EVIDTRIAGEDBY: str,
         row
 ) -> bool:
 
     if (
-        evid_found_by and evid_found_by_witness
-        and evid_found_by == evid_found_by_witness
+        EVIDFOUNDBY and EVIDFOUNDBYWITNESS
+        and EVIDFOUNDBY == EVIDFOUNDBYWITNESS
     ):
         ui.notify(
             "The same agent cannot be listed in the 'Found By' and "
@@ -690,7 +687,7 @@ def validate_update_evidence(
         )
         return False
 
-    if evid_triaged == "Yes" and not evid_triaged_by:
+    if EVIDTRIAGED == "Yes" and not EVIDTRIAGEDBY:
         ui.notify(
             "The 'Triaged By' field is required if the 'Item Triaged?' "
             "field is set to 'Yes'.",
@@ -705,14 +702,14 @@ def validate_update_evidence(
         dup = (
             session.query(Evidence)
             .filter(
-                Evidence.evid_num == (evid_num),
-                Evidence.id != row["id"])
+                Evidence.EVIDNUM == (EVIDNUM),
+                Evidence.Z_PK != row["Z_PK"])
             .first()
         )
 
         if dup:
             ui.notify(
-                f"Evidence number {evid_num} is already used",
+                f"Evidence number {EVIDNUM} is already used",
                 type="warning",
                 timeout=0,
                 position="center",
@@ -724,13 +721,13 @@ def validate_update_evidence(
 
 
 def validate_room_data(
-        room_label: str,
-        room_desc: str,
-        first_agent: str = "",
-        second_agent: str = ""
+        ROOMLABEL: str,
+        ROOMDESC: str,
+        ROOMFIRSTAGENT: str = "",
+        ROOMSECONDAGENT: str = ""
 ) -> bool:
 
-    if not room_label:
+    if not ROOMLABEL:
         ui.notify(
             "The 'Room Label' field is required.",
             type="warning",
@@ -740,7 +737,7 @@ def validate_room_data(
         )
         return False
 
-    if not room_desc:
+    if not ROOMDESC:
         ui.notify(
             "The 'Room Description' field is required.",
             type="warning",
@@ -753,7 +750,7 @@ def validate_room_data(
     with get_session() as session:
         if (
             session.query(Rooms)
-            .filter_by(room_label=room_label)
+            .filter_by(ROOMLABEL=ROOMLABEL)
             .first()
         ):
             ui.notify(
@@ -768,7 +765,7 @@ def validate_room_data(
         # ----- Duplicate description validation -----
         if (
             session.query(Rooms)
-            .filter_by(room_desc=room_desc)
+            .filter_by(ROOMDESC=ROOMDESC)
             .first()
         ):
             ui.notify(
@@ -782,8 +779,8 @@ def validate_room_data(
 
         # ----- Same agent checks -----
         if (
-            first_agent and second_agent and
-            first_agent == second_agent
+            ROOMFIRSTAGENT and ROOMSECONDAGENT and
+            ROOMFIRSTAGENT == ROOMSECONDAGENT
         ):
             ui.notify(
                 "The same agent cannot be listed in the 'First Agent Name' "

@@ -24,6 +24,31 @@ from models import get_users_session
 DEBUG_MODE = "--dev" in sys.argv
 
 
+# ----- Startup Configuration -----
+def is_authenticated() -> bool:
+    """Checks if user is authenticated (defaults to False)."""
+    try:
+        return app.storage.user.get("authenticated", False)
+    except Exception:
+        return False
+
+
+def get_current_user_name() -> str:
+    """Gets current username (defaults to empty)."""
+    try:
+        return app.storage.user.get("user_name", "")
+    except Exception:
+        return ""
+
+
+def get_is_admin() -> bool:
+    """Checks if current user is admin (defaults to False)."""
+    try:
+        return app.storage.user.get("is_admin", False)
+    except Exception:
+        return False
+
+
 def get_storage_secret() -> str:
     """Loads the storage secret from a hidden file.
 
@@ -63,7 +88,7 @@ def seed_default_user():
 
     The JSON stores hashes as Python byte-string literals.
     """
-    json_path = Path(__file__).parent / f"db\\users.json"
+    json_path = Path(__file__).parent / f"db/users.json"
 
     if not json_path.exists():
         print("WARNING → 'users.json' not found — no user seeded.")
@@ -116,7 +141,7 @@ seed_default_user()
 
 # ----- Theme Configuration -----
 ui.add_css(
-"""
+    """
 /* ----- Theme Colors (replaces ui.colors) ----- */
 :root {
     --q-primary: #6d4aff;
@@ -128,6 +153,17 @@ ui.add_css(
     --q-negative: #ef4444;
     --q-warning: #f59e0b;
     --q-info: #3b82f6;
+    --q-vspblue: #2984D1;
+
+    --vsp-blue: #2984D1;
+    --vsp-gray: #D4D4D8;
+    --vsp-red: #FF0000;
+    --vsp-green: #31C950;
+    --vsp-white: #FFFFFF;
+}
+
+.confirm-styled-label .q-field__label {
+    color: #ef4444;
 }
 
 /* Textarea height */
@@ -181,6 +217,7 @@ textarea.q-field__native {
 # ----- Page Registrations -----
 # Some page modules define their own @ui.page decorators internally.
 # The ones below are registered here for centralized control.
+import home_page
 
 
 @ui.page("/agents")
@@ -360,9 +397,8 @@ def change_password_page():
                         user.set_password(new_pass.value)
                         user.must_change_password = False
                 ui.notify(
-                    "Password changed successfully!",
-                    type="positive",
-                    timeout=2000,
+                    "Password changed.",
+                    timeout=4000,
                     position="bottom",
                     close_button="OK",
                 )
@@ -374,31 +410,6 @@ def change_password_page():
                 "Save Password",
                 on_click=save_new_password,
             ).props("unelevated").classes("w-full mt-4")
-
-
-# ----- Startup Configuration -----
-def is_authenticated() -> bool:
-    """Checks if user is authenticated (defaults to False)."""
-    try:
-        return app.storage.user.get("authenticated", False)
-    except Exception:
-        return False
-
-
-def get_current_user_name() -> str:
-    """Gets current username (defaults to empty)."""
-    try:
-        return app.storage.user.get("user_name", "")
-    except Exception:
-        return ""
-
-
-def get_is_admin() -> bool:
-    """Checks if current user is admin (defaults to False)."""
-    try:
-        return app.storage.user.get("is_admin", False)
-    except Exception:
-        return False
 
 
 # ----- Run -----

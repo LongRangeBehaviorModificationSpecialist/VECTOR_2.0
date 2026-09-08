@@ -18,6 +18,7 @@ from utils import (
     get_mime_type,
     is_allowed_file,
     format_file_size,
+    confirm_delete_all,
 )
 
 
@@ -43,12 +44,12 @@ def build_uploads_page() -> None:
 
             ui.label(
                 "Upload New File"
-            ).classes("text-lg font-semibold mb-4")
+            ).classes("text-lg font-semibold mb-2")
 
             ui.label(
                 "Allowed file types → (1) Images, (2) Videos, (3) Documents, "
                 "and (4) Archive files."
-            ).classes("text-sm text-gray-400 mb-4")
+            ).classes("text-sm text-gray-400 mb-2")
 
             async def handle_upload(e) -> None:
                 """Handles file upload from ui.upload component."""
@@ -95,8 +96,7 @@ def build_uploads_page() -> None:
                     ui.notify(
                         f"'{file_name}' uploaded successfully ("
                         f"{file_size:,} bytes), {file_mime_type}.",
-                        type="positive",
-                        timeout=2000,
+                        timeout=4000,
                         position="bottom",
                         close_button="OK",
                     )
@@ -228,8 +228,9 @@ def build_uploads_page() -> None:
                     """
                     <q-td :props="props">
                         <div class="row no-wrap gap-1">
-                            <q-btn dense flat color="primary"
+                            <q-btn dense flat
                                 icon="download" size="sm"
+                                style="color: #2984D1;"
                                 @click="$parent.$emit('download', \
                                 props.row)" />
                             <q-btn dense flat color="negative"
@@ -238,7 +239,7 @@ def build_uploads_page() -> None:
                                 props.row)" />
                         </div>
                     </q-td>
-                    """
+                    """,
                 )
 
                 # ----- Download handler -----
@@ -250,12 +251,18 @@ def build_uploads_page() -> None:
                             .filter_by(id=row["id"])
                             .first()
                         )
+
                         if file_record:
                             temp_dir = tempfile.gettempdir()
-                            temp_path = os.join.path(
-                                temp_dir,
+                            safe_name = (
                                 file_record.file_name
+                                or f"file_{file_record.id}"
                             )
+                            safe_name = (
+                                safe_name.replace("/", "_").replace("\\", "_")
+                            )
+                            temp_path = os.path.join(temp_dir, safe_name)
+
                             with open(temp_path, "wb") as f:
                                 f.write(file_record.file_data)
                             ui.download(temp_path)
@@ -267,20 +274,34 @@ def build_uploads_page() -> None:
                     with ui.dialog() as delete_dialog, ui.card(
                         ).classes("max-w-sm p-6"
                     ):
-                        ui.label("Confirm Deletion"
-                            ).classes("text-lg font-semibold mb-2")
+                        ui.label(
+                            "Delete File?"
+                        ).classes(
+                            "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
+                        )
 
                         ui.label(
-                            f"Are you sure you want to delete "
-                            f"'{row['file_name']}'? This cannot be undone!"
-                        ).classes("mb-4")
+                            f"The following file will be removed from the "
+                            "case file :"
+                        ).classes("mb-3 text-base text-[var(--vsp-gray)]")
+
+                        ui.label(
+                            f"{row['file_name']}"
+                        ).classes(
+                            "mb-3 text-base font-semibold text-[var(--vsp-blue)]"
+                        )
+
+                        ui.label("This cannot be undone!").classes(
+                            "mb-3 text-base text-[var(--vsp-gray)]"
+                        )
 
                         with ui.row().classes("w-full justify-end gap-2"):
 
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                            ).props("flat")
+                                color="transparent",
+                            ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_confirm_delete() -> None:
                                 with get_session() as session:
@@ -295,8 +316,7 @@ def build_uploads_page() -> None:
                                 ui.notify(
                                     f"File: {row['file_name']} has been "
                                     "deleted.",
-                                    type="positive",
-                                    timeout=2000,
+                                    timeout=4000,
                                     position="bottom",
                                     close_button="OK",
                                 )
@@ -308,12 +328,39 @@ def build_uploads_page() -> None:
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                            ).props("negative unelevated")
+                            ).props("unelevated").classes(
+                                "text-[var(--vsp-white)]"
+                            )
 
                     delete_dialog.open()
 
                 table.on("download", on_download)
                 table.on("delete", open_delete_dialog)
+
+        with ui.row().classes("w-full justify-center my-2"):
+
+            def delete_all_files() -> None:
+                with get_session() as session:
+                    session.query(UploadedFiles).delete()
+                    session.commit()
+
+                ui.notify(
+                    "All Files has been deleted.",
+                    timeout=4000,
+                    position="bottom",
+                    close_button="OK",
+                )
+
+                refresh_files_table()
+
+            ui.button(
+                "Delete All Files",
+                on_click=lambda: confirm_delete_all(
+                    "files",
+                    delete_all_files,
+                ),
+                color="#ef4444",
+            ).props("unelevated").classes("mb-2 items-center")
 
     # ----- Initial render -----
     refresh_files_table()

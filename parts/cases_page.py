@@ -44,17 +44,17 @@ def build_cases_page() -> None:
         # ----- Input Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
 
-            case_number_input = required_input(
+            CASENUMBER_input = required_input(
                 label="Case Number"
             ).classes("w-full")
 
-            case_number_input.props("autofocus")
+            CASENUMBER_input.props("autofocus")
 
-            location_input =required_input(
+            LOCATION_input =required_input(
                 label="Location"
             ).classes("w-full")
 
-            jurisdiction_combo = required_select(
+            JURISDICTION_combo = required_select(
                 options=load_jurisdiction_options(),
                 label="Jurisdiction",
                 with_input=True,
@@ -62,14 +62,14 @@ def build_cases_page() -> None:
             ).classes("w-full")
 
             # ----- Date/Time Started -----
-            date_time_start = required_input(
+            CASEDATETIMEBEGIN_input = required_input(
                 label="Date/Time Started",
                 placeholder="YYYY-MM-DD HH:MM",
                 ).props('mask="####-##-## ##:##"'
             ).classes("w-full")
 
             # ----- Date/Time Ended -----
-            date_time_end = ui.input(
+            CASEDATETIMEEND_input = ui.input(
                 label="Date/Time Ended",
                 placeholder="YYYY-MM-DD HH:MM"
                 ).props('mask="####-##-## ##:##"'
@@ -79,25 +79,25 @@ def build_cases_page() -> None:
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form() -> None:
-                    case_number_input.value = ""
-                    location_input.value = ""
-                    jurisdiction_combo.value = None
-                    date_time_start.value = None
-                    date_time_end.value = None
+                    CASENUMBER_input.value = ""
+                    LOCATION_input.value = ""
+                    JURISDICTION_combo.value = None
+                    CASEDATETIMEBEGIN_input.value = ""
+                    CASEDATETIMEEND_input.value = ""
 
                 def on_submit() -> None:
-                    case_number = case_number_input.value
-                    location = location_input.value
-                    jurisdiction = jurisdiction_combo.value
-                    datetime_start = date_time_start.value
-                    datetime_end = date_time_end.value
+                    CASENUMBER = CASENUMBER_input.value
+                    LOCATION = LOCATION_input.value
+                    JURISDICTION = JURISDICTION_combo.value
+                    CASEDATETIMEBEGIN = CASEDATETIMEBEGIN_input.value
+                    CASEDATETIMEEND = CASEDATETIMEEND_input.value
 
                     # ----- Required field validation -----
                     if not validate_case_data(
-                        case_number=case_number,
-                        location=location,
-                        jurisdiction=jurisdiction,
-                        datetime_start=datetime_start,
+                        CASENUMBER=CASENUMBER,
+                        LOCATION=LOCATION,
+                        JURISDICTION=JURISDICTION,
+                        CASEDATETIMEBEGIN=CASEDATETIMEBEGIN,
                     ):
                         return
 
@@ -106,12 +106,12 @@ def build_cases_page() -> None:
                             # Check for duplicate case number
                             existing = (
                                 session.query(Cases)
-                                .filter_by(case_number=case_number)
+                                .filter_by(CASENUMBER=CASENUMBER)
                                 .first()
                             )
                             if existing:
                                 ui.notify(
-                                    f"Case '{case_number}' already exists. "
+                                    f"Case '{CASENUMBER}' already exists. "
                                     "Please use a unique case number.",
                                     type="warning",
                                     timeout=0,
@@ -121,18 +121,17 @@ def build_cases_page() -> None:
                                 return
 
                             new_case = Cases(
-                                case_number=case_number,
-                                location=location,
-                                jurisdiction=jurisdiction,
-                                case_date_time_begin=datetime_start,
-                                case_date_time_end=datetime_end,
+                                CASENUMBER=CASENUMBER,
+                                LOCATION=LOCATION,
+                                JURISDICTION=JURISDICTION,
+                                CASEDATETIMEBEGIN=CASEDATETIMEBEGIN,
+                                CASEDATETIMEEND=CASEDATETIMEEND,
                             )
                             session.add(new_case)
 
                         ui.notify(
-                            f"Case {case_number} was added successfully.",
-                            type="positive",
-                            timeout=2000,
+                            f"Case {CASENUMBER} was added.",
+                            timeout=4000,
                             position="bottom",
                             close_button="OK",
                         )
@@ -149,16 +148,22 @@ def build_cases_page() -> None:
                             position="center",
                             close_button="OK",
                         )
+                        import traceback
+                        traceback.print_exc()
 
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                ).props("flat")
+                    color="transparent",
+                ).props(
+                    "flat"
+                ).classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Open New Case",
                     on_click=on_submit,
-                ).props("unelevated")
+                    color="var(--vsp-blue)",
+                ).props("unelevated").classes("text-[var(--vsp-white)]")
 
         # ----- Existing Cases Table -----
         ui.separator().classes("my-6")
@@ -186,12 +191,12 @@ def build_cases_page() -> None:
                 # Build row_data INSIDE the session — BEFORE it closes
                 row_data = [
                     {
-                        "id": r.id,
-                        "case_number": r.case_number or "",
-                        "location": r.location or "",
-                        "jurisdiction": r.jurisdiction or "",
-                        "datetime_start": r.case_date_time_begin or "",
-                        "datetime_end": r.case_date_time_end or "",
+                        "Z_PK": r.Z_PK,
+                        "CASENUMBER": r.CASENUMBER or "",
+                        "LOCATION": r.LOCATION or "",
+                        "JURISDICTION": r.JURISDICTION or "",
+                        "CASEDATETIMEBEGIN": r.CASEDATETIMEBEGIN or "",
+                        "CASEDATETIMEEND": r.CASEDATETIMEEND or "",
                     }
                     for r in cases
                 ]
@@ -200,37 +205,37 @@ def build_cases_page() -> None:
             with table_container:
                 column_defs = [
                     {
-                        "name": "case_number",
+                        "name": "CASENUMBER",
                         "label": "Case Number",
-                        "field": "case_number",
+                        "field": "CASENUMBER",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "location",
+                        "name": "LOCATION",
                         "label": "Location",
-                        "field": "location",
+                        "field": "LOCATION",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "jurisdiction",
+                        "name": "JURISDICTION",
                         "label": "Jurisdiction",
-                        "field": "jurisdiction",
+                        "field": "JURISDICTION",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "datetime_start",
+                        "name": "CASEDATETIMEBEGIN",
                         "label": "Started",
-                        "field": "datetime_start",
+                        "field": "CASEDATETIMEBEGIN",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "datetime_end",
+                        "name": "CASEDATETIMEEND",
                         "label": "Ended",
-                        "field": "datetime_end",
+                        "field": "CASEDATETIMEEND",
                         "sortable": True,
                         "align": "left",
                     },
@@ -246,7 +251,7 @@ def build_cases_page() -> None:
                 table = ui.table(
                     columns=column_defs,
                     rows=row_data,
-                    row_key="id",
+                    row_key="Z_PK",
                 )
 
                 table.props("dense flat")
@@ -275,41 +280,41 @@ def build_cases_page() -> None:
                         "w-full max-w-lg p-6"
                     ):
 
-                        ui.label(f"Edit Case: {row['case_number']}"
+                        ui.label(f"Edit Case: {row['CASENUMBER']}"
                             ).classes("text-lg font-semibold mb-4")
 
-                        edit_case_number = required_input(
+                        CASENUMBER = required_input(
                             label="Case Number",
-                            value=row["case_number"],
+                            value=row["CASENUMBER"],
                         ).classes("w-full")
 
-                        edit_location = required_input(
+                        LOCATION = required_input(
                             label="Location",
-                            value=row["location"],
+                            value=row["LOCATION"],
                         ).classes("w-full")
 
-                        edit_jurisdiction = required_select(
+                        JURISDICTION = required_select(
                             options=load_jurisdiction_options(),
                             label="Jurisdiction",
-                            value=row["jurisdiction"],
+                            value=row["JURISDICTION"],
                             with_input=True,
                             new_value_mode="add",
                         ).classes("w-full")
 
-                        edit_datetime_begin = (
+                        CASEDATETIMEBEGIN = (
                             required_input(
                                 label="Begin Date/Time",
-                                value=row["datetime_start"],
+                                value=row["CASEDATETIMEBEGIN"],
                                 placeholder="YYYY-MM-DD HH:MM",
                             )
                             .props('mask="####-##-## ##:##"')
                             .classes("w-full")
                         )
 
-                        edit_datetime_end = (
+                        CASEDATETIMEEND = (
                             ui.input(
                                 label="End Date/Time",
-                                value=row["datetime_end"],
+                                value=row["CASEDATETIMEEND"],
                                 placeholder="YYYY-MM-DD HH:MM",
                             )
                             .props('mask="####-##-## ##:##"')
@@ -325,31 +330,26 @@ def build_cases_page() -> None:
                                 with get_session() as session:
                                     case = (
                                         session.query(Cases)
-                                        .filter_by(id=row["id"])
+                                        .filter_by(Z_PK=row["Z_PK"])
                                         .first()
                                     )
                                     if case:
-                                        case.case_number = (
-                                            edit_case_number.value or ""
+                                        case.CASENUMBER = CASENUMBER.value or ""
+                                        case.LOCATION = LOCATION.value or ""
+                                        case.JURISDICTION = (
+                                            JURISDICTION.value or ""
+                                        ),
+                                        case.CASEDATETIMEBEGIN = (
+                                            CASEDATETIMEBEGIN.value or ""
                                         )
-                                        case.location = (
-                                            edit_location.value or ""
-                                        )
-                                        case.jurisdiction = (
-                                            edit_jurisdiction.value or ""
-                                        )
-                                        case.case_date_time_begin = (
-                                            edit_datetime_begin.value or ""
-                                        )
-                                        case.case_date_time_end = (
-                                            edit_datetime_end.value or ""
+                                        case.CASEDATETIMEEND = (
+                                            CASEDATETIMEEND.value or ""
                                         )
 
                                 ui.notify(
-                                    f"Case {edit_case_number.value} "
+                                    f"Case {CASENUMBER.value} "
                                     "information was updated.",
-                                    type="positive",
-                                    timeout=2000,
+                                    timeout=4000,
                                     position="bottom",
                                     close_button="OK",
                                 )
@@ -373,13 +373,13 @@ def build_cases_page() -> None:
                         ).classes("max-w-sm p-6"
                     ):
 
-                        ui.label(
-                            "Confirm Deletion"
-                        ).classes("text-lg font-semibold mb-2")
+                        ui.label("Confirm Deletion").classes(
+                            "mb-3 text-lg font-bold text-[var(--vsp-blue)]"
+                        )
 
                         ui.label(
                             f"Are you sure you want to delete "
-                            f"case {row['case_number']}?"
+                            f"case {row['CASENUMBER']}?"
                         ).classes("mb-4")
 
                         with ui.row().classes("w-full justify-end gap-2"):
@@ -387,26 +387,28 @@ def build_cases_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                            ).props("flat")
+                                color="transparent",
+                                ).props("flat").classes(
+                                    "text-[var(--vsp-blue)]"
+                                )
 
                             def on_confirm_delete() -> None:
 
                                 with get_session() as session:
                                     case = (
                                         session.query(Cases)
-                                        .filter_by(id=row["id"])
+                                        .filter_by(Z_PK=row["Z_PK"])
                                         .first()
                                     )
                                     if case:
-                                        case_number = case.case_number
+                                        CASENUMBER = case.CASENUMBER
                                         session.delete(case)
                                     else:
-                                        case_number = row["case_number"]
+                                        CASENUMBER = row["CASENUMBER"]
 
                                 ui.notify(
-                                    f"Case {case_number} has been deleted.",
-                                    type="positive",
-                                    timeout=2000,
+                                    f"Case {CASENUMBER} has been deleted.",
+                                    timeout=4000,
                                     position="bottom",
                                     close_button="OK",
                                 )
@@ -418,7 +420,9 @@ def build_cases_page() -> None:
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                            ).props("negative unelevated")
+                            ).props("unelevated").classes(
+                                "text-[var(--vsp-white)]"
+                            )
 
                     delete_dialog.open()
 

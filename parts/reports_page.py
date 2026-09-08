@@ -66,36 +66,43 @@ def build_reports_page() -> None:
             ui.button(
                 "Print Agent List",
                 on_click=lambda: ui.navigate.to("/reports/agents"),
+                color="#1C69A8",
             ).props("unelevated").classes("w-full py-3")
 
             ui.button(
                 "Print Room List",
                 on_click=lambda: ui.navigate.to("/reports/rooms"),
+                color="#1C69A8",
             ).props("unelevated").classes("w-full py-3")
 
             ui.button(
                 "Print Evidence List (Full)",
                 on_click=lambda: ui.navigate.to("/reports/evidence"),
+                color="#1C69A8",
             ).props("unelevated").classes("w-full py-3")
 
             ui.button(
                 "Print Evidence List (By Room)",
                 on_click=lambda: ui.navigate.to("/reports/evidence_by_room"),
+                color="#1C69A8",
             ).props("unelevated").classes("w-full py-3")
 
             ui.button(
                 "Print Evidence List (Basic)",
                 on_click=lambda: ui.navigate.to("/reports/evidence_basic"),
+                color="#1C69A8",
             ).props("unelevated").classes("w-full py-3")
 
             ui.button(
                 "Print Persons List",
                 on_click=lambda: ui.navigate.to("/reports/persons"),
+                color="#1C69A8",
             ).props("unelevated").classes("w-full py-3")
 
             ui.button(
                 "Print Notes List",
                 on_click=lambda: ui.navigate.to("/reports/notes"),
+                color="#1C69A8",
             ).props("unelevated").classes("w-full py-3")
 
 
@@ -114,6 +121,7 @@ def render_report_page(html_content: str) -> None:
             ui.button(
                 "Print Report",
                 on_click=open_report_window,
+                color="#1C69A8",
             ).props("unelevated icon=print").classes("mb-4 no-print")
 
             ui.html(html_content)

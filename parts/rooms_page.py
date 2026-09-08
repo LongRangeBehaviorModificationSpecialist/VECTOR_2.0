@@ -23,8 +23,8 @@ from utils import (
     get_next_room_ltr,
     validate_room_data,
     confirm_delete_all,
+    get_current_timestamp,
 )
-
 
 # ----- Main Page Builder -----
 def build_rooms_page() -> None:
@@ -49,55 +49,55 @@ def build_rooms_page() -> None:
             next_letter = get_next_room_ltr()
             agent_options = load_agent_names()
 
-            room_label_input = ui.input(
+            ROOMLABEL_input = ui.input(
                 label="Room Label",
                 value=next_letter,
             ).classes("w-full")
 
-            room_label_input.props("readonly")
+            ROOMLABEL_input.props("readonly")
 
-            room_desc_input = required_input(
+            ROOMDESC_input = required_input(
                 label="Room Description",
             ).classes("w-full")
 
-            room_desc_input.props("autofocus")
+            ROOMDESC_input.props("autofocus")
 
-            room_first_agent_combo = ui.select(
+            ROOMFIRSTAGENT_combo = ui.select(
                 options=agent_options,
                 label="First Agent Name",
                 with_input=True,
             ).classes("w-full")
 
-            room_second_agent_combo = ui.select(
+            ROOMSECONDAGENT_combo = ui.select(
                 options=agent_options,
                 label="Second Agent Name",
                 with_input=True,
             ).classes("w-full")
 
-            room_note_input = ui.input(label="Notes").classes("w-full")
+            ROOMNOTE_input = ui.input(label="Notes").classes("w-full")
 
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form() -> None:
-                    room_label_input.value = get_next_room_ltr()
-                    room_desc_input.value = ""
-                    room_first_agent_combo.value = None
-                    room_second_agent_combo.value = None
-                    room_note_input.value = ""
+                    ROOMLABEL_input.value = get_next_room_ltr()
+                    ROOMDESC_input.value = ""
+                    ROOMFIRSTAGENT_combo.value = None
+                    ROOMSECONDAGENT_combo.value = None
+                    ROOMNOTE_input.value = ""
 
                 def on_submit() -> None:
                     """Handles form submission for new rooms."""
-                    room_label = room_label_input.value
-                    room_desc = room_desc_input.value
-                    first_agent = room_first_agent_combo.value or ""
-                    second_agent = room_second_agent_combo.value or ""
-                    room_note = room_note_input.value or ""
+                    ROOMLABEL = ROOMLABEL_input.value
+                    ROOMDESC = ROOMDESC_input.value
+                    ROOMFIRSTAGENT = ROOMFIRSTAGENT_combo.value or ""
+                    ROOMSECONDAGENT = ROOMSECONDAGENT_combo.value or ""
+                    ROOMNOTE = ROOMNOTE_input.value or ""
 
                     # ----- Required field validation -----
                     if not validate_room_data(
-                        room_label=room_label,
-                        room_desc=room_desc,
+                        ROOMLABEL=ROOMLABEL,
+                        ROOMDESC=ROOMDESC,
                     ):
                         return
 
@@ -105,8 +105,8 @@ def build_rooms_page() -> None:
                     with get_session() as session:
                         # ----- Same agent checks -----
                         if (
-                            first_agent and second_agent and
-                            first_agent == second_agent
+                            ROOMFIRSTAGENT and ROOMSECONDAGENT and
+                            ROOMFIRSTAGENT == ROOMSECONDAGENT
                         ):
                             ui.notify(
                                 "The same agent cannot be listed in the "
@@ -121,18 +121,18 @@ def build_rooms_page() -> None:
 
                         # ----- Save to database -----
                         new_room = Rooms(
-                            room_label=room_label,
-                            room_desc=room_desc,
-                            room_first_agent=first_agent,
-                            room_second_agent=second_agent,
-                            room_note=room_note,
+                            ROOMLABEL=ROOMLABEL,
+                            ROOMDESC=ROOMDESC,
+                            ROOMFIRSTAGENT=ROOMFIRSTAGENT,
+                            ROOMSECONDAGENT=ROOMSECONDAGENT,
+                            ROOMNOTE=ROOMNOTE,
+                            ENTEREDDATETIME=get_current_timestamp(format="entry"),
                         )
                         session.add(new_room)
 
                     ui.notify(
-                        f"Room {room_label} was added to the file.",
-                        type="positive",
-                        timeout=2000,
+                        f"Room {ROOMLABEL} was added.",
+                        timeout=4000,
                         position="bottom",
                         close_button="OK",
                     )
@@ -143,12 +143,16 @@ def build_rooms_page() -> None:
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                ).props("flat")
+                    color="transparent",
+                ).props(
+                    "flat"
+                ).classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Add Room",
                     on_click=on_submit,
-                ).props("unelevated")
+                    color="var(--vsp-blue)",
+                ).props("unelevated").classes("text-[var(--vsp-white)]")
 
         # ----- Existing Rooms Table -----
         ui.separator().classes("my-6")
@@ -172,7 +176,7 @@ def build_rooms_page() -> None:
                     with get_session() as session:
                         rooms = (
                             session.query(Rooms)
-                            .order_by(Rooms.room_label)
+                            .order_by(Rooms.ROOMLABEL)
                             .all()
                         )
                         if not rooms:
@@ -184,12 +188,12 @@ def build_rooms_page() -> None:
 
                         row_data = [
                             {
-                                "id": r.id,
-                                "room_label": r.room_label or "",
-                                "room_desc": r.room_desc or "",
-                                "room_first_agent": r.room_first_agent or "",
-                                "room_second_agent": r.room_second_agent or "",
-                                "room_note": r.room_note or "",
+                                "Z_PK": r.Z_PK,
+                                "ROOMLABEL": r.ROOMLABEL or "",
+                                "ROOMDESC": r.ROOMDESC or "",
+                                "ROOMFIRSTAGENT": r.ROOMFIRSTAGENT or "",
+                                "ROOMSECONDAGENT": r.ROOMSECONDAGENT or "",
+                                "ROOMNOTE": r.ROOMNOTE or "",
                             }
                             for r in rooms
                         ]
@@ -197,37 +201,37 @@ def build_rooms_page() -> None:
                     with table_container:
                         column_defs = [
                             {
-                                "name": "room_label",
+                                "name": "ROOMLABEL",
                                 "label": "Label",
-                                "field": "room_label",
+                                "field": "ROOMLABEL",
                                 "sortable": True,
                                 "align": "left",
                             },
                             {
-                                "name": "room_desc",
+                                "name": "ROOMDESC",
                                 "label": "Description",
-                                "field": "room_desc",
+                                "field": "ROOMDESC",
                                 "sortable": True,
                                 "align": "left",
                             },
                             {
-                                "name": "room_first_agent",
+                                "name": "ROOMFIRSTAGENT",
                                 "label": "Agent 1",
-                                "field": "room_first_agent",
+                                "field": "ROOMFIRSTAGENT",
                                 "sortable": True,
                                 "align": "left",
                             },
                             {
-                                "name": "room_second_agent",
+                                "name": "ROOMSECONDAGENT",
                                 "label": "Agent 2",
-                                "field": "room_second_agent",
+                                "field": "ROOMSECONDAGENT",
                                 "sortable": True,
                                 "align": "left",
                             },
                             {
-                                "name": "room_note",
+                                "name": "ROOMNOTE",
                                 "label": "Note",
-                                "field": "room_note",
+                                "field": "ROOMNOTE",
                                 "sortable": True,
                                 "align": "left",
                             },
@@ -243,7 +247,7 @@ def build_rooms_page() -> None:
                         table = ui.table(
                             columns=column_defs,
                             rows=row_data,
-                            row_key="id",
+                            row_key="Z_PK",
                         )
 
                         table.props("dense flat")
@@ -254,8 +258,9 @@ def build_rooms_page() -> None:
                             """
                             <q-td :props="props">
                                 <div class="row no-wrap gap-1">
-                                    <q-btn dense flat color="primary"
+                                    <q-btn dense flat
                                         icon="edit" size="sm"
+                                        style="color: #2984D1;"
                                         @click="$parent.$emit('edit', \
                                         props.row)" />
                                     <q-btn dense flat color="negative"
@@ -277,36 +282,39 @@ def build_rooms_page() -> None:
                             ):
 
                                 ui.label(
-                                    f"Edit Room: {row['room_label']}"
-                                ).classes("text-lg font-semibold mb-4")
+                                    f"Edit Room ({row['ROOMLABEL']} - "
+                                    f"{row['ROOMDESC']})"
+                                ).classes(
+                                    "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
+                                )
 
                                 edit_label = required_input(
                                     label="Room Label",
-                                    value=row["room_label"],
+                                    value=row["ROOMLABEL"],
                                 ).classes("w-full")
 
                                 edit_desc = required_input(
                                     label="Room Description",
-                                    value=row["room_desc"],
+                                    value=row["ROOMDESC"],
                                 ).classes("w-full")
 
                                 edit_first_agent = ui.select(
                                     options=current_agents,
                                     label="First Agent Name",
-                                    value=row["room_first_agent"] or None,
+                                    value=row["ROOMFIRSTAGENT"] or None,
                                     with_input=True,
                                 ).classes("w-full")
 
                                 edit_second_agent = ui.select(
                                     options=current_agents,
                                     label="Second Agent Name",
-                                    value=row["room_second_agent"] or None,
+                                    value=row["ROOMSECONDAGENT"] or None,
                                     with_input=True,
                                 ).classes("w-full")
 
                                 edit_note = ui.input(
                                     label="Notes",
-                                    value=row["room_note"],
+                                    value=row["ROOMNOTE"],
                                 ).classes("w-full")
 
                                 with ui.row().classes(
@@ -315,7 +323,10 @@ def build_rooms_page() -> None:
                                     ui.button(
                                         "Cancel",
                                         on_click=edit_dialog.close,
-                                    ).props("flat")
+                                        color="transparent",
+                                    ).props("flat").classes(
+                                        "text-[var(--vsp-blue)]"
+                                    )
 
                                     def on_save_update() -> None:
                                         # ----- Validate uniqueness -----
@@ -328,10 +339,10 @@ def build_rooms_page() -> None:
                                             dup_label = (
                                                 session.query(Rooms)
                                                 .filter(
-                                                    Rooms.room_label == (
+                                                    Rooms.ROOMLABEL == (
                                                         new_label
                                                     ),
-                                                    Rooms.id != row["id"]
+                                                    Rooms.Z_PK != row["Z_PK"]
                                                 )
                                                 .first()
                                             )
@@ -351,15 +362,15 @@ def build_rooms_page() -> None:
                                             dup_desc = (
                                                 session.query(Rooms)
                                                 .filter(
-                                                    Rooms.room_desc == new_desc,
-                                                    Rooms.id != row["id"],
+                                                    Rooms.ROOMDESC == new_desc,
+                                                    Rooms.Z_PK != row["Z_PK"],
                                                 )
                                                 .first()
                                             )
                                             if dup_desc:
                                                 ui.notify(
-                                                    "That room description is "
-                                                    "already assigned to "
+                                                    "That room description "
+                                                    "is already assigned to "
                                                     "another room.",
                                                     type="warning",
                                                     timeout=0,
@@ -389,20 +400,19 @@ def build_rooms_page() -> None:
                                             # ----- Save changes -----
                                             room = (
                                                 session.query(Rooms)
-                                                .filter_by(id=row["id"])
+                                                .filter_by(Z_PK=row["Z_PK"])
                                                 .first()
                                             )
                                             if room:
-                                                room.room_label = new_label
-                                                room.room_desc = new_desc
-                                                room.room_first_agent = a1
-                                                room.room_second_agent = a2
-                                                room.room_note = new_note
+                                                room.ROOMLABEL = new_label
+                                                room.ROOMDESC = new_desc
+                                                room.ROOMFIRSTAGENT = a1
+                                                room.ROOMSECONDAGENT = a2
+                                                room.ROOMNOTE = new_note
 
                                         ui.notify(
                                             f"Room {new_label} was updated.",
-                                            type="positive",
-                                            timeout=2000,
+                                            timeout=4000,
                                             position="bottom",
                                             close_button="OK",
                                         )
@@ -411,9 +421,12 @@ def build_rooms_page() -> None:
                                         refresh_rooms_table()
 
                                     ui.button(
-                                        "Save",
+                                        "Update",
                                         on_click=on_save_update,
-                                    ).props("unelevated")
+                                        color="var(--vsp-blue)",
+                                    ).props("unelevated").classes(
+                                        "text-[var(--vsp-white)]"
+                                    )
 
                             edit_dialog.open()
 
@@ -426,14 +439,24 @@ def build_rooms_page() -> None:
                                 ).classes("max-w-sm p-6"):
 
                                 ui.label(
-                                    "Confirm Deletion"
-                                ).classes("text-lg font-semibold mb-2")
+                                    f"Delete Room?"
+                                ).classes(
+                                    "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
+                                )
 
                                 ui.label(
-                                    f"Are you sure you want to remove "
-                                    f"Room {row['room_label']} -- "
-                                    f"{row['room_desc']} from the case file?"
-                                ).classes("mb-4")
+                                    f"The following Room ID will be removed "
+                                    "from the case file :"
+                                ).classes(
+                                    "mb-3 text-base text-[var(--vsp-gray)]"
+                                )
+
+                                ui.label(
+                                    f"'Room {row['ROOMLABEL']} -- "
+                                    f"{row['ROOMDESC']}'"
+                                ).classes(
+                                    "mb-3 text-base font-semibold text-[var(--vsp-blue)]"
+                                )
 
                                 with ui.row().classes(
                                     "w-full justify-end gap-2"
@@ -442,29 +465,31 @@ def build_rooms_page() -> None:
                                     ui.button(
                                         "Cancel",
                                         on_click=delete_dialog.close,
-                                    ).props("flat")
+                                        color="transparent",
+                                    ).props("flat").classes(
+                                        "text-[var(--vsp-blue)]"
+                                    )
 
                                     def on_confirm_delete() -> None:
                                         with get_session() as session:
                                             room = (
                                                 session.query(Rooms)
-                                                .filter_by(id=row["id"])
+                                                .filter_by(Z_PK=row["Z_PK"])
                                                 .first()
                                             )
                                             if room:
-                                                room_label = room.room_label
-                                                room_desc = room.room_desc
+                                                ROOMLABEL = room.ROOMLABEL
+                                                ROOMDESC = room.ROOMDESC
                                                 session.delete(room)
                                             else:
-                                                room_label = row["room_label"]
-                                                room_desc = row["room_desc"]
+                                                ROOMLABEL = row["ROOMLABEL"]
+                                                ROOMDESC = row["ROOMDESC"]
 
                                         ui.notify(
-                                            f"Room {room_label} ({room_desc}) "
+                                            f"Room {ROOMLABEL} ({ROOMDESC}) "
                                             "has been removed from the case "
                                             "file.",
-                                            type="positive",
-                                            timeout=2000,
+                                            timeout=4000,
                                             position="bottom",
                                             close_button="OK",
                                         )
@@ -476,7 +501,9 @@ def build_rooms_page() -> None:
                                         "Delete",
                                         on_click=on_confirm_delete,
                                         color="#ef4444",
-                                    ).props("negative unelevated")
+                                    ).props("unelevated").classes(
+                                        "text-[var(--vsp-white)]"
+                                    )
 
                             delete_dialog.open()
 
@@ -491,15 +518,14 @@ def build_rooms_page() -> None:
                         session.commit()
                     ui.notify(
                         "All rooms have been deleted.",
-                        type="positive",
-                        timeout=2000,
+                        timeout=4000,
                         position="bottom",
                         close_button="OK",
                     )
                     refresh_rooms_table()
 
                 ui.button(
-                    "Clear All Rooms",
+                    "Delete All Rooms",
                     on_click=lambda: confirm_delete_all(
                         "rooms",
                         delete_all_rooms

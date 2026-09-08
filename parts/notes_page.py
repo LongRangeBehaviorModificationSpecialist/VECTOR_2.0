@@ -21,8 +21,8 @@ from utils import (
     required_input,
     load_agent_names,
     get_current_timestamp,
+    confirm_delete_all,
 )
-
 
 # ----- Main Page Builder -----
 def build_notes_page() -> None:
@@ -47,23 +47,23 @@ def build_notes_page() -> None:
             agent_options = load_agent_names()
             current_time = get_current_timestamp()
 
-            note_date_time_input = ui.input(
+            NOTEDATETIME_input = ui.input(
                 label="Date/Time Added",
                 value=current_time,
             ).classes("w-full")
 
-            note_date_time_input.props("readonly")
+            NOTEDATETIME_input.props("readonly")
 
-            note_author_combo = required_select(
+            NOTEAUTHOR_combo = required_select(
                 options=agent_options,
                 label="Agent Name",
                 with_input=True,
             ).classes("w-full")
 
-            note_author_combo.props("autofocus")
+            NOTEAUTHOR_combo.props("autofocus")
 
-            # note_text — TextAreaField
-            note_text_input = required_input(
+            # NOTETEXT — TextAreaField
+            NOTETEXT_input = required_input(
                 label="Note"
             ).classes("w-full")
 
@@ -71,15 +71,15 @@ def build_notes_page() -> None:
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form() -> None:
-                    note_date_time_input.value = get_current_timestamp()
-                    note_author_combo.value = None
-                    note_text_input.value = ""
+                    NOTEDATETIME_input.value = get_current_timestamp()
+                    NOTEAUTHOR_combo.value = None
+                    NOTETEXT_input.value = ""
 
                 def on_submit() -> None:
                     # ----- Required field validation -----
-                    note_author = note_author_combo.value
+                    NOTEAUTHOR = NOTEAUTHOR_combo.value
 
-                    if not note_author:
+                    if not NOTEAUTHOR:
                         ui.notify(
                             "The 'Agent Name' field is required.",
                             type="warning",
@@ -89,9 +89,9 @@ def build_notes_page() -> None:
                         )
                         return
 
-                    note_text = note_text_input.value or ""
+                    NOTETEXT = NOTETEXT_input.value or ""
 
-                    if not note_text:
+                    if not NOTETEXT:
                         ui.notify(
                             "The 'Note Text' field is required.",
                             type="warning",
@@ -101,25 +101,24 @@ def build_notes_page() -> None:
                         )
                         return
 
-                    note_date_time = (
-                        note_date_time_input.value or
+                    NOTEDATETIME = (
+                        NOTEDATETIME_input.value or
                         get_current_timestamp()
                     )
 
                     # ----- Save to database -----
                     with get_session() as session:
                         new_note = Notes(
-                            note_date_time=note_date_time,
-                            note_date_time_updated="",
-                            note_author=note_author,
-                            note_text=note_text,
+                            NOTEDATETIME=NOTEDATETIME,
+                            NOTEDATETIMEUPDATED="",
+                            NOTEAUTHOR=NOTEAUTHOR,
+                            NOTETEXT=NOTETEXT,
                         )
                         session.add(new_note)
 
                     ui.notify(
-                        f"Note from {note_author} was added.",
-                        type="positive",
-                        timeout=2000,
+                        f"Note from {NOTEAUTHOR} was added.",
+                        timeout=4000,
                         position="bottom",
                         close_button="OK",
                     )
@@ -130,12 +129,16 @@ def build_notes_page() -> None:
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                ).props("flat")
+                    color="transparent",
+                ).props(
+                    "flat"
+                ).classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Add Note",
                     on_click=on_submit,
-                ).props("unelevated")
+                    color="var(--vsp-blue)",
+                ).props("unelevated").classes("text-[var(--vsp-white)]")
 
         # ----- Existing Notes Table -----
         ui.separator().classes("my-6")
@@ -166,13 +169,13 @@ def build_notes_page() -> None:
 
                 row_data = [
                     {
-                        "id": r.id,
-                        "note_date_time": r.note_date_time or "",
-                        "note_date_time_updated": (
-                            r.note_date_time_updated or ""
+                        "Z_PK": r.Z_PK,
+                        "NOTEDATETIME": r.NOTEDATETIME or "",
+                        "NOTEDATETIMEUPDATED": (
+                            r.NOTEDATETIMEUPDATED or ""
                             ),
-                        "note_author": r.note_author or "",
-                        "note_text": r.note_text or "",
+                        "NOTEAUTHOR": r.NOTEAUTHOR or "",
+                        "NOTETEXT": r.NOTETEXT or "",
                     }
                     for r in notes
                 ]
@@ -180,30 +183,30 @@ def build_notes_page() -> None:
             with table_container:
                 column_defs = [
                     {
-                        "name": "note_date_time",
+                        "name": "NOTEDATETIME",
                         "label": "Date Added",
-                        "field": "note_date_time",
+                        "field": "NOTEDATETIME",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "note_updated",
+                        "name": "NOTEDATETIMEUPDATED",
                         "label": "Date Updated",
-                        "field": "note_date_time_updated",
+                        "field": "NOTEDATETIMEUPDATED",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "note_author",
+                        "name": "NOTEAUTHOR",
                         "label": "Author",
-                        "field": "note_author",
+                        "field": "NOTEAUTHOR",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "note_text",
+                        "name": "NOTETEXT",
                         "label": "Note",
-                        "field": "note_text",
+                        "field": "NOTETEXT",
                         "sortable": False,
                         "align": "left",
                     },
@@ -219,7 +222,7 @@ def build_notes_page() -> None:
                 table = ui.table(
                     columns=column_defs,
                     rows=row_data,
-                    row_key="id",
+                    row_key="Z_PK",
                 )
 
                 table.props("dense flat")
@@ -230,15 +233,16 @@ def build_notes_page() -> None:
                     """
                     <q-td :props="props">
                         <div class="row no-wrap gap-1">
-                            <q-btn dense flat color="primary"
+                            <q-btn dense flat
                                 icon="edit" size="sm"
+                                style="color: #2984D1;"
                                 @click="$parent.$emit('edit', props.row)" />
                             <q-btn dense flat color="negative"
                                 icon="delete" size="sm"
                                 @click="$parent.$emit('delete', props.row)" />
                         </div>
                     </q-td>
-                    """
+                    """,
                 )
 
                 # ----- Edit dialog -----
@@ -250,34 +254,34 @@ def build_notes_page() -> None:
                         ).classes("w-full max-w-lg p-6"
                     ):
 
-                        ui.label(
-                            f"Edit Note #{row['id']}"
-                        ).classes("text-lg font-semibold mb-4")
+                        ui.label(f"Edit Note #{row['id']}").classes(
+                            "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
+                        )
 
-                        edit_date_added = ui.input(
+                        NOTEDATETIME_added = ui.input(
                             label="Date/Time Added",
-                            value=row["note_date_time"],
+                            value=row["NOTEDATETIME"],
                         ).classes("w-full")
 
-                        edit_date_added.props("readonly")
+                        NOTEDATETIME_added.props("readonly")
 
-                        edit_date_updated = ui.input(
+                        NOTEDATETIMEUPDATED = ui.input(
                             label="Date/Time Updated",
                             value=get_current_timestamp(),
                         ).classes("w-full")
 
-                        edit_date_updated.props("readonly")
+                        NOTEDATETIMEUPDATED.props("readonly")
 
-                        edit_author = ui.select(
+                        NOTEAUTHOR = ui.select(
                             options=current_agents,
                             label="Agent Name",
-                            value=row["note_author"] or None,
+                            value=row["NOTEAUTHOR"] or None,
                             with_input=True,
                         ).classes("w-full")
 
-                        edit_text = required_input(
+                        NOTETEXT = required_input(
                             label="Note",
-                            value=row["note_text"],
+                            value=row["NOTETEXT"],
                         ).classes("w-full")
 
                         with ui.row().classes("w-full justify-end gap-2 mt-4"):
@@ -285,11 +289,12 @@ def build_notes_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=edit_dialog.close,
-                            ).props("flat")
+                                color="transparent",
+                            ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_save_update() -> None:
-                                new_author = edit_author.value or ""
-                                if not new_author:
+                                NOTEAUTHOR = NOTEAUTHOR.value or ""
+                                if not NOTEAUTHOR:
                                     ui.notify(
                                         "The 'Agent Name' field is required.",
                                         type="warning",
@@ -299,9 +304,9 @@ def build_notes_page() -> None:
                                     )
                                     return
 
-                                new_text = edit_text.value or ""
+                                NOTETEXT = NOTETEXT.value or ""
 
-                                if not new_text:
+                                if not NOTETEXT:
                                     ui.notify(
                                         "The 'Note Text' field is required.",
                                         type="warning",
@@ -314,21 +319,20 @@ def build_notes_page() -> None:
                                 with get_session() as session:
                                     note = (
                                         session.query(Notes)
-                                        .filter_by(id=row["id"])
+                                        .filter_by(Z_PK=row["Z_PK"])
                                         .first()
                                     )
                                     if note:
                                         # Only update these fields
-                                        note.note_date_time_updated = (
-                                            edit_date_updated.value
+                                        note.NOTEDATETIMEUPDATED = (
+                                            NOTEDATETIMEUPDATED.value
                                         )
-                                        note.note_author = new_author
-                                        note.note_text = new_text
+                                        note.NOTEAUTHOR = NOTEAUTHOR
+                                        note.NOTETEXT = NOTETEXT
 
                                 ui.notify(
-                                    f"Note from {new_author} was updated.",
-                                    type="positive",
-                                    timeout=2000,
+                                    f"Note from {NOTEAUTHOR} was updated.",
+                                    timeout=4000,
                                     position="bottom",
                                     close_button="OK",
                                 )
@@ -337,9 +341,12 @@ def build_notes_page() -> None:
                                 refresh_notes_table()
 
                             ui.button(
-                                "Update Note",
+                                "Update",
                                 on_click=on_save_update,
-                            ).props("unelevated")
+                                color="var(--vsp-blue)",
+                            ).props("unelevated").classes(
+                                "text-[var(--vsp-white)]"
+                            )
 
                     edit_dialog.open()
 
@@ -350,20 +357,26 @@ def build_notes_page() -> None:
                         ).classes("max-w-sm p-6"
                     ):
 
-                        ui.label(
-                            "Confirm Deletion"
-                        ).classes("text-lg font-semibold mb-2")
+                        ui.label("Delete Note?").classes(
+                            "text-lg font-semibold mb-3 text-[var(--vsp-blue)]"
+                        )
 
                         ui.label(
                             f"Are you sure you want to delete "
                             f"Note #{row['id']}?"
-                        ).classes("mb-4")
+                        ).classes("mb-3 text-base text-[var(--vsp-gray)]")
 
                         # Show a preview of the note text (truncated)
                         preview = (
-                            row["note_text"][:100] + "..."
-                            if len(row["note_text"]) > 100
-                            else row["note_text"]
+                            row["NOTETEXT"][:100] + "..."
+                            if len(row["NOTETEXT"]) > 100
+                            else row["NOTETEXT"]
+                        )
+
+                        ui.label(
+                            "Note content:"
+                        ).classes(
+                            "mb-3 text-base font-semibold text-[var(--vsp-blue)]"
                         )
 
                         ui.label(f"'{preview}'").classes(
@@ -374,13 +387,14 @@ def build_notes_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                            ).props("flat")
+                                color="transparent",
+                            ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_confirm_delete() -> None:
                                 with get_session() as session:
                                     note = (
                                         session.query(Notes)
-                                        .filter_by(id=row["id"])
+                                        .filter_by(Z_PK=row["Z_PK"])
                                         .first()
                                     )
                                     if note:
@@ -391,8 +405,7 @@ def build_notes_page() -> None:
 
                                 ui.notify(
                                     f"Note {note_id} was deleted.",
-                                    type="positive",
-                                    timeout=2000,
+                                    timeout=4000,
                                     position="bottom",
                                     close_button="OK",
                                 )
@@ -404,12 +417,39 @@ def build_notes_page() -> None:
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                            ).props("negative unelevated")
+                            ).props("unelevated").classes(
+                                "text-[var(--vsp-white)]"
+                            )
 
                     delete_dialog.open()
 
                 table.on("edit", open_edit_dialog)
                 table.on("delete", open_delete_dialog)
+
+        with ui.row().classes("w-full justify-center my-2"):
+
+            def delete_all_notes() -> None:
+                with get_session() as session:
+                    session.query(Notes).delete()
+                    session.commit()
+
+                ui.notify(
+                    "All Notes has been deleted.",
+                    timeout=4000,
+                    position="bottom",
+                    close_button="OK",
+                )
+
+                refresh_notes_table()
+
+            ui.button(
+                "Delete All Notes",
+                on_click=lambda: confirm_delete_all(
+                    "notes",
+                    delete_all_notes,
+                ),
+                color="#ef4444",
+            ).props("unelevated").classes("mb-2 items-center")
 
     # ----- Initial render -----
     refresh_notes_table()

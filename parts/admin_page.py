@@ -81,7 +81,6 @@ def build_admin_page():
                     f"User '{uname}' created.\n"
                     f"Default password: {DEFAULT_USER_PASSWORD}\n"
                     f"They will be prompted to change it on first login.",
-                    type="positive",
                     timeout=0,
                     position="bottom",
                     close_button="OK",
@@ -299,7 +298,6 @@ def build_admin_page():
                                         ui.notify(
                                             f"User '{row["username"]}' "
                                             "deleted.",
-                                            type="positive",
                                             timeout=0,
                                             position="bottom",
                                             close_button="OK",

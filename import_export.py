@@ -9,11 +9,13 @@ Export: Saves all tables to CSV files and file BLOBs to disk.
 
 import csv
 from datetime import datetime
+import hashlib
 import json
 from nicegui import ui
 from pathlib import Path
 import pyzipper
 import shutil
+import sys
 import tempfile
 from typing import Optional
 
@@ -151,7 +153,7 @@ def deserialize_value(value: str, column) -> str:
 def export_database(password: Optional[str] = None) -> None:
     """Exports all database tables to CSV files and file BLOBs to disk.
 
-    Saves to ~/<case-number>_<datetime>_saved_results/
+    Saves to ~/Desktop/<case-number>_<datetime>_saved_results/
     """
     from models import UploadedFiles
 
@@ -162,11 +164,12 @@ def export_database(password: Optional[str] = None) -> None:
         return
 
     home_dir = Path.home()
+    desktop_dir = home_dir / "Desktop"
 
     # ----- Create temporary dir for export before zipping -----
-    export_dir = home_dir / folder_name
+    export_dir = desktop_dir / folder_name
     files_dir = export_dir / "files"
-    zip_path = home_dir / f"{folder_name}.zip"
+    zip_path = desktop_dir / f"{folder_name}.zip"
 
     try:
         export_dir.mkdir(parents=True, exist_ok=True)
@@ -236,12 +239,16 @@ def export_database(password: Optional[str] = None) -> None:
                     with open(file_path, "wb") as f:
                         f.write(uf.file_data)
 
+                    sha256_hash = hashlib.sha256(uf.file_data).hexdigest()
+
                     files_list.append(
                         {
                             "file_name": safe_name,
-                            "file_size": uf.file_size or len(uf.file_data)
+                            "file_size": uf.file_size or len(uf.file_data),
+                            "file_hash": sha256_hash
                         }
                     )
+
                     num_files += 1
 
     except Exception as err:
@@ -265,6 +272,7 @@ def export_database(password: Optional[str] = None) -> None:
         ],
         "total_records": total_records,
         "files": files_list,
+        "total_files": num_files,
         "encrypted": password is not None and len(password) > 0,
     }
 
@@ -325,7 +333,6 @@ def export_database(password: Optional[str] = None) -> None:
         f"Tables: {', '.join(f'{n} ({c})' for n, c in exported_tables.items())}\n"
         f"Files: {num_files}\n"
         f"Saved to: {export_dir}",
-        type="positive",
         timeout=0,
         position="bottom",
         close_button="OK",
@@ -564,7 +571,6 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
         f"Tables: {', '.join(imported_tables)}\n"
         f"Files: {files_imported}\n"
         f"Total records: {total_records}",
-        type="positive",
         timeout=0,
         position="bottom",
         close_button="OK",

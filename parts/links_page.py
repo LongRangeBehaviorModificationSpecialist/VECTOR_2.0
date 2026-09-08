@@ -91,7 +91,8 @@ def build_link_section(title: str, icon: str, links: dict[str, str]) -> None:
                     on_click=lambda u=url: ui.navigate.to(
                         u,
                         new_tab=True,
-                    )
+                    ),
+                    color="blue-6",
                 ).props("outline no-caps").classes("text-left text-sm")
 
 

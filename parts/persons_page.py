@@ -16,8 +16,7 @@ from models import get_session, Persons
 from navbar import build_navbar
 from home_page import confirm_new_case_handler
 from main import get_current_user_name, get_is_admin
-from utils import required_input
-
+from utils import required_input, confirm_delete_all, get_current_timestamp
 
 # ----- Main Page Builder -----
 def build_persons_page() -> None:
@@ -39,25 +38,25 @@ def build_persons_page() -> None:
         # ----- Add Person Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
 
-            sus_name_input = required_input(
+            SUSPECTNAME_input = required_input(
                 label="Name"
             ).classes("w-full")
 
-            sus_name_input.props("autofocus")
+            SUSPECTNAME_input.props("autofocus")
 
-            sus_dob_input = ui.input(
+            SUSPECTDOB_input = ui.input(
                 label="DOB"
             ).classes("w-full")
 
-            sus_address_input = ui.input(
+            SUSPECTADDRESS_input = ui.input(
                 label="Address"
             ).classes("w-full")
 
-            sus_phone_input = ui.input(
+            SUSPECTPHONE_input = ui.input(
                 label="Phone Number"
             ).classes("w-full")
 
-            sus_note_input = required_input(
+            SUSPECTNOTE_input = required_input(
                 label="Notes"
             ).classes("w-full")
 
@@ -65,17 +64,17 @@ def build_persons_page() -> None:
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form() -> None:
-                    sus_name_input.value = ""
-                    sus_dob_input.value = ""
-                    sus_address_input.value = ""
-                    sus_phone_input.value = ""
-                    sus_note_input.value = ""
+                    SUSPECTNAME_input.value = ""
+                    SUSPECTDOB_input.value = ""
+                    SUSPECTADDRESS_input.value = ""
+                    SUSPECTPHONE_input.value = ""
+                    SUSPECTNOTE_input.value = ""
 
                 def on_submit() -> None:
                     # ----- Required field validation (DataRequired) -----
-                    sus_name = sus_name_input.value
+                    SUSPECTNAME = SUSPECTNAME_input.value
 
-                    if not sus_name:
+                    if not SUSPECTNAME:
                         ui.notify(
                             "The 'Name' field is required.",
                             type="warning",
@@ -85,21 +84,21 @@ def build_persons_page() -> None:
                         )
                         return
 
-                    sus_dob = sus_dob_input.value or ""
-                    sus_address = sus_address_input.value or ""
-                    sus_phone = sus_phone_input.value or ""
-                    sus_note = sus_note_input.value or ""
+                    SUSPECTDOB = SUSPECTDOB_input.value or ""
+                    SUSPECTADDRESS = SUSPECTADDRESS_input.value or ""
+                    SUSPECTPHONE = SUSPECTPHONE_input.value or ""
+                    SUSPECTNOTE = SUSPECTNOTE_input.value or ""
 
-                    # ----- Duplicate name check (sus_name is unique) -----
+                    # ----- Duplicate name check (SUSPECTNAME is unique) -----
                     with get_session() as session:
                         existing = (
                             session.query(Persons)
-                            .filter_by(sus_name=sus_name)
+                            .filter_by(SUSPECTNAME=SUSPECTNAME)
                             .first()
                         )
                         if existing:
                             ui.notify(
-                                f"'{sus_name}' is already in the "
+                                f"'{SUSPECTNAME}' is already in the "
                                 "database. Person names must be unique.",
                                 type="warning",
                                 timeout=0,
@@ -110,18 +109,18 @@ def build_persons_page() -> None:
 
                         # ----- Save to database -----
                         new_person = Persons(
-                            sus_name=sus_name,
-                            sus_dob=sus_dob,
-                            sus_address=sus_address,
-                            sus_phone=sus_phone,
-                            sus_note=sus_note,
+                            SUSPECTNAME=SUSPECTNAME,
+                            SUSPECTDOB=SUSPECTDOB,
+                            SUSPECTADDRESS=SUSPECTADDRESS,
+                            SUSPECTPHONE=SUSPECTPHONE,
+                            SUSPECTNOTE=SUSPECTNOTE,
+                            ENTEREDDATETIME=get_current_timestamp(format="entry"),
                         )
                         session.add(new_person)
 
                     ui.notify(
-                        f"'{sus_name}' was added.",
-                        type="positive",
-                        timeout=2000,
+                        f"'{SUSPECTNAME}' was added.",
+                        timeout=4000,
                         position="bottom",
                         close_button="OK",
                     )
@@ -132,12 +131,16 @@ def build_persons_page() -> None:
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                ).props("flat")
+                    color="transparent",
+                ).props(
+                    "flat"
+                ).classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Add Person",
                     on_click=on_submit,
-                ).props("unelevated")
+                    color="var(--vsp-blue)",
+                ).props("unelevated").classes("text-[var(--vsp-white)]")
 
         # ----- Existing Persons Table -----
         ui.separator().classes("my-6")
@@ -156,7 +159,7 @@ def build_persons_page() -> None:
             with get_session() as session:
                 persons = (
                     session.query(Persons)
-                    .order_by(Persons.sus_name)
+                    .order_by(Persons.SUSPECTNAME)
                     .all()
                 )
                 if not persons:
@@ -168,12 +171,12 @@ def build_persons_page() -> None:
 
                 row_data = [
                     {
-                        "id": r.id,
-                        "sus_name": r.sus_name or "",
-                        "sus_dob": r.sus_dob or "",
-                        "sus_address": r.sus_address or "",
-                        "sus_phone": r.sus_phone or "",
-                        "sus_note": r.sus_note or "",
+                        "Z_PK": r.Z_PK,
+                        "SUSPECTNAME": r.SUSPECTNAME or "",
+                        "SUSPECTDOB": r.SUSPECTDOB or "",
+                        "SUSPECTADDRESS": r.SUSPECTADDRESS or "",
+                        "SUSPECTPHONE": r.SUSPECTPHONE or "",
+                        "SUSPECTNOTE": r.SUSPECTNOTE or "",
                     }
                     for r in persons
                 ]
@@ -181,37 +184,37 @@ def build_persons_page() -> None:
             with table_container:
                 column_defs = [
                     {
-                        "name": "sus_name",
+                        "name": "SUSPECTNAME",
                         "label": "Name",
-                        "field": "sus_name",
+                        "field": "SUSPECTNAME",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "sus_dob",
+                        "name": "SUSPECTDOB",
                         "label": "DOB",
-                        "field": "sus_dob",
+                        "field": "SUSPECTDOB",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "sus_address",
+                        "name": "SUSPECTADDRESS",
                         "label": "Address",
-                        "field": "sus_address",
+                        "field": "SUSPECTADDRESS",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "sus_phone",
+                        "name": "SUSPECTPHONE",
                         "label": "Phone",
-                        "field": "sus_phone",
+                        "field": "SUSPECTPHONE",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "sus_note",
+                        "name": "SUSPECTNOTE",
                         "label": "Notes",
-                        "field": "sus_note",
+                        "field": "SUSPECTNOTE",
                         "sortable": False,
                         "align": "left",
                     },
@@ -227,7 +230,7 @@ def build_persons_page() -> None:
                 table = ui.table(
                     columns=column_defs,
                     rows=row_data,
-                    row_key="id",
+                    row_key="Z_PK",
                 )
 
                 table.props("dense flat")
@@ -238,8 +241,9 @@ def build_persons_page() -> None:
                     """
                     <q-td :props="props">
                         <div class="row no-wrap gap-1">
-                            <q-btn dense flat color="primary"
+                            <q-btn dense flat
                                 icon="edit" size="sm"
+                                style="color: #2984D1;"
                                 @click="$parent.$emit('edit', props.row)" />
                             <q-btn dense flat color="negative"
                                 icon="delete" size="sm"
@@ -257,32 +261,34 @@ def build_persons_page() -> None:
                     ):
 
                         ui.label(
-                            f"Edit Person: {row['sus_name']}"
-                        ).classes("text-lg font-semibold mb-4")
+                            f"Edit Person ({row['SUSPECTNAME']})"
+                        ).classes(
+                            "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
+                        )
 
-                        edit_name = required_input(
+                        SUSPECTNAME = required_input(
                             label="Name",
-                            value=row["sus_name"],
+                            value=row["SUSPECTNAME"],
                         ).classes("w-full")
 
-                        edit_dob = ui.input(
+                        SUSPECTDOB = ui.input(
                             label="DOB",
-                            value=row["sus_dob"],
+                            value=row["SUSPECTDOB"],
                         ).classes("w-full")
 
-                        edit_address = ui.input(
+                        SUSPECTADDRESS = ui.input(
                             label="Address",
-                            value=row["sus_address"],
+                            value=row["SUSPECTADDRESS"],
                         ).classes("w-full")
 
-                        edit_phone = ui.input(
+                        SUSPECTPHONE = ui.input(
                             label="Phone Number",
-                            value=row["sus_phone"],
+                            value=row["SUSPECTPHONE"],
                             ).classes("w-full")
 
-                        edit_notes = required_input(
+                        SUSPECTNOTE = required_input(
                             label="Notes",
-                            value=row["sus_note"],
+                            value=row["SUSPECTNOTE"],
                         ).classes("w-full")
 
                         with ui.row().classes(
@@ -292,10 +298,11 @@ def build_persons_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=edit_dialog.close,
-                            ).props("flat")
+                                color="transparent",
+                            ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_save_update() -> None:
-                                new_name = edit_name.value or ""
+                                new_name = SUSPECTNAME.value or ""
                                 if not new_name:
                                     ui.notify(
                                         "The 'Name' field is required.",
@@ -311,8 +318,8 @@ def build_persons_page() -> None:
                                     dup = (
                                         session.query(Persons)
                                         .filter(
-                                            Persons.sus_name == new_name,
-                                            Persons.id != row["id"],
+                                            Persons.SUSPECTNAME == new_name,
+                                            Persons.Z_PK != row["Z_PK"],
                                         )
                                         .first()
                                     )
@@ -330,29 +337,28 @@ def build_persons_page() -> None:
 
                                     person = (
                                         session.query(Persons)
-                                        .filter_by(id=row["id"])
+                                        .filter_by(Z_PK=row["Z_PK"])
                                         .first()
                                     )
 
                                     if person:
-                                        person.sus_name = new_name
-                                        person.sus_dob = (
-                                            edit_dob.value or ""
+                                        person.SUSPECTNAME = new_name
+                                        person.SUSPECTDOB = (
+                                            SUSPECTDOB.value or ""
                                         )
-                                        person.sus_address = (
-                                            edit_address.value or ""
+                                        person.SUSPECTADDRESS = (
+                                            SUSPECTADDRESS.value or ""
                                         )
-                                        person.sus_phone = (
-                                            edit_phone.value or ""
+                                        person.SUSPECTPHONE = (
+                                            SUSPECTPHONE.value or ""
                                         )
-                                        person.sus_note = (
-                                            edit_notes.value or ""
+                                        person.SUSPECTNOTE = (
+                                            SUSPECTNOTE.value or ""
                                         )
 
                                 ui.notify(
                                     f"'{new_name}' was updated.",
-                                    type="positive",
-                                    timeout=2000,
+                                    timeout=4000,
                                     position="bottom",
                                     close_button="OK",
                                 )
@@ -360,10 +366,13 @@ def build_persons_page() -> None:
                                 edit_dialog.close()
                                 refresh_persons_table()
 
-                                ui.button(
-                                    "Save",
-                                    on_click=on_save_update,
-                                ).props("unelevated")
+                            ui.button(
+                                "Update",
+                                on_click=on_save_update,
+                                color="var(--vsp-blue)",
+                            ).props("unelevated").classes(
+                                "text-[var(--vsp-white)]"
+                            )
 
                     edit_dialog.open()
 
@@ -375,38 +384,47 @@ def build_persons_page() -> None:
                     ):
 
                         ui.label(
-                            "Confirm Deletion"
-                        ).classes("text-lg font-semibold mb-2")
+                            "Delete Person?"
+                        ).classes(
+                            "text-lg font-semibold mb-1 text-[var(--vsp-blue)]"
+                        )
 
                         ui.label(
-                            f"Are you sure you want to remove "
-                            f"{row['sus_name']} from the case file?"
-                        ).classes("mb-4")
+                            f"The following Person will be removed from the "
+                            "case file :"
+                        ).classes(
+                            "mb-3 text-base text-[var(--vsp-gray)]"
+                        )
+
+                        ui.label(
+                            f"\'{row['SUSPECTNAME']}\'"
+                        ).classes(
+                            "mb-3 text-base font-semibold text-[var(--vsp-blue)]")
 
                         with ui.row().classes("w-full justify-end gap-2"):
 
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                            ).props("flat")
+                                color="transparent",
+                            ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_confirm_delete() -> None:
                                 with get_session() as session:
                                     person = (
                                         session.query(Persons)
-                                        .filter_by(id=row["id"])
+                                        .filter_by(Z_PK=row["Z_PK"])
                                         .first()
                                     )
                                     if person:
-                                        sus_name = person.sus_name
+                                        SUSPECTNAME = person.SUSPECTNAME
                                         session.delete(person)
                                     else:
-                                        sus_name = row["sus_name"]
+                                        SUSPECTNAME = row["SUSPECTNAME"]
 
                                 ui.notify(
-                                    f"'{sus_name}' was removed from the case.",
-                                    type="positive",
-                                    timeout=2000,
+                                    f"'{SUSPECTNAME}' was removed.",
+                                    timeout=4000,
                                     position="bottom",
                                     close_button="OK",
                                 )
@@ -418,12 +436,39 @@ def build_persons_page() -> None:
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                            ).props("negative unelevated")
+                            ).props("unelevated").classes(
+                                "text-[var(--vsp-white)]"
+                            )
 
                     delete_dialog.open()
 
                 table.on("edit", open_edit_dialog)
                 table.on("delete", open_delete_dialog)
+
+        with ui.row().classes("w-full justify-center my-2"):
+
+            def delete_all_persons() -> None:
+                with get_session() as session:
+                    session.query(Persons).delete()
+                    session.commit()
+
+                ui.notify(
+                    "All Persons has been deleted.",
+                    timeout=4000,
+                    position="bottom",
+                    close_button="OK",
+                )
+
+                refresh_persons_table()
+
+            ui.button(
+                "Delete All Persons",
+                on_click=lambda: confirm_delete_all(
+                    "persons",
+                    delete_all_persons,
+                ),
+                color="#ef4444",
+            ).props("unelevated").classes("mb-2 items-center")
 
     # -----Initial render -----
     refresh_persons_table()

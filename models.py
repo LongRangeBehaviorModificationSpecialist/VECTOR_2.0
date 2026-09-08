@@ -60,204 +60,220 @@ UsersBase = declarative_base()
 
 # ----- MODELS -----
 
-class Agents(Base):
-    """Agents table — stores agent details."""
-
-    __tablename__ = "agents"
-
-    id = Column(Integer(), primary_key=True)
-    agent_name = Column(String(), nullable=False, unique=True)
-    agent_parent_agency = Column(String(), nullable=False)
-    agent_role = Column(String(), nullable=False)
-    agent_role_secondary = Column(String())
-    agent_phone = Column(String(), nullable=False, unique=True)
-    agent_email = Column(String(), unique=True)
-    agent_note = Column(Text())
-
-    def __repr__(self):
-        return f"Agent {self.id}: {self.agent_name}"
-
-    def __str__(self):
-        return f"Agent {self.id}: {self.agent_name}"
-
-class AgentsSchema(Schema):
-    """Agent schema."""
-
-    agent_name = fields.Str()
-    agent_parent_agency = fields.Str()
-    agent_role = fields.Str()
-    agent_role_secondary = fields.Str()
-    agent_phone = fields.Str()
-    agent_email = fields.Str()
-    agent_note = fields.Str()
-
-agents_schema = AgentsSchema(many=True)
-
 
 class Cases(Base):
     """Cases table — stores case details."""
 
-    __tablename__ = "cases"
+    __tablename__ = "CASES"
 
-    id = Column(Integer(), primary_key=True)
-    case_number = Column(String(), nullable=False)
-    location = Column(String(), nullable=False)
-    jurisdiction = Column(String(), nullable=False)
-    case_date_time_begin = Column(String(), nullable=False)
-    case_date_time_end = Column(String())
+    Z_PK = Column(Integer(), primary_key=True)
+    CASENUMBER = Column(String(), nullable=False)
+    LOCATION = Column(String(), nullable=False)
+    JURISDICTION = Column(String(), nullable=False)
+    CASEDATETIMEBEGIN = Column(String(), nullable=False)
+    CASEDATETIMEEND = Column(String())
 
     def __repr__(self):
-        return f"Case Number: {self.case_number}"
+        return f"Case Number: {self.CASENUMBER}"
 
     def __str__(self):
-        return f"Case Number: {self.case_number}"
+        return f"Case Number: {self.CASENUMBER}"
+
 
 class CaseSchema(Schema):
     """Case schema."""
 
-    case_number = fields.Str()
-    location = fields.Str()
-    jurisdiction = fields.Str()
-    case_date_time_begin = fields.Str()
-    case_date_time_end = fields.Str()
+    CASENUMBER = fields.Str()
+    LOCATION = fields.Str()
+    JURISDICTION = fields.Str()
+    CASEDATETIMEBEGIN = fields.Str()
+    CASEDATETIMEEND = fields.Str()
+
 
 case_schema = CaseSchema(many=True)
 
 
-class Evidence(Base):
-    """Evidence table — stores evidence item details."""
+class Agents(Base):
+    """Agents table — stores agent details."""
 
-    __tablename__ = "evidence"
+    __tablename__ = "AGENTS"
 
-    id = Column(Integer(), primary_key=True)
-    evid_num = Column(String(), nullable=False, unique=True)
-    evid_qty = Column(String(), nullable=False)
-    evid_desc = Column(String(), nullable=False)
-    evid_model_num = Column(String())
-    evid_serial_num = Column(String())
-    evid_loc_room = Column(String(), nullable=False)
-    evid_loc_room_detail = Column(String(), nullable=False)
-    evid_found_by = Column(String(), nullable=False)
-    evid_found_by_witness = Column(String(), nullable=False)
-    evid_pic_taken = Column(String())
-    evid_triaged = Column(String())
-    evid_triaged_by = Column(String())
-    evid_is_contraband = Column(String())
-    evid_note = Column(Text())
+    Z_PK = Column(Integer(), primary_key=True)
+    AGENTNAME = Column(String(), nullable=False, unique=True)
+    AGENTPARENTAGENCY = Column(String(), nullable=False)
+    AGENTPRIMARYROLE = Column(String(), nullable=False)
+    AGENTROLESECONDARY = Column(String())
+    AGENTPHONE = Column(String(), nullable=False, unique=True)
+    AGENTEMAIL = Column(String(), unique=True)
+    AGENTNOTE = Column(Text())
+    ENTEREDDATETIME = Column(String())
 
     def __repr__(self):
-        return f"Item {self.id}: {self.evid_desc}"
+        return f"Agent {self.Z_PK}: {self.AGENTNAME}"
 
     def __str__(self):
-        return f"Item {self.id}: {self.evid_desc}"
-
-class EvidenceSchema(Schema):
-    """Evidence schema."""
-
-    evid_num = fields.Str()
-    evid_qty = fields.Str()
-    evid_desc = fields.Str()
-    evid_model_num = fields.Str()
-    evid_serial_num = fields.Str()
-    evid_loc_room = fields.Str()
-    evid_loc_room_detail = fields.Str()
-    evid_found_by = fields.Str()
-    evid_found_by_witness = fields.Str()
-    evid_pic_taken = fields.Str()
-    evid_triaged = fields.Str()
-    evid_triaged_by = fields.Str()
-    evid_is_contraband = fields.Str()
-    evid_note = fields.Str()
-
-evid_schema = EvidenceSchema(many=True)
+        return f"Agent {self.Z_PK}: {self.AGENTNAME}"
 
 
-class Notes(Base):
-    """Notes table — stores general case/agent notes."""
+class AgentsSchema(Schema):
+    """Agent schema."""
 
-    __tablename__ = "notes"
+    AGENTNAME = fields.Str()
+    AGENTPARENTAGENCY = fields.Str()
+    AGENTPRIMARYROLE = fields.Str()
+    AGENTROLESECONDARY = fields.Str()
+    AGENTPHONE = fields.Str()
+    AGENTEMAIL = fields.Str()
+    AGENTNOTE = fields.Str()
+    ENTEREDDATETIME = fields.Str()
 
-    id = Column(Integer(), primary_key=True)
-    note_date_time = Column(String(), nullable=False)
-    note_date_time_updated = Column(String())
-    note_author = Column(String(), nullable=False)
-    note_text = Column(Text(), nullable=False)
-
-    def __repr__(self):
-        return f"Note {self.id}: {self.note_text}"
-
-    def __str__(self):
-        return f"Note {self.id}: {self.note_text}"
-
-class NotesSchema(Schema):
-    """Notes schema."""
-
-    note_date_time = fields.Str()
-    note_date_time_updated = fields.Str()
-    note_author = fields.Str()
-    note_text = fields.Str()
-
-note_schema = NotesSchema(many=True)
-
-
-class Persons(Base):
-    """Persons table — stores suspect/person details."""
-
-    __tablename__ = "persons"
-
-    id = Column(Integer(), primary_key=True)
-    sus_name = Column(String(), nullable=False, unique=True)
-    sus_dob = Column(String())
-    sus_address = Column(String())
-    sus_phone = Column(String())
-    sus_note = Column(Text())
-
-    def __repr__(self):
-        return f"Person {self.id}: {self.sus_name}"
-
-    def __str__(self):
-        return f"Person {self.id}: {self.sus_name}"
-
-class PersonSchema(Schema):
-    """Person schema."""
-
-    sus_name = fields.Str()
-    sus_dob = fields.Str()
-    sus_address = fields.Str()
-    sus_phone = fields.Str()
-    sus_note = fields.Str()
-
-person_schema = PersonSchema(many=True)
+agents_schema = AgentsSchema(many=True)
 
 
 class Rooms(Base):
     """Rooms table — stores room/area details."""
 
-    __tablename__ = "rooms"
+    __tablename__ = "ROOMS"
 
-    id = Column(Integer(), primary_key=True)
-    room_label = Column(String(), nullable=False, unique=True)
-    room_desc = Column(String(), nullable=False, unique=True)
-    room_first_agent = Column(String(), nullable=False)
-    room_second_agent = Column(String(), nullable=False)
-    room_note = Column(Text())
+    Z_PK = Column(Integer(), primary_key=True)
+    ROOMLABEL = Column(String(), nullable=False, unique=True)
+    ROOMDESC = Column(String(), nullable=False, unique=True)
+    ROOMFIRSTAGENT = Column(String(), nullable=False)
+    ROOMSECONDAGENT = Column(String(), nullable=False)
+    ROOMNOTE = Column(Text())
+    ENTEREDDATETIME = Column(String())
 
     def __repr__(self):
-        return f"Room {self.room_label}: {self.room_desc}"
+        return f"Room {self.ROOMLABEL}: {self.ROOMDESC}"
 
     def __str__(self):
-        return f"Room {self.room_label}: {self.room_desc}"
+        return f"Room {self.ROOMLABEL}: {self.ROOMDESC}"
+
 
 class RoomsSchema(Schema):
     """Room schema."""
 
-    room_label = fields.Str()
-    room_desc = fields.Str()
-    room_first_agent = fields.Str()
-    room_second_agent = fields.Str()
-    room_note = fields.Str()
+    ROOMLABEL = fields.Str()
+    ROOMDESC = fields.Str()
+    ROOMFIRSTAGENT = fields.Str()
+    ROOMSECONDAGENT = fields.Str()
+    ROOMNOTE = fields.Str()
+    ENTEREDDATETIME = fields.Str()
+
 
 rooms_schema = RoomsSchema(many=True)
+
+
+class Evidence(Base):
+    """Evidence table — stores evidence item details."""
+
+    __tablename__ = "EVIDENCE"
+
+    Z_PK = Column(Integer(), primary_key=True)
+    EVIDNUM = Column(String(), nullable=False, unique=True)
+    EVIDQTY = Column(String(), nullable=False)
+    EVIDDESC = Column(String(), nullable=False)
+    EVIDMODELNUMBER = Column(String())
+    EVIDSERIALNUMBER = Column(String())
+    EVIDLOCROOM = Column(String(), nullable=False)
+    EVIDLOCROOMDETAIL = Column(String(), nullable=False)
+    EVIDFOUNDBY = Column(String(), nullable=False)
+    EVIDFOUNDBYWITNESS = Column(String(), nullable=False)
+    EVIDPICTAKEN = Column(String())
+    EVIDTRIAGED = Column(String())
+    EVIDTRIAGEDBY = Column(String())
+    EVIDISCONTRABAND = Column(String())
+    EVIDNOTE = Column(Text())
+    ENTEREDDATETIME = Column(String())
+
+    def __repr__(self):
+        return f"Item {self.Z_PK}: {self.EVIDDESC}"
+
+    def __str__(self):
+        return f"Item {self.Z_PK}: {self.EVIDDESC}"
+
+class EvidenceSchema(Schema):
+    """Evidence schema."""
+
+    EVIDNUM = fields.Str()
+    EVIDQTY = fields.Str()
+    EVIDDESC = fields.Str()
+    EVIDMODELNUMBER = fields.Str()
+    EVIDSERIALNUMBER = fields.Str()
+    EVIDLOCROOM = fields.Str()
+    EVIDLOCROOMDETAIL = fields.Str()
+    EVIDFOUNDBY = fields.Str()
+    EVIDFOUNDBYWITNESS = fields.Str()
+    EVIDPICTAKEN = fields.Str()
+    EVIDTRIAGED = fields.Str()
+    EVIDTRIAGEDBY = fields.Str()
+    EVIDISCONTRABAND = fields.Str()
+    EVIDNOTE = fields.Str()
+    ENTEREDDATETIME = fields.Str()
+
+evid_schema = EvidenceSchema(many=True)
+
+
+class Persons(Base):
+    """Persons table — stores suspect/person details."""
+
+    __tablename__ = "PERSONS"
+
+    Z_PK = Column(Integer(), primary_key=True)
+    SUSPECTNAME = Column(String(), nullable=False, unique=True)
+    SUSPECTDOB = Column(String())
+    SUSPECTADDRESS = Column(String())
+    SUSPECTPHONE = Column(String())
+    SUSPECTNOTE = Column(Text())
+    ENTEREDDATETIME = Column(String())
+
+    def __repr__(self):
+        return f"Person {self.Z_PK}: {self.SUSPECTNAME}"
+
+    def __str__(self):
+        return f"Person {self.Z_PK}: {self.SUSPECTNAME}"
+
+
+class PersonSchema(Schema):
+    """Person schema."""
+
+    SUSPECTNAME = fields.Str()
+    SUSPECTDOB = fields.Str()
+    SUSPECTADDRESS = fields.Str()
+    SUSPECTPHONE = fields.Str()
+    SUSPECTNOTE = fields.Str()
+    ENTEREDDATETIME = fields.Str()
+
+
+person_schema = PersonSchema(many=True)
+
+
+class Notes(Base):
+    """Notes table — stores general case/agent notes."""
+
+    __tablename__ = "NOTES"
+
+    Z_PK = Column(Integer(), primary_key=True)
+    NOTEDATETIME = Column(String(), nullable=False)
+    NOTEDATETIMEUPDATED = Column(String())
+    NOTEAUTHOR = Column(String(), nullable=False)
+    NOTETEXT = Column(Text(), nullable=False)
+
+    def __repr__(self):
+        return f"Note {self.Z_PK}: {self.note_text}"
+
+    def __str__(self):
+        return f"Note {self.Z_PK}: {self.note_text}"
+
+class NotesSchema(Schema):
+    """Notes schema."""
+
+    NOTEDATETIME = fields.Str()
+    NOTEDATETIMEUPDATED = fields.Str()
+    NOTEAUTHOR = fields.Str()
+    NOTETEXT = fields.Str()
+
+note_schema = NotesSchema(many=True)
 
 
 class UploadedFiles(Base):
