@@ -19,7 +19,7 @@ from main import get_current_user_name, get_is_admin
 def build_admin_page():
     """Builds the Admin user management page."""
 
-    # ----- Navbar -----
+    # ----- Header / Navbar -----
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -28,7 +28,9 @@ def build_admin_page():
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label("User Administration").classes("text-2xl font-bold m-4")
+        ui.label(
+            "User Administration"
+        ).classes("text-2xl font-bold m-4")
 
         # ----- Add New User Card -----
         with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
@@ -48,7 +50,7 @@ def build_admin_page():
                 # ----- Validation -----
                 if not uname:
                     ui.notify(
-                        "Username is required.",
+                        "A username is required.",
                         type="negative",
                         timeout=0,
                         position="center",
@@ -57,7 +59,9 @@ def build_admin_page():
                     return
 
                 with get_users_session() as session:
+
                     if session.query(Users).filter_by(user_name=uname).first():
+
                         ui.notify(
                             "That username already exists.",
                             type="negative",
@@ -94,7 +98,8 @@ def build_admin_page():
             ui.button(
                 "Create User",
                 on_click=create_user,
-            ).props("unelevated").classes("mt-2")
+                color="var(--vsp-blue)",
+            ).props("unelevated").classes("text-[var(--vsp-white)]")
 
         # ----- Existing Users Table -----
         ui.separator().classes("my-6")
@@ -112,8 +117,12 @@ def build_admin_page():
                     table_container.clear()
 
                     with get_users_session() as session:
-                        users = session.query(Users).order_by(
-                            Users.user_name).all()
+
+                        users = (
+                            session.query(Users)
+                            .order_by(Users.user_name)
+                            .all()
+                        )
 
                         rows = [
                             {
@@ -123,7 +132,7 @@ def build_admin_page():
                                 "is_active": "Yes" if u.is_active else "No",
                                 "must_change_pw": (
                                     "Yes" if u.must_change_password else "No"
-                                )
+                                ),
                             }
                             for u in users
                         ]
@@ -177,8 +186,9 @@ def build_admin_page():
                             <q-td :props="props">
                                 <div class="row no-wrap gap-1">
                                     <q-btn dense flat color="warning" \
-                                    icon="refresh"
-                                        size="sm" title="Reset Password"
+                                    icon="refresh" size="sm"
+                                    style="color: #2984D1;"
+                                    title="Reset Password"
                                         @click="$parent.$emit('reset', \
                                         props.row)" />
                                     <q-btn dense flat color="negative" \
@@ -194,12 +204,16 @@ def build_admin_page():
 
                         # ----- Reset password handler -----
                         def reset_password(e):
+
                             row = e.args
+
                             with ui.dialog() as reset_dialog, ui.card(
-                                ).classes("max-w-sm p-6"):
+                                ).classes("max-w-sm p-6"
+                            ):
 
                                 ui.label("Reset Password"
-                                    ).classes("text-lg font-semibold mb-2")
+                                    ).classes("text-lg font-semibold mb-2"
+                                )
 
                                 ui.label(
                                     f"Reset the password for "
@@ -209,19 +223,27 @@ def build_admin_page():
                                 ).classes("mb-4")
 
                                 with ui.row().classes(
-                                    "w-full justify-end gap-2"):
+                                    "w-full justify-end gap-2"
+                                ):
 
-                                    ui.button("Cancel",
-                                        on_click=reset_dialog.close
-                                    ).props("flat")
+                                    ui.button(
+                                        "Cancel",
+                                        on_click=reset_dialog.close,
+                                        color="transparent",
+                                        ).props("flat").classes(
+                                        "text-[var(--vsp-blue)]"
+                                    )
 
                                     def on_confirm_reset():
+
                                         with get_users_session() as session:
+
                                             user = (
                                                 session.query(Users)
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
+
                                             if user:
                                                 user.set_password(
                                                     DEFAULT_USER_PASSWORD
@@ -245,14 +267,20 @@ def build_admin_page():
                                     ui.button(
                                         "Reset",
                                         on_click=on_confirm_reset,
-                                    ).props("negative unelevated")
+                                        color="var(--vsp-blue)",
+                                        ).props("unelevated").classes(
+                                        "text-[var(--vsp-white)]"
+                                    )
 
                             reset_dialog.open()
 
                         # ----- Delete user handler -----
                         def delete_user(e):
+
                             row = e.args
+
                             if row["is_admin"] == "Yes":
+
                                 ui.notify(
                                     "Cannot delete the admin account.",
                                     type="negative",
@@ -283,22 +311,27 @@ def build_admin_page():
                                     ui.button(
                                         "Cancel",
                                         on_click=delete_dialog.close,
-                                    ).props("flat")
+                                        color="transparent",
+                                        ).props("flat"
+                                    ).classes("text-[var(--vsp-blue)]")
 
                                     def on_confirm_delete():
+
                                         with get_users_session() as session:
+
                                             user = (
                                                 session.query(Users)
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
+
                                             if user:
                                                 session.delete(user)
 
                                         ui.notify(
-                                            f"User '{row["username"]}' "
+                                            f"User \"{row['username']}\" "
                                             "deleted.",
-                                            timeout=0,
+                                            timeout=4000,
                                             position="bottom",
                                             close_button="OK",
                                         )
@@ -309,7 +342,10 @@ def build_admin_page():
                                     ui.button(
                                         "Delete",
                                         on_click=on_confirm_delete,
-                                    ).props("negative unelevated")
+                                        color="#ef4444",
+                                        ).props("unelevated").classes(
+                                        "text-[var(--vsp-white)]"
+                                    )
 
                             delete_dialog.open()
 

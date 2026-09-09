@@ -50,16 +50,18 @@ def build_persons_page() -> None:
             SUSPECTNAME_input.props("autofocus")
 
             SUSPECTDOB_input = ui.input(
-                label="DOB"
-            ).classes("w-full")
+                label="DOB",
+                placeholder="MM-DD-YYYY",
+            ).props('mask="##-##-####"').classes("w-full")
 
             SUSPECTADDRESS_input = ui.input(
                 label="Address"
             ).classes("w-full")
 
             SUSPECTPHONE_input = ui.input(
-                label="Phone Number"
-            ).classes("w-full")
+                label="Phone Number",
+                placeholder="(###) ###-####"
+            ).props('mask="(###) ###-####"').classes("w-full")
 
             SUSPECTNOTE_input = required_input(
                 label="Notes"
@@ -69,6 +71,7 @@ def build_persons_page() -> None:
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form() -> None:
+
                     SUSPECTNAME_input.value = ""
                     SUSPECTDOB_input.value = ""
                     SUSPECTADDRESS_input.value = ""
@@ -76,6 +79,7 @@ def build_persons_page() -> None:
                     SUSPECTNOTE_input.value = ""
 
                 def on_submit() -> None:
+
                     SUSPECTNAME = SUSPECTNAME_input.value
                     SUSPECTDOB = SUSPECTDOB_input.value or ""
                     SUSPECTADDRESS = SUSPECTADDRESS_input.value or ""
@@ -89,25 +93,8 @@ def build_persons_page() -> None:
                     ):
                         return
 
-                    # ----- Duplicate name check (SUSPECTNAME is unique) -----
                     with get_session() as session:
-                        # existing = (
-                        #     session.query(Persons)
-                        #     .filter_by(SUSPECTNAME=SUSPECTNAME)
-                        #     .first()
-                        # )
-                        # if existing:
-                        #     ui.notify(
-                        #         f"'{SUSPECTNAME}' is already in the "
-                        #         "database. Person names must be unique.",
-                        #         type="warning",
-                        #         timeout=0,
-                        #         position="center",
-                        #         close_button="OK",
-                        #     )
-                        #     return
 
-                        # ----- Save to database -----
                         new_person = Persons(
                             SUSPECTNAME=SUSPECTNAME,
                             SUSPECTDOB=SUSPECTDOB,
@@ -132,9 +119,7 @@ def build_persons_page() -> None:
                     "Clear",
                     on_click=clear_form,
                     color="transparent",
-                ).props(
-                    "flat"
-                ).classes("text-[var(--vsp-blue)]")
+                ).props("flat").classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Add Person",
@@ -146,8 +131,8 @@ def build_persons_page() -> None:
         ui.separator().classes("my-6")
 
         ui.label(
-            "Current Persons").classes("text-xl font-bold mb-3"
-        )
+            "Current Persons"
+        ).classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2"
@@ -158,11 +143,13 @@ def build_persons_page() -> None:
             table_container.clear()
 
             with get_session() as session:
+
                 persons = (
                     session.query(Persons)
                     .order_by(Persons.SUSPECTNAME)
                     .all()
                 )
+
                 if not persons:
                     with table_container:
                         ui.label(
@@ -265,7 +252,7 @@ def build_persons_page() -> None:
 
                         ui.label(
                             f"Edit Person ({row['SUSPECTNAME']})"
-                        ).classes(
+                            ).classes(
                             "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
                         )
 
@@ -306,10 +293,12 @@ def build_persons_page() -> None:
 
                             def on_save_update() -> None:
                                 SUSPECTNAME = SUSPECTNAME_input.value or ""
-                                SUSPECTDOB = SUSPECTDOB_input or ""
-                                SUSPECTADDRESS = SUSPECTADDRESS_input or ""
-                                SUSPECTPHONE = SUSPECTPHONE_input or ""
-                                SUSPECTNOTE = SUSPECTNOTE_input or ""
+                                SUSPECTDOB = SUSPECTDOB_input.value or ""
+                                SUSPECTADDRESS = (
+                                    SUSPECTADDRESS_input.value or ""
+                                )
+                                SUSPECTPHONE = SUSPECTPHONE_input.value or ""
+                                SUSPECTNOTE = SUSPECTNOTE_input.value or ""
 
                                 if validate_person_data(
                                     stage="update",
@@ -320,6 +309,7 @@ def build_persons_page() -> None:
                                     return
 
                                 with get_session() as session:
+
                                     person = (
                                         session.query(Persons)
                                         .filter_by(Z_PK=row["Z_PK"])
@@ -329,16 +319,16 @@ def build_persons_page() -> None:
                                     if person:
                                         person.SUSPECTNAME = SUSPECTNAME
                                         person.SUSPECTDOB = (
-                                            SUSPECTDOB.value or ""
+                                            SUSPECTDOB or ""
                                         )
                                         person.SUSPECTADDRESS = (
-                                            SUSPECTADDRESS.value or ""
+                                            SUSPECTADDRESS or ""
                                         )
                                         person.SUSPECTPHONE = (
-                                            SUSPECTPHONE.value or ""
+                                            SUSPECTPHONE or ""
                                         )
                                         person.SUSPECTNOTE = (
-                                            SUSPECTNOTE.value or ""
+                                            SUSPECTNOTE or ""
                                         )
 
                                 ui.notify(
@@ -355,7 +345,7 @@ def build_persons_page() -> None:
                                 "Update",
                                 on_click=on_save_update,
                                 color="var(--vsp-blue)",
-                            ).props("unelevated").classes(
+                                ).props("unelevated").classes(
                                 "text-[var(--vsp-white)]"
                             )
 
@@ -372,7 +362,7 @@ def build_persons_page() -> None:
 
                         ui.label(
                             "Delete Person?"
-                        ).classes(
+                            ).classes(
                             "text-lg font-semibold mb-1 text-[var(--vsp-blue)]"
                         )
 
@@ -396,12 +386,15 @@ def build_persons_page() -> None:
                             ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_confirm_delete() -> None:
+
                                 with get_session() as session:
+
                                     person = (
                                         session.query(Persons)
                                         .filter_by(Z_PK=row["Z_PK"])
                                         .first()
                                     )
+
                                     if person:
                                         SUSPECTNAME = person.SUSPECTNAME
                                         session.delete(person)
@@ -422,7 +415,7 @@ def build_persons_page() -> None:
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                            ).props("unelevated").classes(
+                                ).props("unelevated").classes(
                                 "text-[var(--vsp-white)]"
                             )
 
@@ -434,7 +427,9 @@ def build_persons_page() -> None:
         with ui.row().classes("w-full justify-center my-2"):
 
             def delete_all_persons() -> None:
+
                 with get_session() as session:
+
                     session.query(Persons).delete()
                     session.commit()
 

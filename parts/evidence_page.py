@@ -199,7 +199,7 @@ def build_evidence_page() -> None:
                             EVIDDESC=EVIDDESC,
                             EVIDMODELNUMBER=EVIDMODELNUMBER_input.value or "",
                             EVIDSERIALNUMBER=(
-                                EVIDSERIALNUMBER_input.value or "",
+                                EVIDSERIALNUMBER_input.value or ""
                             ),
                             EVIDLOCROOM=EVIDLOCROOM,
                             EVIDLOCROOMDETAIL=EVIDLOCROOMDETAIL,
@@ -212,7 +212,9 @@ def build_evidence_page() -> None:
                                 EVIDISCONTRABAND_combo.value or ""
                             ),
                             EVIDNOTE=EVIDNOTE_input.value or "",
-                            ENTEREDDATETIME=get_current_timestamp(format="entry"),
+                            ENTEREDDATETIME=(
+                                get_current_timestamp(format="entry")
+                            ),
                         )
                         session.add(new_evid)
 

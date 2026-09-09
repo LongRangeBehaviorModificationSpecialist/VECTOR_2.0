@@ -80,6 +80,7 @@ def build_rooms_page() -> None:
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_room_form() -> None:
+
                     ROOMLABEL_input.value = get_next_room_ltr()
                     ROOMDESC_input.value = ""
                     ROOMFIRSTAGENT_combo.value = None
@@ -88,6 +89,7 @@ def build_rooms_page() -> None:
 
                 def on_submit() -> None:
                     """Handles form submission for new rooms."""
+
                     ROOMLABEL = ROOMLABEL_input.value
                     ROOMDESC = ROOMDESC_input.value
                     ROOMFIRSTAGENT = ROOMFIRSTAGENT_combo.value or ""
@@ -106,7 +108,6 @@ def build_rooms_page() -> None:
 
                     try:
                         with get_session() as session:
-                            # ----- Save to database -----
                             new_room = Rooms(
                                 ROOMLABEL=ROOMLABEL,
                                 ROOMDESC=ROOMDESC,
@@ -114,8 +115,8 @@ def build_rooms_page() -> None:
                                 ROOMSECONDAGENT=ROOMSECONDAGENT,
                                 ROOMNOTE=ROOMNOTE,
                                 ENTEREDDATETIME=(
-                                    get_current_timestamp(format="entry"),
-                                )
+                                    get_current_timestamp(format="entry")
+                                ),
                             )
                             session.add(new_room)
 
@@ -126,12 +127,12 @@ def build_rooms_page() -> None:
                             close_button="OK",
                         )
 
-                        clear_room_form()
                         refresh_rooms_table()
+                        clear_room_form()
 
                     except Exception:
                         ui.notify(
-                            "Please check the Agent Information you just tried "
+                            "Please check the Room information you just tried "
                             "to enter/update — You may have entered a "
                             "duplicate value. No changes were made.",
                             type="negative",
@@ -322,7 +323,8 @@ def build_rooms_page() -> None:
                                 ).classes("w-full")
 
                                 with ui.row().classes(
-                                    "w-full justify-end gap-2 mt-4"):
+                                    "w-full justify-end gap-2 mt-4"
+                                ):
 
                                     ui.button(
                                         "Cancel",

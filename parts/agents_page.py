@@ -95,6 +95,7 @@ def build_agents_page() -> None:
 
             # ----- Auto-populate on name selection -----
             def on_name_change(e) -> None:
+
                 selected = e.value
                 if not selected:
                     return
@@ -120,6 +121,7 @@ def build_agents_page() -> None:
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_agent_form() -> None:
+
                     AGENTNAME_input.value = None
                     AGENTPARENTAGENCY_input.value = None
                     AGENTPRIMARYROLE_input.value = None
@@ -130,6 +132,7 @@ def build_agents_page() -> None:
 
                 def on_submit() -> None:
                     """Handles form submission for new agents."""
+
                     AGENTNAME = AGENTNAME_input.value or ""
                     AGENTPARENTAGENCY = AGENTPARENTAGENCY_input.value or ""
                     AGENTPRIMARYROLE = AGENTPRIMARYROLE_input.value
@@ -138,7 +141,6 @@ def build_agents_page() -> None:
                     AGENTEMAIL = AGENTEMAIL_input.value or ""
                     AGENTNOTE = AGENTNOTE_input.value or ""
 
-                    # ----- Required field validation -----
                     if validate_agent_entry(
                         stage="initial",
                         AGENTNAME=AGENTNAME,
@@ -150,7 +152,6 @@ def build_agents_page() -> None:
 
                     try:
                         with get_session() as session:
-                            # ----- Uniqueness checks for data -----
                             new_agent = Agents(
                                 AGENTNAME=AGENTNAME,
                                 AGENTPARENTAGENCY=AGENTPARENTAGENCY,
@@ -188,7 +189,7 @@ def build_agents_page() -> None:
                             )
                         else:
                             ui.notify(
-                                f"{AGENTNAME} added to the case databse.",
+                                f"{AGENTNAME} was added.",
                                 timeout=4000,
                                 position="bottom",
                                 close_button="OK",
@@ -199,8 +200,8 @@ def build_agents_page() -> None:
 
                     except Exception:
                         ui.notify(
-                            "Please check the Agent Information you just tried "
-                            "to enter/update — You may have entered a "
+                            "Please check the Agent Information you just "
+                            "tried to enter/update — You may have entered a "
                             "duplicate value. No changes were made.",
                             type="negative",
                             timeout=0,
@@ -260,9 +261,13 @@ def build_agents_page() -> None:
                             {
                                 "Z_PK": r.Z_PK,
                                 "AGENTNAME": r.AGENTNAME or "",
-                                "AGENTPARENTAGENCY": (r.AGENTPARENTAGENCY or ""),
+                                "AGENTPARENTAGENCY": (
+                                    r.AGENTPARENTAGENCY or ""
+                                ),
                                 "AGENTPRIMARYROLE": r.AGENTPRIMARYROLE or "",
-                                "AGENTROLESECONDARY": (r.AGENTROLESECONDARY or ""),
+                                "AGENTROLESECONDARY": (
+                                    r.AGENTROLESECONDARY or ""
+                                ),
                                 "AGENTPHONE": r.AGENTPHONE or "",
                                 "AGENTEMAIL": r.AGENTEMAIL or "",
                                 "AGENTNOTE": r.AGENTNOTE or "",
@@ -408,7 +413,8 @@ def build_agents_page() -> None:
                                 ).classes("w-full")
 
                                 with ui.row().classes(
-                                    "w-full justify-end gap-2 mt-4"):
+                                    "w-full justify-end gap-2 mt-4"
+                                ):
 
                                     ui.button(
                                         "Cancel",
@@ -442,7 +448,6 @@ def build_agents_page() -> None:
                                             AGENTNOTE_input.value or ""
                                         )
 
-                                        # ----- Validate fields -----
                                         if validate_agent_entry(
                                             stage="update",
                                             AGENTNAME=AGENTNAME,
@@ -483,7 +488,7 @@ def build_agents_page() -> None:
                                                 agent.AGENTNOTE = AGENTNOTE
 
                                         ui.notify(
-                                            f"{AGENTNAME} was updated ",
+                                            f"'{AGENTNAME}' was updated ",
                                             timeout=4000,
                                             position="bottom",
                                             close_button="OK",
@@ -586,11 +591,12 @@ def build_agents_page() -> None:
                 def delete_all_agents() -> None:
 
                     with get_session() as session:
+
                         session.query(Agents).delete()
                         session.commit()
 
                     ui.notify(
-                        "All agents have been deleted.",
+                        "All Agents have been deleted.",
                         timeout=4000,
                         position="bottom",
                         close_button="OK",

@@ -85,7 +85,7 @@ mimetypes.add_type("application/x-bzip2", ".bz2")
 mimetypes.add_type("application/x-xz", ".xz")
 
 
-def get_current_timestamp(format: str) -> str:
+def get_current_timestamp(format: str = "") -> str:
     """Gets the current date and time.
 
     Returns:
@@ -599,8 +599,11 @@ def validate_evid_entry(
     item_num = EVIDNUM.strip()
     qty = EVIDQTY.strip()
     desc = EVIDDESC.strip()
-    room = EVIDLOCROOM.strip()
-    loc_detail = EVIDLOCROOMDETAIL.strip()
+
+    if EVIDLOCROOM:
+        room = EVIDLOCROOM.strip()
+    if EVIDLOCROOMDETAIL:
+        loc_detail = EVIDLOCROOMDETAIL.strip()
     found_by = EVIDFOUNDBY.strip()
     witness = EVIDFOUNDBYWITNESS.strip()
     triaged = EVIDTRIAGED.strip()
@@ -767,11 +770,12 @@ def validate_person_data(
         row: Optional[dict] = None,
 ) -> bool:
 
-    name = SUSPECTNAME.strip()
-    note = SUSPECTNOTE.strip()
+    suspect = SUSPECTNAME.strip()
+    if SUSPECTNOTE:
+        note = SUSPECTNOTE.strip()
 
     for field_label, value in [
-        ("Name", name),
+        ("Name", suspect),
         ("Note", note)
     ]:
         if not value:
@@ -789,13 +793,38 @@ def validate_person_data(
         if value_in_use(session,
                         Persons,
                         "SUSPECTNAME",
-                        name,
+                        suspect,
                         exclude_pk=exclude_pk,
         ):
             ui.notify(
-                f"'{name}' is already in the database. Person names "
+                f"'{suspect}' is already in the database. Person names "
                 "must be unique.",
                 type="warning", timeout=0, position="center", close_button="OK",
+            )
+            return True
+
+    return False
+
+
+def validate_note_data(
+        NOTEAUTHOR: str,
+        NOTETEXT: str,
+) -> bool:
+
+    author = NOTEAUTHOR.strip()
+    text = NOTETEXT.strip()
+
+    for field_label, value in [
+        ("Agent Name", author),
+        ("Note Text", text)
+    ]:
+        if not value:
+            ui.notify(
+                f"The '{field_label}' field is required.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
             )
             return True
 
