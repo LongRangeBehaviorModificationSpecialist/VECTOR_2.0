@@ -20,7 +20,7 @@ from utils import (
     required_input,
     required_select,
     load_jurisdiction_options,
-    validate_case_data,
+    validate_case_entry,
 )
 
 
@@ -93,7 +93,8 @@ def build_cases_page() -> None:
                     CASEDATETIMEEND = CASEDATETIMEEND_input.value
 
                     # ----- Required field validation -----
-                    if not validate_case_data(
+                    if validate_case_entry(
+                        stage="initial",
                         CASENUMBER=CASENUMBER,
                         LOCATION=LOCATION,
                         JURISDICTION=JURISDICTION,
@@ -103,23 +104,7 @@ def build_cases_page() -> None:
 
                     try:
                         with get_session() as session:
-                            # Check for duplicate case number
-                            existing = (
-                                session.query(Cases)
-                                .filter_by(CASENUMBER=CASENUMBER)
-                                .first()
-                            )
-                            if existing:
-                                ui.notify(
-                                    f"Case '{CASENUMBER}' already exists. "
-                                    "Please use a unique case number.",
-                                    type="warning",
-                                    timeout=0,
-                                    position="center",
-                                    close_button="OK",
-                                )
-                                return
-
+                            # ----- Save to database -----
                             new_case = Cases(
                                 CASENUMBER=CASENUMBER,
                                 LOCATION=LOCATION,
@@ -155,9 +140,7 @@ def build_cases_page() -> None:
                     "Clear",
                     on_click=clear_form,
                     color="transparent",
-                ).props(
-                    "flat"
-                ).classes("text-[var(--vsp-blue)]")
+                ).props("flat").classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Open New Case",
@@ -181,7 +164,9 @@ def build_cases_page() -> None:
             table_container.clear()
 
             with get_session() as session:
+
                 cases = session.query(Cases).all()
+
                 if not cases:
                     with table_container:
                         ui.label("No cases in the database yet."
@@ -283,17 +268,17 @@ def build_cases_page() -> None:
                         ui.label(f"Edit Case: {row['CASENUMBER']}"
                             ).classes("text-lg font-semibold mb-4")
 
-                        CASENUMBER = required_input(
+                        CASENUMBER_input = required_input(
                             label="Case Number",
                             value=row["CASENUMBER"],
                         ).classes("w-full")
 
-                        LOCATION = required_input(
+                        LOCATION_input = required_input(
                             label="Location",
                             value=row["LOCATION"],
                         ).classes("w-full")
 
-                        JURISDICTION = required_select(
+                        JURISDICTION_input = required_select(
                             options=load_jurisdiction_options(),
                             label="Jurisdiction",
                             value=row["JURISDICTION"],
@@ -301,7 +286,7 @@ def build_cases_page() -> None:
                             new_value_mode="add",
                         ).classes("w-full")
 
-                        CASEDATETIMEBEGIN = (
+                        CASEDATETIMEBEGIN_input = (
                             required_input(
                                 label="Begin Date/Time",
                                 value=row["CASEDATETIMEBEGIN"],
@@ -311,7 +296,7 @@ def build_cases_page() -> None:
                             .classes("w-full")
                         )
 
-                        CASEDATETIMEEND = (
+                        CASEDATETIMEEND_input = (
                             ui.input(
                                 label="End Date/Time",
                                 value=row["CASEDATETIMEEND"],
@@ -321,11 +306,33 @@ def build_cases_page() -> None:
                             .classes("w-full")
                         )
 
-                        with ui.row().classes("w-full justify-end gap-2 mt-4"):
-                            ui.button("Cancel", on_click=edit_dialog.close,
-                                ).props("flat")
+                        with ui.row().classes(
+                            "w-full justify-end gap-2 mt-4"):
+
+                            ui.button(
+                                "Cancel",
+                                on_click=edit_dialog.close,
+                                color="transparent",
+                            ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_save_update() -> None:
+                                CASENUMBER = CASENUMBER_input.value or ""
+                                LOCATION = LOCATION_input.value or ""
+                                JURISDICTION = (
+                                    (JURISDICTION_input.value or "")
+                                )
+                                CASEDATETIMEBEGIN = CASEDATETIMEBEGIN_input.value or ""
+                                CASEDATETIMEEND = CASEDATETIMEEND_input.value or ""
+
+                                if validate_case_entry(
+                                    stage="update",
+                                    CASENUMBER=CASENUMBER,
+                                    LOCATION=LOCATION,
+                                    JURISDICTION=JURISDICTION,
+                                    CASEDATETIMEBEGIN=CASEDATETIMEBEGIN,
+                                    row=row,
+                                ):
+                                    return
 
                                 with get_session() as session:
                                     case = (
@@ -334,21 +341,16 @@ def build_cases_page() -> None:
                                         .first()
                                     )
                                     if case:
-                                        case.CASENUMBER = CASENUMBER.value or ""
-                                        case.LOCATION = LOCATION.value or ""
-                                        case.JURISDICTION = (
-                                            JURISDICTION.value or ""
-                                        ),
+                                        case.CASENUMBER = CASENUMBER
+                                        case.LOCATION = LOCATION
+                                        case.JURISDICTION = JURISDICTION
                                         case.CASEDATETIMEBEGIN = (
-                                            CASEDATETIMEBEGIN.value or ""
+                                            CASEDATETIMEBEGIN
                                         )
-                                        case.CASEDATETIMEEND = (
-                                            CASEDATETIMEEND.value or ""
-                                        )
+                                        case.CASEDATETIMEEND = CASEDATETIMEEND
 
                                 ui.notify(
-                                    f"Case {CASENUMBER.value} "
-                                    "information was updated.",
+                                    f"Case {CASENUMBER} was updated.",
                                     timeout=4000,
                                     position="bottom",
                                     close_button="OK",
@@ -358,9 +360,12 @@ def build_cases_page() -> None:
                                 refresh_cases_table()
 
                             ui.button(
-                                "Save",
+                                "Update",
                                 on_click=on_save_update,
-                            ).props("unelevated")
+                                color="var(--vsp-blue)",
+                            ).props("unelevated").classes(
+                                "text-[var(--vsp-white)]"
+                            )
 
                     edit_dialog.open()
 
@@ -373,7 +378,8 @@ def build_cases_page() -> None:
                         ).classes("max-w-sm p-6"
                     ):
 
-                        ui.label("Confirm Deletion").classes(
+                        ui.label(
+                            "Confirm Deletion").classes(
                             "mb-3 text-lg font-bold text-[var(--vsp-blue)]"
                         )
 
@@ -390,7 +396,7 @@ def build_cases_page() -> None:
                                 color="transparent",
                                 ).props("flat").classes(
                                     "text-[var(--vsp-blue)]"
-                                )
+                            )
 
                             def on_confirm_delete() -> None:
 

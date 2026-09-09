@@ -16,7 +16,12 @@ from models import get_session, Persons
 from navbar import build_navbar
 from home_page import confirm_new_case_handler
 from main import get_current_user_name, get_is_admin
-from utils import required_input, confirm_delete_all, get_current_timestamp
+from utils import (
+    required_input,
+    confirm_delete_all,
+    get_current_timestamp,
+    validate_person_data,
+)
 
 # ----- Main Page Builder -----
 def build_persons_page() -> None:
@@ -71,41 +76,36 @@ def build_persons_page() -> None:
                     SUSPECTNOTE_input.value = ""
 
                 def on_submit() -> None:
-                    # ----- Required field validation (DataRequired) -----
                     SUSPECTNAME = SUSPECTNAME_input.value
-
-                    if not SUSPECTNAME:
-                        ui.notify(
-                            "The 'Name' field is required.",
-                            type="warning",
-                            timeout=0,
-                            position="center",
-                            close_button="OK",
-                        )
-                        return
-
                     SUSPECTDOB = SUSPECTDOB_input.value or ""
                     SUSPECTADDRESS = SUSPECTADDRESS_input.value or ""
                     SUSPECTPHONE = SUSPECTPHONE_input.value or ""
                     SUSPECTNOTE = SUSPECTNOTE_input.value or ""
 
+                    if validate_person_data(
+                        stage="initial",
+                        SUSPECTNAME=SUSPECTNAME,
+                        SUSPECTNOTE=SUSPECTNOTE,
+                    ):
+                        return
+
                     # ----- Duplicate name check (SUSPECTNAME is unique) -----
                     with get_session() as session:
-                        existing = (
-                            session.query(Persons)
-                            .filter_by(SUSPECTNAME=SUSPECTNAME)
-                            .first()
-                        )
-                        if existing:
-                            ui.notify(
-                                f"'{SUSPECTNAME}' is already in the "
-                                "database. Person names must be unique.",
-                                type="warning",
-                                timeout=0,
-                                position="center",
-                                close_button="OK",
-                            )
-                            return
+                        # existing = (
+                        #     session.query(Persons)
+                        #     .filter_by(SUSPECTNAME=SUSPECTNAME)
+                        #     .first()
+                        # )
+                        # if existing:
+                        #     ui.notify(
+                        #         f"'{SUSPECTNAME}' is already in the "
+                        #         "database. Person names must be unique.",
+                        #         type="warning",
+                        #         timeout=0,
+                        #         position="center",
+                        #         close_button="OK",
+                        #     )
+                        #     return
 
                         # ----- Save to database -----
                         new_person = Persons(
@@ -146,11 +146,12 @@ def build_persons_page() -> None:
         ui.separator().classes("my-6")
 
         ui.label(
-            "Current Persons"
-            ).classes("text-xl font-bold mb-3")
+            "Current Persons").classes("text-xl font-bold mb-3"
+        )
 
         table_container = ui.column().classes(
-            "w-full max-w-5xl mx-auto items-center gap-2")
+            "w-full max-w-5xl mx-auto items-center gap-2"
+        )
 
         def refresh_persons_table() -> None:
             """Re-renders the persons table from the database."""
@@ -255,7 +256,9 @@ def build_persons_page() -> None:
 
                 # ----- Edit dialog -----
                 def open_edit_dialog(e) -> None:
+
                     row = e.args
+
                     with ui.dialog() as edit_dialog, ui.card(
                         ).classes("w-full max-w-lg p-6"
                     ):
@@ -266,27 +269,27 @@ def build_persons_page() -> None:
                             "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
                         )
 
-                        SUSPECTNAME = required_input(
+                        SUSPECTNAME_input = required_input(
                             label="Name",
                             value=row["SUSPECTNAME"],
                         ).classes("w-full")
 
-                        SUSPECTDOB = ui.input(
+                        SUSPECTDOB_input = ui.input(
                             label="DOB",
                             value=row["SUSPECTDOB"],
                         ).classes("w-full")
 
-                        SUSPECTADDRESS = ui.input(
+                        SUSPECTADDRESS_input = ui.input(
                             label="Address",
                             value=row["SUSPECTADDRESS"],
                         ).classes("w-full")
 
-                        SUSPECTPHONE = ui.input(
+                        SUSPECTPHONE_input = ui.input(
                             label="Phone Number",
                             value=row["SUSPECTPHONE"],
                             ).classes("w-full")
 
-                        SUSPECTNOTE = required_input(
+                        SUSPECTNOTE_input = required_input(
                             label="Notes",
                             value=row["SUSPECTNOTE"],
                         ).classes("w-full")
@@ -302,39 +305,21 @@ def build_persons_page() -> None:
                             ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_save_update() -> None:
-                                new_name = SUSPECTNAME.value or ""
-                                if not new_name:
-                                    ui.notify(
-                                        "The 'Name' field is required.",
-                                        type="warning",
-                                        timeout=0,
-                                        position="center",
-                                        close_button="OK",
-                                    )
+                                SUSPECTNAME = SUSPECTNAME_input.value or ""
+                                SUSPECTDOB = SUSPECTDOB_input or ""
+                                SUSPECTADDRESS = SUSPECTADDRESS_input or ""
+                                SUSPECTPHONE = SUSPECTPHONE_input or ""
+                                SUSPECTNOTE = SUSPECTNOTE_input or ""
+
+                                if validate_person_data(
+                                    stage="update",
+                                    SUSPECTNAME=SUSPECTNAME,
+                                    SUSPECTNOTE=SUSPECTNOTE,
+                                    row=row,
+                                ):
                                     return
 
                                 with get_session() as session:
-                                    # Check duplicate name (exclude self)
-                                    dup = (
-                                        session.query(Persons)
-                                        .filter(
-                                            Persons.SUSPECTNAME == new_name,
-                                            Persons.Z_PK != row["Z_PK"],
-                                        )
-                                        .first()
-                                    )
-                                    if dup:
-                                        ui.notify(
-                                            f"'{new_name}' is already in the "
-                                            "database. Person names must "
-                                            "be unique.",
-                                            type="warning",
-                                            timeout=0,
-                                            position="center",
-                                            close_button="OK",
-                                        )
-                                        return
-
                                     person = (
                                         session.query(Persons)
                                         .filter_by(Z_PK=row["Z_PK"])
@@ -342,7 +327,7 @@ def build_persons_page() -> None:
                                     )
 
                                     if person:
-                                        person.SUSPECTNAME = new_name
+                                        person.SUSPECTNAME = SUSPECTNAME
                                         person.SUSPECTDOB = (
                                             SUSPECTDOB.value or ""
                                         )
@@ -357,7 +342,7 @@ def build_persons_page() -> None:
                                         )
 
                                 ui.notify(
-                                    f"'{new_name}' was updated.",
+                                    f"'{SUSPECTNAME}' was updated.",
                                     timeout=4000,
                                     position="bottom",
                                     close_button="OK",
@@ -378,7 +363,9 @@ def build_persons_page() -> None:
 
                 # ----- Delete confirmation dialog -----
                 def open_delete_dialog(e) -> None:
+
                     row = e.args
+
                     with ui.dialog() as delete_dialog, ui.card(
                         ).classes("max-w-sm p-6"
                     ):
@@ -391,8 +378,7 @@ def build_persons_page() -> None:
 
                         ui.label(
                             f"The following Person will be removed from the "
-                            "case file :"
-                        ).classes(
+                            "case file :").classes(
                             "mb-3 text-base text-[var(--vsp-gray)]"
                         )
 

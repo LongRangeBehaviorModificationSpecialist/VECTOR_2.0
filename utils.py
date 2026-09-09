@@ -23,6 +23,9 @@ from pathlib import Path
 from program.inc.agent_role import AGENT_ROLE_LIST
 from program.inc.agency_list import AGENCY_LIST
 from program.inc.jurisdictions import JURISDICTIONS
+from sqlalchemy import exists, inspect
+from typing import Optional
+
 
 NOTIFICATION_TIMEOUT = 0
 POSITIVE_NOTIFICATION_TIMEOUT = 2000
@@ -440,106 +443,147 @@ def delete_all_data() -> None:
             )
 
 
-def validate_case_data(
-    CASENUMBER: str, LOCATION: str, JURISDICTION: str, CASEDATETIMEBEGIN: str
+def value_in_use(session, model, column_name, value, exclude_pk=None) -> bool:
+    """Return True if `value` already exists in `model.column_name`.
+
+    Args:
+        model:         the mapped class, e.g. Agents
+        column_name:   name of the attribute to check, e.g. "agent_name"
+        value:         the proposed value
+        exclude_pk:    primary key of the row being updated (None on insert)
+
+    Returns:
+        [bool] True if the value exists in the database, else returns False
+    """
+    column = getattr(model, column_name)  # raises AttributeError if misspelled
+
+    q = exists().where(column == value)
+
+    if exclude_pk is not None:
+        # Find the model's primary key column automatically
+        pk_column = inspect(model).primary_key[0]
+        q = q.where(pk_column != exclude_pk)
+
+    return session.query(q).scalar()
+
+
+def validate_case_entry(
+        stage: str,
+        CASENUMBER: str,
+        LOCATION: str,
+        JURISDICTION: str,
+        CASEDATETIMEBEGIN: str,
+        row: Optional[dict] = None,
 ) -> bool:
 
-    if not CASENUMBER:
-        ui.notify(
-            "The 'Case Number' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
+    number = CASENUMBER.strip()
+    location = LOCATION.strip()
+    jurisdiction = JURISDICTION.strip()
+    begin = CASEDATETIMEBEGIN.strip()
 
-    if not LOCATION:
-        ui.notify(
-            "The 'Location' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    if not JURISDICTION:
-        ui.notify(
-            "The 'Jurisdiction' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    if not CASEDATETIMEBEGIN:
-        ui.notify(
-            "The 'Date/Time Started' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    return True
-
-
-def validate_agent_data(
-        AGENTNAME: str | None,
-        AGENTPARENTAGENCY: str | None,
-        AGENTPRIMARYROLE: str | None,
-        AGENTROLESECONDARY: str = ""
-) -> bool:
-
-    if not AGENTNAME:
-        ui.notify(
-            "The 'Agent Name' field is required",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-            )
-        return False
-
-    if not AGENTPARENTAGENCY:
-        ui.notify(
-            "The 'Agency' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-            )
-        return False
-
-    if not AGENTPRIMARYROLE:
-        ui.notify(
-            "The 'Agent Role' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-            )
-        return False
-
-    if AGENTPRIMARYROLE and AGENTROLESECONDARY:
-        if AGENTPRIMARYROLE.strip().lower() == AGENTROLESECONDARY.strip().lower():
+    for field_label, value in [
+        ("Case Number", number),
+        ("Location", location),
+        ("Jurisdiction", jurisdiction),
+        ("Date/Time Started", begin),
+    ]:
+        if not value:
             ui.notify(
-                f"The 'Primary Role' field and the 'Secondary Role' "
-                f"field for {AGENTNAME} cannot be the same.",
+                f"The '{field_label}' field is required.",
+                type="warning", timeout=0, position="center", close_button="OK",
+            )
+            return True
+
+    exclude_pk = (
+        row["Z_PK"] if (stage == "update" and row is not None) else None
+    )
+
+    with get_session() as session:
+        if value_in_use(session,
+                        Cases,
+                        "CASENUMBER",
+                        number,
+                        exclude_pk=exclude_pk,
+        ):
+            ui.notify(
+                f"Case '{number}' already exists. Please use a unique case "
+                "number.",
                 type="warning",
                 timeout=0,
                 position="center",
                 close_button="OK",
             )
-            return False
+            return True
 
-    return True
+    return False
 
 
-def validate_initial_evidence(
+def validate_agent_entry(
+        stage: str,
+        AGENTNAME: str = "",
+        AGENTPARENTAGENCY: str ="",
+        AGENTPRIMARYROLE: str ="",
+        AGENTROLESECONDARY: str = "",
+        row: Optional[dict] = None,
+) -> bool:
+
+    name = AGENTNAME.strip()
+    agency = AGENTPARENTAGENCY.strip()
+    primary = AGENTPRIMARYROLE.strip()
+    secondary = AGENTROLESECONDARY.strip()
+
+    for field_label, value in [
+        ("Agent Name", name),
+        ("Agency", agency),
+        ("Agent Role", primary),
+    ]:
+        if not value:
+            ui.notify(
+                f"The '{field_label}' field is required.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return True
+
+    if primary and primary == secondary:
+        ui.notify(
+                f"The 'Primary Role' field and the 'Secondary Role' "
+                f"field for {name} cannot be the same.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+        return True
+
+    exclude_pk = (
+        row["Z_PK"] if (stage == "update" and row is not None) else None
+    )
+
+    with get_session() as session:
+        if value_in_use(session,
+                        Agents,
+                        "AGENTNAME",
+                        name,
+                        exclude_pk=exclude_pk
+        ):
+            ui.notify(
+                f"'{name}' is already in the case database. Please "
+                "check the name and try again.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return True
+
+    return False
+
+
+def validate_evid_entry(
+        stage: str,
         EVIDNUM: str,
         EVIDQTY: str,
         EVIDDESC: str,
@@ -549,247 +593,210 @@ def validate_initial_evidence(
         EVIDFOUNDBYWITNESS: str,
         EVIDTRIAGED: str = "",
         EVIDTRIAGEDBY: str = "",
+        row: Optional[dict] = None,
 ) -> bool:
 
-    if not EVIDNUM:
-        ui.notify(
-            "The 'Evidence Item Number' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
+    item_num = EVIDNUM.strip()
+    qty = EVIDQTY.strip()
+    desc = EVIDDESC.strip()
+    room = EVIDLOCROOM.strip()
+    loc_detail = EVIDLOCROOMDETAIL.strip()
+    found_by = EVIDFOUNDBY.strip()
+    witness = EVIDFOUNDBYWITNESS.strip()
+    triaged = EVIDTRIAGED.strip()
+    triaged_by = EVIDTRIAGEDBY.strip()
 
-    if not EVIDQTY:
-        ui.notify(
-            "The 'Quantity' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    if not EVIDDESC:
-        ui.notify(
-            "The 'Evidence Description' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    if not EVIDLOCROOM:
-        ui.notify(
-            "The 'Room Located' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    if not EVIDLOCROOMDETAIL:
-        ui.notify(
-            "The 'Where Located' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    if not EVIDFOUNDBY:
-        ui.notify(
-            "The 'Found By' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    if not EVIDFOUNDBYWITNESS:
-        ui.notify(
-            "The 'Witnessed By' field is required.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    if EVIDFOUNDBY == EVIDFOUNDBYWITNESS:
-        ui.notify(
-            "The same agent cannot be listed in the 'Found By' and "
-            "'Witnessed By' fields.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    if EVIDTRIAGED == "Yes" and not EVIDTRIAGEDBY:
-        ui.notify(
-            "The 'Triaged By' field is required if the 'Item Triaged?' "
-            "field is set to 'Yes'.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    with get_session() as session:
-        existing = (
-            session.query(Evidence)
-            .filter_by(EVIDNUM=EVIDNUM)
-            .first()
-        )
-
-        if existing:
+    for field_label, value in [
+        ("Evidence Item Number", item_num),
+        ("Quantity", qty),
+        ("Evidence Description", desc),
+        ("Room Located", room),
+        ("Where Located", loc_detail),
+        ("Found By", found_by),
+        ("Witnessed By", witness)
+    ]:
+        if not value:
             ui.notify(
-                f"Evidence Item Number '{EVIDNUM}' is "
-                "already used.",
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
-            return False
-
-    return True
-
-
-def validate_update_evidence(
-        EVIDNUM: str,
-        EVIDFOUNDBY: str,
-        EVIDFOUNDBYWITNESS: str,
-        EVIDTRIAGED: str,
-        EVIDTRIAGEDBY: str,
-        row
-) -> bool:
-
-    if (
-        EVIDFOUNDBY and EVIDFOUNDBYWITNESS
-        and EVIDFOUNDBY == EVIDFOUNDBYWITNESS
-    ):
-        ui.notify(
-            "The same agent cannot be listed in the 'Found By' and "
-            "'Witnessed By' fields.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    if EVIDTRIAGED == "Yes" and not EVIDTRIAGEDBY:
-        ui.notify(
-            "The 'Triaged By' field is required if the 'Item Triaged?' "
-            "field is set to 'Yes'.",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return False
-
-    with get_session() as session:
-        dup = (
-            session.query(Evidence)
-            .filter(
-                Evidence.EVIDNUM == (EVIDNUM),
-                Evidence.Z_PK != row["Z_PK"])
-            .first()
-        )
-
-        if dup:
-            ui.notify(
-                f"Evidence number {EVIDNUM} is already used",
+                f"The '{field_label}' field is required.",
                 type="warning",
                 timeout=0,
                 position="center",
                 close_button="OK",
             )
-            return False
+            return True
 
-    return True
-
-
-def validate_room_data(
-        ROOMLABEL: str,
-        ROOMDESC: str,
-        ROOMFIRSTAGENT: str = "",
-        ROOMSECONDAGENT: str = ""
-) -> bool:
-
-    if not ROOMLABEL:
+    if found_by == witness:
         ui.notify(
-            "The 'Room Label' field is required.",
+            "The same agent cannot be listed in the 'Found By' and the "
+            "'Witnessed By' fields.",
             type="warning",
             timeout=0,
             position="center",
             close_button="OK",
         )
-        return False
+        return True
 
-    if not ROOMDESC:
+    if triaged == "Yes" and not triaged_by:
         ui.notify(
-            "The 'Room Description' field is required.",
+            "The 'Triaged By' field is required if the 'Item Triaged?' "
+            "field is set to 'Yes'.",
             type="warning",
             timeout=0,
             position="center",
             close_button="OK",
         )
-        return False
+        return True
+
+    exclude_pk = (
+        row["Z_PK"] if (stage == "update" and row is not None) else None
+    )
 
     with get_session() as session:
-        if (
-            session.query(Rooms)
-            .filter_by(ROOMLABEL=ROOMLABEL)
-            .first()
+        if value_in_use(session,
+                        Evidence,
+                        "EVIDNUM",
+                        item_num,
+                        exclude_pk=exclude_pk
+        ):
+            ui.notify(
+                f"Evidence Item Number '{item_num}' is already in use.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return True
+
+    return False
+
+
+def validate_room_entry(
+        stage: str,
+        ROOMLABEL: str = "",
+        ROOMDESC: str = "",
+        ROOMFIRSTAGENT: str = "",
+        ROOMSECONDAGENT: str = "",
+        row: Optional[dict] = None,
+) -> bool:
+    """Return True if the entry is INVALID (i.e., submission should abort).
+
+    Rules:
+        - Room Label and Room Description: always required
+        - Agents: on initial entry, both or neither; on update, both required
+        - The same agent may not occupy both agent fields
+        - Room label must be unique (excluding the row being updated)
+    """
+
+    label = ROOMLABEL.strip()
+    desc = ROOMDESC.strip()
+    first = ROOMFIRSTAGENT.strip()
+    second = ROOMSECONDAGENT.strip()
+
+    for field_label, value in [
+        ("Room Label", label),
+        ("Room Description", desc)
+    ]:
+        if not value:
+            ui.notify(
+                f"The '{field_label}' field is required.",
+                type="warning", timeout=0, position="center", close_button="OK",
+            )
+            return True
+
+    if stage == "update":
+        # Both agents are mandatory on update
+        for field_label, value in [
+            ("First Agent Name", first),
+            ("Second Agent Name", second),
+        ]:
+            if not value:
+                ui.notify(
+                    f"The '{field_label}' field is required.",
+                    type="warning",
+                    timeout=0,
+                    position="center",
+                    close_button="OK",
+                )
+                return True
+    else:
+        # On initial entry: both or neither
+        if bool(first) != bool(second):
+            ui.notify(
+                "Agents must be entered as a pair: fill both 'First Agent "
+                "Name' and 'Second Agent Name', or leave both blank.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return True
+
+    # ----- Same agent checks -----
+    if first and first == second:
+        ui.notify(
+            "The same agent cannot be listed in both the 'First Agent Name' "
+            "and 'Second Agent Name' fields.",
+            type="warning", timeout=0, position="center", close_button="OK",
+        )
+        return True
+
+    exclude_pk = (
+        row["Z_PK"] if (stage == "update" and row is not None) else None
+    )
+
+    with get_session() as session:
+        if value_in_use(session,
+                        Rooms,
+                        "ROOMLABEL",
+                        label,
+                        exclude_pk=exclude_pk
         ):
             ui.notify(
                 "That label is currently assigned to another room.",
-                type="warning",
-                timeout=0,
-                position="center",
-                close_button="OK",
+                type="warning", timeout=0, position="center", close_button="OK",
             )
-            return False
+            return True
 
-        # ----- Duplicate description validation -----
-        if (
-            session.query(Rooms)
-            .filter_by(ROOMDESC=ROOMDESC)
-            .first()
+    return False
+
+
+def validate_person_data(
+        stage: str,
+        SUSPECTNAME: str = "",
+        SUSPECTNOTE: str = "",
+        row: Optional[dict] = None,
+) -> bool:
+
+    name = SUSPECTNAME.strip()
+    note = SUSPECTNOTE.strip()
+
+    for field_label, value in [
+        ("Name", name),
+        ("Note", note)
+    ]:
+        if not value:
+            ui.notify(
+                f"The '{field_label}' field is required.",
+                type="warning", timeout=0, position="center", close_button="OK",
+            )
+            return True
+
+    exclude_pk = (
+            row["Z_PK"] if (stage == "update" and row is not None) else None
+        )
+
+    with get_session() as session:
+        if value_in_use(session,
+                        Persons,
+                        "SUSPECTNAME",
+                        name,
+                        exclude_pk=exclude_pk,
         ):
             ui.notify(
-                "That room description is already assigned to another room.",
-                type="warning",
-                timeout=0,
-                position="center",
-                close_button="OK",
+                f"'{name}' is already in the database. Person names "
+                "must be unique.",
+                type="warning", timeout=0, position="center", close_button="OK",
             )
-            return False
+            return True
 
-        # ----- Same agent checks -----
-        if (
-            ROOMFIRSTAGENT and ROOMSECONDAGENT and
-            ROOMFIRSTAGENT == ROOMSECONDAGENT
-        ):
-            ui.notify(
-                "The same agent cannot be listed in the 'First Agent Name' "
-                "and 'Second Agent Name' fields.",
-                type="warning",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
-            return False
-
-    return True
+    return False

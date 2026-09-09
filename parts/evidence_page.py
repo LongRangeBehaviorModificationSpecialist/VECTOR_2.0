@@ -23,8 +23,7 @@ from utils import (
     load_room_labels,
     get_next_evid_num,
     confirm_delete_all,
-    validate_initial_evidence,
-    validate_update_evidence,
+    validate_evid_entry,
     get_current_timestamp,
 )
 
@@ -178,16 +177,17 @@ def build_evidence_page() -> None:
                     EVIDTRIAGEDBY = EVIDTRIAGEDBY_combo.value or ""
 
                     # ----- Required field validation -----
-                    if not validate_initial_evidence(
+                    if validate_evid_entry(
+                        stage="initial",
                         EVIDNUM=EVIDNUM,
                         EVIDQTY=EVIDQTY,
-                        EVIDDESC= EVIDDESC,
+                        EVIDDESC=EVIDDESC,
                         EVIDLOCROOM=EVIDLOCROOM,
                         EVIDLOCROOMDETAIL=EVIDLOCROOMDETAIL,
                         EVIDFOUNDBY=EVIDFOUNDBY,
                         EVIDFOUNDBYWITNESS=EVIDFOUNDBYWITNESS,
                         EVIDTRIAGED=EVIDTRIAGED,
-                        EVIDTRIAGEDBY=EVIDTRIAGEDBY
+                        EVIDTRIAGEDBY=EVIDTRIAGEDBY,
                     ):
                         return
 
@@ -218,7 +218,7 @@ def build_evidence_page() -> None:
 
                     ui.notify(
                         f"Evidence Item {EVIDNUM} ({EVIDDESC}) has been "
-                        "added to the case file.",
+                        "added.",
                         timeout=4000,
                         position="bottom",
                         close_button="OK",
@@ -231,9 +231,7 @@ def build_evidence_page() -> None:
                     "Clear",
                     on_click=clear_form,
                     color="transparent",
-                ).props(
-                    "flat"
-                ).classes("text-[var(--vsp-blue)]")
+                ).props("flat").classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Add Evidence Item",
@@ -253,18 +251,21 @@ def build_evidence_page() -> None:
             with ui.row().classes("w-full max-w-6xl items-center"):
 
                 table_container = ui.column().classes(
-                    "w-full max-w-5xl mx-auto items-center gap-2")
+                    "w-full max-w-5xl mx-auto items-center gap-2"
+                )
 
                 def refresh_evidence_table() -> None:
                     """Re-renders the evidence table from the database."""
                     table_container.clear()
 
                     with get_session() as session:
+
                         evidence = (
                             session.query(Evidence)
                             .order_by(Evidence.EVIDNUM)
                             .all()
                         )
+
                         if not evidence:
                             with table_container:
                                 ui.label(
@@ -282,15 +283,18 @@ def build_evidence_page() -> None:
                                 "EVIDSERIALNUMBER": r.EVIDSERIALNUMBER or "",
                                 "EVIDLOCROOM": r.EVIDLOCROOM or "",
                                 "EVIDLOCROOMDETAIL": (
-                                    r.EVIDLOCROOMDETAIL or ""),
+                                    r.EVIDLOCROOMDETAIL or ""
+                                ),
                                 "EVIDFOUNDBY": r.EVIDFOUNDBY or "",
                                 "EVIDFOUNDBYWITNESS": (
-                                    r.EVIDFOUNDBYWITNESS or ""),
+                                    r.EVIDFOUNDBYWITNESS or ""
+                                ),
                                 "EVIDPICTAKEN": r.EVIDPICTAKEN or "",
                                 "EVIDTRIAGED": r.EVIDTRIAGED or "",
                                 "EVIDTRIAGEDBY": r.EVIDTRIAGEDBY or "",
                                 "EVIDISCONTRABAND": (
-                                    r.EVIDISCONTRABAND or ""),
+                                    r.EVIDISCONTRABAND or ""
+                                ),
                                 "EVIDNOTE": r.EVIDNOTE or ""
                             }
                             for r in evidence
@@ -375,7 +379,6 @@ def build_evidence_page() -> None:
                             rows=row_data,
                             row_key="Z_PK",
                         )
-
                         table.props("dense flat")
 
                         # ----- Slot: Actions column -----
@@ -400,6 +403,7 @@ def build_evidence_page() -> None:
 
                         # ----- Edit dialog -----
                         def open_edit_dialog(e) -> None:
+
                             row = e.args
 
                             current_agents = load_agent_names()
@@ -412,74 +416,74 @@ def build_evidence_page() -> None:
                                 ui.label(
                                     f"Edit Evidence (Item {row['EVIDNUM']} - "
                                     f"{row['EVIDDESC']})"
-                                ).classes(
+                                    ).classes(
                                     "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
                                 )
 
-                                EVIDNUM = required_input(
+                                EVIDNUM_input = required_input(
                                     label="Evidence Item Number",
                                     value=row["EVIDNUM"],
                                 ).classes("w-full")
 
-                                EVIDQTY = required_input(
+                                EVIDQTY_input = required_input(
                                     label="Quantity",
                                     value=row["EVIDQTY"],
                                 ).classes("w-full")
 
-                                EVIDDESC = required_input(
+                                EVIDDESC_input = required_input(
                                     label="Evidence Description",
                                     value=row["EVIDDESC"],
                                 ).classes("w-full")
 
-                                EVIDMODELNUMBER = ui.input(
+                                EVIDMODELNUMBER_input = ui.input(
                                     label="Model Number",
                                     value=row["EVIDMODELNUMBER"],
                                 ).classes("w-full")
 
-                                EVIDSERIALNUMBER = ui.input(
+                                EVIDSERIALNUMBER_input = ui.input(
                                     label="Serial Number",
                                     value=row["EVIDSERIALNUMBER"],
                                 ).classes("w-full")
 
-                                EVIDLOCROOM = required_select(
+                                EVIDLOCROOM_combo = required_select(
                                     options=current_rooms,
                                     label="Room Located",
                                     value=row["EVIDLOCROOM"] or None,
                                     with_input=True,
                                 ).classes("w-full")
 
-                                EVIDLOCROOMDETAIL = required_input(
+                                EVIDLOCROOMDETAIL_input = required_input(
                                     label="Where Located",
                                     value=row["EVIDLOCROOMDETAIL"],
                                 ).classes("w-full")
 
-                                EVIDFOUNDBY = required_select(
+                                EVIDFOUNDBY_combo = required_select(
                                     options=current_agents,
                                     label="Found By",
                                     value=row["EVIDFOUNDBY"] or None,
                                     with_input=True,
                                 ).classes("w-full")
 
-                                EVIDFOUNDBYWITNESS = required_select(
+                                EVIDFOUNDBYWITNESS_combo = required_select(
                                     options=current_agents,
                                     label="Witnessed By",
                                     value=row["EVIDFOUNDBYWITNESS"] or None,
                                     with_input=True,
                                 ).classes("w-full")
 
-                                EVIDPICTAKEN = ui.select(
+                                EVIDPICTAKEN_combo = ui.select(
                                     options=["Yes", "No"],
                                     label="Item Photographed",
                                     value=row["EVIDPICTAKEN"] or None,
                                 ).classes("w-full")
 
-                                EVIDTRIAGED = ui.select(
+                                EVIDTRIAGED_combo = ui.select(
                                     options=["", "Yes", "No"],
                                     label="Item Triaged?",
                                     value=row["EVIDTRIAGED"] or None,
                                 ).classes("w-full")
 
-                                EVIDTRIAGEDBY = ui.select(
+                                EVIDTRIAGEDBY_combo = ui.select(
                                     options=current_agents,
                                     label="Triaged By",
                                     value=row["EVIDTRIAGEDBY"] or None,
@@ -489,20 +493,20 @@ def build_evidence_page() -> None:
                                 # Enable/disable triaged_by based on
                                 # current triaged value
                                 if row["EVIDTRIAGED"] != "Yes":
-                                    EVIDTRIAGEDBY.disable()
+                                    EVIDTRIAGEDBY_combo.disable()
 
                                 def on_edit_triage_change(ev) -> None:
                                     if ev.value == "Yes":
-                                        EVIDTRIAGEDBY.enable()
+                                        EVIDTRIAGEDBY_combo.enable()
                                     else:
-                                        EVIDTRIAGEDBY.disable()
-                                        EVIDTRIAGEDBY.value = None
+                                        EVIDTRIAGEDBY_combo.disable()
+                                        EVIDTRIAGEDBY_combo.value = None
 
-                                EVIDTRIAGED.on_value_change(
+                                EVIDTRIAGEDBY_combo.on_value_change(
                                     on_edit_triage_change
                                 )
 
-                                EVIDISCONTRABAND = ui.select(
+                                EVIDISCONTRABAND_combo = ui.select(
                                     options=["","Yes","No","Unknown","N/A"],
                                     label="Contains Contraband?",
                                     value=(
@@ -510,7 +514,7 @@ def build_evidence_page() -> None:
                                     ),
                                 ).classes("w-full")
 
-                                EVIDNOTE = ui.input(
+                                EVIDNOTE_input = ui.input(
                                     label="Notes",
                                     value=row["EVIDNOTE"],
                                 ).classes("w-full")
@@ -523,99 +527,113 @@ def build_evidence_page() -> None:
                                         "Cancel",
                                         on_click=edit_dialog.close,
                                         color="transparent",
-                                    ).props("flat"
-                                    ).classes("text-[var(--vsp-blue)]")
+                                        ).props("flat").classes(
+                                        "text-[var(--vsp-blue)]"
+                                    )
 
                                     def on_save_update() -> None:
                                         """Handles form submission for
                                         updating existing evidence item.
                                         """
+                                        EVIDNUM = EVIDNUM_input.value
+                                        EVIDQTY = (
+                                            EVIDQTY_input.value
+                                            or ""
+                                        )
+                                        EVIDDESC = EVIDDESC_input.value or ""
+                                        EVIDMODELNUMBER = (
+                                            EVIDMODELNUMBER_input.value or ""
+                                        )
+                                        EVIDSERIALNUMBER = (
+                                            EVIDSERIALNUMBER_input.value or ""
+                                        )
+                                        EVIDLOCROOM = (
+                                            EVIDLOCROOM_combo.value
+                                            or ""
+                                        )
+                                        EVIDLOCROOMDETAIL = (
+                                            EVIDLOCROOMDETAIL_input.value or ""
+                                        )
+                                        EVIDFOUNDBY = (
+                                            EVIDFOUNDBY_combo.value
+                                        )
+                                        EVIDFOUNDBYWITNESS = (
+                                            EVIDFOUNDBYWITNESS_combo.value
+                                        )
+                                        EVIDPICTAKEN = (
+                                            EVIDPICTAKEN_combo.value
+                                            or ""
+                                        )
+                                        EVIDTRIAGED = (
+                                            EVIDTRIAGED_combo.value
+                                        )
+                                        EVIDTRIAGEDBY = (
+                                            EVIDTRIAGEDBY_combo.value
+                                        )
+                                        EVIDISCONTRABAND = (
+                                            EVIDISCONTRABAND_combo.value
+                                            or ""
+                                        )
+                                        EVIDNOTE = EVIDNOTE_input.value or ""
+
+                                        # ----- Validate req fields -----
+                                        if validate_evid_entry(
+                                            stage="update",
+                                            EVIDNUM=EVIDNUM,
+                                            EVIDFOUNDBY=EVIDFOUNDBY,
+                                            EVIDFOUNDBYWITNESS=(
+                                                EVIDFOUNDBYWITNESS
+                                            ),
+                                            EVIDTRIAGED=EVIDTRIAGED,
+                                            EVIDTRIAGEDBY=EVIDTRIAGEDBY,
+                                            row=row,
+                                        ):
+                                            return
+
                                         with get_session() as session:
+
                                             evid = (
                                                 session.query(Evidence)
                                                 .filter_by(Z_PK=row["Z_PK"])
                                                 .first()
                                             )
-                                            if not evid:
-                                                ui.notify(
-                                                    "Evidence item not found.",
-                                                    type="warning",
-                                                    timeout=0,
-                                                    position="center",
-                                                    close_button="OK",
+
+                                            if evid:
+                                                evid.EVIDNUM = EVIDNUM
+                                                evid.EVIDQTY = EVIDQTY
+                                                evid.EVIDDESC = EVIDDESC
+                                                evid.EVIDMODELNUMBER = (
+                                                    EVIDMODELNUMBER
                                                 )
-                                                return
-
-                                            evid.EVIDNUM = EVIDNUM.value
-                                            evid.EVIDQTY = (
-                                                EVIDQTY.value
-                                                or ""
-                                            )
-                                            evid.EVIDDESC = (
-                                                EVIDDESC.value
-                                                or ""
-                                            )
-                                            evid.EVIDMODELNUMBER = (
-                                                EVIDMODELNUMBER.value
-                                                or ""
-                                            )
-                                            evid.EVIDSERIALNUMBER = (
-                                                EVIDSERIALNUMBER.value
-                                                or ""
-                                            )
-                                            evid.EVIDLOCROOM = (
-                                                EVIDLOCROOM.value
-                                                or ""
-                                            )
-                                            evid.EVIDLOCROOMDETAIL = (
-                                                EVIDLOCROOMDETAIL.value
-                                                or ""
-                                            )
-                                            evid.EVIDFOUNDBY = (
-                                                EVIDFOUNDBY.value
-                                            )
-                                            evid.EVIDFOUNDBYWITNESS = (
-                                                EVIDFOUNDBYWITNESS.value
-                                            )
-                                            evid.EVIDPICTAKEN = (
-                                                EVIDPICTAKEN.value
-                                                or ""
-                                            )
-                                            evid.EVIDTRIAGED = (
-                                                EVIDTRIAGED.value
-                                            )
-                                            evid.EVIDTRIAGEDBY = (
-                                                EVIDTRIAGEDBY.value
-                                            )
-                                            evid.EVIDISCONTRABAND = (
-                                                EVIDISCONTRABAND.value
-                                                or ""
-                                            )
-                                            evid.EVIDNOTE = (
-                                                EVIDNOTE.value
-                                                or ""
-                                            )
-
-                                            # ----- Validate req fields -----
-                                            if not validate_update_evidence(
-                                                EVIDNUM=EVIDNUM.value,
-                                                EVIDFOUNDBY=(
-                                                    EVIDFOUNDBY.value
-                                                ),
-                                                EVIDFOUNDBYWITNESS=(
-                                                    EVIDFOUNDBYWITNESS.value
-                                                ),
-                                                EVIDTRIAGED=EVIDTRIAGED.value,
-                                                EVIDTRIAGEDBY=(
-                                                    EVIDTRIAGEDBY.value
-                                                ),
-                                                row=row,
-                                            ):
-                                                return
+                                                evid.EVIDSERIALNUMBER = (
+                                                    EVIDSERIALNUMBER
+                                                )
+                                                evid.EVIDLOCROOM = EVIDLOCROOM
+                                                evid.EVIDLOCROOMDETAIL = (
+                                                    EVIDLOCROOMDETAIL
+                                                )
+                                                evid.EVIDFOUNDBY = (
+                                                    EVIDFOUNDBY
+                                                )
+                                                evid.EVIDFOUNDBYWITNESS = (
+                                                    EVIDFOUNDBYWITNESS
+                                                )
+                                                evid.EVIDPICTAKEN = (
+                                                    EVIDPICTAKEN
+                                                )
+                                                evid.EVIDTRIAGED = (
+                                                    EVIDTRIAGED
+                                                )
+                                                evid.EVIDTRIAGEDBY = (
+                                                    EVIDTRIAGEDBY
+                                                )
+                                                evid.EVIDISCONTRABAND = (
+                                                    EVIDISCONTRABAND
+                                                )
+                                                evid.EVIDNOTE = EVIDNOTE
 
                                         ui.notify(
-                                            f"Item {EVIDNUM.value} was "
-                                            "updated.",
+                                            f"Item {EVIDNUM} was updated.",
                                             timeout=4000,
                                             position="bottom",
                                             close_button="OK",
@@ -628,7 +646,7 @@ def build_evidence_page() -> None:
                                         "Update",
                                         on_click=on_save_update,
                                         color="var(--vsp-blue)",
-                                    ).props("unelevated").classes(
+                                        ).props("unelevated").classes(
                                         "text-[var(--vsp-white)]"
                                     )
 
@@ -636,14 +654,16 @@ def build_evidence_page() -> None:
 
                         # ----- Delete confirmation dialog -----
                         def open_delete_dialog(e) -> None:
+
                             row = e.args
+
                             with ui.dialog() as delete_dialog, ui.card(
                                 ).classes("max-w-sm p-6"
                             ):
 
                                 ui.label(
                                     "Delete Evidence Item?"
-                                ).classes(
+                                    ).classes(
                                     "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
                                 )
 
@@ -657,7 +677,7 @@ def build_evidence_page() -> None:
                                 ui.label(
                                     f"Item {row['EVIDNUM']} -- "
                                     f"{row['EVIDDESC']}"
-                                ).classes(
+                                    ).classes(
                                     "mb-3 text-base font-semibold text-[var(--vsp-blue)]"
                                 )
 
@@ -669,16 +689,19 @@ def build_evidence_page() -> None:
                                         "Cancel",
                                         on_click=delete_dialog.close,
                                         color="transparent",
-                                    ).props("flat"
+                                        ).props("flat"
                                     ).classes("text-[var(--vsp-blue)]")
 
                                     def on_confirm_delete() -> None:
+
                                         with get_session() as session:
+
                                             evid = (
                                                 session.query(Evidence)
                                                 .filter_by(Z_PK=row["Z_PK"])
                                                 .first()
                                             )
+
                                             if evid:
                                                 EVIDNUM = evid.EVIDNUM
                                                 EVIDDESC = evid.EVIDDESC
@@ -689,7 +712,7 @@ def build_evidence_page() -> None:
 
                                         ui.notify(
                                             f"Item {EVIDNUM} ({EVIDDESC}) "
-                                            "was deleted.",
+                                            "has bene removed.",
                                             timeout=4000,
                                             position="bottom",
                                             close_button="OK",
@@ -702,7 +725,7 @@ def build_evidence_page() -> None:
                                         "Delete",
                                         on_click=on_confirm_delete,
                                         color="#ef4444",
-                                    ).props("unelevated").classes(
+                                        ).props("unelevated").classes(
                                         "text-[var(--vsp-white)]"
                                     )
 
@@ -713,7 +736,9 @@ def build_evidence_page() -> None:
 
             with ui.row().classes("w-full justify-center my-2"):
 
+                # ----- DELETE ALL BUTTON -----
                 def delete_all_evidence() -> None:
+
                     with get_session() as session:
                         session.query(Evidence).delete()
                         session.commit()
