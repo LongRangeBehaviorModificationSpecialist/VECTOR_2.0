@@ -105,6 +105,24 @@ The same credentials are written to `db/FIRST_RUN_PASSWORD.txt` in case
 the console scrolls. You will be asked to change the password
 immediately; delete that file once you have.
 
+### Upgrading an existing database
+
+If you already have a `db/app_data.db` from an earlier version, the
+first start after upgrading rebuilds three tables to remove constraints
+that blocked ordinary scenes — a second agent with no email address, a
+house with two bedrooms, the same photograph attached twice:
+
+```
+Schema migration: backed up case database to app_data.db.bak-20260910-164753
+Schema migration: dropped UNIQUE on AGENTS.AGENTEMAIL, AGENTPHONE
+Schema migration: dropped UNIQUE on ROOMS.ROOMDESC
+Schema migration: dropped UNIQUE on files.file_data
+```
+
+Your case is copied to a timestamped `.bak` beside it first, and the
+migration runs once. Keep the backup until you have confirmed the case
+looks right, then delete it — it is an unencrypted copy of the case.
+
 ---
 
 ## Access from another device
