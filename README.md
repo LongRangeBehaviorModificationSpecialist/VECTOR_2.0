@@ -202,19 +202,77 @@ one, replacing everything currently loaded.
 
 ---
 
+## The audit trail
+
+Every change to case data is recorded — creations, edits, deletions,
+bulk wipes, imports, and both successful and failed logins. Admins read
+it at **Welcome → Audit Trail**.
+
+Each entry records when (UTC), who, what action, which record, and the
+field-level before and after. Deletions keep the complete row, so a
+mis-click is recoverable from the trail even though the record is gone.
+
+Three properties worth knowing:
+
+- **It is append-only.** Nothing in the application can edit or remove
+  an entry, including an administrator.
+- **It survives "Delete All Data".** A wipe is exactly the event the
+  trail exists to record, so it is never cleared.
+- **It travels with the case.** Exports include `audit.csv`. An import
+  does *not* overwrite the local trail — it appends a record of the
+  import instead, so the receiving machine's own history stays intact.
+
+The trail is captured at the database layer rather than in each page,
+so a new screen cannot accidentally skip it.
+
+---
+
+## How data is protected
+
+Be clear about this before deciding where VECTOR runs.
+
+| Data | At rest | Notes |
+|------|---------|-------|
+| Case data — suspects, evidence, notes | **Plaintext** | Anyone who opens `db/app_data.db` reads all of it |
+| Attachments — photographs, documents | **Plaintext** | Stored as raw bytes inside the same file |
+| Login passwords | **Hashed** | bcrypt; not recoverable, not reversible |
+| Exported archive | **Encrypted, if you ask** | AES-256, only when you tick the box and set a password |
+| Network traffic | **Unencrypted** | Plain HTTP, including with `--lan` |
+
+The case database is ordinary SQLite. It has no password and is not
+obfuscated — a suspect's name, address and date of birth are readable in
+a text editor, and a photograph can be carved straight out of the file.
+
+**What to do about it:**
+
+- Keep the case database on an encrypted volume — BitLocker on Windows,
+  FileVault on macOS. Point VECTOR at it with `VECTOR_DB_DIR`.
+- Always tick **Encrypt with password** when exporting.
+- Delete `db/*.bak-*` migration backups once a case is verified; they
+  are unencrypted copies.
+- Treat the whole `db/` directory as evidence, and wipe the machine's
+  disk to policy when the case closes.
+
+Full at-rest encryption (SQLCipher) is on the enhancement list and is
+not implemented.
+
+---
+
 ## Known limitations
 
 Read these before relying on VECTOR for a case that will be charged.
 
-- **No audit trail.** Records can be edited or deleted by any signed-in
-  user with no history of what changed, when, or by whom.
 - **One case at a time.** The database holds a single case. "Make New
   Case File" deletes the current one — export first.
-- **Note authorship is self-declared**, chosen from a dropdown rather
-  than taken from the signed-in user.
-- **Evidence file hashes are computed at export**, not at collection.
+- **No soft delete.** A deleted record is gone from its table; it is
+  recoverable from the audit trail, but by hand.
 - **New accounts share a default password** defined in `models.py`.
   Change it after creating a user.
+- **Case start and end times are free text**, typed by the agent, with
+  no time zone recorded. Everything the application generates itself is
+  UTC and marked.
+- **No live refresh.** With several devices connected, a page shows
+  another agent's entry only after a reload.
 
 ---
 
@@ -237,6 +295,45 @@ password. Delete `db/users.json` once every account is set up.
 
 **Everyone needs to be signed out** — delete `.secret` and restart.
 That regenerates the session key and invalidates every active session.
+
+**Never delete `db/*.db-wal` or `db/*.db-shm`.** SQLite runs in
+write-ahead-logging mode, so recent changes may live in the `-wal` file
+until they are checkpointed. If the application was closed uncleanly,
+deleting it discards those changes silently. SQLite recovers from the
+`-wal` on its own the next time the database is opened — leave both
+files alone.
+
+---
+
+## Tests
+
+```
+.venv/bin/pip install -r requirements-dev.txt
+```
+
+```
+.venv/bin/python -m pytest
+```
+
+89 tests, about two seconds. They run against a temporary database and
+never touch `db/`.
+
+The suite exists because of a specific failure: a variable rename
+reached the models and the CRUD pages but not the report or export
+code, and every report returned HTTP 500 for an unknown period with
+nothing to catch it. Coverage is aimed at that class of bug — each
+report is rendered and asserted to contain the case number, and the
+export is round-tripped and compared row for row and byte for byte.
+
+| File | Covers |
+|------|--------|
+| `test_reports.py` | All seven reports render, carry the case header, and escape their values |
+| `test_export_import.py` | Round trip preserves rows, bytes and provenance; encrypted archives; tampering is detected |
+| `test_audit.py` | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
+| `test_validators.py` | Every validator reports rather than crashing, and the domain rules hold |
+| `test_numbering.py` | Evidence numbering past item 9; room labels past Z |
+| `test_constraints.py` | The constraints that were removed, and the four that must stay |
+| `test_migration.py` | An old-schema database migrates without losing a row |
 
 ---
 
