@@ -436,6 +436,9 @@ def build_case_header_html(
         )
         # Redirect to case creation page
         ui.navigate.to("/cases")
+        # Stop here: without this the header below subscripts None and
+        # the whole report route returns a 500 instead of redirecting.
+        return ""
 
     print_date_time = get_print_date_time()
 
