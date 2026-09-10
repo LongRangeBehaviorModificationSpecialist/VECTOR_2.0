@@ -6,11 +6,12 @@ files_page.py — File upload and management page.
 Stores files as BLOBs in the SQLite database with download and delete capability.
 """
 
+import hashlib
 from nicegui import ui
 import os
 import tempfile
 
-from models import get_session, UploadedFiles
+from models import get_session, UploadedFiles, audit_timestamp
 from program.config import Config
 from navbar import build_navbar
 from home_page import confirm_new_case_handler
@@ -87,6 +88,12 @@ def build_uploads_page() -> None:
 
                     uploader = get_current_user_name()
 
+                    # Hashed on arrival, not at export time: the stored
+                    # digest then certifies the file as collected rather
+                    # than whatever the database holds later.
+                    digest = hashlib.sha256(file_data).hexdigest()
+                    hashed_at = audit_timestamp()
+
                     with get_session() as session:
                         new_file = UploadedFiles(
                             file_name=file_name,
@@ -94,13 +101,16 @@ def build_uploads_page() -> None:
                             file_size=file_size,
                             file_mime_type=file_mime_type,
                             uploaded_by=uploader,
+                            sha256=digest,
+                            hashed_at=hashed_at,
                         )
                         session.add(new_file)
 
                     ui.notify(
-                        f"'{file_name}' uploaded successfully ("
-                        f"{file_size:,} bytes), {file_mime_type}.",
-                        timeout=4000,
+                        f"'{file_name}' uploaded ({file_size:,} bytes, "
+                        f"{file_mime_type}).\n"
+                        f"SHA-256: {digest}",
+                        timeout=0,
                         position="bottom",
                         close_button="OK",
                     )
@@ -165,6 +175,11 @@ def build_uploads_page() -> None:
                         "file_size_bytes": f.file_size or 0,
                         "file_mime_type": f.file_mime_type or "unknown",
                         "uploaded_by": f.uploaded_by or "",
+                        "sha256": (f.sha256 or "not recorded"),
+                        "sha256_short": (
+                            f"{f.sha256[:12]}…" if f.sha256
+                            else "not recorded"
+                        ),
                         "upload_date": (
                             f.upload_date.strftime("%Y-%m-%d %H:%M:%S")
                             if f.upload_date
@@ -202,6 +217,13 @@ def build_uploads_page() -> None:
                         "label": "Uploaded By",
                         "field": "uploaded_by",
                         "sortable": True,
+                        "align": "left",
+                    },
+                    {
+                        "name": "sha256_short",
+                        "label": "SHA-256",
+                        "field": "sha256_short",
+                        "sortable": False,
                         "align": "left",
                     },
                     {

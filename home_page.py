@@ -16,7 +16,7 @@ from pathlib import Path
 
 from import_export import export_database, import_database
 from main import is_authenticated, get_current_user_name, get_is_admin
-from models import get_users_session
+from models import get_session, get_users_session, record_audit
 from navbar import build_navbar
 from program.config import Config
 from utils import delete_all_data
@@ -543,6 +543,16 @@ def build_login_home():
                 )
 
                 if user and user.check_password_correction(entered_pass):
+                    with get_session() as audit_session:
+                        record_audit(
+                            audit_session,
+                            action="LOGIN",
+                            table_name="users",
+                            row_pk=user.id,
+                            summary=user.user_name,
+                            actor=user.user_name,
+                        )
+
                     from nicegui import app
                     app.storage.user["authenticated"] = True
                     app.storage.user["user_name"] = user.user_name
@@ -562,6 +572,17 @@ def build_login_home():
                         )
                         ui.navigate.to("/")
                 else:
+                    # Failed attempts are recorded too: a run of them is
+                    # the signal worth having.
+                    with get_session() as audit_session:
+                        record_audit(
+                            audit_session,
+                            action="LOGIN_FAILED",
+                            table_name="users",
+                            summary=entered_user,
+                            actor=entered_user or "unknown",
+                        )
+
                     ui.notify(
                         "Invalid username or password.",
                         type="warning",

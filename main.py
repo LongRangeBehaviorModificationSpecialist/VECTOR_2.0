@@ -376,6 +376,27 @@ def admin_route():
     build_admin_page()
 
 
+@ui.page("/audit")
+def audit_route():
+    if not is_authenticated():
+        ui.navigate.to("/")
+        return
+
+    if not get_is_admin():
+        ui.notify(
+            "Admin access required.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        ui.navigate.to("/")
+        return
+
+    from parts.audit_page import build_audit_page
+    build_audit_page()
+
+
 @ui.page("/change-password")
 def change_password_page():
 

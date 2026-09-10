@@ -19,7 +19,6 @@ from main import get_current_user_name, get_is_admin
 from utils import (
     required_select,
     required_input,
-    load_agent_names,
     get_current_timestamp,
     confirm_delete_all,
     validate_note_data,
@@ -45,7 +44,6 @@ def build_notes_page() -> None:
         # ----- Add Note Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
 
-            agent_options = load_agent_names()
             current_time = get_current_timestamp()
 
             NOTEDATETIME_input = ui.input(
@@ -61,17 +59,23 @@ def build_notes_page() -> None:
 
             NOTEDATETIMEUPDATED_input.props("readonly")
 
-            NOTEAUTHOR_combo = required_select(
-                options=agent_options,
-                label="Agent Name",
-                with_input=True,
+            # Authorship comes from the signed-in user, not a dropdown.
+            # Choosing it meant anyone could write, or later rewrite, a
+            # note under a colleague's name.
+            NOTEAUTHOR = get_current_user_name() or "unknown"
+
+            NOTEAUTHOR_input = ui.input(
+                label="Author",
+                value=NOTEAUTHOR,
             ).classes("w-full")
 
-            NOTEAUTHOR_combo.props("autofocus")
+            NOTEAUTHOR_input.props("readonly")
 
             NOTETEXT_input = required_input(
                 label="Note"
             ).classes("w-full")
+
+            NOTETEXT_input.props("autofocus")
 
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
@@ -79,7 +83,6 @@ def build_notes_page() -> None:
                 def clear_form() -> None:
 
                     NOTEDATETIME_input.value = get_current_timestamp()
-                    NOTEAUTHOR_combo.value = None
                     NOTETEXT_input.value = ""
 
                 def on_submit() -> None:
@@ -88,7 +91,7 @@ def build_notes_page() -> None:
                         NOTEDATETIME_input.value or
                         get_current_timestamp()
                     )
-                    NOTEAUTHOR = NOTEAUTHOR_combo.value
+                    NOTEAUTHOR = get_current_user_name() or "unknown"
                     NOTETEXT = NOTETEXT_input.value or ""
 
                     if validate_note_data(
@@ -240,7 +243,6 @@ def build_notes_page() -> None:
 
                     row = e.args
 
-                    current_agents = load_agent_names()
 
                     with ui.dialog() as edit_dialog, ui.card(
                         ).classes("w-full max-w-lg p-6"
@@ -266,12 +268,19 @@ def build_notes_page() -> None:
 
                         NOTEDATETIMEUPDATED_input.props("readonly")
 
-                        NOTEAUTHOR_combo = ui.select(
-                            options=current_agents,
-                            label="Agent Name",
-                            value=row["NOTEAUTHOR"] or None,
-                            with_input=True,
+                        # The original author is fixed. Reassigning it
+                        # after the fact is exactly the rewrite the audit
+                        # trail exists to prevent.
+                        NOTEAUTHOR_input = ui.input(
+                            label="Original Author",
+                            value=row["NOTEAUTHOR"] or "",
                         ).classes("w-full")
+
+                        NOTEAUTHOR_input.props("readonly")
+
+                        ui.label(
+                            f"Edited by {get_current_user_name() or 'unknown'}"
+                        ).classes("text-xs text-gray-400 -mt-2 mb-2")
 
                         NOTETEXT_input = required_input(
                             label="Note",
@@ -292,7 +301,7 @@ def build_notes_page() -> None:
                                 NOTEDATETIMEUPDATED = (
                                     NOTEDATETIMEUPDATED_input.value or ""
                                 )
-                                NOTEAUTHOR = NOTEAUTHOR_combo.value or ""
+                                NOTEAUTHOR = row["NOTEAUTHOR"] or ""
                                 NOTETEXT = NOTETEXT_input.value or ""
 
                                 if validate_note_data(
@@ -313,7 +322,9 @@ def build_notes_page() -> None:
                                         note.NOTEDATETIMEUPDATED = (
                                             NOTEDATETIMEUPDATED
                                         )
-                                        note.NOTEAUTHOR = NOTEAUTHOR
+                                        # NOTEAUTHOR is deliberately not
+                                        # reassigned; the audit trail
+                                        # records who made this edit.
                                         note.NOTETEXT = NOTETEXT
 
                                 ui.notify(

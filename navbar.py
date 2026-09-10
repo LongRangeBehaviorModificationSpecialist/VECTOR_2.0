@@ -216,6 +216,12 @@ def build_navbar(
                     lambda: ui.navigate.to("/admin")
                 )
             )
+            welcome_items.append(
+                (
+                    "Audit Trail",
+                    lambda: ui.navigate.to("/audit")
+                )
+            )
             welcome_items.append(("---", None))
         welcome_items.append(
             (

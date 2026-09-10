@@ -18,14 +18,16 @@ import shutil
 import tempfile
 from typing import Optional
 
-from models import get_session
+from models import get_session, record_audit
 
 
 # ----- MODEL REGISTRY -----
 # [Add or remove tables here as your app grows]
 def get_exportable_models() -> list:
     """Returns a list of (model_class, model_name) tuples for CSV export."""
-    from models import Cases, Agents, Rooms, Evidence, Persons, Notes
+    from models import (
+        Cases, Agents, Rooms, Evidence, Persons, Notes, AuditLog,
+    )
 
     return [
         (Cases, "cases"),
@@ -33,7 +35,10 @@ def get_exportable_models() -> list:
         (Rooms, "rooms"),
         (Evidence, "evidence"),
         (Persons, "persons"),
-        (Notes, "notes")
+        (Notes, "notes"),
+        # The audit trail travels with the case: an export that drops it
+        # cannot answer what changed after collection.
+        (AuditLog, "audit"),
     ]
 
 
@@ -224,6 +229,7 @@ def export_database(password: Optional[str] = None) -> None:
     # ----- Export uploaded files -----
     files_list = []
     num_files = 0
+    integrity_failures = []
 
     try:
         with get_session() as session:
@@ -240,11 +246,25 @@ def export_database(password: Optional[str] = None) -> None:
 
                     sha256_hash = hashlib.sha256(uf.file_data).hexdigest()
 
+                    # The hash taken when the file was collected is the
+                    # one that matters. Recomputing here only certifies
+                    # the copy, so compare the two and say so if they
+                    # disagree.
+                    recorded = uf.sha256 or ""
+                    verified = (not recorded) or recorded == sha256_hash
+                    if not verified:
+                        integrity_failures.append(safe_name)
+
                     files_list.append(
                         {
                             "file_name": safe_name,
                             "file_size": uf.file_size or len(uf.file_data),
-                            "file_hash": sha256_hash
+                            "file_hash": sha256_hash,
+                            "hash_at_ingest": recorded or None,
+                            "hashed_at": uf.hashed_at or None,
+                            "mime_type": uf.file_mime_type or "",
+                            "uploaded_by": uf.uploaded_by or "",
+                            "matches_ingest_hash": verified,
                         }
                     )
 
@@ -270,8 +290,22 @@ def export_database(password: Optional[str] = None) -> None:
         "total_records": total_records,
         "files": files_list,
         "total_files": num_files,
+        "integrity_failures": integrity_failures,
         "encrypted": password is not None and len(password) > 0,
     }
+
+    if integrity_failures:
+        ui.notify(
+            "WARNING: these attachments no longer match the SHA-256 "
+            "recorded when they were collected:\n"
+            + "\n".join(integrity_failures)
+            + "\nThe export still completed. Investigate before relying "
+            "on these files.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
 
     manifest_path = export_dir / "export_manifest.json"
 
@@ -531,24 +565,66 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
     files_dir = import_dir / "files"
     files_imported = 0
 
+    # The manifest records a SHA-256 per file. Verify against it rather
+    # than trusting the archive, and carry the original provenance back
+    # instead of stamping every file "import" / octet-stream.
+    manifest_files = {
+        entry.get("file_name"): entry
+        for entry in manifest.get("files", [])
+        if isinstance(entry, dict) and entry.get("file_name")
+    }
+    hash_mismatches = []
+    unlisted_files = []
+
     if files_dir.exists():
         try:
             with get_session() as session:
                 session.query(UploadedFiles).delete()
-                for file_path in files_dir.iterdir():
-                    if file_path.is_file():
-                        with open(file_path, "rb") as f:
-                            file_data = f.read()
+                for file_path in sorted(files_dir.iterdir()):
+                    if not file_path.is_file():
+                        continue
 
-                        new_file = UploadedFiles(
-                            file_name=file_path.name,
-                            file_data=file_data,
-                            file_size=len(file_data),
-                            file_mime_type="application/octet-stream",
-                            uploaded_by="import",
-                        )
-                        session.add(new_file)
-                        files_imported += 1
+                    with open(file_path, "rb") as f:
+                        file_data = f.read()
+
+                    actual_hash = hashlib.sha256(file_data).hexdigest()
+                    entry = manifest_files.get(file_path.name)
+
+                    if entry is None:
+                        unlisted_files.append(file_path.name)
+                    else:
+                        expected = entry.get("file_hash")
+                        if expected and expected != actual_hash:
+                            hash_mismatches.append(file_path.name)
+
+                    new_file = UploadedFiles(
+                        file_name=file_path.name,
+                        file_data=file_data,
+                        file_size=len(file_data),
+                        file_mime_type=(
+                            (entry or {}).get("mime_type")
+                            or "application/octet-stream"
+                        ),
+                        uploaded_by=(entry or {}).get("uploaded_by") or "import",
+                        sha256=(entry or {}).get("hash_at_ingest")
+                        or actual_hash,
+                        hashed_at=(entry or {}).get("hashed_at"),
+                    )
+                    session.add(new_file)
+                    files_imported += 1
+
+                record_audit(
+                    session,
+                    action="IMPORT",
+                    table_name="(all case tables)",
+                    summary=f"{total_records} rows, {files_imported} files",
+                    after={
+                        "source": str(zip_file),
+                        "exported": manifest.get("export_date", "unknown"),
+                        "hash_mismatches": hash_mismatches,
+                        "files_not_in_manifest": unlisted_files,
+                    },
+                )
 
         except Exception as err:
             ui.notify(
@@ -558,6 +634,29 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
                 position="center",
                 close_button="OK",
             )
+
+    if hash_mismatches or unlisted_files:
+        problems = []
+        if hash_mismatches:
+            problems.append(
+                "Files whose contents do not match the manifest hash:\n"
+                + "\n".join(hash_mismatches)
+            )
+        if unlisted_files:
+            problems.append(
+                "Files present in the archive but absent from the "
+                "manifest:\n" + "\n".join(unlisted_files)
+            )
+        ui.notify(
+            "WARNING — this archive failed integrity checks.\n\n"
+            + "\n\n".join(problems)
+            + "\n\nThe import completed and has been recorded in the "
+            "audit trail. Treat these files as unverified.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
 
     # ----- Clean up temporary directory -----
     shutil.rmtree(temp_dir, ignore_errors=True)

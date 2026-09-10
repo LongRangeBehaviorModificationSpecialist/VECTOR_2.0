@@ -11,6 +11,7 @@ from nicegui import ui
 import mimetypes
 from models import (
     get_session,
+    record_audit,
     Agents,
     Cases,
     Evidence,
@@ -431,15 +432,38 @@ def delete_all_data() -> None:
     Raises on failure rather than reporting it here, so the caller can
     decide what the user sees. The session context manager rolls back,
     so a failure leaves the case intact.
+
+    The audit trail is deliberately NOT cleared -- it is append-only,
+    and a wipe is exactly the event it exists to record.
     """
+    tables = [
+        (Cases, "CASES"),
+        (Agents, "AGENTS"),
+        (Rooms, "ROOMS"),
+        (Evidence, "EVIDENCE"),
+        (Persons, "PERSONS"),
+        (Notes, "NOTES"),
+        (UploadedFiles, "files"),
+    ]
+
     with get_session() as session:
-        session.query(Cases).delete()
-        session.query(Agents).delete()
-        session.query(Rooms).delete()
-        session.query(Evidence).delete()
-        session.query(Persons).delete()
-        session.query(Notes).delete()
-        session.query(UploadedFiles).delete()
+        # query().delete() is a bulk statement and does not raise ORM
+        # events, so the flush listener never sees these. Count first,
+        # then record the wipe explicitly.
+        counts = {
+            name: session.query(model).count() for model, name in tables
+        }
+
+        for model, _name in tables:
+            session.query(model).delete()
+
+        record_audit(
+            session,
+            action="DELETE_ALL",
+            table_name="(all case tables)",
+            summary=f"{sum(counts.values())} rows deleted",
+            before=counts,
+        )
 
 
 def value_in_use(session, model, column_name, value, exclude_pk=None) -> bool:
