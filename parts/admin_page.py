@@ -17,7 +17,16 @@ from main import get_current_user_name, get_is_admin
 
 # ----- PAGE BUILDER -----
 def build_admin_page():
-    """Builds the Admin user management page."""
+    """Builds the Admin user management page.
+
+    Re-checks admin status rather than trusting the caller: the route
+    guard and this check must both fail before a non-admin sees the
+    panel.
+    """
+
+    if not get_is_admin():
+        ui.navigate.to("/")
+        return
 
     # ----- Header / Navbar -----
     build_navbar(
@@ -45,6 +54,11 @@ def build_admin_page():
             new_username = ui.input(label="Username").classes("w-full")
 
             def create_user():
+
+                if not get_is_admin():
+                    ui.navigate.to("/")
+                    return
+
                 uname = new_username.value.strip()
 
                 # ----- Validation -----
@@ -236,6 +250,11 @@ def build_admin_page():
 
                                     def on_confirm_reset():
 
+                                        if not get_is_admin():
+                                            reset_dialog.close()
+                                            ui.navigate.to("/")
+                                            return
+
                                         with get_users_session() as session:
 
                                             user = (
@@ -317,6 +336,11 @@ def build_admin_page():
 
                                     def on_confirm_delete():
 
+                                        if not get_is_admin():
+                                            delete_dialog.close()
+                                            ui.navigate.to("/")
+                                            return
+
                                         with get_users_session() as session:
 
                                             user = (
@@ -324,6 +348,21 @@ def build_admin_page():
                                                 .filter_by(id=row["id"])
                                                 .first()
                                             )
+
+                                            # Admin status comes from the
+                                            # database, never from the row
+                                            # payload the browser sent.
+                                            if user and user.is_admin:
+                                                ui.notify(
+                                                    "Cannot delete an admin "
+                                                    "account.",
+                                                    type="negative",
+                                                    timeout=0,
+                                                    position="center",
+                                                    close_button="OK",
+                                                )
+                                                delete_dialog.close()
+                                                return
 
                                             if user:
                                                 session.delete(user)

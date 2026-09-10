@@ -14,14 +14,20 @@ Usage:
 import ast
 import json
 from nicegui import ui, app
-import os
 from pathlib import Path
 import secrets
 import sys
 
 from models import get_users_session
+from program.config import Config, SECRET_FILE, STATIC_DIR, USERS_SEED_PATH
 
 DEBUG_MODE = "--dev" in sys.argv
+
+# ----- Network exposure -----
+# Loopback unless explicitly opted in, so an install is never reachable
+# from the network by accident. See README "Access from another device".
+LAN_MODE = "--lan" in sys.argv
+HOST = "0.0.0.0" if LAN_MODE else Config.HOST
 
 
 # ----- Startup Configuration -----
@@ -55,24 +61,21 @@ def get_storage_secret() -> str:
     Generates a new secret and saves it if the file doesn't exist.
     """
 
-    secret_file = Path(__file__).parent / ".secret"
-
-    if secret_file.exists():
-        secret = secret_file.read_text(encoding="utf-8").strip()
+    if SECRET_FILE.exists():
+        secret = SECRET_FILE.read_text(encoding="utf-8").strip()
         if secret:
             return secret
 
     # ----- Generate a new secret and save it -----
     secret = secrets.token_hex(32)
-    secret_file.write_text(secret, encoding="utf-8")
+    SECRET_FILE.write_text(secret, encoding="utf-8")
     return secret
 
 
-# Explicitly tell NiceGUI where the static folder is
-app.add_static_files(
-    "/static",
-    os.path.join(os.path.dirname(__file__), "static"),
-)
+# Explicitly tell NiceGUI where the static folder is.
+# Created if absent: a checkout without the logo files must still boot.
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+app.add_static_files("/static", str(STATIC_DIR))
 
 
 # ----- Initialize Database -----
@@ -82,19 +85,51 @@ init_db()
 
 
 # ----- Seed Default User -----
+def bootstrap_first_admin():
+    """Creates a starting admin account if no users exist at all.
+
+    A fresh checkout ships no credentials -- db/users.json is not
+    tracked -- so without this there would be no way to log in. The
+    password is random, shown once on the console, and must be changed
+    at first login.
+    """
+    with get_users_session() as session:
+        if session.query(Users).count() > 0:
+            return
+
+        password = secrets.token_urlsafe(12)
+        admin = Users(
+            user_name="admin",
+            is_admin=True,
+            is_active=True,
+            must_change_password=True,
+        )
+        admin.set_password(password)
+        session.add(admin)
+
+    print("\n" + "=" * 62)
+    print("  FIRST RUN — an administrator account has been created.")
+    print("=" * 62)
+    print("    Username:  admin")
+    print(f"    Password:  {password}")
+    print("\n  This password is shown once and cannot be recovered.")
+    print("  You will be asked to change it at first login.")
+    print("=" * 62 + "\n")
+
+
 def seed_default_user():
     """Reads user credentials from users.json and upserts into the
     Users table.
 
-    The JSON stores hashes as Python byte-string literals.
+    The JSON stores hashes as Python byte-string literals. This path is
+    for existing installs that already have a users.json; new installs
+    go through bootstrap_first_admin() instead.
     """
-    json_path = Path(__file__).parent / f"db/users.json"
-
-    if not json_path.exists():
-        print("WARNING → 'users.json' not found — no user seeded.")
+    if not USERS_SEED_PATH.exists():
+        bootstrap_first_admin()
         return
 
-    with open(json_path, "r", encoding="utf-8") as f:
+    with open(USERS_SEED_PATH, "r", encoding="utf-8") as f:
         user_data = json.load(f)
 
     raw_hash = user_data.get("password_hash", "")
@@ -117,14 +152,14 @@ def seed_default_user():
     with get_users_session() as session:
         existing = (
             session.query(Users)
-            .filter_by(user_name="novaicac")
+            .filter_by(user_name=user_name)
             .first()
         )
         if existing:
-            # Update existing user with latest hash from JSON
-            existing.password_hash = clean_hash
-            existing.is_admin = is_admin
-            existing.is_active = True
+            # Seed only. Re-applying the hash on every start would undo
+            # the user's own password changes each time the app
+            # restarts -- which it does on every save under --dev.
+            pass
         else:
             # Create new user
             new_user = Users(
@@ -315,6 +350,8 @@ def admin_route():
             position="center",
             close_button="OK",
         )
+        ui.navigate.to("/")
+        return
 
     from parts.admin_page import build_admin_page
     build_admin_page()
@@ -420,10 +457,20 @@ if __name__ in {"__main__", "__mp_main__"}:
         shared=True,
     )
 
+    if LAN_MODE:
+        print(
+            "\n  ** LAN MODE ** VECTOR is reachable from other devices on "
+            "this network.\n"
+            "  Traffic is unencrypted HTTP. Use only on a network you "
+            "control.\n"
+        )
+
     ui.run(
         title="V·E·C·T·O·R",
-        port=8080,
+        host=HOST,
+        port=Config.PORT,
         reload=DEBUG_MODE,  # or "False"
+        show=Config.SHOW_BROWSER,
         dark=True,
         storage_secret=get_storage_secret(),
     )

@@ -739,8 +739,16 @@ def logout_page():
 
 @ui.page("/shutdown")
 def shutdown_page():
-    """Shuts down the application."""
+    """Shuts down the application. Admins only.
+
+    Without these checks any unauthenticated request -- from any device
+    that can reach the port -- terminates evidence logging.
+    """
     from nicegui import app
+
+    if not is_authenticated() or not get_is_admin():
+        ui.navigate.to("/")
+        return
 
     app.storage.user["authenticated"] = False
     app.storage.user["user_name"] = ""
@@ -749,4 +757,3 @@ def shutdown_page():
     ui.notify("Shutting down...", type="positive", timeout=2000)
 
     app.shutdown()
-    ui.run(reload=False)
