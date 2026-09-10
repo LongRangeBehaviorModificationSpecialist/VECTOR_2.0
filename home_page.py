@@ -16,16 +16,7 @@ from pathlib import Path
 
 from import_export import export_database, import_database
 from main import is_authenticated, get_current_user_name, get_is_admin
-from models import (
-    get_session,
-    get_users_session,
-    Agents,
-    Cases,
-    Evidence,
-    Notes,
-    Persons,
-    Rooms,
-)
+from models import get_users_session
 from navbar import build_navbar
 from program.config import Config
 from utils import delete_all_data
@@ -434,7 +425,26 @@ def build_authenticated_home():
                             return
 
                         dialog.close()
-                        delete_all_data()
+                        try:
+                            delete_all_data()
+                        except Exception as err:
+                            ui.notify(
+                                f"Nothing was deleted — the database was "
+                                f"rolled back. → {err}",
+                                type="negative",
+                                timeout=0,
+                                position="center",
+                                close_button="OK",
+                            )
+                            return
+
+                        ui.notify(
+                            "All case data has been deleted.",
+                            timeout=4000,
+                            position="bottom",
+                            close_button="OK",
+                        )
+                        ui.navigate.to("/")
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -669,10 +679,11 @@ def confirm_new_case_handler():
 
         ui.label(
             "This will DELETE ALL DATA from all database tables:\n"
-            "- Agents\n- Cases\n- Evidence\n- Notes\n- Persons\n"
-            "- Rooms\n\n. This action CANNOT be undone. Are you "
-            "absolutely sure?"
-        ).classes("text-sm mb-4")
+            "- Case\n- Agents\n- Rooms\n- Evidence\n- People\n"
+            "- Notes\n- Uploaded files\n\n"
+            "Export the case first if you need to keep it. "
+            "This action CANNOT be undone. Are you absolutely sure?"
+        ).classes("text-sm mb-4 whitespace-pre-line")
 
         with ui.row().classes("w-full justify-end gap-2"):
 
@@ -682,16 +693,13 @@ def confirm_new_case_handler():
             ).props("flat")
 
             def on_confirm_delete_all():
+                # Delegates to delete_all_data() rather than repeating the
+                # table list. The inline version here cleared six tables
+                # and omitted UploadedFiles, so starting a new case left
+                # the previous subject's photographs and documents in the
+                # database, to be swept into the next case's export.
                 try:
-                    with get_session() as session:
-                        # Delete in order to avoid foreign key issues
-                        session.query(Evidence).delete()
-                        session.query(Notes).delete()
-                        session.query(Persons).delete()
-                        session.query(Rooms).delete()
-                        session.query(Agents).delete()
-                        session.query(Cases).delete()
-                        session.commit()
+                    delete_all_data()
                     ui.notify(
                         "Data in the app database tables has been deleted.",
                         timeout=0,
@@ -699,12 +707,13 @@ def confirm_new_case_handler():
                         close_button="OK",
                     )
                     ui.navigate.to("/")
-                except Exception as e:
-                    session.rollback()
+                except Exception as err:
                     ui.notify(
-                        "The database information was rolled back.",
-                        timeout=4000,
-                        position="bottom",
+                        f"Nothing was deleted — the database was rolled "
+                        f"back. → {err}",
+                        type="negative",
+                        timeout=0,
+                        position="center",
                         close_button="OK",
                     )
                 finally:
