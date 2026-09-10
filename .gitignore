@@ -33,3 +33,4 @@ temp/
 # excluded by a blanket image ignore.
 !static/
 !static/*
+/db/FIRST_RUN_PASSWORD.txt

@@ -14,12 +14,17 @@ Usage:
 import ast
 import json
 from nicegui import ui, app
-from pathlib import Path
 import secrets
 import sys
 
 from models import get_users_session
-from program.config import Config, SECRET_FILE, STATIC_DIR, USERS_SEED_PATH
+from program.config import (
+    Config,
+    DB_DIR,
+    SECRET_FILE,
+    STATIC_DIR,
+    USERS_SEED_PATH,
+)
 
 DEBUG_MODE = "--dev" in sys.argv
 
@@ -107,13 +112,27 @@ def bootstrap_first_admin():
         admin.set_password(password)
         session.add(admin)
 
+    # Also written to a file: a launcher script or a double-clicked
+    # shortcut can close or scroll the console before anyone reads it.
+    # ASCII only -- the Windows console is not UTF-8 by default.
+    note = DB_DIR / "FIRST_RUN_PASSWORD.txt"
+    note.write_text(
+        "VECTOR first-run administrator account\n"
+        "======================================\n\n"
+        "  Username:  admin\n"
+        f"  Password:  {password}\n\n"
+        "You will be asked to change this password at first login.\n"
+        "Delete this file once you have done so.\n",
+        encoding="utf-8",
+    )
+
     print("\n" + "=" * 62)
-    print("  FIRST RUN — an administrator account has been created.")
+    print("  FIRST RUN - an administrator account has been created.")
     print("=" * 62)
     print("    Username:  admin")
     print(f"    Password:  {password}")
-    print("\n  This password is shown once and cannot be recovered.")
-    print("  You will be asked to change it at first login.")
+    print("\n  You will be asked to change it at first login.")
+    print(f"  Also saved to: {note}")
     print("=" * 62 + "\n")
 
 
@@ -169,7 +188,7 @@ def seed_default_user():
                 is_active=True,
             )
             session.add(new_user)
-            print(f"✓ Created user '{user_name}' from users.json")
+            print(f"Created user '{user_name}' from users.json")
 
 seed_default_user()
 
