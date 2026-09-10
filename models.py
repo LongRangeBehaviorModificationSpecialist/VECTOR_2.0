@@ -66,7 +66,7 @@ class Cases(Base):
 
     __tablename__ = "CASES"
 
-    Z_PK = Column(Integer(), primary_key=True)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     CASENUMBER = Column(String(), nullable=False)
     LOCATION = Column(String(), nullable=False)
     JURISDICTION = Column(String(), nullable=False)
@@ -74,10 +74,10 @@ class Cases(Base):
     CASEDATETIMEEND = Column(String())
 
     def __repr__(self):
-        return f"Case Number: {self.CASENUMBER}"
+        return f"Case Number: {self.CASENUMBER}; Location: {self.LOCATION}"
 
     def __str__(self):
-        return f"Case Number: {self.CASENUMBER}"
+        return f"Case Number: {self.CASENUMBER}; Location: {self.LOCATION}"
 
 
 class CaseSchema(Schema):
@@ -98,7 +98,7 @@ class Agents(Base):
 
     __tablename__ = "AGENTS"
 
-    Z_PK = Column(Integer(), primary_key=True)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     AGENTNAME = Column(String(), nullable=False, unique=True)
     AGENTPARENTAGENCY = Column(String(), nullable=False)
     AGENTPRIMARYROLE = Column(String(), nullable=False)
@@ -109,10 +109,10 @@ class Agents(Base):
     ENTEREDDATETIME = Column(String())
 
     def __repr__(self):
-        return f"Agent {self.Z_PK}: {self.AGENTNAME}"
+        return f"Agent ID: {self.Z_PK}: Name: {self.AGENTNAME}"
 
     def __str__(self):
-        return f"Agent {self.Z_PK}: {self.AGENTNAME}"
+        return f"Agent ID: {self.Z_PK}; Name: {self.AGENTNAME}"
 
 
 class AgentsSchema(Schema):
@@ -135,7 +135,7 @@ class Rooms(Base):
 
     __tablename__ = "ROOMS"
 
-    Z_PK = Column(Integer(), primary_key=True)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     ROOMLABEL = Column(String(), nullable=False, unique=True)
     ROOMDESC = Column(String(), nullable=False, unique=True)
     ROOMFIRSTAGENT = Column(String(), nullable=False)
@@ -144,10 +144,10 @@ class Rooms(Base):
     ENTEREDDATETIME = Column(String())
 
     def __repr__(self):
-        return f"Room {self.ROOMLABEL}: {self.ROOMDESC}"
+        return f"Room {self.ROOMLABEL} ({self.ROOMDESC})"
 
     def __str__(self):
-        return f"Room {self.ROOMLABEL}: {self.ROOMDESC}"
+        return f"Room {self.ROOMLABEL} ({self.ROOMDESC})"
 
 
 class RoomsSchema(Schema):
@@ -169,7 +169,7 @@ class Evidence(Base):
 
     __tablename__ = "EVIDENCE"
 
-    Z_PK = Column(Integer(), primary_key=True)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     EVIDNUM = Column(String(), nullable=False, unique=True)
     EVIDQTY = Column(String(), nullable=False)
     EVIDDESC = Column(String(), nullable=False)
@@ -219,28 +219,28 @@ class Persons(Base):
 
     __tablename__ = "PERSONS"
 
-    Z_PK = Column(Integer(), primary_key=True)
-    SUSPECTNAME = Column(String(), nullable=False, unique=True)
-    SUSPECTDOB = Column(String())
-    SUSPECTADDRESS = Column(String())
-    SUSPECTPHONE = Column(String())
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
+    PERSONNAME = Column(String(), nullable=False, unique=True)
+    PERSONDOB = Column(String())
+    PERSONADDRESS = Column(String())
+    PERSONPHONE = Column(String())
     SUSPECTNOTE = Column(Text())
     ENTEREDDATETIME = Column(String())
 
     def __repr__(self):
-        return f"Person {self.Z_PK}: {self.SUSPECTNAME}"
+        return f"Person {self.Z_PK}: {self.PERSONNAME}"
 
     def __str__(self):
-        return f"Person {self.Z_PK}: {self.SUSPECTNAME}"
+        return f"Person {self.Z_PK}: {self.PERSONNAME}"
 
 
 class PersonSchema(Schema):
     """Person schema."""
 
-    SUSPECTNAME = fields.Str()
-    SUSPECTDOB = fields.Str()
-    SUSPECTADDRESS = fields.Str()
-    SUSPECTPHONE = fields.Str()
+    PERSONNAME = fields.Str()
+    PERSONDOB = fields.Str()
+    PERSONADDRESS = fields.Str()
+    PERSONPHONE = fields.Str()
     SUSPECTNOTE = fields.Str()
     ENTEREDDATETIME = fields.Str()
 
@@ -253,17 +253,17 @@ class Notes(Base):
 
     __tablename__ = "NOTES"
 
-    Z_PK = Column(Integer(), primary_key=True)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     NOTEDATETIME = Column(String(), nullable=False)
     NOTEDATETIMEUPDATED = Column(String())
     NOTEAUTHOR = Column(String(), nullable=False)
     NOTETEXT = Column(Text(), nullable=False)
 
     def __repr__(self):
-        return f"Note {self.Z_PK}: {self.note_text}"
+        return f"Note {self.Z_PK}: {self.NOTETEXT}"
 
     def __str__(self):
-        return f"Note {self.Z_PK}: {self.note_text}"
+        return f"Note {self.Z_PK}: {self.NOTETEXT}"
 
 class NotesSchema(Schema):
     """Notes schema."""
@@ -279,32 +279,33 @@ note_schema = NotesSchema(many=True)
 class UploadedFiles(Base):
     """Uploaded files table."""
 
-    __tablename__ = "files"
+    __tablename__ = "FILES"
 
-    id = Column(Integer(), primary_key=True, autoincrement=True)
-    file_name = Column(String(), nullable=False)
-    file_size = Column(Integer(), nullable=False)
-    file_mime_type = Column(String(50))
-    upload_date = Column(DateTime(), default=datetime.utcnow)
-    file_data = Column(LargeBinary(), nullable=False, unique=True)
-    uploaded_by = Column(String(100), nullable=False)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
+    FILENAME = Column(String(), nullable=False)
+    FILESIZE = Column(Integer(), nullable=False)
+    FILEMIMETYPE = Column(String(50))
+    FILEUPLOADDATE = Column(DateTime(), default=datetime.utcnow)
+    FILEUPLOADEDBY = Column(String(100), nullable=False)
+    FILEDATA = Column(LargeBinary(), nullable=False, unique=True)
+    FILENOTE = Column(String())
 
     def __repr__(self):
-        return f"File Name: {self.file_name}, Uploaded at: {self.upload_date}"
+        return f"File: {self.FILENAME}, Uploaded at: {self.FILEUPLOADDATE}"
 
     def __str__(self):
-        return f"File Name: {self.file_name}, Uploaded at: {self.upload_date}"
+        return f"File: {self.FILENAME}, Uploaded at: {self.FILEUPLOADDATE}"
 
 
 class FileSchema(Schema):
     """File schema."""
 
-    file_name = fields.Str()
-    file_size = fields.Int()
-    file_mime_type = fields.Str()
-    file_note = fields.Str()
-    upload_date = fields.Str()
-    uploaded_by = fields.Str()
+    FILENAME = fields.Str()
+    FILESIZE = fields.Int()
+    FILEMIMETYPE = fields.Str()
+    FILEUPLOADDATE = fields.Str()
+    FILEUPLOADEDBY = fields.Str()
+    FILENOTE = fields.Str()
 
 file_schema = FileSchema(many=True)
 
@@ -314,25 +315,25 @@ class Users(UsersBase):
 
     __tablename__ = "users"
 
-    id = Column(Integer(), primary_key=True, autoincrement=True)
-    user_name = Column(String(100), unique=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
-    is_admin = Column(Boolean(), default=False)
-    is_active = Column(Boolean(), default=True)
-    must_change_password = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
+    USERNAME = Column(String(100), unique=True, nullable=False)
+    PASSWORDHASH = Column(String(255), nullable=False)
+    ISADMIN = Column(Boolean(), default=False)
+    ISACTIVE = Column(Boolean(), default=True)
+    MUSTCHANGEPASSWORD = Column(Boolean, default=True)
+    ENTEREDDATETIME = Column(DateTime, default=datetime.utcnow)
 
     def __repr__(self):
-        return f"User Name: {self.user_name}"
+        return f"User Name: {self.USERNAME}"
 
     def __str__(self):
-        return f"User {self.id}: {self.user_name}"
+        return f"User {self.Z_PK}: {self.USERNAME}"
 
     def set_password(self, password: str):
-        """Hashes a plaintext password and stores it."""
+        """Hashes a plaintext password and stores hash value."""
         password_bytes = password.encode("utf-8")
         salt = bcrypt.gensalt()
-        self.password_hash = bcrypt.hashpw(
+        self.PASSWORDHASH = bcrypt.hashpw(
             password_bytes, salt
         ).decode("utf-8")
 
@@ -341,7 +342,7 @@ class Users(UsersBase):
         try:
             return bcrypt.checkpw(
                 attempted_password.encode("utf-8"),
-                self.password_hash.encode("utf-8"),
+                self.PASSWORDHASH.encode("utf-8"),
             )
         except (ValueError, TypeError):
             return False

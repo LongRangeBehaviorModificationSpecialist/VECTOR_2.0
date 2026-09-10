@@ -10,11 +10,15 @@ Handles:
     /make_new_case   →   Clear all data (dangerous!)
 """
 
-from datetime import datetime
 from nicegui import ui
 from pathlib import Path
 
-from import_export import export_database, import_database
+from import_export import (
+    export_vector_to_csv,
+    export_vector_to_json,
+    import_vector_from_csv,
+    import_vector_from_json,
+)
 from main import is_authenticated, get_current_user_name, get_is_admin
 from models import (
     get_session,
@@ -34,7 +38,7 @@ from utils import delete_all_data
 # ----- Home Page Registration -----
 @ui.page("/")
 @ui.page("/home")
-def home():
+def home() -> None:
     """Home/login page — shows menu if authenticated, login
     form otherwise.
     """
@@ -52,7 +56,7 @@ def home():
         build_login_home()
 
 
-def build_authenticated_home():
+def build_authenticated_home() -> None:
     """Main menu shown to logged-in users."""
 
     with ui.column().classes("items-center w-full mt-8 py-2"):
@@ -87,7 +91,7 @@ def build_authenticated_home():
         ui.button(
             "Start New Case",
             on_click=lambda: ui.navigate.to("/cases"),
-            color="#1C69A8",
+            color="var(--vsp-blue)",
         ).props("unelevated").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
@@ -168,12 +172,11 @@ def build_authenticated_home():
 
     # ----- Import / Export ROW -----
 
-    # ui.separator().classes("my-2")
-
     with ui.column().classes("items-center w-full py-2"):
 
         with ui.row().classes(
-                "flex justify-center items-center gap-6 w-full"):
+                "flex justify-center items-center gap-6 w-full"
+        ):
 
             ui.label(
                 "Data Management"
@@ -183,45 +186,62 @@ def build_authenticated_home():
         with ui.row().classes("flex justify-center items-center gap-6 w-full"):
 
             # ----- EXPORT Button -----
-            def open_export_dialog():
+            def open_export_dialog() -> None:
 
                 with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
-                    ui.label("Export All Data...").classes(
-                        "text-lg font-bold mb-1 text-[var(--vsp-blue)]"
+                    ui.label(
+                        "Export Data..."
+                    ).classes(
+                        "text-lg font-bold text-[var(--vsp-blue)]"
                     )
 
                     ui.label(
-                        "Export all database tables to CSV files and "
-                        "uploaded files into a single compresses ZIP "
-                        "archive saved to your /Desktop/ directory."
-                    ).classes("mb-1 text-base text-[var(--vsp-gray)]")
+                        "Export all database tables and uploaded files "
+                        "into a single compressed ZIP archive saved to "
+                        "your /Desktop/ directory."
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
                     ui.label("The ZIP file will be named :").classes(
-                        "mb-1 text-base text-[var(--vsp-gray)]"
+                        "text-sm text-[var(--vsp-gray)]"
                     )
 
-                    ui.label("'<case-number>_<datetime>_saved_results'").classes(
-                        "mb-1 text-base text-[var(--vsp-gray)]"
+                    ui.label(
+                        "'<case-number>_<datetime>_saved_results'"
+                    ).classes("text-base text-[var(--vsp-blue)]")
+
+                    # ----- Export format selection -----
+                    ui.label("Export format:").classes(
+                        "mt-2 text-sm font-semibold text-[var(--vsp-gray)]"
                     )
+
+                    format_radio = ui.radio(
+                        {
+                            "csv": "CSV — one file per database table",
+                            "json": "JSON — all data in a single file",
+                            "both": "Both — export CSV ZIP and JSON together",
+                        },
+                        value="csv",
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
                     # ----- Password option -----
-
                     encrypt_checkbox = ui.checkbox(
                         "Encrypt with password (AES-256)"
-                    ).classes("mb-1 mt-1 text-base text-[var(--vsp-gray)]")
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
                     password_input = ui.input(
-                        label="Password",
+                        label="ENTER PASSWORD :",
                         password=True,
-                    ).classes("w-full")
+                    ).classes("w-full yellow-label text-sm")
 
                     password_input.bind_visibility_from(
                         encrypt_checkbox,
                         "value",
                     )
 
-                    def do_export():
+                    def do_export() -> None:
+
+                        #  ----- Password validation -----
                         pwd = (
                             password_input.value
                             if encrypt_checkbox.value
@@ -240,7 +260,13 @@ def build_authenticated_home():
                             return
 
                         dialog.close()
-                        export_database(password=pwd)
+
+                        # ----- Run the selected exports -----
+                        if format_radio.value in ("csv", "both"):
+                            export_vector_to_csv(password=pwd)
+
+                        if format_radio.value in ("json", "both"):
+                            export_vector_to_json(password=pwd)
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -261,48 +287,74 @@ def build_authenticated_home():
                 dialog.open()
 
             # ----- IMPORT Button -----
-            def open_import_dialog():
+            def open_import_dialog() -> None:
 
                 with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
                     ui.label("Import Data...").classes(
-                        "text-lg font-bold mb-1 text-[var(--vsp-blue)]"
+                        "text-lg font-bold text-[var(--vsp-blue)]"
                     )
 
                     ui.label(
-                        "Select a ZIP file previously exported from VECTOR."
-                    ).classes("mb-1 text-base text-[var(--vsp-gray)]")
+                        "Select a file previously exported from VECTOR."
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
-                    ui.label("WARNING :").classes("mb-1 text-base text-[var(--vsp-blue)]")
+                    # ----- Import format selection -----
+                    ui.label(
+                        "Select file format :"
+                    ).classes("text-sm text-[var(--vsp-blue)]")
 
-                    ui.label("This will REPLACE all existing data!").classes(
-                        "mb-1 text-base text-[var(--vsp-gray)]"
-                    )
+                    format_radio = ui.radio(
+                        {
+                            "csv": "CSV ZIP — archive with one .csv per table",
+                            "json": "JSON — single .json file (or encrypted .json.zip)",
+                        },
+                        value="csv",
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
-                    zip_path_input = ui.input(
-                        label="ZIP File Path",
-                        placeholder=r"Enter\Path\To\ZIP\File",
-                    ).classes("w-full")
+                    ui.label(
+                        "WARNING :"
+                    ).classes("text-sm font-bold text-[#EF4444]")
+
+                    ui.label(text="This will REPLACE ALL existing data!").classes(
+                        "close"
+                    )  # text-[var(--vsp-gray)]
+
+                    file_path_input = ui.input(
+                        label="PATH TO FILE :"
+                    ).classes("w-full text-sm yellow-label")
+
+                    def update_path_label() -> None:
+                        """Adapts the path input to the selected format."""
+                        if format_radio.value == "csv":
+                            file_path_input._props["label"] = "ZIP File Path"
+                        else:
+                            file_path_input._props["label"] = "JSON File Path"
+                        file_path_input.update()
+
+                    format_radio.on_value_change(update_path_label)
 
                     encrypt_checkbox = ui.checkbox(
                         "ZIP is encrypted (requires password)"
-                    ).classes("mb-1 mt-1 text-base text-[var(--vsp-gray)]")
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
                     password_input = ui.input(
-                        label="Password",
+                        label="ENTER PASSWORD :",
                         password=True,
-                    ).classes("w-full")
+                    ).classes("w-full yellow-label text-sm")
 
                     password_input.bind_visibility_from(
                         encrypt_checkbox,
                         "value",
                     )
 
-                    def do_import():
-                        path = zip_path_input.value.strip("\"'")
+                    def do_import() -> None:
+                        # ----- Path validation -----
+                        path = file_path_input.value.strip("\"'").strip()
+
                         if not path:
                             ui.notify(
-                                "Please enter file path to ZIP file.",
+                                "Please enter file path.",
                                 type="warning",
                                 timeout=0,
                                 position="center",
@@ -312,8 +364,34 @@ def build_authenticated_home():
 
                         if not Path(path).exists():
                             ui.notify(
-                                "ZIP file not found.",
+                                f"File at '{path}' not found.",
                                 type="negative",
+                                timeout=0,
+                                position="center",
+                                close_button="OK",
+                            )
+                            return
+
+                        # ----- Extension sanity check -----
+                        suffix = Path(path).suffix.lower()
+                        if format_radio.value == "csv" and suffix != ".zip":
+                            ui.notify(
+                                "Selected CSV import, but the file is "
+                                "not a ZIP archive.",
+                                type="warning",
+                                timeout=0,
+                                position="center",
+                                close_button="OK",
+                            )
+                            return
+
+                        if format_radio.value == "json" and suffix not in (
+                            ".json", ".zip"
+                        ):
+                            ui.notify(
+                                "Selected JSON import, but the file is "
+                                "neither a JSON nor a ZIP file.",
+                                type="warning",
                                 timeout=0,
                                 position="center",
                                 close_button="OK",
@@ -328,7 +406,8 @@ def build_authenticated_home():
 
                         if encrypt_checkbox.value and not pwd:
                             ui.notify(
-                                "Please enter the password.",
+                                "Please enter the password to decrypt "
+                                "the file.",
                                 type="warning",
                                 timeout=0,
                                 position="center",
@@ -337,7 +416,17 @@ def build_authenticated_home():
                             return
 
                         dialog.close()
-                        import_database(path, password=pwd)
+
+                        # ----- Run the selected import -----
+                        # if csv_checkbox.value:
+                        #     import_vector_from_csv(path, password=pwd)
+                        # else:
+                        #     import_vector_from_json(path, password=pwd)
+
+                        if format_radio.value == "csv":
+                            import_vector_from_csv(path, password=pwd)
+                        else:
+                            import_vector_from_json(path, password=pwd)
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -359,7 +448,7 @@ def build_authenticated_home():
 
             # ----- DELETE ALL Button -----
 
-            def open_delete_all_dialog():
+            def open_delete_all_dialog() -> None:
 
                 with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
@@ -383,10 +472,10 @@ def build_authenticated_home():
 
                     affirm_input = (
                         ui.input(
-                            label="Affirm by typing 'DELETE' on the line below",
+                            label="AFFIRM BY TYPING 'DELETE' BELOW",
                             password=False,
                         )
-                        .classes("w-full mb-3")
+                        .classes("w-full yellow-label mb-3")
                     )
 
                     affirm_input.bind_visibility_from(
@@ -394,7 +483,7 @@ def build_authenticated_home():
                         "value",
                     )
 
-                    def do_delete():
+                    def do_delete() -> None:
                         if not affirm_checkbox.value:
                             ui.notify(
                                 "Is it really that much trouble to click "
@@ -453,25 +542,25 @@ def build_authenticated_home():
                 dialog.open()
 
             ui.button(
-                "📤 Export All Data",
+                "📤 EXPORT CASE DATA",
                 on_click=open_export_dialog,
-                color="#2AA63E",
+                color="#379161",
             ).props("unelevated").classes("w-56 py-3 text-[var(--vsp-white)]")
 
             ui.button(
-                "📥 Import Data",
+                "📥 IMPORT CASE DATA",
                 on_click=open_import_dialog,
-                color="#2AA63E",
+                color="#379161",
             ).props("unelevated").classes("w-56 py-3 text-[var(--vsp-white)]")
 
             ui.button(
-                "Delete All Data",
+                "DELETE ALL DATA",
                 on_click=open_delete_all_dialog,
                 color="#EF4444",
             ).props("unelevated").classes("w-56 py-3 text-[var(--vsp-white)]")
 
 
-def build_login_home():
+def build_login_home() -> None:
     """Login page for unauthenticated users."""
 
     with ui.column().classes("items-center w-full mt-12"):
@@ -505,7 +594,7 @@ def build_login_home():
             password_toggle_button=True,
         ).classes("w-full max-w-xs")
 
-        def attempt_login():
+        def attempt_login() -> None:
             # Wire this to your Users model authentication
             from models import Users
 
@@ -526,8 +615,8 @@ def build_login_home():
                 user = (
                     session.query(Users)
                     .filter_by(
-                        user_name=entered_user,
-                        is_active=True,
+                        USERNAME=entered_user,
+                        ISACTIVE=True,
                     )
                     .first()
                 )
@@ -535,17 +624,17 @@ def build_login_home():
                 if user and user.check_password_correction(entered_pass):
                     from nicegui import app
                     app.storage.user["authenticated"] = True
-                    app.storage.user["user_name"] = user.user_name
-                    app.storage.user["is_admin"] = user.is_admin
+                    app.storage.user["USERNAME"] = user.USERNAME
+                    app.storage.user["ISADMIN"] = user.ISADMIN
                     app.storage.user["session_generation"] = (
                         app.storage.general.get("session_generation", 0)
                     )
 
-                    if user.must_change_password:
+                    if user.MUSTCHANGEPASSWORD:
                         ui.navigate.to("/change-password")
                     else:
                         ui.notify(
-                            f"Welcome, {user.user_name}!",
+                            f"Welcome, {user.USERNAME}!",
                             timeout=4000,
                             position="bottom",
                             close_button="OK",
@@ -572,7 +661,7 @@ def build_login_home():
 
 # ----- About Page -----
 @ui.page("/about")
-def about_page():
+def about_page() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -600,7 +689,7 @@ def about_page():
 
 # ----- Help Page -----
 @ui.page("/help")
-def help_page():
+def help_page() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -656,7 +745,7 @@ Use the top menu to access different sections:\n
 
 
 # ----- Confirm New Case Handler -----
-def confirm_new_case_handler():
+def confirm_new_case_handler() -> None:
     """Called when user clicks "Make New Case File".
 
     Clears ALL data from all tables (destructive operation!).
@@ -681,7 +770,7 @@ def confirm_new_case_handler():
                 on_click=dialog.close,
             ).props("flat")
 
-            def on_confirm_delete_all():
+            def on_confirm_delete_all() -> None:
                 try:
                     with get_session() as session:
                         # Delete in order to avoid foreign key issues
@@ -699,7 +788,7 @@ def confirm_new_case_handler():
                         close_button="OK",
                     )
                     ui.navigate.to("/")
-                except Exception as e:
+                except Exception as err:
                     session.rollback()
                     ui.notify(
                         "The database information was rolled back.",
@@ -719,13 +808,13 @@ def confirm_new_case_handler():
 
 
 @ui.page("/logout")
-def logout_page():
+def logout_page() -> None:
     """Logs out the current user."""
     from nicegui import app
 
     app.storage.user["authenticated"] = False
-    app.storage.user["user_name"] = ""
-    app.storage.user["is_admin"] = False
+    app.storage.user["USERNAME"] = ""
+    app.storage.user["ISADMIN"] = False
 
     ui.notify(
         "You have been logged out successfully.",
@@ -738,13 +827,13 @@ def logout_page():
 
 
 @ui.page("/shutdown")
-def shutdown_page():
+def shutdown_page() -> None:
     """Shuts down the application."""
     from nicegui import app
 
     app.storage.user["authenticated"] = False
-    app.storage.user["user_name"] = ""
-    app.storage.user["is_admin"] = False
+    app.storage.user["USERNAME"] = ""
+    app.storage.user["ISADMIN"] = False
 
     ui.notify("Shutting down...", type="positive", timeout=2000)
 

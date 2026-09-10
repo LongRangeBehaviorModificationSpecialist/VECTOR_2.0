@@ -107,7 +107,7 @@ def build_evidence_page() -> None:
                     ).classes("w-full")
 
                     EVIDPICTAKEN_combo = ui.select(
-                        options=["Yes", "No"],
+                        options=["", "Yes", "No"],
                         label="Item Photographed",
                     ).classes("w-full")
 
@@ -247,7 +247,7 @@ def build_evidence_page() -> None:
         with ui.column().classes("w-full items-center"):
 
             ui.label(
-                "Evidence Items"
+                "Evidence List"
             ).classes("text-xl font-bold mb-3")
 
             with ui.row().classes("w-full max-w-6xl items-center"):
@@ -726,7 +726,7 @@ def build_evidence_page() -> None:
                                     ui.button(
                                         "Delete",
                                         on_click=on_confirm_delete,
-                                        color="#ef4444",
+                                        color="#EF4444",
                                         ).props("unelevated").classes(
                                         "text-[var(--vsp-white)]"
                                     )
@@ -760,7 +760,7 @@ def build_evidence_page() -> None:
                         "evidence",
                         delete_all_evidence,
                     ),
-                    color="#ef4444",
+                    color="#EF4444",
                 ).props("unelevated").classes("mb-2 items-center")
 
     # ----- Initial render -----

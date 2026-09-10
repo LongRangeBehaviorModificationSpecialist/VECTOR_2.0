@@ -190,6 +190,13 @@ def build_cases_page() -> None:
             with table_container:
                 column_defs = [
                     {
+                        "name": "Z_PK",
+                        "label": "ID #",
+                        "field": "Z_PK",
+                        "sortable": True,
+                        "align": "left",
+                    },
+                    {
                         "name": "CASENUMBER",
                         "label": "Case Number",
                         "field": "CASENUMBER",
@@ -425,7 +432,7 @@ def build_cases_page() -> None:
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#ef4444",
+                                color="#EF4444",
                             ).props("unelevated").classes(
                                 "text-[var(--vsp-white)]"
                             )

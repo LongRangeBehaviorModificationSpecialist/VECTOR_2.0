@@ -311,9 +311,10 @@ def confirm_delete_all(action: str, callback):
         ui.label(
             f"This will permanently delete ALL {action} from the database. "
             "This action cannot be undone."
-        ).classes("mb-4 text-[#D4D4D8]")
+        ).classes("mb-4 text-base text-[#D4D4D8]")
 
         with ui.row().classes("w-full justify-end gap-2"):
+
             ui.button("Cancel", on_click=dialog.close).props("flat")
 
             def on_confirm():
@@ -765,12 +766,12 @@ def validate_room_entry(
 
 def validate_person_data(
         stage: str,
-        SUSPECTNAME: str = "",
+        PERSONNAME: str = "",
         SUSPECTNOTE: str = "",
         row: Optional[dict] = None,
 ) -> bool:
 
-    suspect = SUSPECTNAME.strip()
+    suspect = PERSONNAME.strip()
     if SUSPECTNOTE:
         note = SUSPECTNOTE.strip()
 
@@ -792,7 +793,7 @@ def validate_person_data(
     with get_session() as session:
         if value_in_use(session,
                         Persons,
-                        "SUSPECTNAME",
+                        "PERSONNAME",
                         suspect,
                         exclude_pk=exclude_pk,
         ):

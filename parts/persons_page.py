@@ -43,22 +43,22 @@ def build_persons_page() -> None:
         # ----- Add Person Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
 
-            SUSPECTNAME_input = required_input(
+            PERSONNAME_input = required_input(
                 label="Name"
             ).classes("w-full")
 
-            SUSPECTNAME_input.props("autofocus")
+            PERSONNAME_input.props("autofocus")
 
-            SUSPECTDOB_input = ui.input(
+            PERSONDOB_input = ui.input(
                 label="DOB",
                 placeholder="MM-DD-YYYY",
             ).props('mask="##-##-####"').classes("w-full")
 
-            SUSPECTADDRESS_input = ui.input(
+            PERSONADDRESS_input = ui.input(
                 label="Address"
             ).classes("w-full")
 
-            SUSPECTPHONE_input = ui.input(
+            PERSONPHONE_input = ui.input(
                 label="Phone Number",
                 placeholder="(###) ###-####"
             ).props('mask="(###) ###-####"').classes("w-full")
@@ -72,23 +72,23 @@ def build_persons_page() -> None:
 
                 def clear_form() -> None:
 
-                    SUSPECTNAME_input.value = ""
-                    SUSPECTDOB_input.value = ""
-                    SUSPECTADDRESS_input.value = ""
-                    SUSPECTPHONE_input.value = ""
+                    PERSONNAME_input.value = ""
+                    PERSONDOB_input.value = ""
+                    PERSONADDRESS_input.value = ""
+                    PERSONPHONE_input.value = ""
                     SUSPECTNOTE_input.value = ""
 
                 def on_submit() -> None:
 
-                    SUSPECTNAME = SUSPECTNAME_input.value
-                    SUSPECTDOB = SUSPECTDOB_input.value or ""
-                    SUSPECTADDRESS = SUSPECTADDRESS_input.value or ""
-                    SUSPECTPHONE = SUSPECTPHONE_input.value or ""
+                    PERSONNAME = PERSONNAME_input.value
+                    PERSONDOB = PERSONDOB_input.value or ""
+                    PERSONADDRESS = PERSONADDRESS_input.value or ""
+                    PERSONPHONE = PERSONPHONE_input.value or ""
                     SUSPECTNOTE = SUSPECTNOTE_input.value or ""
 
                     if validate_person_data(
                         stage="initial",
-                        SUSPECTNAME=SUSPECTNAME,
+                        PERSONNAME=PERSONNAME,
                         SUSPECTNOTE=SUSPECTNOTE,
                     ):
                         return
@@ -96,17 +96,17 @@ def build_persons_page() -> None:
                     with get_session() as session:
 
                         new_person = Persons(
-                            SUSPECTNAME=SUSPECTNAME,
-                            SUSPECTDOB=SUSPECTDOB,
-                            SUSPECTADDRESS=SUSPECTADDRESS,
-                            SUSPECTPHONE=SUSPECTPHONE,
+                            PERSONNAME=PERSONNAME,
+                            PERSONDOB=PERSONDOB,
+                            PERSONADDRESS=PERSONADDRESS,
+                            PERSONPHONE=PERSONPHONE,
                             SUSPECTNOTE=SUSPECTNOTE,
                             ENTEREDDATETIME=get_current_timestamp(format="entry"),
                         )
                         session.add(new_person)
 
                     ui.notify(
-                        f"'{SUSPECTNAME}' was added.",
+                        f"'{PERSONNAME}' was added.",
                         timeout=4000,
                         position="bottom",
                         close_button="OK",
@@ -131,7 +131,7 @@ def build_persons_page() -> None:
         ui.separator().classes("my-6")
 
         ui.label(
-            "Current Persons"
+            "Persons List"
         ).classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
@@ -146,7 +146,7 @@ def build_persons_page() -> None:
 
                 persons = (
                     session.query(Persons)
-                    .order_by(Persons.SUSPECTNAME)
+                    .order_by(Persons.PERSONNAME)
                     .all()
                 )
 
@@ -160,10 +160,10 @@ def build_persons_page() -> None:
                 row_data = [
                     {
                         "Z_PK": r.Z_PK,
-                        "SUSPECTNAME": r.SUSPECTNAME or "",
-                        "SUSPECTDOB": r.SUSPECTDOB or "",
-                        "SUSPECTADDRESS": r.SUSPECTADDRESS or "",
-                        "SUSPECTPHONE": r.SUSPECTPHONE or "",
+                        "PERSONNAME": r.PERSONNAME or "",
+                        "PERSONDOB": r.PERSONDOB or "",
+                        "PERSONADDRESS": r.PERSONADDRESS or "",
+                        "PERSONPHONE": r.PERSONPHONE or "",
                         "SUSPECTNOTE": r.SUSPECTNOTE or "",
                     }
                     for r in persons
@@ -172,30 +172,37 @@ def build_persons_page() -> None:
             with table_container:
                 column_defs = [
                     {
-                        "name": "SUSPECTNAME",
+                        "name": "Z_PK",
+                        "label": "ID #",
+                        "field": "Z_PK",
+                        "sortable": True,
+                        "align": "left",
+                    },
+                    {
+                        "name": "PERSONNAME",
                         "label": "Name",
-                        "field": "SUSPECTNAME",
+                        "field": "PERSONNAME",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "SUSPECTDOB",
+                        "name": "PERSONDOB",
                         "label": "DOB",
-                        "field": "SUSPECTDOB",
+                        "field": "PERSONDOB",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "SUSPECTADDRESS",
+                        "name": "PERSONADDRESS",
                         "label": "Address",
-                        "field": "SUSPECTADDRESS",
+                        "field": "PERSONADDRESS",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "SUSPECTPHONE",
+                        "name": "PERSONPHONE",
                         "label": "Phone",
-                        "field": "SUSPECTPHONE",
+                        "field": "PERSONPHONE",
                         "sortable": True,
                         "align": "left",
                     },
@@ -251,29 +258,29 @@ def build_persons_page() -> None:
                     ):
 
                         ui.label(
-                            f"Edit Person ({row['SUSPECTNAME']})"
+                            f"Edit Person ({row['PERSONNAME']})"
                             ).classes(
                             "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
                         )
 
-                        SUSPECTNAME_input = required_input(
+                        PERSONNAME_input = required_input(
                             label="Name",
-                            value=row["SUSPECTNAME"],
+                            value=row["PERSONNAME"],
                         ).classes("w-full")
 
-                        SUSPECTDOB_input = ui.input(
+                        PERSONDOB_input = ui.input(
                             label="DOB",
-                            value=row["SUSPECTDOB"],
+                            value=row["PERSONDOB"],
                         ).classes("w-full")
 
-                        SUSPECTADDRESS_input = ui.input(
+                        PERSONADDRESS_input = ui.input(
                             label="Address",
-                            value=row["SUSPECTADDRESS"],
+                            value=row["PERSONADDRESS"],
                         ).classes("w-full")
 
-                        SUSPECTPHONE_input = ui.input(
+                        PERSONPHONE_input = ui.input(
                             label="Phone Number",
-                            value=row["SUSPECTPHONE"],
+                            value=row["PERSONPHONE"],
                             ).classes("w-full")
 
                         SUSPECTNOTE_input = required_input(
@@ -292,17 +299,17 @@ def build_persons_page() -> None:
                             ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_save_update() -> None:
-                                SUSPECTNAME = SUSPECTNAME_input.value or ""
-                                SUSPECTDOB = SUSPECTDOB_input.value or ""
-                                SUSPECTADDRESS = (
-                                    SUSPECTADDRESS_input.value or ""
+                                PERSONNAME = PERSONNAME_input.value or ""
+                                PERSONDOB = PERSONDOB_input.value or ""
+                                PERSONADDRESS = (
+                                    PERSONADDRESS_input.value or ""
                                 )
-                                SUSPECTPHONE = SUSPECTPHONE_input.value or ""
+                                PERSONPHONE = PERSONPHONE_input.value or ""
                                 SUSPECTNOTE = SUSPECTNOTE_input.value or ""
 
                                 if validate_person_data(
                                     stage="update",
-                                    SUSPECTNAME=SUSPECTNAME,
+                                    PERSONNAME=PERSONNAME,
                                     SUSPECTNOTE=SUSPECTNOTE,
                                     row=row,
                                 ):
@@ -317,22 +324,22 @@ def build_persons_page() -> None:
                                     )
 
                                     if person:
-                                        person.SUSPECTNAME = SUSPECTNAME
-                                        person.SUSPECTDOB = (
-                                            SUSPECTDOB or ""
+                                        person.PERSONNAME = PERSONNAME
+                                        person.PERSONDOB = (
+                                            PERSONDOB or ""
                                         )
-                                        person.SUSPECTADDRESS = (
-                                            SUSPECTADDRESS or ""
+                                        person.PERSONADDRESS = (
+                                            PERSONADDRESS or ""
                                         )
-                                        person.SUSPECTPHONE = (
-                                            SUSPECTPHONE or ""
+                                        person.PERSONPHONE = (
+                                            PERSONPHONE or ""
                                         )
                                         person.SUSPECTNOTE = (
                                             SUSPECTNOTE or ""
                                         )
 
                                 ui.notify(
-                                    f"'{SUSPECTNAME}' was updated.",
+                                    f"'{PERSONNAME}' was updated.",
                                     timeout=4000,
                                     position="bottom",
                                     close_button="OK",
@@ -373,7 +380,7 @@ def build_persons_page() -> None:
                         )
 
                         ui.label(
-                            f"\'{row['SUSPECTNAME']}\'"
+                            f"\"{row['PERSONNAME']}\""
                         ).classes(
                             "mb-3 text-base font-semibold text-[var(--vsp-blue)]")
 
@@ -396,13 +403,13 @@ def build_persons_page() -> None:
                                     )
 
                                     if person:
-                                        SUSPECTNAME = person.SUSPECTNAME
+                                        PERSONNAME = person.PERSONNAME
                                         session.delete(person)
                                     else:
-                                        SUSPECTNAME = row["SUSPECTNAME"]
+                                        PERSONNAME = row["PERSONNAME"]
 
                                 ui.notify(
-                                    f"'{SUSPECTNAME}' was removed.",
+                                    f"'{PERSONNAME}' was removed.",
                                     timeout=4000,
                                     position="bottom",
                                     close_button="OK",
@@ -414,7 +421,7 @@ def build_persons_page() -> None:
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#ef4444",
+                                color="#EF4444",
                                 ).props("unelevated").classes(
                                 "text-[var(--vsp-white)]"
                             )
@@ -448,7 +455,7 @@ def build_persons_page() -> None:
                     "persons",
                     delete_all_persons,
                 ),
-                color="#ef4444",
+                color="#EF4444",
             ).props("unelevated").classes("mb-2 items-center")
 
     # -----Initial render -----

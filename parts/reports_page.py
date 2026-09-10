@@ -430,23 +430,23 @@ def build_case_header_html(
         <table class="headerTable">
             <tr>
                 <td class="header font-11">Investigation Number:</td>
-                <td class="data font-11">{active_case["case_number"]}</td>
+                <td class="data font-11">{active_case["CASENUMBER"]}</td>
             </tr>
             <tr>
                 <td class="header font-11">Site Address:</td>
-                <td class="data font-11">{active_case["location"]}</td>
+                <td class="data font-11">{active_case["LOCATION"]}</td>
             </tr>
             <tr>
                 <td class="header font-11">Jurisdiction:</td>
-                <td class="data font-11">{active_case["jurisdiction"]}</td>
+                <td class="data font-11">{active_case["JURISDICTION"]}</td>
             </tr>
             <tr>
                 <td class="header font-11">Starting Date and Time:</td>
-                <td class="data font-11">{active_case["case_date_time_begin"]}</td>
+                <td class="data font-11">{active_case["CASEDATETIMEBEGIN"]}</td>
             </tr>
             <tr>
                 <td class="header font-11">Ending Date and Time:</td>
-                <td class="data font-11">{active_case["case_date_time_end"]}</td>
+                <td class="data font-11">{active_case["CASEDATETIMEEND"]}</td>
             </tr>
             <tr>
                 <td class="header font-11">Report Printed Date:</td>
@@ -534,7 +534,7 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
 
     Each item is displayed as vertical label/value rows with ALL fields.
 
-    This is the "AGENT COPY" version.
+    This is the agent's version.
     """
 
     evid_rows = "".join([f"""
@@ -656,7 +656,7 @@ def build_evidence_by_room_report_html(
 
     Groups evidence items under dark-background room headers with item counts.
 
-    Uses the same full detail layout as the AGENT COPY evidence report.
+    Uses the same full detail layout as the full evidence report.
     """
 
     room_tables = ""
@@ -940,10 +940,10 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 
     person_rows = "".join([f"""
         <tr>
-            <td class="personTableData font-10">{p["SUSPECTNAME"]}</td>
-            <td class="personTableData font-10">{p["SUSPECTDOB"]}</td>
-            <td class="personTableData font-10">{p["SUSPECTADDRESS"]}</td>
-            <td class="personTableData font-10">{p["SUSPECTPHONE"]}</td>
+            <td class="personTableData font-10">{p["PERSONNAME"]}</td>
+            <td class="personTableData font-10">{p["PERSONDOB"]}</td>
+            <td class="personTableData font-10">{p["PERSONADDRESS"]}</td>
+            <td class="personTableData font-10">{p["PERSONPHONE"]}</td>
             <td class="personTableData font-10">{p["SUSPECTNOTE"]}</td>
         </tr>"""
         for p in persons
@@ -1045,7 +1045,7 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 
 # ----- Updated Agents Route -----
 @ui.page("/reports/agents")
-def print_agents_report():
+def print_agents_report() -> None:
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -1077,7 +1077,7 @@ def print_agents_report():
 
 # ----- Updated Evidence Routes -----
 @ui.page("/reports/evidence")
-def print_evidence_report():
+def print_evidence_report() -> None:
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -1116,7 +1116,7 @@ def print_evidence_report():
 
 # ----- Updated Evidence By Room Route -----
 @ui.page("/reports/evidence_by_room")
-def print_evidence_by_room_report():
+def print_evidence_by_room_report() -> None:
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -1125,7 +1125,6 @@ def print_evidence_by_room_report():
     with get_session() as session:
         active_case = get_case_info()
 
-        # Get unique rooms with item counts (matches Flask route query)
         unique_rooms = (
             session.query(
                 Evidence.EVIDLOCROOM,
@@ -1168,7 +1167,7 @@ def print_evidence_by_room_report():
 
 # ----- Updated Basic Evidence Report Route -----
 @ui.page("/reports/evidence_basic")
-def print_basic_evidence_report():
+def print_basic_evidence_report() -> None:
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -1199,7 +1198,7 @@ def print_basic_evidence_report():
 
 # ----- Updated Rooms Route -----
 @ui.page("/reports/rooms")
-def print_rooms_report():
+def print_rooms_report() -> None:
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -1228,7 +1227,8 @@ def print_rooms_report():
 
 # ----- Updated Persons Route -----
 @ui.page("/reports/persons")
-def print_persons_report():
+def print_persons_report() -> None:
+
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -1237,13 +1237,13 @@ def print_persons_report():
         active_case = get_case_info()
         persons = [
             {
-                "SUSPECTNAME": p.SUSPECTNAME,
-                "SUSPECTDOB": p.SUSPECTDOB or "",
-                "SUSPECTADDRESS": p.SUSPECTADDRESS or "",
-                "SUSPECTPHONE": p.SUSPECTPHONE or "",
+                "PERSONNAME": p.PERSONNAME,
+                "PERSONDOB": p.PERSONDOB or "",
+                "PERSONADDRESS": p.PERSONADDRESS or "",
+                "PERSONPHONE": p.PERSONPHONE or "",
                 "SUSPECTNOTE": p.SUSPECTNOTE or "",
             }
-            for p in session.query(Persons).order_by(Persons.SUSPECTNAME).all()
+            for p in session.query(Persons).order_by(Persons.PERSONNAME).all()
         ]
 
     html = build_persons_report_html(
@@ -1256,7 +1256,8 @@ def print_persons_report():
 
 # ----- Updated Notes Route -----
 @ui.page("/reports/notes")
-def print_notes_report():
+def print_notes_report() -> None:
+
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -1283,7 +1284,7 @@ def print_notes_report():
 
 # ----- JSON Output -----
 @ui.page("/reports/json")
-def json_output_page():
+def json_output_page() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -1311,59 +1312,59 @@ def json_output_page():
             "agents": [
                 {
                     "AGENTNAME": a.AGENTNAME,
-                    # "agent_initials": a.agent_initials,
-                    "agent_parent_agency": a.agent_parent_agency,
-                    "agent_role": a.agent_role,
-                    "agent_role_secondary": a.agent_role_secondary or "",
-                    "agent_phone": a.agent_phone,
-                    "agent_note": a.agent_note or "",
+                    "AGENTPARENTAGENCY": a.AGENTPARENTAGENCY,
+                    "AGENTPRIMARYROLE": a.AGENTPRIMARYROLE,
+                    "AGENTROLESECONDARY": a.AGENTROLESECONDARY or "",
+                    "AGENTPHONE": a.AGENTPHONE,
+                    "AGENTEMAIL": a.AGENTEMAIL,
+                    "AGENTNOTE": a.AGENTNOTE or "",
                 }
                 for a in session.query(Agents).all()
             ],
             "evidence": [
                 {
-                    "evid_num": e.evid_num,
-                    "evid_qty": e.evid_qty,
-                    "evid_desc": e.evid_desc,
-                    "evid_model_num": e.evid_model_num,
-                    "evid_serial_num": e.evid_serial_num,
-                    "evid_loc_room": e.evid_loc_room,
-                    "evid_loc_room_detail": e.evid_loc_room_detail,
-                    "evid_found_by": e.evid_found_by,
-                    "evid_found_by_witness": e.evid_found_by_witness,
-                    "evid_pic_taken": e.evid_pic_taken,
-                    "evid_triaged": e.evid_triaged,
-                    "evid_triaged_by": e.evid_triaged_by,
-                    "evid_is_contraband": e.evid_is_contraband,
-                    "evid_note": e.evid_note,
+                    "EVIDNUM": e.EVIDNUM,
+                    "EVIDQTY": e.EVIDQTY,
+                    "EVIDDESC": e.EVIDDESC,
+                    "EVIDMODELNUMBER": e.EVIDMODELNUMBER,
+                    "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER,
+                    "EVIDLOCROOM": e.EVIDLOCROOM,
+                    "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
+                    "EVIDFOUNDBY": e.EVIDFOUNDBY,
+                    "EVIDFOUNDBYWITNESS": e.EVIDFOUNDBYWITNESS,
+                    "EVIDPICTAKEN": e.EVIDPICTAKEN,
+                    "EVIDTRIAGED": e.EVIDTRIAGED,
+                    "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY,
+                    "EVIDISCONTRABAND": e.EVIDISCONTRABAND,
+                    "EVIDNOTE": e.EVIDNOTE,
                 }
                 for e in session.query(Evidence).all()
             ],
             "rooms": [
                 {
-                    "room_label": r.room_label,
-                    "room_desc": r.room_desc,
-                    "room_first_agent": r.room_first_agent,
-                    "room_second_agent": r.room_second_agent,
+                    "ROOMLABEL": r.ROOMLABEL,
+                    "ROOMDESC": r.ROOMDESC,
+                    "ROOMFIRSTAGENT": r.ROOMFIRSTAGENT,
+                    "ROOMSECONDAGENT": r.ROOMSECONDAGENT,
                 }
                 for r in session.query(Rooms).all()
             ],
             "persons": [
                 {
-                    "sus_name": p.sus_name,
-                    "sus_dob": p.sus_dob or "",
-                    "sus_address": p.sus_address or "",
-                    "sus_phone": p.sus_phone or "",
-                    "sus_note": p.sus_note or "",
+                    "PERSONNAME": p.PERSONNAME,
+                    "PERSONDOB": p.PERSONDOB or "",
+                    "PERSONADDRESS": p.PERSONADDRESS or "",
+                    "PERSONPHONE": p.PERSONPHONE or "",
+                    "SUSPECTNOTE": p.SUSPECTNOTE or "",
                 }
                 for p in session.query(Persons).all()
             ],
             "notes": [
                 {
-                    "note_date_time": n.note_date_time,
-                    "note_date_time_updated": n.note_date_time_updated or "",
-                    "note_author": n.note_author,
-                    "note_text": n.note_text,
+                    "NOTEDATETIME": n.NOTEDATETIME,
+                    "NOTEDATETIMEUPDATED": n.NOTEDATETIMEUPDATED or "",
+                    "NOTEAUTHOR": n.NOTEAUTHOR,
+                    "NOTETEXT": n.NOTETEXT,
                 }
                 for n in session.query(Notes).all()
             ],
@@ -1382,7 +1383,7 @@ def json_output_page():
         ui.code(json_str, language="json").classes("w-full")
 
 
-def open_report_window():
+def open_report_window() -> None:
     """Extracts the report innerHTML and opens it in a clean new tab.
 
     The report can be printed after validation has occured.

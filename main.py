@@ -36,7 +36,7 @@ def is_authenticated() -> bool:
 def get_current_user_name() -> str:
     """Gets current username (defaults to empty)."""
     try:
-        return app.storage.user.get("user_name", "")
+        return app.storage.user.get("USERNAME", "")
     except Exception:
         return ""
 
@@ -44,7 +44,7 @@ def get_current_user_name() -> str:
 def get_is_admin() -> bool:
     """Checks if current user is admin (defaults to False)."""
     try:
-        return app.storage.user.get("is_admin", False)
+        return app.storage.user.get("ISADMIN", False)
     except Exception:
         return False
 
@@ -82,7 +82,7 @@ init_db()
 
 
 # ----- Seed Default User -----
-def seed_default_user():
+def seed_default_user() -> None:
     """Reads user credentials from users.json and upserts into the
     Users table.
 
@@ -91,13 +91,19 @@ def seed_default_user():
     json_path = Path(__file__).parent / f"db/users.json"
 
     if not json_path.exists():
-        print("WARNING → 'users.json' not found — no user seeded.")
+        ui.notify(
+            "WARNING → 'users.json' not found — no user seeded.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
         return
 
     with open(json_path, "r", encoding="utf-8") as f:
         user_data = json.load(f)
 
-    raw_hash = user_data.get("password_hash", "")
+    raw_hash = user_data.get("PASSWORDHASH", "")
 
     try:
         hash_bytes = ast.literal_eval(raw_hash)
@@ -111,30 +117,36 @@ def seed_default_user():
         if clean_hash.startswith("b'") and clean_hash.endswith("'"):
             clean_hash = clean_hash[2:-1]
 
-    user_name = user_data.get("user_name", "")
-    is_admin = user_data.get("is_admin", False)
+    user_name = user_data.get("USERNAME", "")
+    is_admin = user_data.get("ISADMIN", False)
 
     with get_users_session() as session:
         existing = (
             session.query(Users)
-            .filter_by(user_name="novaicac")
+            .filter_by(USERNAME="novaicac")
             .first()
         )
         if existing:
             # Update existing user with latest hash from JSON
-            existing.password_hash = clean_hash
-            existing.is_admin = is_admin
-            existing.is_active = True
+            existing.PASSWORDHASH = clean_hash
+            existing.ISADMIN = is_admin
+            existing.ISACTIVE = True
         else:
             # Create new user
             new_user = Users(
-                user_name=user_name,
-                password_hash=clean_hash,
-                is_admin=is_admin,
-                is_active=True,
+                USERNAME=user_name,
+                PASSWORDHASH=clean_hash,
+                ISADMIN=is_admin,
+                ISACTIVE=True,
             )
             session.add(new_user)
-            print(f"✓ Created user '{user_name}' from users.json")
+            ui.notify(
+                f"✓ Created user '{user_name}' from users.json",
+                timeout=4000,
+                position="bottom",
+                close_button="OK",
+            )
+
 
 seed_default_user()
 
@@ -153,9 +165,10 @@ ui.add_css(
     --q-negative: #ef4444;
     --q-warning: #f59e0b;
     --q-info: #3b82f6;
-    --q-vspblue: #2984D1;
+    --q-vspblue: #2984d1;
 
     --vsp-blue: #2984D1;
+    --vsp-blue-2: #1C69A8;
     --vsp-gray: #D4D4D8;
     --vsp-red: #FF0000;
     --vsp-green: #31C950;
@@ -179,6 +192,18 @@ textarea.q-field__native {
 .required {
     color: #ef4444 !important;
     margin-left: 2px;
+}
+
+
+.q-field--labeled .q-field__native {
+    padding-bottom: 0px;
+}
+
+
+.yellow-label .q-field__label {
+    color: #F5B027;
+    font-size: 10pt;
+    font-weight: normal;
 }
 
 /* Print styles */
@@ -221,7 +246,7 @@ import home_page
 
 
 @ui.page("/agents")
-def agents_route():
+def agents_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -230,7 +255,7 @@ def agents_route():
 
 
 @ui.page("/cases")
-def cases_route():
+def cases_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -239,7 +264,7 @@ def cases_route():
 
 
 @ui.page("/rooms")
-def rooms_route():
+def rooms_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -248,7 +273,7 @@ def rooms_route():
 
 
 @ui.page("/evidence")
-def evidence_route():
+def evidence_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -257,7 +282,7 @@ def evidence_route():
 
 
 @ui.page("/persons")
-def persons_route():
+def persons_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -266,7 +291,7 @@ def persons_route():
 
 
 @ui.page("/notes")
-def notes_route():
+def notes_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -275,7 +300,7 @@ def notes_route():
 
 
 @ui.page("/uploads")
-def uploads_route():
+def uploads_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -284,7 +309,7 @@ def uploads_route():
 
 
 @ui.page("/links")
-def links_route():
+def links_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -293,7 +318,7 @@ def links_route():
 
 
 @ui.page("/reports")
-def reports_route():
+def reports_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -302,14 +327,14 @@ def reports_route():
 
 
 @ui.page("/admin")
-def admin_route():
+def admin_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
 
     if not get_is_admin():
         ui.notify(
-            "Admin access required.",
+            "Admin access is required to access this page.",
             type="negative",
             timeout=0,
             position="center",
@@ -321,7 +346,7 @@ def admin_route():
 
 
 @ui.page("/change-password")
-def change_password_page():
+def change_password_page() -> None:
 
     from models import get_users_session, Users, DEFAULT_USER_PASSWORD
 
@@ -356,7 +381,7 @@ def change_password_page():
                 password=True,
             ).classes("w-full")
 
-            def save_new_password():
+            def save_new_password() -> None:
                 if not new_pass.value or len(new_pass.value) < 8:
                     ui.notify(
                         "Password must be at least 8 characters.",
@@ -390,12 +415,12 @@ def change_password_page():
                 with get_users_session() as session:
                     user = (
                         session.query(Users)
-                        .filter_by(user_name=username)
+                        .filter_by(USERNAME=username)
                         .first()
                     )
                     if user:
                         user.set_password(new_pass.value)
-                        user.must_change_password = False
+                        user.MUSTCHANGEPASSWORD = False
                 ui.notify(
                     "Password changed.",
                     timeout=4000,

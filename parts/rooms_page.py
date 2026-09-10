@@ -160,9 +160,7 @@ def build_rooms_page() -> None:
 
         with ui.column().classes("w-full items-center"):
 
-            ui.label(
-                "Current Rooms"
-            ).classes("text-xl font-bold mb-3")
+            ui.label("Rooms List").classes("text-xl font-bold mb-3")
 
             with ui.row().classes("w-full max-w-6xl items-center"):
 
@@ -464,7 +462,7 @@ def build_rooms_page() -> None:
                                     ui.button(
                                         "Delete",
                                         on_click=on_confirm_delete,
-                                        color="#ef4444",
+                                        color="#EF4444",
                                         ).props("unelevated").classes(
                                         "text-[var(--vsp-white)]"
                                     )
@@ -497,7 +495,7 @@ def build_rooms_page() -> None:
                         "rooms",
                         delete_all_rooms
                     ),
-                    color="#ef4444",
+                    color="#EF4444",
                 ).props("unelevated").classes("mb-2 items-center")
 
     # ----- Initial render -----

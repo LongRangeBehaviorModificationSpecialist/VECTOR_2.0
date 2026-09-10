@@ -133,7 +133,7 @@ def build_notes_page() -> None:
         ui.separator().classes("my-6")
 
         ui.label(
-            "Current Notes"
+            "Notes List"
         ).classes("text-xl font-bold mb-3")
 
         table_container = ui.column().classes(
@@ -172,6 +172,13 @@ def build_notes_page() -> None:
 
             with table_container:
                 column_defs = [
+                    {
+                        "name": "Z_PK",
+                        "label": "ID #",
+                        "field": "Z_PK",
+                        "sortable": True,
+                        "align": "left",
+                    },
                     {
                         "name": "NOTEDATETIME",
                         "label": "Date Added",
@@ -409,7 +416,7 @@ def build_notes_page() -> None:
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#ef4444",
+                                color="#EF4444",
                                 ).props("unelevated").classes(
                                 "text-[var(--vsp-white)]"
                             )
@@ -443,7 +450,7 @@ def build_notes_page() -> None:
                     "notes",
                     delete_all_notes,
                 ),
-                color="#ef4444",
+                color="#EF4444",
             ).props("unelevated").classes("mb-2 items-center")
 
     # ----- Initial render -----

@@ -46,9 +46,7 @@ def build_agents_page() -> None:
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label(
-            "Agents"
-        ).classes("text-2xl font-bold m-4")
+        ui.label("Agents").classes("text-2xl font-bold m-4")
 
         # ----- Add Agent Section -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
@@ -97,6 +95,7 @@ def build_agents_page() -> None:
             def on_name_change(e) -> None:
 
                 selected = e.value
+
                 if not selected:
                     return
 
@@ -112,8 +111,6 @@ def build_agents_page() -> None:
                     AGENTEMAIL_input.value = info.get("AGENTEMAIL", "") or ""
                 else:
                     AGENTPARENTAGENCY_input.value = None
-                    AGENTPHONE_input.value = ""
-                    AGENTEMAIL_input.value = ""
 
             AGENTNAME_input.on_value_change(on_name_change)
 
@@ -228,9 +225,7 @@ def build_agents_page() -> None:
 
         with ui.column().classes("w-full items-center"):
 
-            ui.label(
-                "Current Agents"
-            ).classes("text-xl font-bold mb-3")
+            ui.label("Agents List").classes("text-xl font-bold mb-3")
 
             with ui.row().classes("w-full max-w-6xl items-center"):
 
@@ -277,6 +272,13 @@ def build_agents_page() -> None:
 
                     with table_container:
                         column_defs = [
+                            {
+                                "name": "Z_PK",
+                                "label": "Agent #",
+                                "field": "Z_PK",
+                                "sortable": True,
+                                "align": "left",
+                            },
                             {
                                 "name": "AGENTNAME",
                                 "label": "Name",
@@ -519,7 +521,7 @@ def build_agents_page() -> None:
                                 ui.label(
                                     "Delete Agent?"
                                     ).classes(
-                                    "text-lg font-semibold mb-3 text-[var(--vsp-blue)]"
+                                    "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
                                 )
 
                                 ui.label(
@@ -530,8 +532,7 @@ def build_agents_page() -> None:
                                 )
 
                                 ui.label(
-                                    f"'{row['AGENTNAME']}'"
-                                    ).classes(
+                                    f"\"{row['AGENTNAME']}\"").classes(
                                     "mb-3 text-base font-semibold text-[var(--vsp-blue)]"
                                 )
 
@@ -575,7 +576,7 @@ def build_agents_page() -> None:
                                     ui.button(
                                         "Delete",
                                         on_click=confirm_agent_delete,
-                                        color="#ef4444",
+                                        color="#EF4444",
                                         ).props("unelevated").classes(
                                         "text-[var(--vsp-white)]"
                                     )
@@ -610,7 +611,7 @@ def build_agents_page() -> None:
                         "agents",
                         delete_all_agents
                     ),
-                    color="#ef4444",
+                    color="#EF4444",
                 ).props("unelevated").classes("mb-2 items-center")
 
     # ----- Initial render -----

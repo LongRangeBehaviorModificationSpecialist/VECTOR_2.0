@@ -15,5 +15,5 @@ class Config:
     author = "SSA M. Sponheimer"
     dept = "Virginia State Police -- NOVA/DC ICAC"
     url = "github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0"
-    updated = "02-Sep-2026"
+    updated = "10-Sep-2026"
     USERPROFILE = str(Path.home())  # Fallback for Windows profile path

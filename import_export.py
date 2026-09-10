@@ -29,27 +29,35 @@ def get_exportable_models() -> list:
     from models import Cases, Agents, Rooms, Evidence, Persons, Notes
 
     return [
-        (Cases, "cases"),
-        (Agents, "agents"),
-        (Rooms, "rooms"),
-        (Evidence, "evidence"),
-        (Persons, "persons"),
-        (Notes, "notes")
+        (Cases, "CASES"),
+        (Agents, "AGENTS"),
+        (Rooms, "ROOMS"),
+        (Evidence, "EVIDENDCE"),
+        (Persons, "PERSONS"),
+        (Notes, "NOTES")
     ]
 
 
 def get_all_models() -> dict:
     """Returns ALL models including UploadedFiles for import."""
-    from models import Cases, Agents, Rooms, Evidence, Persons, Notes, UploadedFiles
+    from models import (
+        Cases,
+        Agents,
+        Rooms,
+        Evidence,
+        Persons,
+        Notes,
+        UploadedFiles,
+    )
 
     return {
-        "cases": Cases,
-        "agents": Agents,
-        "rooms": Rooms,
-        "evidence": Evidence,
-        "persons": Persons,
-        "notes": Notes,
-        "uploaded_files": UploadedFiles
+        "CASES": Cases,
+        "AGENTS": Agents,
+        "ROOMS": Rooms,
+        "EVIDENCE": Evidence,
+        "PERSONS": Persons,
+        "NOTES": Notes,
+        "FILES": UploadedFiles
     }
 
 
@@ -72,13 +80,13 @@ def get_case_info_for_folder_name() -> str:
             return ""
 
         case_number = (
-            (case.case_number or "UNKNOWN")
+            (case.CASENUMBER or "UNKNOWN")
             .replace("/", "_")
             .replace("\\", "_")
             .replace(" ", "_")
         )
 
-        begin_dt = case.case_date_time_begin or "UNKNOWN"
+        begin_dt = case.CASEDATETIMEBEGIN or "UNKNOWN"
 
         # Format the datetime
         if hasattr(begin_dt, "strftime"):
@@ -150,7 +158,7 @@ def deserialize_value(value: str, column) -> str:
 # ----- EXPORT FUNCTION -----
 
 
-def export_database(password: Optional[str] = None) -> None:
+def export_vector_to_csv(password: Optional[str] = None) -> None:
     """Exports all database tables to CSV files and file BLOBs to disk.
 
     Saves to ~/Desktop/<case-number>_<datetime>_saved_results/
@@ -177,6 +185,7 @@ def export_database(password: Optional[str] = None) -> None:
     except OSError as err:
         ui.notify(
             f"Error creating export directory → {err}",
+            multi_line=True,
             type="negative",
             timeout=0,
             position="center",
@@ -215,6 +224,7 @@ def export_database(password: Optional[str] = None) -> None:
         except Exception as err:
             ui.notify(
                 f"Error exporting {table_name} → {err}",
+                multi_line=True,
                 type="negative",
                 timeout=0,
                 position="center",
@@ -230,22 +240,22 @@ def export_database(password: Optional[str] = None) -> None:
         with get_session() as session:
             uploaded_files = session.query(UploadedFiles).all()
             for uf in uploaded_files:
-                if uf.file_data:
+                if uf.FILEDATA:
                     # Sanitize filename
-                    safe_name = uf.file_name or f"file_{uf.id}"
+                    safe_name = uf.FILENAME or f"file_{uf.Z_PK}"
                     safe_name = safe_name.replace("/", "_").replace("\\", "_")
                     file_path = files_dir / safe_name
 
                     with open(file_path, "wb") as f:
-                        f.write(uf.file_data)
+                        f.write(uf.FILEDATA)
 
-                    sha256_hash = hashlib.sha256(uf.file_data).hexdigest()
+                    sha256_hash = hashlib.sha256(uf.FILEDATA).hexdigest()
 
                     files_list.append(
                         {
-                            "file_name": safe_name,
-                            "file_size": uf.file_size or len(uf.file_data),
-                            "file_hash": sha256_hash
+                            "FILENAME": safe_name,
+                            "FILESIZE": uf.FILESIZE or len(uf.FILEDATA),
+                            "FILEHASH": sha256_hash
                         }
                     )
 
@@ -254,6 +264,7 @@ def export_database(password: Optional[str] = None) -> None:
     except Exception as err:
         ui.notify(
             f"Error exporting files → {err}",
+            multi_line=True,
             type="warning",
             timeout=0,
             position="center",
@@ -314,6 +325,7 @@ def export_database(password: Optional[str] = None) -> None:
     except Exception as err:
         ui.notify(
             f"Error creating zip file → {err}",
+            multi_line=True,
             type="negative",
             timeout=0,
             position="center",
@@ -333,25 +345,184 @@ def export_database(password: Optional[str] = None) -> None:
         f"Tables: {', '.join(f'{n} ({c})' for n, c in exported_tables.items())}\n"
         f"Files: {num_files}\n"
         f"Saved to: {export_dir}",
+        multi_line=True,
         timeout=0,
         position="bottom",
         close_button="OK",
     )
 
-    # Also show in terminal
-    print(f"\n{'='*60}")
-    print(f"  EXPORT COMPLETE")
-    print(f"  Location: {export_dir}")
-    print(f"  Tables: {exported_tables}")
-    print(f"  Total records: {total_records}")
-    print(f"  Files exported: {num_files}")
-    print(f"{'='*60}\n")
+
+def export_vector_to_json(password: Optional[str] = None):
+    """Exports ALL database tables into ONE .json file.
+
+    If a password is provided, the .json is placed inside an
+    AES-256 encrypted .zip with the same naming convention.
+
+    Saves to ~/<case-number>_<datetime>_saved_results.json
+    """
+    from models import UploadedFiles
+
+    folder_name = get_case_info_for_folder_name()
+    if not folder_name:
+        return
+
+    home_dir = Path.home()
+    desktop_dir = home_dir / "Desktop"
+
+    # ----- Build the complete data structure -----
+    all_data = {
+        "export_metadata": {
+            "export_date": datetime.now().isoformat(),
+            "format_version": "1.0",
+            "case_folder": folder_name,
+        },
+        "tables": {},
+    }
+
+    total_records = 0
+
+    # ----- Case tables → JSON -----
+    for model_class, table_name in get_exportable_models():
+
+        columns = get_column_names(model_class)
+
+        try:
+            with get_session() as session:
+                records = session.query(model_class).all()
+
+                table_rows = []
+                for record in records:
+                    row = {}
+                    for col in columns:
+                        value = getattr(record, col)
+                        if isinstance(value, datetime):
+                            row[col] = value.isoformat()
+                        elif isinstance(value, bytes):
+                            # Binary BLOBs encoded as base64 text
+                            import base64
+
+                            row[col] = base64.b64encode(value).decode("ascii")
+                        elif isinstance(value, bool):
+                            row[col] = value
+                        else:
+                            row[col] = value
+                    table_rows.append(row)
+
+                all_data["tables"][table_name] = {
+                    "record_count": len(table_rows),
+                    "records": table_rows,
+                }
+                total_records += len(table_rows)
+
+        except Exception as err:
+            ui.notify(
+                f"Error exporting {table_name} → {err}",
+                multi_line=True,
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return
+
+    # ----- Uploaded files → base64 inside the JSON -----
+    import base64
+
+    files_list = []
+    try:
+        with get_session() as session:
+            for uf in session.query(UploadedFiles).all():
+                if uf.FILEDATA:
+                    safe_name = (
+                        (uf.FILENAME or f"file_{uf.Z_PK}")
+                        .replace("/", "_")
+                        .replace("\\", "_")
+                    )
+                    files_list.append(
+                        {
+                            "FILENAME": safe_name,
+                            "FILESIZE": uf.FILESIZE or len(uf.FILEDATA),
+                            "FILEMIMETYPE": uf.FILEMIMETYPE or "application/octet-stream",
+                            "FILEDATA_b64": base64.b64encode(uf.FILEDATA).decode("ascii"),
+                        }
+                    )
+    except Exception as err:
+        ui.notify(
+            f"Error exporting files → {err}",
+            type="warning",
+            timeout=5000,
+            position="center",
+            close_button="OK",
+        )
+
+    all_data["files"] = {
+        "record_count": len(files_list),
+        "records": files_list,
+    }
+
+    # ----- Write the .json file -----
+    json_path = desktop_dir / f"{folder_name}.json"
+    try:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(all_data, f, indent=4, ensure_ascii=False)
+    except OSError as err:
+        ui.notify(
+            f"Error writing JSON → {err}",
+            multi_line=True,
+            type="negative",
+            timeout=5000,
+            position="center",
+            close_button="OK",
+        )
+        return
+
+    # ----- Optional: encrypt the .json inside a .zip -----
+    final_path = json_path
+    if password:
+        zip_path = desktop_dir / f"{folder_name}.json.zip"
+        try:
+            with pyzipper.AESZipFile(
+                zip_path,
+                "w",
+                compression=pyzipper.ZIP_DEFLATED,
+                encryption=pyzipper.WZ_AES,
+            ) as zf:
+                zf.setpassword(password.encode("utf-8"))
+                zf.setencryption(pyzipper.WZ_AES, nbits=256)
+                zf.write(json_path, arcname=json_path.name)
+
+            json_path.unlink()  # Remove the plain .json
+            final_path = zip_path
+        except Exception as err:
+            ui.notify(
+                f"Error creating encrypted zip → {err}",
+                multi_line=True,
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return
+
+    ui.notify(
+        f"JSON export complete! \n"
+        f"Total records: {total_records} \n"
+        f"Files embedded: {len(files_list)} \n"
+        f"Saved to: {final_path}",
+        multi_line=True,
+        timeout=0,
+        position="bottom",
+        close_button="OK",
+    )
 
 
 # ----- IMPORT FUNCTION -----
 
 
-def import_database(zip_path: str, password: Optional[str] = None) -> None:
+def import_vector_from_csv(
+        zip_path: str,
+        password: Optional[str] = None
+) -> None:
     """Imports database tables from a .zip file.
 
     If the zip is encrypted, decrypts it with the provided password.
@@ -393,8 +564,9 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
                     zf.extractall(temp_dir)
             except RuntimeError as err:
                 ui.notify(
-                    f"Failed to decrypt ZIP file → {err}.\n"
+                    f"Failed to decrypt ZIP file → {err}. \n"
                     "Check your password and try again.",
+                    multi_line=True,
                     type="negative",
                     timeout=0,
                     position="center",
@@ -423,6 +595,7 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
     except Exception as err:
         ui.notify(
             f"Error extracting ZIP → {err}",
+            multi_line=True,
             type="negative",
             timeout=0,
             position="center",
@@ -520,6 +693,7 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
         except Exception as err:
             ui.notify(
                 f"Error importing {table_name} → {err}",
+                multi_line=True,
                 type="negative",
                 timeout=0,
                 position="center",
@@ -544,11 +718,11 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
                             file_data = f.read()
 
                         new_file = UploadedFiles(
-                            file_name=file_path.name,
-                            file_data=file_data,
-                            file_size=len(file_data),
-                            file_mime_type="application/octet-stream",
-                            uploaded_by="import",
+                            FILENAME=file_path.name,
+                            FILEDATA=file_data,
+                            FILESIZE=len(file_data),
+                            FILEMIMETYPE="application/octet-stream",
+                            FILEUPLOADEDBY="import",
                         )
                         session.add(new_file)
                         files_imported += 1
@@ -556,6 +730,7 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
         except Exception as err:
             ui.notify(
                 f"Error importing files → {err}",
+                multi_line=True,
                 type="warning",
                 timeout=0,
                 position="center",
@@ -567,18 +742,240 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
 
     # ----- Success notification -----
     ui.notify(
-        f"Import complete!\n"
-        f"Tables: {', '.join(imported_tables)}\n"
-        f"Files: {files_imported}\n"
+        f"Import complete! \n"
+        f"Tables: {', '.join(imported_tables)} \n"
+        f"Files: {files_imported} \n"
         f"Total records: {total_records}",
+        multi_line=True,
         timeout=0,
         position="bottom",
         close_button="OK",
     )
 
-    print(f"\n{'='*60}")
-    print(f"  IMPORT COMPLETE")
-    print(f"  Tables: {imported_tables}")
-    print(f"  Total records: {total_records}")
-    print(f"  Files imported: {files_imported}")
-    print(f"{'='*60}\n")
+
+def import_vector_from_json(source: str, password: Optional[str] = None):
+    """Imports all tables from a single VECTOR .json export file.
+
+    Accepts a .json file directly, or an encrypted .zip containing one.
+
+    Clears existing data before importing.
+    """
+    import base64
+    import tempfile
+    from sqlalchemy import Boolean, DateTime, Integer, Float
+
+    source_path = Path(source)
+    if not source_path.exists():
+        ui.notify(
+            f"{source_path.name} File not found.", type="negative")
+        return
+
+    temp_dir_to_clean = None
+
+    # ----- If a zip was given, extract it first -----
+    if source_path.suffix.lower() == ".zip":
+        temp_dir = Path(tempfile.mkdtemp(prefix="vector_json_import_"))
+        temp_dir_to_clean = temp_dir
+        try:
+            with pyzipper.AESZipFile(source_path, "r") as zf:
+                if password:
+                    zf.setpassword(password.encode("utf-8"))
+                zf.extractall(temp_dir)
+        except RuntimeError:
+            ui.notify(
+                "Failed to decrypt — check your password.",
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return
+
+        json_files = list(temp_dir.rglob("*.json"))
+        if not json_files:
+            ui.notify(
+                "No .json file found inside the archive.",
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return
+        source_path = json_files[0]
+
+    try:
+        with open(source_path, "r", encoding="utf-8") as f:
+            all_data = json.load(f)
+    except (json.JSONDecodeError, OSError) as err:
+        ui.notify(
+            f"Error reading JSON file → {err}",
+            multi_line=True,
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        if temp_dir_to_clean:
+            shutil.rmtree(temp_dir_to_clean, ignore_errors=True)
+        return
+
+    # ----- Validate format -----
+    if "tables" not in all_data:
+        ui.notify(
+            "Not a valid VECTOR JSON export (missing 'tables' key).",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        if temp_dir_to_clean:
+            shutil.rmtree(temp_dir_to_clean, ignore_errors=True)
+        return
+
+    def json_to_value(value, column):
+        """Converts a JSON value back to the right Python type."""
+        if value is None:
+            if column.nullable:
+                return None
+            if isinstance(column.type, Boolean):
+                return False
+            return ""
+        col_type = column.type
+        if isinstance(col_type, Boolean):
+            if isinstance(value, bool):
+                return value
+            return str(value).lower() in ("true", "1", "yes", "t")
+        elif isinstance(col_type, (Integer, Float)):
+            return value
+        elif isinstance(col_type, DateTime):
+            try:
+                return datetime.fromisoformat(str(value))
+            except (ValueError, TypeError):
+                return None
+        else:
+            # Detect base64-encoded BLOBs heuristically: they are long
+            # ASCII strings stored by export_vector_to_csv_json
+            if isinstance(value, str) and len(value) > 0:
+                try:
+                    import base64
+
+                    decoded = base64.b64decode(value, validate=True)
+                    # Heuristic: only treat as binary if mostly non-text
+                    if (
+                        decoded[:4] not in (b"[BIN", b"")
+                        and not value.isprintable() is False
+                    ):
+                        return decoded
+                except Exception:
+                    pass
+            return value
+
+    models = get_all_models()
+    imported_tables = []
+    total_records = 0
+
+    # ----- Import each table -----
+    for table_name, table_payload in all_data["tables"].items():
+        if table_name not in models:
+            print(f"Skipping unknown table: {table_name}")
+            continue
+
+        model_class = models[table_name]
+        records = table_payload.get("records", [])
+        columns = {col.name: col for col in model_class.__table__.columns}
+
+        try:
+            with get_session() as session:
+                session.query(model_class).delete()
+
+                for rec in records:
+                    record_data = {}
+                    for col_name, col_obj in columns.items():
+                        if col_name == "Z_PK":
+                            continue  # Let autoincrement reassign
+                        raw = rec.get(col_name)
+                        record_data[col_name] = json_to_value(raw, col_obj)
+
+                    session.add(model_class(**record_data))
+
+            with get_session() as session:
+                count = session.query(models[table_name]).count()
+
+            imported_tables.append(f"{table_name} ({count})")
+            total_records += count
+
+        except Exception as err:
+            ui.notify(
+                f"Error importing {table_name} → {err}",
+                multi_line=True,
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            if temp_dir_to_clean:
+                shutil.rmtree(temp_dir_to_clean, ignore_errors=True)
+            return
+
+    # ----- Import uploaded files -----
+    from models import UploadedFiles
+
+    files_imported = 0
+
+    files_payload = all_data.get("files", {})
+    if files_payload.get("records"):
+        try:
+            with get_session() as session:
+                session.query(UploadedFiles).delete()
+
+                for rec in files_payload["records"]:
+                    file_bytes = base64.b64decode(rec["FILEDATA_b64"])
+                    session.add(
+                        UploadedFiles(
+                            FILENAME=rec["FILENAME"],
+                            FILEDATA=FILEDATA if False else file_bytes,
+                            FILESIZE=rec.get("FILESIZE") or len(file_bytes),
+                            FILEMIMETYPE=rec.get(
+                                "FILEMIMETYPE",
+                                "application/octet-stream"
+                            ),
+                            FILEUPLOADEDBY="json-import",
+                        )
+                    )
+                    files_imported_count = (
+                        files_imported_count + 1
+                        if "files_imported_count" in dir()
+                        else 1
+                    )
+
+            files_imported = len(files_payload["records"])
+
+        except Exception as err:
+            ui.notify(
+                f"Error importing files → {err}",
+                multi_line=True,
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            files_imported = 0
+    else:
+        files_imported = 0
+
+    # ----- Cleanup & success -----
+    if temp_dir_to_clean:
+        shutil.rmtree(temp_dir_to_clean, ignore_errors=True)
+
+    ui.notify(
+        f"JSON import complete! \n"
+        f"Tables: {', '.join(imported_tables)} \n"
+        f"Files: {files_imported} \n"
+        f"Total records: {total_records}",
+        multi_line=True,
+        timeout=0,
+        position="bottom",
+        close_button="OK",
+    )
