@@ -18,7 +18,12 @@ from pathlib import Path
 # config.py lives in <project>/program/, so the root is two levels up.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-DB_DIR = PROJECT_ROOT / "db"
+# VECTOR_DB_DIR relocates the case database. Point it at an encrypted
+# volume (BitLocker, FileVault, VeraCrypt) to protect case data at rest
+# -- the database itself is plain SQLite. The test suite uses it to work
+# against a temporary directory.
+DB_DIR = Path(os.environ["VECTOR_DB_DIR"]).expanduser() \
+    if os.environ.get("VECTOR_DB_DIR") else PROJECT_ROOT / "db"
 STATIC_DIR = PROJECT_ROOT / "static"
 SECRET_FILE = PROJECT_ROOT / ".secret"
 

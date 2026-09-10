@@ -9,7 +9,8 @@ Dependencies:
 
 import bcrypt
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
+import json
 from sqlalchemy import (
     create_engine,
     event,
@@ -317,9 +318,12 @@ class UploadedFiles(Base):
     upload_date = Column(DateTime(), default=datetime.utcnow)
     # Not unique: the same photograph may legitimately be attached
     # twice, and enforcing it made SQLite index every byte of every
-    # attachment. Use a sha256 column if duplicate detection is
-    # wanted.
+    # attachment. Duplicate detection belongs on sha256 below.
     file_data = Column(LargeBinary(), nullable=False)
+    # Computed when the file is received, not when it is exported, so
+    # the recorded hash certifies the file as collected.
+    sha256 = Column(String(64), index=True)
+    hashed_at = Column(String())
     uploaded_by = Column(String(100), nullable=False)
 
     def __repr__(self):
@@ -380,6 +384,194 @@ class Users(UsersBase):
             return False
 
 
+class AuditLog(Base):
+    """Append-only record of every change to case data.
+
+    Never updated and never deleted. A tool whose purpose is
+    documenting a seizure has to be able to answer "was this record
+    changed after it was written, by whom, and from what?" -- so every
+    insert, update and delete lands here with the values on both sides.
+
+    Deletions store the complete row in `before`, which is what makes a
+    deleted item recoverable without soft-delete columns on every table.
+    """
+
+    __tablename__ = "AUDIT"
+
+    id = Column(Integer(), primary_key=True, autoincrement=True)
+    ts_utc = Column(String(), nullable=False, index=True)
+    actor = Column(String(), nullable=False)
+    action = Column(String(), nullable=False)      # CREATE/UPDATE/DELETE/...
+    table_name = Column(String(), nullable=False, index=True)
+    row_pk = Column(Integer())
+    summary = Column(String())                     # human-readable label
+    before = Column(Text())                        # JSON, changed fields only
+    after = Column(Text())
+
+    def __repr__(self):
+        return f"Audit {self.id}: {self.action} {self.table_name}"
+
+
+# ----- Audit plumbing -----
+# Columns never worth recording: file_data would put every byte of every
+# attachment into the log.
+_AUDIT_SKIP_COLUMNS = {"file_data"}
+
+# Tables the listener watches. AUDIT itself is excluded -- it is
+# append-only and must never audit its own writes.
+_AUDITED_TABLES = {
+    "CASES": "CASENUMBER",
+    "AGENTS": "AGENTNAME",
+    "ROOMS": "ROOMLABEL",
+    "EVIDENCE": "EVIDNUM",
+    "PERSONS": "SUSPECTNAME",
+    "NOTES": "NOTEAUTHOR",
+    "files": "file_name",
+}
+
+
+def audit_timestamp() -> str:
+    """UTC, ISO-8601, explicitly marked. Never local time."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def current_actor() -> str:
+    """The signed-in user, or a marker when there is no web session.
+
+    Never raises: an audit record with an uncertain actor is worth far
+    more than a failed save.
+    """
+    try:
+        from nicegui import app
+        name = app.storage.user.get("user_name", "")
+        return name or "unauthenticated"
+    except Exception:
+        return "system"
+
+
+def _serialise(value):
+    """Makes a column value JSON-safe."""
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return f"<{len(bytes(value))} bytes>"
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+def _row_dict(obj) -> dict:
+    """Every auditable column of a mapped object."""
+    return {
+        column.name: _serialise(getattr(obj, column.name, None))
+        for column in obj.__table__.columns
+        if column.name not in _AUDIT_SKIP_COLUMNS
+    }
+
+
+def _changed_fields(obj) -> tuple[dict, dict]:
+    """Returns (before, after) limited to columns that actually changed."""
+    from sqlalchemy import inspect as sa_inspect
+
+    before, after = {}, {}
+    state = sa_inspect(obj)
+    for column in obj.__table__.columns:
+        if column.name in _AUDIT_SKIP_COLUMNS:
+            continue
+        history = state.attrs[column.name].history
+        if not history.has_changes():
+            continue
+        before[column.name] = _serialise(
+            history.deleted[0] if history.deleted else None
+        )
+        after[column.name] = _serialise(
+            history.added[0] if history.added else None
+        )
+    return before, after
+
+
+def record_audit(
+    session,
+    action: str,
+    table_name: str,
+    row_pk=None,
+    summary: str = "",
+    before=None,
+    after=None,
+    actor: str | None = None,
+) -> None:
+    """Writes one audit row.
+
+    Used directly for events the ORM listener cannot see -- logins, and
+    bulk deletes issued as query().delete(), which bypass ORM events
+    entirely.
+    """
+    session.add(
+        AuditLog(
+            ts_utc=audit_timestamp(),
+            actor=actor or current_actor(),
+            action=action,
+            table_name=table_name,
+            row_pk=row_pk,
+            summary=summary or "",
+            before=json.dumps(before, default=str) if before else None,
+            after=json.dumps(after, default=str) if after else None,
+        )
+    )
+
+
+# Bound to the app_data sessionmaker specifically, not to Session as a
+# class: users.db has no AUDIT table, so auditing its writes would
+# fail every login.
+@event.listens_for(Session, "before_flush")
+def _audit_before_flush(session, _flush_context, _instances) -> None:
+    """Captures every ORM insert, update and delete as it is flushed.
+
+    Hooking the flush rather than each page's save handler means a new
+    page, or a forgotten call site, cannot silently skip the audit
+    trail.
+    """
+    entries = []
+
+    for obj in session.new:
+        table = getattr(obj, "__tablename__", None)
+        if table not in _AUDITED_TABLES:
+            continue
+        entries.append(("CREATE", obj, None, _row_dict(obj)))
+
+    for obj in session.dirty:
+        table = getattr(obj, "__tablename__", None)
+        if table not in _AUDITED_TABLES or not session.is_modified(obj):
+            continue
+        before, after = _changed_fields(obj)
+        if not after:
+            continue
+        entries.append(("UPDATE", obj, before, after))
+
+    for obj in session.deleted:
+        table = getattr(obj, "__tablename__", None)
+        if table not in _AUDITED_TABLES:
+            continue
+        entries.append(("DELETE", obj, _row_dict(obj), None))
+
+    if not entries:
+        return
+
+    actor = current_actor()
+    for action, obj, before, after in entries:
+        label_column = _AUDITED_TABLES[obj.__tablename__]
+        session.add(
+            AuditLog(
+                ts_utc=audit_timestamp(),
+                actor=actor,
+                action=action,
+                table_name=obj.__tablename__,
+                row_pk=getattr(obj, "Z_PK", None) or getattr(obj, "id", None),
+                summary=str(getattr(obj, label_column, "") or ""),
+                before=json.dumps(before, default=str) if before else None,
+                after=json.dumps(after, default=str) if after else None,
+            )
+        )
+
+
 DEFAULT_USER_PASSWORD = "Vector2026!"
 
 
@@ -420,6 +612,53 @@ def _stale_unique_columns(connection, table_name: str) -> set:
         }
         stale |= columns & _UNIQUE_DROPPED[table_name]
     return stale
+
+
+def _add_missing_columns() -> None:
+    """Adds columns introduced after a database was first created.
+
+    SQLite supports ALTER TABLE ADD COLUMN, so unlike the unique-index
+    work below this needs no table rebuild.
+    """
+    from sqlalchemy import text
+
+    additions = {
+        "files": [
+            ("sha256", "VARCHAR(64)"),
+            ("hashed_at", "VARCHAR"),
+        ],
+    }
+
+    with engine.begin() as connection:
+        for table_name, columns in additions.items():
+            exists = connection.execute(
+                text(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type='table' AND name=:name"
+                ),
+                {"name": table_name},
+            ).scalar()
+            if not exists:
+                continue
+
+            present = {
+                row[1]
+                for row in connection.execute(
+                    text(f'PRAGMA table_info("{table_name}")')
+                )
+            }
+            for column_name, column_type in columns:
+                if column_name in present:
+                    continue
+                connection.execute(
+                    text(
+                        f'ALTER TABLE "{table_name}" '
+                        f'ADD COLUMN "{column_name}" {column_type}'
+                    )
+                )
+                print(
+                    f"Schema migration: added {table_name}.{column_name}"
+                )
 
 
 def migrate_schema() -> None:
@@ -484,6 +723,7 @@ def init_db():
     UsersBase.metadata.create_all(users_engine)
 
     # Bring an existing case database up to the current schema.
+    _add_missing_columns()
     migrate_schema()
 
 
