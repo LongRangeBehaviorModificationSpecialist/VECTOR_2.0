@@ -15,7 +15,7 @@ from models import get_session, UploadedFiles, audit_timestamp
 from program.config import Config
 from navbar import build_navbar
 from home_page import confirm_new_case_handler
-from main import get_current_user_name, get_is_admin
+from auth import get_current_user_name, get_is_admin
 from utils import (
     get_mime_type,
     is_allowed_file,

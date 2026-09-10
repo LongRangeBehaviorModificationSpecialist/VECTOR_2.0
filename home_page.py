@@ -15,7 +15,7 @@ from nicegui import ui
 from pathlib import Path
 
 from import_export import export_database, import_database
-from main import is_authenticated, get_current_user_name, get_is_admin
+from auth import is_authenticated, get_current_user_name, get_is_admin
 from models import get_session, get_users_session, record_audit
 from navbar import build_navbar
 from program.config import Config

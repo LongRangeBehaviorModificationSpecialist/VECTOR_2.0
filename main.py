@@ -17,6 +17,13 @@ from nicegui import ui, app
 import secrets
 import sys
 
+from auth import (
+    get_current_user_name,
+    get_is_admin,
+    is_authenticated,
+    require_admin,
+    require_login,
+)
 from models import get_users_session
 from program.config import (
     Config,
@@ -33,31 +40,6 @@ DEBUG_MODE = "--dev" in sys.argv
 # from the network by accident. See README "Access from another device".
 LAN_MODE = "--lan" in sys.argv
 HOST = "0.0.0.0" if LAN_MODE else Config.HOST
-
-
-# ----- Startup Configuration -----
-def is_authenticated() -> bool:
-    """Checks if user is authenticated (defaults to False)."""
-    try:
-        return app.storage.user.get("authenticated", False)
-    except Exception:
-        return False
-
-
-def get_current_user_name() -> str:
-    """Gets current username (defaults to empty)."""
-    try:
-        return app.storage.user.get("user_name", "")
-    except Exception:
-        return ""
-
-
-def get_is_admin() -> bool:
-    """Checks if current user is admin (defaults to False)."""
-    try:
-        return app.storage.user.get("is_admin", False)
-    except Exception:
-        return False
 
 
 def get_storage_secret() -> str:
@@ -269,132 +251,47 @@ textarea.q-field__native {
 
 
 # ----- Page Registrations -----
-# Some page modules define their own @ui.page decorators internally.
-# The ones below are registered here for centralized control.
+# Imported eagerly. These modules were previously imported inside each
+# route to dodge the circular dependency on main.py, which meant the
+# report sub-routes were not registered until somebody first visited
+# /reports -- so a bookmark or a page refresh returned 404. auth.py
+# removed the cycle, so the imports can sit where they belong.
 import home_page
 
-
-@ui.page("/agents")
-def agents_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    from parts.agents_page import build_agents_page
-    build_agents_page()
-
-
-@ui.page("/cases")
-def cases_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    from parts.cases_page import build_cases_page
-    build_cases_page()
+from parts.admin_page import build_admin_page
+from parts.agents_page import build_agents_page
+from parts.audit_page import build_audit_page
+from parts.cases_page import build_cases_page
+from parts.evidence_page import build_evidence_page
+from parts.files_page import build_uploads_page
+from parts.links_page import build_links_page
+from parts.notes_page import build_notes_page
+from parts.persons_page import build_persons_page
+from parts.reports_page import build_reports_page
+from parts.rooms_page import build_rooms_page
 
 
-@ui.page("/rooms")
-def rooms_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    from parts.rooms_page import build_rooms_page
-    build_rooms_page()
+# Route -> builder, and whether the page is admin-only. Written once so
+# a new page cannot arrive with its guard subtly different from the
+# others -- which is how /admin ended up reachable by any signed-in
+# user, and /shutdown by anyone at all.
+PAGES = [
+    ("/cases", build_cases_page, False),
+    ("/agents", build_agents_page, False),
+    ("/rooms", build_rooms_page, False),
+    ("/evidence", build_evidence_page, False),
+    ("/persons", build_persons_page, False),
+    ("/notes", build_notes_page, False),
+    ("/uploads", build_uploads_page, False),
+    ("/links", build_links_page, False),
+    ("/reports", build_reports_page, False),
+    ("/admin", build_admin_page, True),
+    ("/audit", build_audit_page, True),
+]
 
-
-@ui.page("/evidence")
-def evidence_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    from parts.evidence_page import build_evidence_page
-    build_evidence_page()
-
-
-@ui.page("/persons")
-def persons_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    from parts.persons_page import build_persons_page
-    build_persons_page()
-
-
-@ui.page("/notes")
-def notes_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    from parts.notes_page import build_notes_page
-    build_notes_page()
-
-
-@ui.page("/uploads")
-def uploads_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    from parts.files_page import build_uploads_page
-    build_uploads_page()
-
-
-@ui.page("/links")
-def links_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    from parts.links_page import build_links_page
-    build_links_page()
-
-
-@ui.page("/reports")
-def reports_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-    from parts.reports_page import build_reports_page
-    build_reports_page()
-
-
-@ui.page("/admin")
-def admin_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-
-    if not get_is_admin():
-        ui.notify(
-            "Admin access required.",
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        ui.navigate.to("/")
-        return
-
-    from parts.admin_page import build_admin_page
-    build_admin_page()
-
-
-@ui.page("/audit")
-def audit_route():
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-
-    if not get_is_admin():
-        ui.notify(
-            "Admin access required.",
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        ui.navigate.to("/")
-        return
-
-    from parts.audit_page import build_audit_page
-    build_audit_page()
+for _route, _builder, _admin_only in PAGES:
+    _guard = require_admin if _admin_only else require_login
+    ui.page(_route)(_guard(_builder))
 
 
 @ui.page("/change-password")

@@ -13,7 +13,7 @@ from nicegui import ui
 
 from models import get_users_session, Users, DEFAULT_USER_PASSWORD
 from navbar import build_navbar
-from main import get_current_user_name, get_is_admin
+from auth import get_current_user_name, get_is_admin
 
 # ----- PAGE BUILDER -----
 def build_admin_page():

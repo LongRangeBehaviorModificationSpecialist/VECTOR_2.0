@@ -15,7 +15,7 @@ import json
 from nicegui import ui
 
 from home_page import confirm_new_case_handler
-from main import get_current_user_name, get_is_admin
+from auth import get_current_user_name, get_is_admin
 from models import get_session, AuditLog
 from navbar import build_navbar
 

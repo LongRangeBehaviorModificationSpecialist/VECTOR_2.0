@@ -37,7 +37,7 @@ import json
 from models import get_session, Agents, Cases, Evidence, Notes, Persons, Rooms
 from navbar import build_navbar
 from home_page import confirm_new_case_handler
-from main import is_authenticated, get_current_user_name, get_is_admin
+from auth import is_authenticated, get_current_user_name, get_is_admin
 from utils import get_print_date_time, get_case_info
 
 

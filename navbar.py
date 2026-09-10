@@ -3,88 +3,17 @@
 """
 navbar.py
 
-Provides build_navbar() to be called at the top of every authenticated page.
-Uses Quasar's button + menu pattern for dropdown navigation items.
+Provides build_navbar() to be called at the top of every authenticated
+page. Uses Quasar's button + menu pattern for dropdown navigation items.
 
-Also registers the two modal dialogs from the original includes:
-    - _new_case_confirm.html     →  confirm_new_case_dialog()
-    - _confirm_data_delete.html  →  confirm_delete_dialog()
+The two dialog builders that used to live here -- confirm_new_case_dialog
+and confirm_delete_dialog -- were written as shared helpers and never
+adopted by any page. parts/crud.py now provides the real shared dialogs,
+so they have been removed rather than left as a second, dead answer to
+the same question.
 """
 
 from nicegui import ui
-
-
-# ----- Modal Dialog Builders -----
-def confirm_new_case_dialog(on_confirm: callable) -> None:
-    """Replacement for _new_case_confirm.html.
-
-    Shows a confirmation dialog before creating a new case file.
-
-    Call the returned function to open it.
-    """
-
-    def open_dialog() -> None:
-        with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
-
-            ui.label(
-                "Create New Case File"
-            ).classes("text-lg font-semibold mb-2")
-
-            ui.label(
-                "This will archive the current case and start a new one. "
-                "Are you sure you want to proceed?"
-            ).classes("text-sm text-gray-500 mb-4")
-
-            with ui.row().classes("w-full justify-end gap-2"):
-
-                ui.button(
-                    "Cancel",
-                    on_click=dialog.close,
-                ).props("flat")
-
-                ui.button(
-                    "Confirm",
-                    on_click=lambda: (on_confirm(), dialog.close()),
-                ).props("unelevated")
-
-        dialog.open()
-
-    return open_dialog
-
-
-def confirm_delete_dialog(on_confirm: callable, item_name: str = "this item"):
-    """Replacement for _confirm_data_delete.html.
-
-    Shows a confirmation dialog before deleting data.
-    """
-
-    def open_dialog() -> None:
-        with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
-
-            ui.label(
-                "Confirm Deletion"
-            ).classes("text-lg font-semibold mb-2")
-
-            ui.label(
-                f"Are you sure you want to delete {item_name}? "
-                "This action cannot be undone."
-            ).classes("text-sm text-gray-500 mb-4")
-
-            with ui.row().classes("w-full justify-end gap-2"):
-
-                ui.button(
-                    "Cancel",
-                    on_click=dialog.close,
-                ).props("flat")
-
-                ui.button(
-                    "Delete",
-                    on_click=lambda: (on_confirm(), dialog.close()),
-                ).props("negative unelevated")
-
-        dialog.open()
-
-    return open_dialog
 
 
 # ----- Dropdown Helper -----

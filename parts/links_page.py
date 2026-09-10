@@ -11,7 +11,7 @@ from nicegui import ui
 
 from navbar import build_navbar
 from home_page import confirm_new_case_handler
-from main import get_current_user_name, get_is_admin
+from auth import get_current_user_name, get_is_admin
 
 # ----- Link Data -----
 starter_links = {
