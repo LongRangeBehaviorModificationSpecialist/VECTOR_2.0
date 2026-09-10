@@ -129,8 +129,10 @@ class Agents(Base):
     AGENTPARENTAGENCY = Column(String(), nullable=False)
     AGENTPRIMARYROLE = Column(String(), nullable=False)
     AGENTROLESECONDARY = Column(String())
-    AGENTPHONE = Column(String(), nullable=False, unique=True)
-    AGENTEMAIL = Column(String(), unique=True)
+    # Not unique: several agents legitimately have no direct number,
+    # and blank values collided with each other.
+    AGENTPHONE = Column(String())
+    AGENTEMAIL = Column(String())
     AGENTNOTE = Column(Text())
     ENTEREDDATETIME = Column(String())
 
@@ -163,7 +165,8 @@ class Rooms(Base):
 
     Z_PK = Column(Integer(), primary_key=True)
     ROOMLABEL = Column(String(), nullable=False, unique=True)
-    ROOMDESC = Column(String(), nullable=False, unique=True)
+    # Not unique: a house with two bedrooms is ordinary.
+    ROOMDESC = Column(String(), nullable=False)
     ROOMFIRSTAGENT = Column(String(), nullable=False)
     ROOMSECONDAGENT = Column(String(), nullable=False)
     ROOMNOTE = Column(Text())
@@ -312,7 +315,11 @@ class UploadedFiles(Base):
     file_size = Column(Integer(), nullable=False)
     file_mime_type = Column(String(50))
     upload_date = Column(DateTime(), default=datetime.utcnow)
-    file_data = Column(LargeBinary(), nullable=False, unique=True)
+    # Not unique: the same photograph may legitimately be attached
+    # twice, and enforcing it made SQLite index every byte of every
+    # attachment. Use a sha256 column if duplicate detection is
+    # wanted.
+    file_data = Column(LargeBinary(), nullable=False)
     uploaded_by = Column(String(100), nullable=False)
 
     def __repr__(self):
@@ -376,6 +383,98 @@ class Users(UsersBase):
 DEFAULT_USER_PASSWORD = "Vector2026!"
 
 
+# ----- Schema Migration -----
+# Columns that used to carry UNIQUE and no longer should. SQLite cannot
+# drop an implicit unique index, so the table has to be rebuilt.
+_UNIQUE_DROPPED = {
+    "AGENTS": {"AGENTPHONE", "AGENTEMAIL"},
+    "ROOMS": {"ROOMDESC"},
+    "files": {"file_data"},
+}
+
+
+def _stale_unique_columns(connection, table_name: str) -> set:
+    """Returns the columns on `table_name` still carrying UNIQUE."""
+    from sqlalchemy import text
+
+    exists = connection.execute(
+        text(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='table' AND name=:name"
+        ),
+        {"name": table_name},
+    ).scalar()
+    if not exists:
+        return set()
+
+    stale = set()
+    for row in connection.execute(text(f'PRAGMA index_list("{table_name}")')):
+        index_name, is_unique = row[1], row[2]
+        if not is_unique:
+            continue
+        columns = {
+            info[2]
+            for info in connection.execute(
+                text(f'PRAGMA index_info("{index_name}")')
+            )
+        }
+        stale |= columns & _UNIQUE_DROPPED[table_name]
+    return stale
+
+
+def migrate_schema() -> None:
+    """Rebuilds any table still carrying a UNIQUE we have since dropped.
+
+    Those constraints blocked ordinary scenes: a second agent with no
+    email address, a house with two bedrooms, the same photograph
+    attached twice. Existing databases keep the old indexes until the
+    table is rebuilt, so this runs at startup and is a no-op once done.
+
+    The database is copied to a timestamped .bak alongside itself before
+    anything is rewritten.
+    """
+    import shutil
+    from sqlalchemy import text
+
+    with engine.connect() as connection:
+        pending = {
+            name: _stale_unique_columns(connection, name)
+            for name in _UNIQUE_DROPPED
+        }
+    pending = {name: cols for name, cols in pending.items() if cols}
+
+    if not pending:
+        return
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = APP_DB_PATH.with_suffix(f".db.bak-{stamp}")
+    shutil.copy2(APP_DB_PATH, backup)
+    print(f"Schema migration: backed up case database to {backup.name}")
+
+    for table_name, columns in pending.items():
+        table = Base.metadata.tables[table_name]
+        column_list = ", ".join(f'"{c.name}"' for c in table.columns)
+        temp_name = f"{table_name}__premigrate"
+
+        with engine.begin() as connection:
+            connection.execute(
+                text(f'ALTER TABLE "{table_name}" RENAME TO "{temp_name}"')
+            )
+            table.create(bind=connection)
+            connection.execute(
+                text(
+                    f'INSERT INTO "{table_name}" ({column_list}) '
+                    f'SELECT {column_list} FROM "{temp_name}"'
+                )
+            )
+            connection.execute(text(f'DROP TABLE "{temp_name}"'))
+
+        print(
+            f"Schema migration: dropped UNIQUE on "
+            f"{table_name}.{', '.join(sorted(columns))}"
+        )
+
+
 # ----- Table Creation -----
 def init_db():
     """Initialize both databases."""
@@ -383,6 +482,9 @@ def init_db():
 
     # Create ONLY the Users table in users.db
     UsersBase.metadata.create_all(users_engine)
+
+    # Bring an existing case database up to the current schema.
+    migrate_schema()
 
 
 # ----- Convenience Context Manager -----

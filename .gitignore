@@ -34,3 +34,4 @@ temp/
 !static/
 !static/*
 /db/FIRST_RUN_PASSWORD.txt
+/db/*.bak-*
