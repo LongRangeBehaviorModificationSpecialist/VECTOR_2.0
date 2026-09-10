@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from sqlalchemy import (
     create_engine,
+    event,
     Column,
     Integer,
     String,
@@ -23,14 +24,37 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker
 from marshmallow import Schema, fields
 
+from program.config import APP_DB_PATH, DB_DIR, USERS_DB_PATH
+
 
 # ----- Database Setup -----
-# To add the date to the database file name
-current_date = datetime.today().strftime("%Y-%m-%d")
+# Paths are absolute (see program/config.py) so the app always opens the
+# same database regardless of the current working directory. A relative
+# path would silently create an empty database next to wherever the
+# process happened to start.
+DB_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _sqlite_url(path) -> str:
+    """Builds a SQLAlchemy URL from an absolute path, cross-platform."""
+    return f"sqlite:///{path.as_posix()}"
+
+
+def _enable_wal(dbapi_connection, _connection_record) -> None:
+    """Puts SQLite in WAL mode so readers never block the writer.
+
+    Without this, two agents working the same case over the network
+    trip "database is locked" as soon as their writes overlap.
+    """
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.close()
 
 
 # ----- Main database -----
-DATABASE_URL = f"sqlite:///db/app_data.db"
+DATABASE_URL = _sqlite_url(APP_DB_PATH)
 
 engine = create_engine(
     DATABASE_URL,
@@ -38,16 +62,18 @@ engine = create_engine(
     future=True,
     connect_args={"check_same_thread": False}
 )
+event.listen(engine, "connect", _enable_wal)
 
 Session = sessionmaker(bind=engine)
 
 # ----- Users database -----
-USERS_DATABASE_URL = "sqlite:///db/users.db"
+USERS_DATABASE_URL = _sqlite_url(USERS_DB_PATH)
 
 users_engine = create_engine(
     USERS_DATABASE_URL,
     connect_args={"check_same_thread": False}
 )
+event.listen(users_engine, "connect", _enable_wal)
 
 UsersSession = sessionmaker(bind=users_engine)
 
@@ -260,10 +286,10 @@ class Notes(Base):
     NOTETEXT = Column(Text(), nullable=False)
 
     def __repr__(self):
-        return f"Note {self.Z_PK}: {self.note_text}"
+        return f"Note {self.Z_PK}: {self.NOTETEXT}"
 
     def __str__(self):
-        return f"Note {self.Z_PK}: {self.note_text}"
+        return f"Note {self.Z_PK}: {self.NOTETEXT}"
 
 class NotesSchema(Schema):
     """Notes schema."""

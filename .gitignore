@@ -1,12 +1,35 @@
-__pycache__
-temp
-.vscode
-.nicegui
-/db/*
-/logs/
-*.ico
-*.png
-*temp*
-agents.json
-users.json
+# ----- Python -----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# ----- Editors / tooling -----
+.vscode/
+.idea/
+.nicegui/
+
+# ----- Runtime secrets -----
+# Session signing key, generated on first run. Never commit.
 .secret
+
+# ----- Case data -----
+# Databases hold live case material, suspect PII and password hashes.
+# They are created on first run and must never be tracked.
+/db/*.db
+/db/*.db-wal
+/db/*.db-shm
+/db/users.json
+/parts/agents.json
+
+# ----- Scratch -----
+/logs/
+temp/
+*temp*
+
+# ----- Application assets are tracked -----
+# The UI will not render without these, so they are deliberately NOT
+# excluded by a blanket image ignore.
+!static/
+!static/*
