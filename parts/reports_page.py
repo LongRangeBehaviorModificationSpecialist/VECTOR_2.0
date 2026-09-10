@@ -1301,6 +1301,14 @@ def print_notes_report():
 # ----- JSON Output -----
 @ui.page("/reports/json")
 def json_output_page():
+    """Raw case data as JSON, for feeding another tool.
+
+    Rows are built from each model's own column list rather than a
+    hand-written field map. The hand-written version listed thirty
+    pre-rename attributes and raised AttributeError on the first one --
+    a map that has to be updated by hand every time a column changes
+    will eventually not be.
+    """
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -1313,86 +1321,49 @@ def json_output_page():
 
     ui.label("JSON Data Output").classes("text-2xl font-bold m-4")
 
-    with get_session() as session:
+    def rows_for(model) -> list:
+        columns = [column.name for column in model.__table__.columns]
+        return [
+            {name: getattr(record, name) for name in columns}
+            for record in session.query(model).all()
+        ]
 
+    with get_session() as session:
         case = session.query(Cases).first()
 
         data = {
-            "case": {
-                "CASENUMBER": case.CASENUMBER,
-                "LOCATION": case.LOCATION,
-                "JURISDICTION": case.JURISDICTION,
-                "CASEDATETIMEBEGIN": case.CASEDATETIMEBEGIN,
-                "CASEDATETIMEEND": case.CASEDATETIMEEND,
-            },
-            "agents": [
+            "case": (
                 {
-                    "AGENTNAME": a.AGENTNAME,
-                    # "agent_initials": a.agent_initials,
-                    "agent_parent_agency": a.agent_parent_agency,
-                    "agent_role": a.agent_role,
-                    "agent_role_secondary": a.agent_role_secondary or "",
-                    "agent_phone": a.agent_phone,
-                    "agent_note": a.agent_note or "",
+                    column.name: getattr(case, column.name)
+                    for column in Cases.__table__.columns
                 }
-                for a in session.query(Agents).all()
-            ],
-            "evidence": [
-                {
-                    "evid_num": e.evid_num,
-                    "evid_qty": e.evid_qty,
-                    "evid_desc": e.evid_desc,
-                    "evid_model_num": e.evid_model_num,
-                    "evid_serial_num": e.evid_serial_num,
-                    "evid_loc_room": e.evid_loc_room,
-                    "evid_loc_room_detail": e.evid_loc_room_detail,
-                    "evid_found_by": e.evid_found_by,
-                    "evid_found_by_witness": e.evid_found_by_witness,
-                    "evid_pic_taken": e.evid_pic_taken,
-                    "evid_triaged": e.evid_triaged,
-                    "evid_triaged_by": e.evid_triaged_by,
-                    "evid_is_contraband": e.evid_is_contraband,
-                    "evid_note": e.evid_note,
-                }
-                for e in session.query(Evidence).all()
-            ],
-            "rooms": [
-                {
-                    "room_label": r.room_label,
-                    "room_desc": r.room_desc,
-                    "room_first_agent": r.room_first_agent,
-                    "room_second_agent": r.room_second_agent,
-                }
-                for r in session.query(Rooms).all()
-            ],
-            "persons": [
-                {
-                    "sus_name": p.sus_name,
-                    "sus_dob": p.sus_dob or "",
-                    "sus_address": p.sus_address or "",
-                    "sus_phone": p.sus_phone or "",
-                    "sus_note": p.sus_note or "",
-                }
-                for p in session.query(Persons).all()
-            ],
-            "notes": [
-                {
-                    "note_date_time": n.note_date_time,
-                    "note_date_time_updated": n.note_date_time_updated or "",
-                    "note_author": n.note_author,
-                    "note_text": n.note_text,
-                }
-                for n in session.query(Notes).all()
-            ],
+                if case
+                else None
+            ),
+            "agents": rows_for(Agents),
+            "rooms": rows_for(Rooms),
+            "evidence": rows_for(Evidence),
+            "persons": rows_for(Persons),
+            "notes": rows_for(Notes),
         }
 
-    json_str = json.dumps(data, indent=4)
+    json_str = json.dumps(data, indent=4, default=str)
 
     with ui.column().classes("w-full max-w-4xl mx-auto p-4"):
+
+        if case is None:
+            ui.label(
+                "No case in the database yet."
+            ).classes("text-gray-500 italic mb-4")
+
+        # json.dumps supplies the JavaScript string literal. Splicing
+        # the payload into quotes directly could never work: indent=4
+        # puts newlines in it, which terminate a JS string, and an
+        # apostrophe in a name breaks out of one.
         ui.button(
             "Copy JSON",
             on_click=lambda: ui.run_javascript(
-                f"navigator.clipboard.writeText('{json_str}')"
+                f"navigator.clipboard.writeText({json.dumps(json_str)})"
             ),
         ).props("outline icon=content_copy").classes("mb-4")
 
