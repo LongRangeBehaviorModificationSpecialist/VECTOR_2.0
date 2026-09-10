@@ -11,6 +11,7 @@ import os
 import tempfile
 
 from models import get_session, UploadedFiles
+from program.config import Config
 from navbar import build_navbar
 from home_page import confirm_new_case_handler
 from main import get_current_user_name, get_is_admin
@@ -57,8 +58,11 @@ def build_uploads_page() -> None:
                 try:
                     uploaded_file = e.file
                     file_name = uploaded_file.name
-                    # SmallFileUpload stores the data as bytes in _data
-                    file_data = uploaded_file._data
+                    # read() is the public API and works for both the
+                    # in-memory and spooled-to-disk cases. The private
+                    # _data attribute only exists on small uploads, so
+                    # reading it failed for anything over ~1 MB.
+                    file_data = await uploaded_file.read()
                     file_size = len(file_data)
                     file_mime_type = (
                         uploaded_file.content_type
@@ -119,6 +123,7 @@ def build_uploads_page() -> None:
                 auto_upload=True,
                 label="Drag files here or click to browse",
                 multiple=True,
+                max_file_size=Config.MAX_UPLOAD_BYTES,
                 ).props("accept=image/*, video/*,"
                     ".pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, .txt, .rtf,"
                     ".zip, .7z, .tar, .tgz, .gz, .tar.gz, .rar, .bz2, .xz"
@@ -253,7 +258,9 @@ def build_uploads_page() -> None:
                         )
 
                         if file_record:
-                            temp_dir = tempfile.gettempdir()
+                            temp_dir = tempfile.mkdtemp(
+                                prefix="vector_dl_"
+                            )
                             safe_name = (
                                 file_record.file_name
                                 or f"file_{file_record.id}"
