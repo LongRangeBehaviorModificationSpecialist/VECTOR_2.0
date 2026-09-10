@@ -15,7 +15,6 @@ from nicegui import ui
 from pathlib import Path
 import pyzipper
 import shutil
-import sys
 import tempfile
 from typing import Optional
 
@@ -72,13 +71,13 @@ def get_case_info_for_folder_name() -> str:
             return ""
 
         case_number = (
-            (case.case_number or "UNKNOWN")
+            (case.CASENUMBER or "UNKNOWN")
             .replace("/", "_")
             .replace("\\", "_")
             .replace(" ", "_")
         )
 
-        begin_dt = case.case_date_time_begin or "UNKNOWN"
+        begin_dt = case.CASEDATETIMEBEGIN or "UNKNOWN"
 
         # Format the datetime
         if hasattr(begin_dt, "strftime"):
@@ -260,8 +259,6 @@ def export_database(password: Optional[str] = None) -> None:
             close_button="OK",
         )
 
-    print(f"DEBUG: zip_path = {zip_path}")
-
     # ----- Write a manifest file -----
     manifest = {
         "export_date": datetime.now().isoformat(),
@@ -332,7 +329,7 @@ def export_database(password: Optional[str] = None) -> None:
         f"Export complete!{enc_text}\n"
         f"Tables: {', '.join(f'{n} ({c})' for n, c in exported_tables.items())}\n"
         f"Files: {num_files}\n"
-        f"Saved to: {export_dir}",
+        f"Saved to: {zip_path}",
         timeout=0,
         position="bottom",
         close_button="OK",
@@ -341,7 +338,7 @@ def export_database(password: Optional[str] = None) -> None:
     # Also show in terminal
     print(f"\n{'='*60}")
     print(f"  EXPORT COMPLETE")
-    print(f"  Location: {export_dir}")
+    print(f"  Location: {zip_path}")
     print(f"  Tables: {exported_tables}")
     print(f"  Total records: {total_records}")
     print(f"  Files exported: {num_files}")

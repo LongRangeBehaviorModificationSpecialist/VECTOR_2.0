@@ -29,6 +29,7 @@ Workflow for report creation:
 
 """
 
+from html import escape
 from nicegui import ui
 from sqlalchemy import func
 import json
@@ -38,6 +39,18 @@ from navbar import build_navbar
 from home_page import confirm_new_case_handler
 from main import is_authenticated, get_current_user_name, get_is_admin
 from utils import get_print_date_time, get_case_info
+
+
+# ----- HTML Escaping -----
+def h(value) -> str:
+    """Escapes a database value for safe interpolation into report HTML.
+
+    Without this, a description containing "&" or "<" corrupts the
+    printed exhibit list, and a "<script>" tag executes in the print
+    window.
+    """
+    return escape("" if value is None else str(value))
+
 
 
 # ----- Report Page Wrapper -----
@@ -410,7 +423,8 @@ def build_case_header_html(
         sub_title: str
 ) -> str:
     """Generates the standard report title + case info header HTML."""
-    active_case = get_case_info()
+    if not active_case:
+        active_case = get_case_info()
 
     if not active_case:
         ui.notify(
@@ -430,23 +444,23 @@ def build_case_header_html(
         <table class="headerTable">
             <tr>
                 <td class="header font-11">Investigation Number:</td>
-                <td class="data font-11">{active_case["case_number"]}</td>
+                <td class="data font-11">{h(active_case["CASENUMBER"])}</td>
             </tr>
             <tr>
                 <td class="header font-11">Site Address:</td>
-                <td class="data font-11">{active_case["location"]}</td>
+                <td class="data font-11">{h(active_case["LOCATION"])}</td>
             </tr>
             <tr>
                 <td class="header font-11">Jurisdiction:</td>
-                <td class="data font-11">{active_case["jurisdiction"]}</td>
+                <td class="data font-11">{h(active_case["JURISDICTION"])}</td>
             </tr>
             <tr>
                 <td class="header font-11">Starting Date and Time:</td>
-                <td class="data font-11">{active_case["case_date_time_begin"]}</td>
+                <td class="data font-11">{h(active_case["CASEDATETIMEBEGIN"])}</td>
             </tr>
             <tr>
                 <td class="header font-11">Ending Date and Time:</td>
-                <td class="data font-11">{active_case["case_date_time_end"]}</td>
+                <td class="data font-11">{h(active_case["CASEDATETIMEEND"])}</td>
             </tr>
             <tr>
                 <td class="header font-11">Report Printed Date:</td>
@@ -480,11 +494,11 @@ def build_agents_report_html(active_case: dict, agents: list) -> str:
 
     agent_rows = "".join([f"""
         <tr>
-            <td class="agentTableData font-10">{a["AGENTNAME"]}</td>
-            <td class="agentTableData font-10">{a["AGENTPARENTAGENCY"]}</td>
-            <td class="agentTableData font-10">{a["AGENTPRIMARYROLE"]}</td>
-            <td class="agentTableData font-10">{a["AGENTPHONE"]}</td>
-            <td class="agentTableData font-10">{a["AGENTEMAIL"]}</td>
+            <td class="agentTableData font-10">{h(a["AGENTNAME"])}</td>
+            <td class="agentTableData font-10">{h(a["AGENTPARENTAGENCY"])}</td>
+            <td class="agentTableData font-10">{h(a["AGENTPRIMARYROLE"])}</td>
+            <td class="agentTableData font-10">{h(a["AGENTPHONE"])}</td>
+            <td class="agentTableData font-10">{h(a["AGENTEMAIL"])}</td>
         </tr>"""
         for a in agents]
     )
@@ -540,75 +554,75 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
     evid_rows = "".join([f"""
             <tr class="evidTableItemRow">
                 <td colspan="2" class="evidTableData">
-                    Item #:&ensp;{e["EVIDNUM"]}
+                    Item #:&ensp;{h(e["EVIDNUM"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
-                <td class="evidTableDataColTwo px-6">{e["EVIDQTY"]}</td>
+                <td class="evidTableDataColTwo px-6">{h(e["EVIDQTY"])}</td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Description:</td>
-                <td class="evidTableDataColTwo px-6">{e["EVIDDESC"]}</td>
+                <td class="evidTableDataColTwo px-6">{h(e["EVIDDESC"])}</td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Model #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDMODELNUMBER"]}
+                    {h(e["EVIDMODELNUMBER"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Serial #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDSERIALNUMBER"]}
+                    {h(e["EVIDSERIALNUMBER"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Location:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDLOCROOM"]}
+                    {h(e["EVIDLOCROOM"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Where Found:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDLOCROOMDETAIL"]}
+                    {h(e["EVIDLOCROOMDETAIL"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Located By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDFOUNDBY"]}
+                    {h(e["EVIDFOUNDBY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Witnessed By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDFOUNDBYWITNESS"]}
+                    {h(e["EVIDFOUNDBYWITNESS"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Photographed:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDPICTAKEN"]}
+                    {h(e["EVIDPICTAKEN"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDTRIAGED"]}
+                    {h(e["EVIDTRIAGED"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDTRIAGEDBY"]}
+                    {h(e["EVIDTRIAGEDBY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Notes:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDNOTE"]}
+                    {h(e["EVIDNOTE"])}
                 </td>
             </tr>
             <tr>
@@ -667,89 +681,89 @@ def build_evidence_by_room_report_html(
 
         # Singular vs plural
         if item_count == 1:
-            count_text = f"{room_name}&ensp;:&ensp;({item_count} item)"
+            count_text = f"{h(room_name)}&ensp;:&ensp;({item_count} item)"
         else:
-            count_text = f"{room_name}&ensp;:&ensp;({item_count} items)"
+            count_text = f"{h(room_name)}&ensp;:&ensp;({item_count} items)"
 
         # Filter evidence items for this room
-        room_items = [e for e in evidence if e["evid_loc_room"] == room_name]
+        room_items = [e for e in evidence if e["EVIDLOCROOM"] == room_name]
         evid_rows = "".join([f"""
             <tr>
                 <td class="evidTableDataColOne">Item No.:</td>
                 <td class="evidTableDataColTwo px-6" style="font-weight:bold">
-                    {e["EVIDNUM"]}
+                    {h(e["EVIDNUM"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDQTY"]}
+                    {h(e["EVIDQTY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Description:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDDESC"]}
+                    {h(e["EVIDDESC"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Model #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDMODELNUMBER"]}
+                    {h(e["EVIDMODELNUMBER"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Serial #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDSERIALNUMBER"]}
+                    {h(e["EVIDSERIALNUMBER"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Location:</td>
                 <td class="evidTableDataColTwo px-6">
-                    Room {e["EVIDLOCROOM"]}
+                    Room {h(e["EVIDLOCROOM"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Where Found</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDLOCROOMDETAIL"]}
+                    {h(e["EVIDLOCROOMDETAIL"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Located By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDFOUNDBY"]}
+                    {h(e["EVIDFOUNDBY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Witnessed By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDFOUNDBYWITNESS"]}
+                    {h(e["EVIDFOUNDBYWITNESS"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Photographed:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDPICTAKEN"]}
+                    {h(e["EVIDPICTAKEN"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDTRIAGED"]}
+                    {h(e["EVIDTRIAGED"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDTRIAGEDBY"]}
+                    {h(e["EVIDTRIAGEDBY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Notes:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDNOTE"]}
+                    {h(e["EVIDNOTE"])}
                 </td>
             </tr>
             <tr>
@@ -767,7 +781,7 @@ def build_evidence_by_room_report_html(
                 </thead>
                 <tbody>
                     <tr class="evidTableRoomNameRow">
-                        <th colspan="2">{count_text}</th>
+                        <th colspan="2">{h(count_text)}</th>
                     </tr>
                     {evid_rows}
                 </tbody>
@@ -815,31 +829,31 @@ def build_basic_evidence_report_html(
     evid_rows = "".join([f"""
             <tr class="evidTableItemRow">
                 <td colspan="2" class="evidTableData">
-                    Item #:&ensp;{e["EVIDNUM"]}
+                    Item #:&ensp;{h(e["EVIDNUM"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDQTY"]}
+                    {h(e["EVIDQTY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Description:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDDESC"]}
+                    {h(e["EVIDDESC"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Model #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDMODELNUMBER"]}
+                    {h(e["EVIDMODELNUMBER"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Serial #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDSERIALNUMBER"]}
+                    {h(e["EVIDSERIALNUMBER"])}
                 </td>
             </tr>
             <tr>
@@ -884,12 +898,12 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
     room_rows = "".join([f"""
             <tr>
                 <td class="roomTableData" style="padding-left:25px;">
-                    {r["ROOMLABEL"]}
+                    {h(r["ROOMLABEL"])}
                 </td>
-                <td class="roomTableData font-10">{r["ROOMDESC"]}</td>
-                <td class="roomTableData font-10">{r["ROOMFIRSTAGENT"]}</td>
-                <td class="roomTableData font-10">{r["ROOMSECONDAGENT"]}</td>
-                <td class="roomTableData font-10">{r["ROOMNOTE"]}</td>
+                <td class="roomTableData font-10">{h(r["ROOMDESC"])}</td>
+                <td class="roomTableData font-10">{h(r["ROOMFIRSTAGENT"])}</td>
+                <td class="roomTableData font-10">{h(r["ROOMSECONDAGENT"])}</td>
+                <td class="roomTableData font-10">{h(r["ROOMNOTE"])}</td>
             </tr>"""
             for r in rooms
         ]
@@ -940,11 +954,11 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 
     person_rows = "".join([f"""
         <tr>
-            <td class="personTableData font-10">{p["SUSPECTNAME"]}</td>
-            <td class="personTableData font-10">{p["SUSPECTDOB"]}</td>
-            <td class="personTableData font-10">{p["SUSPECTADDRESS"]}</td>
-            <td class="personTableData font-10">{p["SUSPECTPHONE"]}</td>
-            <td class="personTableData font-10">{p["SUSPECTNOTE"]}</td>
+            <td class="personTableData font-10">{h(p["SUSPECTNAME"])}</td>
+            <td class="personTableData font-10">{h(p["SUSPECTDOB"])}</td>
+            <td class="personTableData font-10">{h(p["SUSPECTADDRESS"])}</td>
+            <td class="personTableData font-10">{h(p["SUSPECTPHONE"])}</td>
+            <td class="personTableData font-10">{h(p["SUSPECTNOTE"])}</td>
         </tr>"""
         for p in persons
         ]
@@ -995,10 +1009,10 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 
     note_rows = "".join([f"""
         <tr>
-            <td class="noteTableData font-10">{n["NOTEDATETIME"]}</td>
-            <td class="noteTableData font-10">{n["NOTEDATETIMEUPDATED"]}</td>
-            <td class="noteTableData font-10">{n["NOTEAUTHOR"]}</td>
-            <td class="noteTableData font-10">{n["NOTETEXT"]}</td>
+            <td class="noteTableData font-10">{h(n["NOTEDATETIME"])}</td>
+            <td class="noteTableData font-10">{h(n["NOTEDATETIMEUPDATED"])}</td>
+            <td class="noteTableData font-10">{h(n["NOTEAUTHOR"])}</td>
+            <td class="noteTableData font-10">{h(n["NOTETEXT"])}</td>
         </tr>
         """
         for n in notes
