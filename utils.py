@@ -260,44 +260,29 @@ def is_duplicate_agent_in_json(
         True if duplicate found, False otherwise.
     """
 
+    def digits_only(value: str) -> str:
+        return "".join(ch for ch in (value or "") if ch.isdigit())
+
     agents = load_agents_from_json()
 
-    name_lower = AGENTNAME.strip().lower()
-    phone_clean = (
-        AGENTPHONE.strip()
-        .replace("-", "")
-        .replace("(", "")
-        .replace(")", "")
-        .replace(" ", "")
-    )
+    name_lower = (AGENTNAME or "").strip().lower()
+    phone_clean = digits_only(AGENTPHONE)
+    email_lower = (AGENTEMAIL or "").strip().lower()
 
-    for AGENTNAME in agents:
-        # Check name match
-        if AGENTNAME.get("AGENTNAME", "").strip().lower() == name_lower:
+    # The loop variable used to be named AGENTNAME as well, shadowing the
+    # argument. It happened to work because name_lower is computed first,
+    # but any later use of the parameter inside the loop read a dict.
+    for existing in agents:
+        if (existing.get("AGENTNAME") or "").strip().lower() == name_lower:
             return True
 
-        # Check phone match (normalize format first)
-        existing_phone = AGENTNAME.get("AGENTPHONE", "").strip()
-        existing_phone_clean = (
-            existing_phone.replace("-", "")
-            .replace("(", "")
-            .replace(")", "")
-            .replace(" ", "")
-        )
-
-        if (
-            existing_phone_clean
-            and phone_clean
-            and existing_phone_clean == phone_clean
-        ):
+        existing_phone = digits_only(existing.get("AGENTPHONE"))
+        if existing_phone and phone_clean and existing_phone == phone_clean:
             return True
 
-        # Check email match (if applicable)
-        if AGENTEMAIL:
-            email_lower = AGENTEMAIL.strip().lower()
-            existing_email = AGENTNAME.get("AGENTEMAIL", "").strip().lower()
-            if email_lower and existing_email and existing_email == email_lower:
-                return True
+        existing_email = (existing.get("AGENTEMAIL") or "").strip().lower()
+        if email_lower and existing_email and existing_email == email_lower:
+            return True
 
     return False
 
@@ -341,29 +326,31 @@ def load_room_labels() -> list[str]:
 
 
 def get_next_evid_num() -> str:
-    """Gets the highest evidence number from the database and
-    increments it.
+    """Gets the highest evidence number in use and increments it.
+
+    EVIDNUM is a text column, so it must be compared numerically rather
+    than by sort order: sorted as text, "9" comes after "10", which made
+    this hand back a number already in use as soon as a case reached ten
+    items. EVIDNUM is unique, so the save then failed with nothing to
+    explain why.
+
+    Values that are not plain integers -- a hand-entered "12A", say --
+    are skipped rather than resetting the count.
 
     Returns:
-        "1" if no evidence exists yet.
+        "1" if no numeric evidence numbers exist yet.
     """
     with get_session() as session:
-        evid_query = (
-            session.query(Evidence)
-            .order_by(Evidence.EVIDNUM)
-            .all()
-        )
+        raw_numbers = [row[0] for row in session.query(Evidence.EVIDNUM).all()]
 
-        if evid_query:
-            last_evid = evid_query[-1]
-            try:
-                last_id = int(last_evid.EVIDNUM)
-                next_id = last_id + 1
-                return str(next_id)
-            except ValueError:
-                return "1"
-        else:
-            return "1"
+    highest = 0
+    for value in raw_numbers:
+        try:
+            highest = max(highest, int(str(value).strip()))
+        except (TypeError, ValueError):
+            continue
+
+    return str(highest + 1)
 
 
 def load_agent_names() -> list[str]:
@@ -377,21 +364,36 @@ def load_agent_names() -> list[str]:
         return [r[0] for r in rows]
 
 
+def label_for_position(position: int) -> str:
+    """Converts a 1-based position into a spreadsheet-style label.
+
+    1 -> "A", 26 -> "Z", 27 -> "AA". Incrementing the last label's
+    character code instead produced "[" after "Z", and raised TypeError
+    on any label that had been edited to more than one character.
+    """
+    label = ""
+    while position > 0:
+        position, remainder = divmod(position - 1, 26)
+        label = chr(ord("A") + remainder) + label
+    return label
+
+
 def get_next_room_ltr() -> str:
-    """Gets the label of the last room in the database and
-    increments it to the next letter.
+    """Suggests the next unused room label.
 
     Returns:
         "A" if no rooms exist yet.
     """
     with get_session() as session:
-        rooms = session.query(Rooms).order_by(Rooms.ROOMLABEL).all()
-        if rooms:
-            last_label = rooms[-1].ROOMLABEL
-            # Increment the ASCII value by 1, then convert back to char
-            return chr(ord(last_label) + 1)
-        else:
-            return "A"
+        used = {
+            (row[0] or "").strip().upper()
+            for row in session.query(Rooms.ROOMLABEL).all()
+        }
+
+    position = 1
+    while label_for_position(position) in used:
+        position += 1
+    return label_for_position(position)
 
 
 def get_mime_type(file_name: str, browser_type: str) -> str:
@@ -420,27 +422,24 @@ def format_file_size(size_bytes: int) -> str:
 
 
 def delete_all_data() -> None:
-    """Delete all data from the app_data.db file."""
+    """Deletes every row of case data from app_data.db.
+
+    This is the single wipe path -- both "Delete All Data" and "Make New
+    Case File" go through it, so the table list cannot drift between
+    them and leave attachments behind.
+
+    Raises on failure rather than reporting it here, so the caller can
+    decide what the user sees. The session context manager rolls back,
+    so a failure leaves the case intact.
+    """
     with get_session() as session:
-        try:
-            session.query(Cases).delete()
-            session.query(Agents).delete()
-            session.query(Rooms).delete()
-            session.query(Evidence).delete()
-            session.query(Persons).delete()
-            session.query(Notes).delete()
-            session.query(UploadedFiles).delete()
-
-            session.commit()
-
-        except Exception as err:
-            ui.notify(
-                f"An error occured while trying to delete the data → {err}",
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
+        session.query(Cases).delete()
+        session.query(Agents).delete()
+        session.query(Rooms).delete()
+        session.query(Evidence).delete()
+        session.query(Persons).delete()
+        session.query(Notes).delete()
+        session.query(UploadedFiles).delete()
 
 
 def value_in_use(session, model, column_name, value, exclude_pk=None) -> bool:
@@ -476,10 +475,10 @@ def validate_case_entry(
         row: Optional[dict] = None,
 ) -> bool:
 
-    number = CASENUMBER.strip()
-    location = LOCATION.strip()
-    jurisdiction = JURISDICTION.strip()
-    begin = CASEDATETIMEBEGIN.strip()
+    number = (CASENUMBER or "").strip()
+    location = (LOCATION or "").strip()
+    jurisdiction = (JURISDICTION or "").strip()
+    begin = (CASEDATETIMEBEGIN or "").strip()
 
     for field_label, value in [
         ("Case Number", number),
@@ -527,10 +526,10 @@ def validate_agent_entry(
         row: Optional[dict] = None,
 ) -> bool:
 
-    name = AGENTNAME.strip()
-    agency = AGENTPARENTAGENCY.strip()
-    primary = AGENTPRIMARYROLE.strip()
-    secondary = AGENTROLESECONDARY.strip()
+    name = (AGENTNAME or "").strip()
+    agency = (AGENTPARENTAGENCY or "").strip()
+    primary = (AGENTPRIMARYROLE or "").strip()
+    secondary = (AGENTROLESECONDARY or "").strip()
 
     for field_label, value in [
         ("Agent Name", name),
@@ -596,18 +595,19 @@ def validate_evid_entry(
         row: Optional[dict] = None,
 ) -> bool:
 
-    item_num = EVIDNUM.strip()
-    qty = EVIDQTY.strip()
-    desc = EVIDDESC.strip()
-
-    if EVIDLOCROOM:
-        room = EVIDLOCROOM.strip()
-    if EVIDLOCROOMDETAIL:
-        loc_detail = EVIDLOCROOMDETAIL.strip()
-    found_by = EVIDFOUNDBY.strip()
-    witness = EVIDFOUNDBYWITNESS.strip()
-    triaged = EVIDTRIAGED.strip()
-    triaged_by = EVIDTRIAGEDBY.strip()
+    # Normalise first, then validate. Assigning inside "if" guards left
+    # these unbound when a field was empty, so leaving the room dropdown
+    # untouched raised UnboundLocalError instead of reporting a missing
+    # required field. ui.select hands back None, not "", when untouched.
+    item_num = (EVIDNUM or "").strip()
+    qty = (EVIDQTY or "").strip()
+    desc = (EVIDDESC or "").strip()
+    room = (EVIDLOCROOM or "").strip()
+    loc_detail = (EVIDLOCROOMDETAIL or "").strip()
+    found_by = (EVIDFOUNDBY or "").strip()
+    witness = (EVIDFOUNDBYWITNESS or "").strip()
+    triaged = (EVIDTRIAGED or "").strip()
+    triaged_by = (EVIDTRIAGEDBY or "").strip()
 
     for field_label, value in [
         ("Evidence Item Number", item_num),
@@ -690,10 +690,10 @@ def validate_room_entry(
         - Room label must be unique (excluding the row being updated)
     """
 
-    label = ROOMLABEL.strip()
-    desc = ROOMDESC.strip()
-    first = ROOMFIRSTAGENT.strip()
-    second = ROOMSECONDAGENT.strip()
+    label = (ROOMLABEL or "").strip()
+    desc = (ROOMDESC or "").strip()
+    first = (ROOMFIRSTAGENT or "").strip()
+    second = (ROOMSECONDAGENT or "").strip()
 
     for field_label, value in [
         ("Room Label", label),
@@ -770,9 +770,8 @@ def validate_person_data(
         row: Optional[dict] = None,
 ) -> bool:
 
-    suspect = SUSPECTNAME.strip()
-    if SUSPECTNOTE:
-        note = SUSPECTNOTE.strip()
+    suspect = (SUSPECTNAME or "").strip()
+    note = (SUSPECTNOTE or "").strip()
 
     for field_label, value in [
         ("Name", suspect),
@@ -811,8 +810,8 @@ def validate_note_data(
         NOTETEXT: str,
 ) -> bool:
 
-    author = NOTEAUTHOR.strip()
-    text = NOTETEXT.strip()
+    author = (NOTEAUTHOR or "").strip()
+    text = (NOTETEXT or "").strip()
 
     for field_label, value in [
         ("Agent Name", author),
