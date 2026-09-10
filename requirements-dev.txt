@@ -1,0 +1,12 @@
+# Development and test dependencies.
+#
+#     .venv/bin/pip install -r requirements-dev.txt      (macOS / Linux)
+#     .venv\Scripts\pip install -r requirements-dev.txt  (Windows)
+#
+# Then run the suite from the project root:
+#
+#     .venv/bin/python -m pytest
+
+-r requirements.txt
+
+pytest~=8.3
