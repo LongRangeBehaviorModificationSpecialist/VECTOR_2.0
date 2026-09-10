@@ -315,8 +315,8 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-89 tests, about two seconds. They run against a temporary database and
-never touch `db/`.
+137 tests, about three seconds. They run against a temporary database
+and never touch `db/`.
 
 The suite exists because of a specific failure: a variable rename
 reached the models and the CRUD pages but not the report or export
@@ -334,6 +334,52 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_numbering.py` | Evidence numbering past item 9; room labels past Z |
 | `test_constraints.py` | The constraints that were removed, and the four that must stay |
 | `test_migration.py` | An old-schema database migrates without losing a row |
+| `test_page_specs.py` | Every page field names a real column; required columns are reachable; validators accept what the builder passes |
+
+---
+
+## How the code is laid out
+
+```
+main.py              startup, route table, first-run bootstrap
+auth.py              session state and the require_login / require_admin guards
+models.py            tables, the audit listener, schema migrations
+utils.py             validators and shared helpers
+import_export.py     the encrypted archive
+navbar.py            top navigation
+home_page.py         login, main menu, data management
+parts/crud.py        the table-driven builder every entity page uses
+parts/*_page.py      one file per screen
+program/config.py    paths, network and upload settings
+program/inc/         Virginia jurisdictions, agencies, agent roles
+```
+
+### Adding a field to an entity
+
+Entity pages are declarations, not code. To add a column, add it to the
+model in `models.py` and add one `Field` to that page's `SPEC` — the
+form input, the table column, the edit dialog and the delete
+confirmation all follow from it.
+
+```python
+Field("EVIDCONDITION", "Condition", kind="select",
+      options=lambda: ["", "Sealed", "Damaged"])
+```
+
+`tests/test_page_specs.py` then checks the field names a real column, so
+a typo fails a test rather than a search warrant.
+
+### Adding a page
+
+Write the builder, then add one line to `PAGES` in `main.py`:
+
+```python
+("/exhibits", build_exhibits_page, False),   # True = admin only
+```
+
+The guard comes from that table. Writing it by hand per route is how
+`/admin` ended up reachable by any signed-in user and `/shutdown` by
+anyone at all.
 
 ---
 
