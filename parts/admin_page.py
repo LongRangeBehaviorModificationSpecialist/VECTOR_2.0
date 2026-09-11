@@ -11,9 +11,16 @@ the separate users.db database file.
 
 from nicegui import ui
 
-from models import get_users_session, Users, DEFAULT_USER_PASSWORD
+from models import get_users_session, Users, generate_one_time_password
 from navbar import build_navbar
-from auth import get_current_user_name, get_is_admin
+from auth import (
+    get_current_user_name,
+    get_is_admin,
+    invalidate_all_sessions,
+    invalidate_user_sessions,
+    clear_login_failures,
+    lockout_seconds_remaining,
+)
 
 # ----- PAGE BUILDER -----
 def build_admin_page():
@@ -47,8 +54,9 @@ def build_admin_page():
             ui.label("Add New User").classes("text-lg font-semibold mb-4")
 
             ui.label(
-                "New users are created with the default password and must "
-                "change it on first login. New users are never admins."
+                "A one-time password is generated and shown once. Write it "
+                "down before closing the message -- it cannot be recovered. "
+                "New users are never admins."
             ).classes("text-sm text-gray-400 mb-4")
 
             new_username = ui.input(label="Username").classes("w-full")
@@ -92,15 +100,17 @@ def build_admin_page():
                         must_change_password=True,
                     )
 
-                    new_user.set_password(DEFAULT_USER_PASSWORD)
+                    one_time = generate_one_time_password()
+                    new_user.set_password(one_time)
                     session.add(new_user)
 
                 ui.notify(
-                    f"User '{uname}' created.\n"
-                    f"Default password: {DEFAULT_USER_PASSWORD}\n"
-                    f"They will be prompted to change it on first login.",
+                    f"User '{uname}' created.\n\n"
+                    f"One-time password:  {one_time}\n\n"
+                    "This is shown once and cannot be recovered. They "
+                    "will be asked to change it at first sign-in.",
                     timeout=0,
-                    position="bottom",
+                    position="center",
                     close_button="OK",
                 )
 
@@ -147,6 +157,11 @@ def build_admin_page():
                                 "must_change_pw": (
                                     "Yes" if u.must_change_password else "No"
                                 ),
+                                "locked": (
+                                    "LOCKED"
+                                    if lockout_seconds_remaining(u.user_name)
+                                    else ""
+                                ),
                             }
                             for u in users
                         ]
@@ -179,6 +194,12 @@ def build_admin_page():
                                 "align": "left",
                             },
                             {
+                                "name": "locked",
+                                "label": "Sign-in",
+                                "field": "locked",
+                                "align": "left",
+                            },
+                            {
                                 "name": "actions",
                                 "label": "Actions",
                                 "field": "actions",
@@ -194,6 +215,23 @@ def build_admin_page():
 
                         table.props("dense flat")
 
+                        # A locked account has to be obvious: an agent
+                        # who cannot sign in mid-search will ask an
+                        # admin, and this is what the admin looks at.
+                        table.add_slot(
+                            "body-cell-locked",
+                            """
+                            <q-td :props="props">
+                                <span v-if="props.row.locked"
+                                      class="text-red-500"
+                                      style="font-weight:600">
+                                    {{ props.row.locked }}
+                                </span>
+                                <span v-else class="text-green-500">OK</span>
+                            </q-td>
+                            """,
+                        )
+
                         table.add_slot(
                             "body-cell-actions",
                             """
@@ -204,6 +242,13 @@ def build_admin_page():
                                     style="color: #2984D1;"
                                     title="Reset Password"
                                         @click="$parent.$emit('reset', \
+                                        props.row)" />
+                                    <q-btn dense flat icon="lock_open"
+                                        size="sm"
+                                        style="color: #F59E0B;"
+                                        title="Clear sign-in lock"
+                                        :disable="!props.row.locked"
+                                        @click="$parent.$emit('unlock', \
                                         props.row)" />
                                     <q-btn dense flat color="negative" \
                                     icon="delete"
@@ -230,11 +275,16 @@ def build_admin_page():
                                 )
 
                                 ui.label(
-                                    f"Reset the password for "
-                                    f"{row['username']} "
-                                    f"to the default? They will be prompted "
-                                    f"to change it on next login."
-                                ).classes("mb-4")
+                                    f"Generate a new one-time password for "
+                                    f"{row['username']}?"
+                                ).classes("mb-2")
+
+                                ui.label(
+                                    "Their current password stops working "
+                                    "immediately and any session they have "
+                                    "open is ended. The new password is "
+                                    "shown once."
+                                ).classes("mb-4 text-xs text-gray-400")
 
                                 with ui.row().classes(
                                     "w-full justify-end gap-2"
@@ -264,16 +314,27 @@ def build_admin_page():
                                             )
 
                                             if user:
-                                                user.set_password(
-                                                    DEFAULT_USER_PASSWORD
+                                                one_time = (
+                                                    generate_one_time_password()
                                                 )
+                                                user.set_password(one_time)
                                                 user.must_change_password = True
 
+                                        # A reset that leaves the old
+                                        # session working is not a reset.
+                                        invalidate_user_sessions(
+                                            row["username"]
+                                        )
+                                        clear_login_failures(row["username"])
+
                                         ui.notify(
-                                            f"Password for '{row['username']}' "
-                                            f"reset to default.\n"
-                                            f"Default password: "
-                                            f"{DEFAULT_USER_PASSWORD}",
+                                            f"Password for "
+                                            f"'{row['username']}' reset.\n\n"
+                                            f"One-time password:  "
+                                            f"{one_time}\n\n"
+                                            "Shown once, and cannot be "
+                                            "recovered. Any session they "
+                                            "had open has been ended.",
                                             type="warning",
                                             timeout=0,
                                             position="center",
@@ -367,6 +428,14 @@ def build_admin_page():
                                             if user:
                                                 session.delete(user)
 
+                                        # Otherwise the deleted account
+                                        # keeps working until its browser
+                                        # is closed.
+                                        invalidate_user_sessions(
+                                            row["username"]
+                                        )
+                                        clear_login_failures(row["username"])
+
                                         ui.notify(
                                             f"User \"{row['username']}\" "
                                             "deleted.",
@@ -388,8 +457,80 @@ def build_admin_page():
 
                             delete_dialog.open()
 
+                        def unlock_user(e) -> None:
+                            """Clears a sign-in lock immediately."""
+                            row = e.args
+                            if not get_is_admin():
+                                ui.navigate.to("/")
+                                return
+
+                            clear_login_failures(row["username"])
+                            ui.notify(
+                                f"Sign-in lock cleared for "
+                                f"'{row['username']}'.",
+                                timeout=4000,
+                                position="bottom",
+                                close_button="OK",
+                            )
+                            refresh_users_table()
+
                         table.on("reset", reset_password)
                         table.on("delete", delete_user)
+                        table.on("unlock", unlock_user)
+
+        # ----- Session control -----
+        ui.separator().classes("my-6")
+
+        with ui.column().classes("w-full items-center mb-8"):
+
+            ui.label("Sessions").classes("text-xl font-bold mb-2")
+
+            ui.label(
+                "Ends every signed-in session, on every device, at once. "
+                "Everyone signs in again; nothing else is affected."
+            ).classes("text-sm text-gray-400 mb-3 text-center max-w-lg")
+
+            def open_sign_out_all_dialog() -> None:
+                with ui.dialog() as dialog, ui.card().classes("max-w-sm p-6"):
+                    ui.label("Sign everyone out?").classes(
+                        "text-lg font-bold mb-2 text-[var(--vsp-blue)]"
+                    )
+                    ui.label(
+                        "Every open session ends immediately, including "
+                        "yours. Unsaved form entries on other devices will "
+                        "be lost."
+                    ).classes("mb-4 text-[var(--vsp-gray)]")
+
+                    with ui.row().classes("w-full justify-end gap-2"):
+                        ui.button(
+                            "Cancel",
+                            on_click=dialog.close,
+                            color="transparent",
+                        ).props("flat").classes("text-[var(--vsp-blue)]")
+
+                        def confirm_sign_out_all() -> None:
+                            if not get_is_admin():
+                                ui.navigate.to("/")
+                                return
+                            invalidate_all_sessions()
+                            dialog.close()
+                            ui.navigate.to("/")
+
+                        ui.button(
+                            "Sign Everyone Out",
+                            on_click=confirm_sign_out_all,
+                            color="#ef4444",
+                        ).props("unelevated").classes(
+                            "text-[var(--vsp-white)]"
+                        )
+
+                dialog.open()
+
+            ui.button(
+                "Sign Everyone Out",
+                on_click=open_sign_out_all_dialog,
+                color="#ef4444",
+            ).props("unelevated")
 
     # Initial render
     refresh_users_table()

@@ -297,7 +297,7 @@ for _route, _builder, _admin_only in PAGES:
 @ui.page("/change-password")
 def change_password_page():
 
-    from models import get_users_session, Users, DEFAULT_USER_PASSWORD
+    from models import get_users_session, Users
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -351,15 +351,8 @@ def change_password_page():
                     )
                     return
 
-                if new_pass.value == DEFAULT_USER_PASSWORD:
-                    ui.notify(
-                        "You cannot use the default password.",
-                        type="negative",
-                        timeout=0,
-                        position="center",
-                        close_button="OK",
-                    )
-                    return
+                # There is no shared default password to exclude any
+                # more; every issued password is unique to the account.
 
                 with get_users_session() as session:
                     user = (

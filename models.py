@@ -9,6 +9,7 @@ Dependencies:
 
 import bcrypt
 from contextlib import contextmanager
+import secrets
 from datetime import datetime, timezone
 import json
 from sqlalchemy import (
@@ -572,7 +573,19 @@ def _audit_before_flush(session, _flush_context, _instances) -> None:
         )
 
 
-DEFAULT_USER_PASSWORD = "Vector2026!"
+def generate_one_time_password() -> str:
+    """Makes a fresh password for a new or reset account.
+
+    Replaces a shared DEFAULT_USER_PASSWORD constant that was published
+    in this repository. Every account whose owner had not yet signed in
+    was open to anyone who had read models.py -- and combined with the
+    unguarded admin panel, that was the whole exploit chain.
+
+    Shown to the administrator once, never stored in plaintext, and
+    paired with must_change_password so it survives only until first
+    use.
+    """
+    return secrets.token_urlsafe(9)
 
 
 # ----- Schema Migration -----
