@@ -1,0 +1,15 @@
+# Optional: at-rest encryption for the case database (SQLCipher).
+#
+# VECTOR works without this. Install it only if you intend to encrypt,
+# then run tools/encrypt_database.py.
+#
+#     .venv/bin/pip install -r requirements-encryption.txt      (macOS)
+#     .venv\Scripts\pip install -r requirements-encryption.txt  (Windows)
+#
+# Prebuilt packages exist for Windows x64 and Apple Silicon. On Intel
+# Mac and Linux this is built from source and needs a C compiler and the
+# OpenSSL development headers -- which is why it is not in
+# requirements.txt, where it would break a plain install for anyone who
+# does not want encryption.
+
+sqlcipher3~=0.6

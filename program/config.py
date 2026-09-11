@@ -70,6 +70,12 @@ class Config:
     # headless or always-on machines.
     SHOW_BROWSER = not _env_flag("VECTOR_NO_BROWSER")
 
+    # ----- Encryption -----
+    # Refuse to start on a plaintext case database. For units whose
+    # policy requires encryption, so a machine cannot quietly run
+    # unencrypted after a restore or a fresh checkout.
+    REQUIRE_ENCRYPTION = _env_flag("VECTOR_REQUIRE_ENCRYPTION")
+
     # ----- Uploads -----
     # Rejected in the browser before any bytes reach the server.
     MAX_UPLOAD_BYTES = _env_int("VECTOR_MAX_UPLOAD_MB", 512) * 1024 * 1024

@@ -26,7 +26,13 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker
 from marshmallow import Schema, fields
 
-from program.config import APP_DB_PATH, DB_DIR, USERS_DB_PATH
+import crypto
+from program.config import (
+    APP_DB_PATH,
+    Config,
+    DB_DIR,
+    USERS_DB_PATH,
+)
 
 
 # ----- Database Setup -----
@@ -55,15 +61,65 @@ def _enable_wal(dbapi_connection, _connection_record) -> None:
     cursor.close()
 
 
+# ----- Encryption -----
+# Opt-in. An install with plaintext databases keeps working exactly as
+# before; encryption starts when someone runs tools/encrypt_database.py.
+# The passphrase is resolved once, here, and held only in memory.
+ENCRYPTED = crypto.is_encrypted(APP_DB_PATH) or crypto.is_encrypted(
+    USERS_DB_PATH
+)
+PASSPHRASE = ""
+
+if ENCRYPTED:
+    PASSPHRASE = crypto.resolve_passphrase()
+    if not PASSPHRASE:
+        raise crypto.KeyRequired(
+            "The case database is encrypted and no passphrase was given.\n\n"
+            "Supply one of:\n"
+            "  VECTOR_DB_KEY=...         the passphrase itself\n"
+            "  VECTOR_DB_KEY_FILE=...    a file holding it, e.g. on a USB "
+            "stick\n"
+            "  or start VECTOR from a terminal, which will prompt.\n"
+        )
+elif Config.REQUIRE_ENCRYPTION:
+    raise crypto.KeyRequired(
+        "VECTOR_REQUIRE_ENCRYPTION is set, but the case database is not "
+        "encrypted.\nRun tools/encrypt_database.py, or unset the variable."
+    )
+
+
+def _make_engine(path, **kwargs):
+    """Builds an engine for one database, encrypted or not."""
+    if not ENCRYPTED:
+        return create_engine(
+            _sqlite_url(path),
+            connect_args={"check_same_thread": False},
+            **kwargs,
+        )
+
+    sqlcipher3 = crypto.require_sqlcipher()
+
+    def creator():
+        connection = sqlcipher3.connect(str(path), check_same_thread=False)
+        connection.execute(crypto.key_pragma(PASSPHRASE))
+        return connection
+
+    # The plain sqlite dialect with the sqlcipher driver, rather than
+    # sqlite+pysqlcipher: that dialect runs its own "pragma key=" from
+    # the URL on connect, which would overwrite the one set here and
+    # would also mean URL-escaping the passphrase.
+    return create_engine(
+        "sqlite://",
+        module=sqlcipher3.dbapi2,
+        creator=creator,
+        **kwargs,
+    )
+
+
 # ----- Main database -----
 DATABASE_URL = _sqlite_url(APP_DB_PATH)
 
-engine = create_engine(
-    DATABASE_URL,
-    echo=False,
-    future=True,
-    connect_args={"check_same_thread": False}
-)
+engine = _make_engine(APP_DB_PATH, echo=False, future=True)
 event.listen(engine, "connect", _enable_wal)
 
 Session = sessionmaker(bind=engine)
@@ -71,10 +127,7 @@ Session = sessionmaker(bind=engine)
 # ----- Users database -----
 USERS_DATABASE_URL = _sqlite_url(USERS_DB_PATH)
 
-users_engine = create_engine(
-    USERS_DATABASE_URL,
-    connect_args={"check_same_thread": False}
-)
+users_engine = _make_engine(USERS_DB_PATH)
 event.listen(users_engine, "connect", _enable_wal)
 
 UsersSession = sessionmaker(bind=users_engine)

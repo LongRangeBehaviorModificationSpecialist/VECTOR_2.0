@@ -35,3 +35,6 @@ temp/
 !static/*
 /db/FIRST_RUN_PASSWORD.txt
 /db/*.bak-*
+/db/*-backup-*
+/db/*.encrypting
+/db/*.decrypting
