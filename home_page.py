@@ -12,10 +12,23 @@ Handles:
 
 from datetime import datetime
 from nicegui import ui
+import time
 from pathlib import Path
 
 from import_export import export_database, import_database
-from auth import is_authenticated, get_current_user_name, get_is_admin
+from auth import (
+    clear_login_failures,
+    failure_delay_seconds,
+    get_current_user_name,
+    get_is_admin,
+    is_authenticated,
+    lockout_seconds_remaining,
+    record_login_failure,
+    sign_in,
+    sign_out,
+    LOCK_AFTER_FAILURES,
+    LOCKOUT_MINUTES,
+)
 from models import get_session, get_users_session, record_audit
 from navbar import build_navbar
 from program.config import Config
@@ -532,6 +545,26 @@ def build_login_home():
                 )
                 return
 
+            # Refuse before touching the database, so a locked account
+            # costs an attacker nothing to discover and gains them
+            # nothing either.
+            locked_for = lockout_seconds_remaining(entered_user)
+            if locked_for:
+                minutes = max(1, round(locked_for / 60))
+                ui.notify(
+                    f"Too many failed attempts. This account is locked "
+                    f"for about {minutes} more minute"
+                    f"{'s' if minutes != 1 else ''}.\n"
+                    "An administrator can clear the lock from the Admin "
+                    "Panel.",
+                    type="negative",
+                    timeout=0,
+                    position="center",
+                    close_button="OK",
+                )
+                password_input.value = ""
+                return
+
             with get_users_session() as session:
                 user = (
                     session.query(Users)
@@ -553,13 +586,8 @@ def build_login_home():
                             actor=user.user_name,
                         )
 
-                    from nicegui import app
-                    app.storage.user["authenticated"] = True
-                    app.storage.user["user_name"] = user.user_name
-                    app.storage.user["is_admin"] = user.is_admin
-                    app.storage.user["session_generation"] = (
-                        app.storage.general.get("session_generation", 0)
-                    )
+                    clear_login_failures(entered_user)
+                    sign_in(user.user_name, user.is_admin)
 
                     if user.must_change_password:
                         ui.navigate.to("/change-password")
@@ -572,19 +600,45 @@ def build_login_home():
                         )
                         ui.navigate.to("/")
                 else:
-                    # Failed attempts are recorded too: a run of them is
-                    # the signal worth having.
+                    # A pause that grows with the failure count. Slow
+                    # enough to make scripted guessing impractical,
+                    # short enough not to punish a mistype.
+                    delay = failure_delay_seconds(entered_user)
+                    if delay:
+                        time.sleep(delay)
+
+                    failures = record_login_failure(entered_user)
+                    remaining = LOCK_AFTER_FAILURES - failures
+
                     with get_session() as audit_session:
                         record_audit(
                             audit_session,
                             action="LOGIN_FAILED",
                             table_name="users",
-                            summary=entered_user,
+                            summary=(
+                                f"{entered_user} "
+                                f"(failure {failures})"
+                            ),
                             actor=entered_user or "unknown",
                         )
 
+                    if failures >= LOCK_AFTER_FAILURES:
+                        message = (
+                            "Too many failed attempts. This account is "
+                            f"now locked for {LOCKOUT_MINUTES} minutes."
+                        )
+                    elif remaining <= 3:
+                        message = (
+                            "Invalid username or password.\n"
+                            f"{remaining} attempt"
+                            f"{'s' if remaining != 1 else ''} left before "
+                            "this account is locked."
+                        )
+                    else:
+                        message = "Invalid username or password."
+
                     ui.notify(
-                        "Invalid username or password.",
+                        message,
                         type="warning",
                         timeout=0,
                         position="center",
@@ -753,9 +807,7 @@ def logout_page():
     """Logs out the current user."""
     from nicegui import app
 
-    app.storage.user["authenticated"] = False
-    app.storage.user["user_name"] = ""
-    app.storage.user["is_admin"] = False
+    sign_out()
 
     ui.notify(
         "You have been logged out successfully.",
@@ -780,9 +832,7 @@ def shutdown_page():
         ui.navigate.to("/")
         return
 
-    app.storage.user["authenticated"] = False
-    app.storage.user["user_name"] = ""
-    app.storage.user["is_admin"] = False
+    sign_out()
 
     ui.notify("Shutting down...", type="positive", timeout=2000)
 
