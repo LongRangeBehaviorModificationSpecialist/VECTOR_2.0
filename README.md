@@ -206,9 +206,25 @@ Work top to bottom; each step feeds the next.
 8. **Reports** — seven printable layouts, including the basic
    inventory used as the return copy
 
-**Export** seals every table, every attachment and a SHA-256 manifest
-into a single AES-256 encrypted ZIP on your Desktop. **Import** restores
-one, replacing everything currently loaded.
+### Getting a case out
+
+**Export** offers two formats, both saved to your Desktop and both
+optionally sealed with an AES-256 password:
+
+| Format | What it is | Use it for |
+|--------|-----------|------------|
+| **ZIP of CSVs** | One CSV per table, attachments as files, plus a SHA-256 manifest | Opening in Excel, or reading the case without VECTOR |
+| **Single JSON** | One self-contained file, attachments embedded as base64 | Handing the case to another tool or system |
+
+Both carry the audit trail, and both record the SHA-256 taken when each
+attachment was collected — so a file that has changed since is flagged
+on the way out, and again on the way back in.
+
+**Import** takes either format; it works out which from the file
+itself, so you do not have to say. It replaces everything currently
+loaded. The one thing it will not replace is this machine's audit
+trail: the import is appended to it instead, so the receiving machine
+keeps its own history of what happened here.
 
 ---
 
@@ -428,7 +444,7 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-181 tests, about six seconds. They run against a temporary database and
+200 tests, about six seconds. They run against a temporary database and
 never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -442,7 +458,8 @@ export is round-tripped and compared row for row and byte for byte.
 | File | Covers |
 |------|--------|
 | `test_reports.py` | All seven reports render, carry the case header, and escape their values |
-| `test_export_import.py` | Round trip preserves rows, bytes and provenance; encrypted archives; tampering is detected |
+| `test_export_import.py` | CSV round trip preserves rows, bytes and provenance; encrypted archives; tampering is detected |
+| `test_json_export.py` | JSON round trip, embedded attachments, format detection, tampering is detected |
 | `test_audit.py` | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
 | `test_validators.py` | Every validator reports rather than crashing, and the domain rules hold |
 | `test_numbering.py` | Evidence numbering past item 9; room labels past Z |

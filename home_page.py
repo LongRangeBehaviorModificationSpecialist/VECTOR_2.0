@@ -15,7 +15,13 @@ from nicegui import ui
 import time
 from pathlib import Path
 
-from import_export import export_database, import_database
+from import_export import (
+    export_database,
+    export_database_json,
+    import_database,
+    import_database_json,
+    looks_like_json_export,
+)
 from auth import (
     clear_login_failures,
     failure_delay_seconds,
@@ -196,17 +202,28 @@ def build_authenticated_home():
                     )
 
                     ui.label(
-                        "Export all database tables to CSV files and "
-                        "uploaded files into a single compresses ZIP "
-                        "archive saved to your /Desktop/ directory."
-                    ).classes("mb-1 text-base text-[var(--vsp-gray)]")
+                        "Saves the whole case -- every table, every "
+                        "attachment, and the audit trail -- to your "
+                        "Desktop."
+                    ).classes("mb-2 text-base text-[var(--vsp-gray)]")
 
-                    ui.label("The ZIP file will be named :").classes(
-                        "mb-1 text-base text-[var(--vsp-gray)]"
-                    )
+                    export_format = ui.radio(
+                        {
+                            "zip": "ZIP archive of CSV files  (spreadsheets)",
+                            "json": "Single JSON file  (other tools)",
+                        },
+                        value="zip",
+                    ).props("inline=false").classes("mb-1")
 
-                    ui.label("'<case-number>_<datetime>_saved_results'").classes(
-                        "mb-1 text-base text-[var(--vsp-gray)]"
+                    ui.label(
+                        "CSV opens in Excel. JSON is one self-contained "
+                        "file with the attachments embedded, for handing "
+                        "the case to another system."
+                    ).classes("mb-2 text-xs text-gray-400")
+
+                    ui.label("Named '<case-number>_<datetime>_saved_results'"
+                             ).classes(
+                        "mb-1 text-xs text-[var(--vsp-gray)]"
                     )
 
                     # ----- Password option -----
@@ -244,7 +261,10 @@ def build_authenticated_home():
                             return
 
                         dialog.close()
-                        export_database(password=pwd)
+                        if export_format.value == "json":
+                            export_database_json(password=pwd)
+                        else:
+                            export_database(password=pwd)
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -274,7 +294,9 @@ def build_authenticated_home():
                     )
 
                     ui.label(
-                        "Select a ZIP file previously exported from VECTOR."
+                        "Select a file previously exported from VECTOR -- "
+                        "either the ZIP archive or the JSON file. The "
+                        "format is detected from the file itself."
                     ).classes("mb-1 text-base text-[var(--vsp-gray)]")
 
                     ui.label("WARNING :").classes("mb-1 text-base text-[var(--vsp-blue)]")
@@ -284,8 +306,8 @@ def build_authenticated_home():
                     )
 
                     zip_path_input = ui.input(
-                        label="ZIP File Path",
-                        placeholder=r"Enter\Path\To\ZIP\File",
+                        label="Path to the exported file",
+                        placeholder=r"...-1234_saved_results.zip",
                     ).classes("w-full")
 
                     encrypt_checkbox = ui.checkbox(
@@ -341,7 +363,15 @@ def build_authenticated_home():
                             return
 
                         dialog.close()
-                        import_database(path, password=pwd)
+
+                        # A .json, or a .zip holding one, goes through
+                        # the JSON reader; the CSV archive is also a
+                        # .zip, so the contents decide, not the suffix
+                        # alone.
+                        if looks_like_json_export(path):
+                            import_database_json(path, password=pwd)
+                        else:
+                            import_database(path, password=pwd)
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 

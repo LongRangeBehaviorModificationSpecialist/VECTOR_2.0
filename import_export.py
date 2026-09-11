@@ -678,3 +678,492 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
     print(f"  Total records: {total_records}")
     print(f"  Files imported: {files_imported}")
     print(f"{'='*60}\n")
+
+
+# ----- JSON EXPORT / IMPORT -----
+# A second format alongside the CSV archive: one file rather than a
+# folder, with attachments embedded, so a case can be handed to another
+# tool or another system as a single artifact.
+#
+# Ported from the upstream project and rebuilt to match this branch. The
+# SHA-256 recorded at collection travels with each attachment and is
+# checked on the way back in, the audit trail is included in the export
+# and an import is itself recorded, and the file is staged in a temp
+# directory rather than written to the Desktop in the clear and then
+# encrypted afterwards.
+
+JSON_FORMAT_VERSION = "1.0"
+
+
+def _row_to_json(record, columns: list) -> dict:
+    """Converts one row to JSON-safe values."""
+    import base64
+
+    row = {}
+    for name in columns:
+        value = getattr(record, name)
+        if isinstance(value, datetime):
+            row[name] = value.isoformat()
+        elif isinstance(value, (bytes, bytearray)):
+            row[name] = base64.b64encode(bytes(value)).decode("ascii")
+        else:
+            row[name] = value
+    return row
+
+
+def _json_to_value(value, column):
+    """Converts a JSON value back to the column's Python type."""
+    import base64
+    from sqlalchemy import Boolean, DateTime, Float, Integer, LargeBinary
+
+    if value is None:
+        return None
+
+    column_type = column.type
+
+    if isinstance(column_type, LargeBinary):
+        return base64.b64decode(value)
+    if isinstance(column_type, Boolean):
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() in ("true", "1", "yes", "t")
+    if isinstance(column_type, Integer):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+    if isinstance(column_type, Float):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+    if isinstance(column_type, DateTime):
+        try:
+            return datetime.fromisoformat(str(value))
+        except (TypeError, ValueError):
+            return None
+    return value
+
+
+def export_database_json(password: Optional[str] = None) -> None:
+    """Exports the whole case to a single JSON file.
+
+    Attachments are embedded as base64 alongside the SHA-256 recorded
+    when they were collected, so the file is self-contained and its
+    contents can be checked on the way back in.
+
+    With a password the JSON is sealed in an AES-256 zip. It is built in
+    a temp directory either way, so an unencrypted copy is never written
+    to the Desktop and left sitting there.
+    """
+    from models import UploadedFiles
+
+    folder_name = get_case_info_for_folder_name()
+    if not folder_name:
+        return
+
+    payload = {
+        "export_metadata": {
+            "export_date": datetime.now().isoformat(),
+            "format_version": JSON_FORMAT_VERSION,
+            "case_folder": folder_name,
+            "application": "VECTOR",
+        },
+        "tables": {},
+        "files": [],
+    }
+
+    total_records = 0
+
+    for model_class, table_name in get_exportable_models():
+        columns = get_column_names(model_class)
+        try:
+            with get_session() as session:
+                rows = [
+                    _row_to_json(record, columns)
+                    for record in session.query(model_class).all()
+                ]
+        except Exception as err:
+            ui.notify(
+                f"Error exporting {table_name} - {err}",
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return
+
+        payload["tables"][table_name] = {
+            "record_count": len(rows),
+            "records": rows,
+        }
+        total_records += len(rows)
+
+    # ----- Attachments, with their collection hashes -----
+    import base64
+
+    integrity_failures = []
+    try:
+        with get_session() as session:
+            for uploaded in session.query(UploadedFiles).all():
+                if not uploaded.file_data:
+                    continue
+
+                current_hash = hashlib.sha256(uploaded.file_data).hexdigest()
+                recorded = uploaded.sha256 or ""
+                matches = (not recorded) or recorded == current_hash
+                if not matches:
+                    integrity_failures.append(
+                        uploaded.file_name or "(unnamed)"
+                    )
+
+                payload["files"].append(
+                    {
+                        "file_name": uploaded.file_name,
+                        "file_size": uploaded.file_size,
+                        "file_mime_type": uploaded.file_mime_type,
+                        "uploaded_by": uploaded.uploaded_by,
+                        "hash_at_ingest": recorded or None,
+                        "hashed_at": uploaded.hashed_at,
+                        "file_hash": current_hash,
+                        "matches_ingest_hash": matches,
+                        "data_base64": base64.b64encode(
+                            uploaded.file_data
+                        ).decode("ascii"),
+                    }
+                )
+    except Exception as err:
+        ui.notify(
+            f"Error embedding attachments - {err}",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+
+    payload["export_metadata"]["total_records"] = total_records
+    payload["export_metadata"]["total_files"] = len(payload["files"])
+    payload["export_metadata"]["integrity_failures"] = integrity_failures
+
+    if integrity_failures:
+        ui.notify(
+            "WARNING: these attachments no longer match the SHA-256 "
+            "recorded when they were collected:\n"
+            + "\n".join(integrity_failures)
+            + "\nThe export still completed. Investigate before relying "
+            "on these files.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+
+    # ----- Write it, staging in a temp directory -----
+    desktop_dir = Path.home() / "Desktop"
+    staging = Path(tempfile.mkdtemp(prefix="vector_json_export_"))
+    staged_json = staging / f"{folder_name}.json"
+
+    try:
+        with open(staged_json, "w", encoding="utf-8") as handle:
+            json.dump(
+                payload, handle, indent=4, ensure_ascii=False, default=str
+            )
+
+        if password:
+            final_path = desktop_dir / f"{folder_name}.json.zip"
+            with pyzipper.AESZipFile(
+                final_path,
+                "w",
+                compression=pyzipper.ZIP_DEFLATED,
+                encryption=pyzipper.WZ_AES,
+            ) as archive:
+                archive.setpassword(password.encode("utf-8"))
+                archive.setencryption(pyzipper.WZ_AES, nbits=256)
+                archive.write(staged_json, arcname=staged_json.name)
+        else:
+            final_path = desktop_dir / staged_json.name
+            shutil.copy2(staged_json, final_path)
+
+    except Exception as err:
+        ui.notify(
+            f"Error writing the JSON export - {err}",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        return
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+    encrypted_note = " (AES-256 encrypted)" if password else ""
+    ui.notify(
+        f"JSON export complete{encrypted_note}.\n"
+        f"Records: {total_records}\n"
+        f"Attachments embedded: {len(payload['files'])}\n"
+        f"Saved to: {final_path}",
+        timeout=0,
+        position="bottom",
+        close_button="OK",
+    )
+
+    print(f"\n{'=' * 60}")
+    print("  JSON EXPORT COMPLETE")
+    print(f"  Location: {final_path}")
+    print(f"  Records: {total_records}, files: {len(payload['files'])}")
+    print(f"{'=' * 60}\n")
+
+
+def import_database_json(source: str, password: Optional[str] = None) -> None:
+    """Restores a case from a JSON export, replacing what is loaded.
+
+    Accepts the .json directly or the encrypted .json.zip. Attachments
+    are checked against the hash recorded in the file, and the import
+    itself is written to the audit trail -- which is never overwritten
+    by the one in the export, so the receiving machine keeps its own
+    history.
+    """
+    from models import UploadedFiles
+
+    source_path = Path(str(source).strip("\"'"))
+    if not source_path.exists():
+        ui.notify(
+            f"{source_path.name} not found.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        return
+
+    staging = None
+
+    # ----- Unwrap an encrypted archive -----
+    if source_path.suffix.lower() == ".zip":
+        staging = Path(tempfile.mkdtemp(prefix="vector_json_import_"))
+        try:
+            with pyzipper.AESZipFile(source_path, "r") as archive:
+                if password:
+                    archive.setpassword(password.encode("utf-8"))
+                archive.extractall(staging)
+        except RuntimeError:
+            shutil.rmtree(staging, ignore_errors=True)
+            ui.notify(
+                "Could not open that archive. If it is encrypted, check "
+                "the password.",
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return
+
+        candidates = list(staging.rglob("*.json"))
+        if not candidates:
+            shutil.rmtree(staging, ignore_errors=True)
+            ui.notify(
+                "No .json file inside that archive.",
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return
+        source_path = candidates[0]
+
+    try:
+        with open(source_path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (json.JSONDecodeError, OSError) as err:
+        if staging:
+            shutil.rmtree(staging, ignore_errors=True)
+        ui.notify(
+            f"Could not read that file - {err}",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        return
+
+    if not isinstance(payload, dict) or "tables" not in payload:
+        if staging:
+            shutil.rmtree(staging, ignore_errors=True)
+        ui.notify(
+            "That is not a VECTOR JSON export - it has no 'tables' "
+            "section.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        return
+
+    models_by_name = get_all_models()
+    imported = []
+    total_records = 0
+    table_name = ""
+
+    try:
+        for table_name, table_data in payload["tables"].items():
+            model_class = models_by_name.get(table_name)
+            if model_class is None:
+                # The audit trail is exported but never restored over
+                # the local one; anything else unknown is skipped.
+                continue
+
+            column_objects = {
+                column.name: column
+                for column in model_class.__table__.columns
+            }
+
+            with get_session() as session:
+                session.query(model_class).delete()
+                for row in table_data.get("records", []):
+                    values = {
+                        name: _json_to_value(value, column_objects[name])
+                        for name, value in row.items()
+                        if name in column_objects
+                    }
+                    session.add(model_class(**values))
+
+            with get_session() as session:
+                count = session.query(model_class).count()
+            imported.append(f"{table_name} ({count})")
+            total_records += count
+
+    except Exception as err:
+        if staging:
+            shutil.rmtree(staging, ignore_errors=True)
+        ui.notify(
+            f"Error importing {table_name} - {err}",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        return
+
+    # ----- Attachments -----
+    import base64
+
+    hash_mismatches = []
+    files_imported = 0
+
+    try:
+        with get_session() as session:
+            session.query(UploadedFiles).delete()
+            for entry in payload.get("files", []):
+                raw = base64.b64decode(entry.get("data_base64", ""))
+                actual_hash = hashlib.sha256(raw).hexdigest()
+
+                expected = entry.get("file_hash")
+                if expected and expected != actual_hash:
+                    hash_mismatches.append(
+                        entry.get("file_name") or "(unnamed)"
+                    )
+
+                session.add(
+                    UploadedFiles(
+                        file_name=entry.get("file_name") or "imported",
+                        file_data=raw,
+                        file_size=entry.get("file_size") or len(raw),
+                        file_mime_type=(
+                            entry.get("file_mime_type")
+                            or "application/octet-stream"
+                        ),
+                        uploaded_by=entry.get("uploaded_by") or "import",
+                        sha256=entry.get("hash_at_ingest") or actual_hash,
+                        hashed_at=entry.get("hashed_at"),
+                    )
+                )
+                files_imported += 1
+
+            record_audit(
+                session,
+                action="IMPORT",
+                table_name="(all case tables)",
+                summary=f"JSON: {total_records} rows, {files_imported} files",
+                after={
+                    "source": str(source),
+                    "exported": payload.get("export_metadata", {}).get(
+                        "export_date", "unknown"
+                    ),
+                    "format_version": payload.get("export_metadata", {}).get(
+                        "format_version", "unknown"
+                    ),
+                    "hash_mismatches": hash_mismatches,
+                },
+            )
+    except Exception as err:
+        ui.notify(
+            f"Error importing attachments - {err}",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+
+    if staging:
+        shutil.rmtree(staging, ignore_errors=True)
+
+    if hash_mismatches:
+        ui.notify(
+            "WARNING - these attachments do not match the hash recorded "
+            "in the file:\n"
+            + "\n".join(hash_mismatches)
+            + "\n\nThe import completed and has been recorded in the "
+            "audit trail. Treat these files as unverified.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+
+    ui.notify(
+        f"JSON import complete.\n"
+        f"Tables: {', '.join(imported)}\n"
+        f"Attachments: {files_imported}\n"
+        f"Total records: {total_records}",
+        timeout=0,
+        position="bottom",
+        close_button="OK",
+    )
+
+    print(f"\n{'=' * 60}")
+    print("  JSON IMPORT COMPLETE")
+    print(f"  Tables: {imported}")
+    print(f"  Records: {total_records}, files: {files_imported}")
+    print(f"{'=' * 60}\n")
+
+
+def looks_like_json_export(path: str) -> bool:
+    """Whether a file is a JSON export rather than the CSV archive.
+
+    Both formats can arrive as a .zip, so the suffix alone does not
+    settle it. An encrypted archive cannot be read without the password,
+    but its entry names are still listed, which is enough.
+
+    Anything unreadable falls back to False -- the CSV reader gives the
+    clearer message when handed something it does not recognise.
+    """
+    candidate = Path(str(path).strip("\"'"))
+
+    if candidate.suffix.lower() == ".json":
+        return True
+
+    if candidate.suffix.lower() != ".zip":
+        return False
+
+    try:
+        with pyzipper.AESZipFile(candidate, "r") as archive:
+            names = [name.lower() for name in archive.namelist()]
+    except Exception:
+        return False
+
+    has_json = any(name.endswith(".json") for name in names)
+    has_csv = any(name.endswith(".csv") for name in names)
+
+    # The CSV archive also carries export_manifest.json, so a JSON
+    # export is the one with JSON and no CSVs.
+    return has_json and not has_csv
