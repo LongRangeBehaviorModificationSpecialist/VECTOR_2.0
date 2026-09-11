@@ -105,6 +105,11 @@ The same credentials are written to `db/FIRST_RUN_PASSWORD.txt` in case
 the console scrolls. You will be asked to change the password
 immediately; delete that file once you have.
 
+Every password VECTOR issues — at first run, when an admin creates an
+account, and when an admin resets one — is generated for that account
+and shown **once**. There is no shared default. Write it down before
+closing the message; it cannot be recovered, only reset again.
+
 ### Upgrading an existing database
 
 If you already have a `db/app_data.db` from an earlier version, the
@@ -202,6 +207,39 @@ one, replacing everything currently loaded.
 
 ---
 
+## Accounts and sessions
+
+**Creating an account.** An admin enters a username in the Admin Panel
+and gets a one-time password back, shown once. The new account must
+change it at first sign-in and is never an admin.
+
+**Resetting one.** The reset button issues a fresh one-time password,
+ends every session that account has open, and clears any sign-in lock.
+A reset that left the old session working would not be a reset.
+
+**Failed sign-ins.** After three failures VECTOR starts pausing before
+each attempt, and after ten it locks the account for fifteen minutes.
+Failures older than thirty minutes are forgotten, so attempts spread
+across a shift never accumulate into a lock. Every attempt — successful
+or not — is in the audit trail.
+
+The numbers are deliberately forgiving. An agent mistyping a password
+at 3am on a scene must not be shut out of evidence logging.
+
+A locked account shows **LOCKED** in the Admin Panel's Sign-in column,
+and an admin clears it with the padlock button without changing the
+password.
+
+**Signing everyone out.** Admin Panel → Sessions → *Sign Everyone Out*
+ends every session on every device at once. Use it when a device goes
+missing, or when someone leaves the team. Deleting or resetting a single
+account signs out only that account.
+
+Session state is persisted, so an invalidation survives a restart of the
+server.
+
+---
+
 ## The audit trail
 
 Every change to case data is recorded — creations, edits, deletions,
@@ -266,8 +304,6 @@ Read these before relying on VECTOR for a case that will be charged.
   Case File" deletes the current one — export first.
 - **No soft delete.** A deleted record is gone from its table; it is
   recoverable from the audit trail, but by hand.
-- **New accounts share a default password** defined in `models.py`.
-  Change it after creating a user.
 - **Case start and end times are free text**, typed by the agent, with
   no time zone recorded. Everything the application generates itself is
   UTC and marked.
@@ -315,7 +351,7 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-137 tests, about three seconds. They run against a temporary database
+159 tests, about three seconds. They run against a temporary database
 and never touch `db/`.
 
 The suite exists because of a specific failure: a variable rename
@@ -335,6 +371,27 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_constraints.py` | The constraints that were removed, and the four that must stay |
 | `test_migration.py` | An old-schema database migrates without losing a row |
 | `test_page_specs.py` | Every page field names a real column; required columns are reachable; validators accept what the builder passes |
+| `test_auth.py` | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
+
+---
+
+## Demo data
+
+A checkout ships with no case and no accounts; both are created on first
+run. To load a worked example instead — a fictional twelve-item search
+with agents, rooms, people and notes:
+
+```
+.venv/bin/python tools/make_demo_case.py
+```
+
+Add `--users` to reset the accounts at the same time and print fresh
+one-time passwords.
+
+Everything it loads is invented: placeholder names, `example.invalid`
+addresses, and telephone numbers in the 555-01xx range reserved for
+fiction. It replaces the case entirely, so do not run it against real
+case data.
 
 ---
 
