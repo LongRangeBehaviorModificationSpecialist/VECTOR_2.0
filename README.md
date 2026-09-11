@@ -182,6 +182,11 @@ All optional, read from the environment:
 | `VECTOR_PORT`           | `8080`      | Port to listen on                        |
 | `VECTOR_MAX_UPLOAD_MB`  | `512`       | Largest accepted attachment              |
 | `VECTOR_NO_BROWSER`     | unset       | Set to `1` to not open a browser on start |
+| `VECTOR_DB_DIR`         | `db/`       | Where the databases live                 |
+| `VECTOR_DB_KEY`         | unset       | Passphrase for an encrypted database     |
+| `VECTOR_DB_KEY_FILE`    | unset       | File holding the passphrase              |
+| `VECTOR_NO_PROMPT`      | unset       | Set to `1` to never prompt for it        |
+| `VECTOR_REQUIRE_ENCRYPTION` | unset   | Set to `1` to refuse a plaintext database |
 
 ---
 
@@ -271,28 +276,100 @@ Be clear about this before deciding where VECTOR runs.
 
 | Data | At rest | Notes |
 |------|---------|-------|
-| Case data — suspects, evidence, notes | **Plaintext** | Anyone who opens `db/app_data.db` reads all of it |
-| Attachments — photographs, documents | **Plaintext** | Stored as raw bytes inside the same file |
+| Case data — suspects, evidence, notes | **Plaintext by default** | Encryptable — see below. Otherwise anyone who opens `db/app_data.db` reads all of it |
+| Attachments — photographs, documents | **Plaintext by default** | Same file, same choice |
 | Login passwords | **Hashed** | bcrypt; not recoverable, not reversible |
 | Exported archive | **Encrypted, if you ask** | AES-256, only when you tick the box and set a password |
 | Network traffic | **Unencrypted** | Plain HTTP, including with `--lan` |
 
-The case database is ordinary SQLite. It has no password and is not
-obfuscated — a suspect's name, address and date of birth are readable in
+By default the case database is ordinary SQLite: no password, not
+obfuscated. A suspect's name, address and date of birth are readable in
 a text editor, and a photograph can be carved straight out of the file.
 
-**What to do about it:**
+**You can encrypt it.** See the next section. Once encrypted, the table
+above changes: case data and attachments become unreadable without the
+passphrase.
 
-- Keep the case database on an encrypted volume — BitLocker on Windows,
-  FileVault on macOS. Point VECTOR at it with `VECTOR_DB_DIR`.
+**Either way:**
+
 - Always tick **Encrypt with password** when exporting.
-- Delete `db/*.bak-*` migration backups once a case is verified; they
-  are unencrypted copies.
+- Delete `db/*.bak-*` and `db/*-backup-*` files once a case is verified;
+  they are unencrypted copies.
 - Treat the whole `db/` directory as evidence, and wipe the machine's
   disk to policy when the case closes.
+- Full-disk encryption — BitLocker, FileVault — is still worth having.
+  Database encryption protects the database; it does not protect the
+  exports, the temporary files, or anything else on the machine.
 
-Full at-rest encryption (SQLCipher) is on the enhancement list and is
-not implemented.
+---
+
+## Encrypting the case database
+
+Optional, and off until you turn it on. An existing install keeps
+working untouched.
+
+```
+.venv/bin/pip install -r requirements-encryption.txt
+```
+
+```
+.venv/bin/python tools/encrypt_database.py
+```
+
+> ### There is no recovery
+>
+> No reset, no backdoor, no key escrow. **If the passphrase is lost, the
+> case is lost** — not delayed, lost. Record it somewhere your unit
+> already trusts with credentials *before* you encrypt anything.
+
+The tool takes the passphrase twice, backs up each database to a
+timestamped `.plaintext-backup`, writes an encrypted copy, verifies it
+opens with the same row counts, and only then replaces the original. If
+anything fails, nothing is replaced.
+
+Start VECTOR, confirm the case looks right, then delete the
+`.plaintext-backup` files — they are unencrypted copies.
+
+### Supplying the passphrase
+
+VECTOR needs it at every start, and takes the first of these it finds:
+
+| Source | Use when |
+|--------|----------|
+| `VECTOR_DB_KEY` | Convenient, but the passphrase ends up in whatever script or shortcut sets it |
+| `VECTOR_DB_KEY_FILE` | A file holding it — ideally on removable media that travels separately from the laptop |
+| A prompt at startup | Nothing is stored, but it needs someone at a console when VECTOR starts |
+
+Set `VECTOR_NO_PROMPT=1` for a launcher with no console — a desktop
+shortcut or scheduled task. Without it, `getpass` on Windows reads the
+console directly and would hang with nothing on screen to explain why.
+
+Set `VECTOR_REQUIRE_ENCRYPTION=1` to refuse to start on a plaintext
+database, so a machine cannot quietly run unencrypted after a restore.
+
+### What it does and does not protect
+
+**Protects:** a laptop lost, stolen or handed in for repair, and a
+backup copied somewhere it should not have gone. The file is unreadable
+without the passphrase.
+
+**Does not protect:** anything while VECTOR is running and unlocked. The
+passphrase is in memory, reports render in the browser, and exports are
+written in the clear unless you encrypt those too. It is not a
+substitute for full-disk encryption, and it does nothing about a machine
+someone is sitting in front of.
+
+### Going back
+
+```
+.venv/bin/python tools/decrypt_database.py
+```
+
+Converts back to plaintext, keeping the encrypted original as a backup.
+Worth knowing it exists: a case that can only be opened by one build of
+one tool is a liability. Use it to hand a case to an examiner without
+the driver, or to step back if encryption does not suit how the unit
+works.
 
 ---
 
@@ -351,8 +428,9 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-159 tests, about three seconds. They run against a temporary database
-and never touch `db/`.
+181 tests, about six seconds. They run against a temporary database and
+never touch `db/`. The encryption tests skip themselves when the
+SQLCipher driver is not installed.
 
 The suite exists because of a specific failure: a variable rename
 reached the models and the CRUD pages but not the report or export
@@ -372,6 +450,7 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_migration.py` | An old-schema database migrates without losing a row |
 | `test_page_specs.py` | Every page field names a real column; required columns are reachable; validators accept what the builder passes |
 | `test_auth.py` | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
+| `test_crypto.py` | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
 
 ---
 
