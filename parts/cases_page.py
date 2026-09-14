@@ -12,7 +12,6 @@ Consolidates four Flask routes into one interactive page:
 
 from nicegui import ui
 
-from home_page import confirm_new_case_handler
 from main import get_current_user_name, get_is_admin
 from models import get_session, Cases
 from navbar import build_navbar
@@ -32,26 +31,21 @@ def build_cases_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label(
-            "Case Management"
-        ).classes("text-2xl font-bold mb-4")
+        ui.label("Case Management").classes("text-2xl font-bold mb-4")
 
         # ----- Input Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
 
-            CASENUMBER_input = required_input(
-                label="Case Number"
+            CASENUMBER_input = required_input(label="Case Number"
             ).classes("w-full")
 
             CASENUMBER_input.props("autofocus")
 
-            LOCATION_input =required_input(
-                label="Location"
+            LOCATION_input =required_input(label="Location"
             ).classes("w-full")
 
             JURISDICTION_combo = required_select(
@@ -64,15 +58,15 @@ def build_cases_page() -> None:
             # ----- Date/Time Started -----
             CASEDATETIMEBEGIN_input = required_input(
                 label="Date/Time Started",
-                placeholder="YYYY-MM-DD HH:MM",
-                ).props('mask="####-##-## ##:##"'
+                placeholder="MM-DD-YYYY HH:MM",
+                ).props('mask="##-##-#### ##:##"'
             ).classes("w-full")
 
             # ----- Date/Time Ended -----
             CASEDATETIMEEND_input = ui.input(
                 label="Date/Time Ended",
-                placeholder="YYYY-MM-DD HH:MM"
-                ).props('mask="####-##-## ##:##"'
+                placeholder="MM-DD-YYYY HH:MM"
+                ).props('mask="##-##-#### ##:##"'
             ).classes("w-full")
 
             # ----- Buttons -----
@@ -139,21 +133,19 @@ def build_cases_page() -> None:
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                    color="transparent",
-                ).props("flat").classes("text-[var(--vsp-blue)]")
+                    color="transparent").props("flat"
+                ).classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Open New Case",
                     on_click=on_submit,
-                    color="var(--vsp-blue)",
-                ).props("unelevated").classes("text-[var(--vsp-white)]")
+                    color="var(--vsp-blue)").props("push"
+                ).classes("text-[var(--vsp-white)]")
 
         # ----- Existing Cases Table -----
         ui.separator().classes("my-6")
 
-        ui.label(
-            "Current Case"
-        ).classes("text-xl font-bold mb-3")
+        ui.label("Current Case").classes("text-xl font-bold mb-1")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2")
@@ -164,13 +156,12 @@ def build_cases_page() -> None:
             table_container.clear()
 
             with get_session() as session:
-
                 cases = session.query(Cases).all()
-
                 if not cases:
                     with table_container:
-                        ui.label("No cases in the database yet."
-                            ).classes("text-gray-500 italic")
+                        ui.label(
+                            "No current active case"
+                        ).classes("text-red italic")
                     return
 
                 # Build row_data INSIDE the session — BEFORE it closes
@@ -268,12 +259,12 @@ def build_cases_page() -> None:
                 # ----- Edit dialog -----
                 def open_edit_dialog(e) -> None:
                     row = e.args
-                    with ui.dialog() as edit_dialog, ui.card().classes(
-                        "w-full max-w-lg p-6"
-                    ):
+                    with ui.dialog() as edit_dialog, ui.card(
+                    ).classes("w-full max-w-lg p-6"):
 
-                        ui.label(f"Edit Case: {row['CASENUMBER']}"
-                            ).classes("text-lg font-semibold mb-4")
+                        ui.label(
+                            f"Edit Case: {row['CASENUMBER']}"
+                        ).classes("text-lg font-semibold mb-4")
 
                         CASENUMBER_input = required_input(
                             label="Case Number",
@@ -297,21 +288,17 @@ def build_cases_page() -> None:
                             required_input(
                                 label="Begin Date/Time",
                                 value=row["CASEDATETIMEBEGIN"],
-                                placeholder="YYYY-MM-DD HH:MM",
-                            )
-                            .props('mask="####-##-## ##:##"')
-                            .classes("w-full")
-                        )
+                                placeholder="MM-DD-YYYY HH:MM",
+                            ).props('mask="##-##-#### ##:##"'
+                        ).classes("w-full"))
 
                         CASEDATETIMEEND_input = (
                             ui.input(
                                 label="End Date/Time",
                                 value=row["CASEDATETIMEEND"],
-                                placeholder="YYYY-MM-DD HH:MM",
-                            )
-                            .props('mask="####-##-## ##:##"')
-                            .classes("w-full")
-                        )
+                                placeholder="MM-DD-YYYY HH:MM",
+                            ).props('mask="##-##-#### ##:##"'
+                        ).classes("w-full"))
 
                         with ui.row().classes(
                             "w-full justify-end gap-2 mt-4"):
@@ -319,17 +306,21 @@ def build_cases_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=edit_dialog.close,
-                                color="transparent",
-                            ).props("flat").classes("text-[var(--vsp-blue)]")
+                                color="transparent").props("flat"
+                            ).classes("text-[var(--vsp-blue)]")
 
                             def on_save_update() -> None:
                                 CASENUMBER = CASENUMBER_input.value or ""
                                 LOCATION = LOCATION_input.value or ""
                                 JURISDICTION = (
-                                    (JURISDICTION_input.value or "")
+                                    JURISDICTION_input.value or ""
                                 )
-                                CASEDATETIMEBEGIN = CASEDATETIMEBEGIN_input.value or ""
-                                CASEDATETIMEEND = CASEDATETIMEEND_input.value or ""
+                                CASEDATETIMEBEGIN = (
+                                    CASEDATETIMEBEGIN_input.value or ""
+                                )
+                                CASEDATETIMEEND = (
+                                    CASEDATETIMEEND_input.value or ""
+                                )
 
                                 if validate_case_entry(
                                     stage="update",
@@ -369,27 +360,21 @@ def build_cases_page() -> None:
                             ui.button(
                                 "Update",
                                 on_click=on_save_update,
-                                color="var(--vsp-blue)",
-                            ).props("unelevated").classes(
-                                "text-[var(--vsp-white)]"
-                            )
+                                color="var(--vsp-blue)").props("push"
+                            ).classes("text-[var(--vsp-white)]")
 
                     edit_dialog.open()
 
                 # ----- Delete confirmation dialog -----
                 def open_delete_dialog(e) -> None:
-
                     row = e.args
-
                     with ui.dialog() as delete_dialog, ui.card(
                         ).classes("max-w-sm p-6"
                     ):
-
                         ui.label(
                             "Confirm Deletion").classes(
                             "mb-3 text-lg font-bold text-[var(--vsp-blue)]"
                         )
-
                         ui.label(
                             f"Are you sure you want to delete "
                             f"case {row['CASENUMBER']}?"
@@ -400,13 +385,10 @@ def build_cases_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                                color="transparent",
-                                ).props("flat").classes(
-                                    "text-[var(--vsp-blue)]"
-                            )
+                                color="transparent").props("flat"
+                            ).classes("text-[var(--vsp-blue)]")
 
                             def on_confirm_delete() -> None:
-
                                 with get_session() as session:
                                     case = (
                                         session.query(Cases)
@@ -432,10 +414,8 @@ def build_cases_page() -> None:
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#EF4444",
-                            ).props("unelevated").classes(
-                                "text-[var(--vsp-white)]"
-                            )
+                                color="#EF4444").props("push"
+                            ).classes("text-[var(--vsp-white)]")
 
                     delete_dialog.open()
 

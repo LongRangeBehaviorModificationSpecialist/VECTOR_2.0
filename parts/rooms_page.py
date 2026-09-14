@@ -13,9 +13,8 @@ Consolidates four Flask routes into one interactive page:
 
 from nicegui import ui
 
-from models import get_session, Rooms
+from models import require_active_case, has_active_case, get_session, Rooms
 from navbar import build_navbar
-from home_page import confirm_new_case_handler
 from main import get_current_user_name, get_is_admin
 from utils import (
     required_input,
@@ -34,14 +33,11 @@ def build_rooms_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label(
-            "Rooms"
-        ).classes("text-2xl font-bold m-4")
+        ui.label("Rooms").classes("text-2xl font-bold m-4")
 
         # ----- Add Room Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
@@ -80,16 +76,15 @@ def build_rooms_page() -> None:
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_room_form() -> None:
-
                     ROOMLABEL_input.value = get_next_room_ltr()
                     ROOMDESC_input.value = ""
                     ROOMFIRSTAGENT_combo.value = None
                     ROOMSECONDAGENT_combo.value = None
                     ROOMNOTE_input.value = ""
 
+                @require_active_case
                 def on_submit() -> None:
                     """Handles form submission for new rooms."""
-
                     ROOMLABEL = ROOMLABEL_input.value
                     ROOMDESC = ROOMDESC_input.value
                     ROOMFIRSTAGENT = ROOMFIRSTAGENT_combo.value or ""
@@ -127,14 +122,14 @@ def build_rooms_page() -> None:
                             close_button="OK",
                         )
 
-                        refresh_rooms_table()
                         clear_room_form()
+                        refresh_rooms_table()
 
                     except Exception:
                         ui.notify(
-                            "Please check the Room information you just tried "
-                            "to enter/update — You may have entered a "
-                            "duplicate value. No changes were made.",
+                            "Please check the data you just tried to "
+                            "enter — an unknown error occured. "
+                            "No changes were made.",
                             type="negative",
                             timeout=0,
                             position="center",
@@ -146,21 +141,21 @@ def build_rooms_page() -> None:
                 ui.button(
                     "Clear",
                     on_click=clear_room_form,
-                    color="transparent",
-                ).props("flat").classes("text-[var(--vsp-blue)]")
+                    color="transparent").props("flat"
+                ).classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Add Room",
                     on_click=on_submit,
-                    color="var(--vsp-blue)",
-                ).props("unelevated").classes("text-[var(--vsp-white)]")
+                    color="var(--vsp-blue)").props("push"
+                ).classes("text-[var(--vsp-white)]")
 
         # ----- Existing Rooms Table -----
         ui.separator().classes("my-6")
 
         with ui.column().classes("w-full items-center"):
 
-            ui.label("Rooms List").classes("text-xl font-bold mb-3")
+            ui.label("Rooms List").classes("text-xl font-bold mb-1")
 
             with ui.row().classes("w-full max-w-6xl items-center"):
 
@@ -173,7 +168,6 @@ def build_rooms_page() -> None:
                     table_container.clear()
 
                     with get_session() as session:
-
                         rooms = (
                             session.query(Rooms)
                             .order_by(Rooms.ROOMLABEL)
@@ -183,8 +177,8 @@ def build_rooms_page() -> None:
                         if not rooms:
                             with table_container:
                                 ui.label(
-                                    "No rooms in the database yet."
-                                ).classes("text-gray-500 italic")
+                                    "No rooms have been entered"
+                                ).classes("text-red italic")
                             return
 
                         row_data = [
@@ -274,10 +268,9 @@ def build_rooms_page() -> None:
                         )
 
                         # ----- Edit dialog -----
+                        @require_active_case
                         def open_edit_dialog(e) -> None:
-
                             row = e.args
-
                             current_agents = load_agent_names()
 
                             with ui.dialog() as edit_dialog, ui.card(
@@ -288,8 +281,7 @@ def build_rooms_page() -> None:
                                     f"Edit Room ({row['ROOMLABEL']} - "
                                     f"{row['ROOMDESC']})"
                                 ).classes(
-                                    "mb-3 text-lg font-semibold text-[var(--vsp-blue)]"
-                                )
+                                    "mb-3 text-lg font-semibold text-[var(--vsp-blue)]")
 
                                 ROOMLABEL_input = required_input(
                                     label="Room Label",
@@ -327,10 +319,8 @@ def build_rooms_page() -> None:
                                     ui.button(
                                         "Cancel",
                                         on_click=edit_dialog.close,
-                                        color="transparent",
-                                    ).props("flat").classes(
-                                        "text-[var(--vsp-blue)]"
-                                    )
+                                        color="transparent").props("flat"
+                                    ).classes("text-[var(--vsp-blue)]")
 
                                     def on_save_update() -> None:
                                         ROOMLABEL = ROOMLABEL_input.value or ""
@@ -354,10 +344,8 @@ def build_rooms_page() -> None:
                                             return
 
                                         with get_session() as session:
-
                                             a1 = ROOMFIRSTAGENT
                                             a2 = ROOMSECONDAGENT
-
                                             # ----- Save changes -----
                                             room = (
                                                 session.query(Rooms)
@@ -384,18 +372,15 @@ def build_rooms_page() -> None:
                                     ui.button(
                                         "Update",
                                         on_click=on_save_update,
-                                        color="var(--vsp-blue)",
-                                        ).props("unelevated").classes(
-                                        "text-[var(--vsp-white)]"
-                                    )
+                                        color="var(--vsp-blue)").props("push"
+                                    ).classes("text-[var(--vsp-white)]")
 
                             edit_dialog.open()
 
                         # ----- Delete confirmation dialog -----
+                        @require_active_case
                         def open_delete_dialog(e) -> None:
-
                             row = e.args
-
                             with ui.dialog() as delete_dialog, ui.card(
                                 ).classes("max-w-sm p-6"
                             ):
@@ -427,10 +412,8 @@ def build_rooms_page() -> None:
                                     ui.button(
                                         "Cancel",
                                         on_click=delete_dialog.close,
-                                        color="transparent",
-                                        ).props("flat").classes(
-                                        "text-[var(--vsp-blue)]"
-                                    )
+                                        color="transparent").props("flat"
+                                    ).classes("text-[var(--vsp-blue)]")
 
                                     def on_confirm_delete() -> None:
 
@@ -462,10 +445,8 @@ def build_rooms_page() -> None:
                                     ui.button(
                                         "Delete",
                                         on_click=on_confirm_delete,
-                                        color="#EF4444",
-                                        ).props("unelevated").classes(
-                                        "text-[var(--vsp-white)]"
-                                    )
+                                        color="#EF4444",).props("push"
+                                    ).classes("text-[var(--vsp-white)]")
 
                             delete_dialog.open()
 
@@ -474,8 +455,9 @@ def build_rooms_page() -> None:
 
             with ui.row().classes("w-full justify-center my-2"):
 
+                # ----- DELETE ALL BUTTON -----
+                @require_active_case
                 def delete_all_rooms() -> None:
-
                     with get_session() as session:
                         session.query(Rooms).delete()
                         session.commit()
@@ -489,14 +471,15 @@ def build_rooms_page() -> None:
 
                     refresh_rooms_table()
 
+                case_exists = has_active_case()
+
                 ui.button(
                     "Delete All Rooms",
                     on_click=lambda: confirm_delete_all(
                         "rooms",
                         delete_all_rooms
-                    ),
-                    color="#EF4444",
-                ).props("unelevated").classes("mb-2 items-center")
+                    ), color="#EF4444").props("push"
+                ).classes("mb-2 items-center").set_enabled(case_exists)
 
     # ----- Initial render -----
     refresh_rooms_table()

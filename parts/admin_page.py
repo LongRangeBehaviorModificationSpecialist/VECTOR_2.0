@@ -24,7 +24,6 @@ def build_admin_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=None,
     )
 
     with ui.column().classes("w-full items-center"):
@@ -58,6 +57,7 @@ def build_admin_page() -> None:
                     return
 
                 with get_users_session() as session:
+
                     if session.query(Users).filter_by(USERNAME=uname).first():
                         ui.notify(
                             "That username already exists.",
@@ -95,8 +95,8 @@ def build_admin_page() -> None:
             ui.button(
                 "Create User",
                 on_click=create_user,
-                color="var(--vsp-blue)",
-            ).props("unelevated").classes("text-[var(--vsp-white)]")
+                color="var(--vsp-blue)").props("push"
+            ).classes("text-[var(--vsp-white)]")
 
         # ----- Existing Users Table -----
         ui.separator().classes("my-6")
@@ -224,8 +224,9 @@ def build_admin_page() -> None:
                                     f"Reset the password for "
                                     f"{row['USERNAME']} back "
                                     f"to the default?  They will be prompted "
-                                    f"to change it on next login."
-                                ).classes("mb-4 text-sm text-[var(--vsp-gray)]")
+                                    f"to change it on next login.").classes(
+                                    "mb-4 text-sm text-[var(--vsp-gray)]"
+                                )
 
                                 with ui.row().classes(
                                     "w-full justify-end gap-2"
@@ -272,9 +273,7 @@ def build_admin_page() -> None:
                                     ui.button(
                                         "Reset",
                                         on_click=on_confirm_reset,
-                                        color="var(--vsp-blue)"
-                                    ).props(
-                                        "unelevated"
+                                        color="var(--vsp-blue)").props("push"
                                     ).classes("text-[var(--vsp-white)]")
 
                             reset_dialog.open()
@@ -346,10 +345,8 @@ def build_admin_page() -> None:
                                     ui.button(
                                         "Delete",
                                         on_click=on_confirm_delete,
-                                        color="#EF4444",
-                                    ).props("unelevated").classes(
-                                        "text-[var(--vsp-white)]"
-                                    )
+                                        color="#EF4444").props("push"
+                                    ).classes("text-[var(--vsp-white)]")
 
                             delete_dialog.open()
 

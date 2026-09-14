@@ -11,6 +11,7 @@ from nicegui import ui
 import mimetypes
 from models import (
     get_session,
+    require_active_case,
     Agents,
     Cases,
     Evidence,
@@ -302,6 +303,7 @@ def is_duplicate_agent_in_json(
     return False
 
 
+@require_active_case
 def confirm_delete_all(action: str, callback):
     """Shows a confirmation dialog before executing a destructive action."""
     with ui.dialog() as dialog, ui.card().classes("max-w-sm p-6"):
@@ -324,8 +326,8 @@ def confirm_delete_all(action: str, callback):
             ui.button(
                 "Delete All",
                 on_click=on_confirm,
-                color="#1C69A8",
-            ).props("negative unelevated")
+                color="#ef4444",
+            ).props("push")
 
     dialog.open()
 

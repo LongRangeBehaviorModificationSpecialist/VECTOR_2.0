@@ -10,9 +10,13 @@ from nicegui import ui
 import os
 import tempfile
 
-from models import get_session, UploadedFiles
+from models import (
+    require_active_case,
+    has_active_case,
+    get_session,
+    UploadedFiles,
+)
 from navbar import build_navbar
-from home_page import confirm_new_case_handler
 from main import get_current_user_name, get_is_admin
 from utils import (
     get_mime_type,
@@ -30,27 +34,23 @@ def build_uploads_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label(
-            "File Upload & Management"
-        ).classes("text-2xl font-bold m-4")
+        ui.label("File Upload & Management").classes("text-2xl font-bold m-4")
 
         # ----- Upload Section -----
         with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
 
-            ui.label(
-                "Upload New File"
-            ).classes("text-lg font-semibold mb-2")
+            ui.label("Upload New File").classes("text-lg font-semibold mb-2")
 
             ui.label(
                 "Allowed file types → (1) Images, (2) Videos, (3) Documents, "
                 "and (4) Archive files."
             ).classes("text-sm text-gray-400 mb-2")
 
+            @require_active_case
             async def handle_upload(e) -> None:
                 """Handles file upload from ui.upload component."""
 
@@ -128,10 +128,11 @@ def build_uploads_page() -> None:
         # ----- Existing Files Table -----
         ui.separator().classes("my-6")
 
-        ui.label("Files List").classes("text-xl font-bold mb-3")
+        ui.label("Files List").classes("text-xl font-bold mb-1")
 
         table_container = ui.column().classes(
-            "w-full max-w-5xl mx-auto items-center gap-2")
+            "w-full max-w-5xl mx-auto items-center gap-2"
+        )
 
         def refresh_files_table() -> None:
             """Re-renders the files table from the database."""
@@ -144,11 +145,12 @@ def build_uploads_page() -> None:
                     .order_by(UploadedFiles.FILEUPLOADDATE.desc())
                     .all()
                 )
+
                 if not files:
                     with table_container:
                         ui.label(
-                            "No files uploaded yet"
-                        ).classes("text-gray-500 italic")
+                            "No files have been uploaded"
+                        ).classes("text-red italic")
                     return
 
                 row_data = [
@@ -249,10 +251,9 @@ def build_uploads_page() -> None:
                 )
 
                 # ----- Download handler -----
+                @require_active_case
                 def on_download(e) -> None:
-
                     row = e.args
-
                     with get_session() as session:
                         file_record = (
                             session.query(UploadedFiles)
@@ -276,11 +277,10 @@ def build_uploads_page() -> None:
                             ui.download(temp_path)
 
                 # ----- Delete confirmation dialog -----
+                @require_active_case
                 def open_delete_dialog(e) -> None:
                     """Confirms and deletes a file."""
-
                     row = e.args
-
                     with ui.dialog() as delete_dialog, ui.card(
                         ).classes("max-w-sm p-6"
                     ):
@@ -310,8 +310,8 @@ def build_uploads_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                                color="transparent",
-                            ).props("flat").classes("text-[var(--vsp-blue)]")
+                                color="transparent").props("flat"
+                            ).classes("text-[var(--vsp-blue)]")
 
                             def on_confirm_delete() -> None:
                                 with get_session() as session:
@@ -320,6 +320,7 @@ def build_uploads_page() -> None:
                                         .filter_by(Z_PK=row["Z_PK"])
                                         .first()
                                     )
+
                                     if file_record:
                                         session.delete(file_record)
 
@@ -337,10 +338,8 @@ def build_uploads_page() -> None:
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#EF4444",
-                            ).props("unelevated").classes(
-                                "text-[var(--vsp-white)]"
-                            )
+                                color="#EF4444").props("push"
+                            ).classes("text-[var(--vsp-white)]")
 
                     delete_dialog.open()
 
@@ -349,6 +348,8 @@ def build_uploads_page() -> None:
 
         with ui.row().classes("w-full justify-center my-2"):
 
+            # ----- DELETE ALL BUTTON -----
+            @require_active_case
             def delete_all_files() -> None:
                 with get_session() as session:
                     session.query(UploadedFiles).delete()
@@ -363,14 +364,15 @@ def build_uploads_page() -> None:
 
                 refresh_files_table()
 
+            case_exists = has_active_case()
+
             ui.button(
                 "Delete All Files",
                 on_click=lambda: confirm_delete_all(
                     "files",
                     delete_all_files,
-                ),
-                color="#EF4444",
-            ).props("unelevated").classes("mb-2 items-center")
+                ), color="#EF4444",).props("push"
+            ).classes("mb-2 items-center").set_enabled(case_exists)
 
     # ----- Initial render -----
     refresh_files_table()

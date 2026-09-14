@@ -35,7 +35,6 @@ import json
 
 from models import get_session, Agents, Cases, Evidence, Notes, Persons, Rooms
 from navbar import build_navbar
-from home_page import confirm_new_case_handler
 from main import is_authenticated, get_current_user_name, get_is_admin
 from utils import get_print_date_time, get_case_info
 
@@ -47,7 +46,6 @@ def build_reports_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("items-center w-full mt-4 mb-4"):
@@ -67,43 +65,43 @@ def build_reports_page() -> None:
                 "Print Agent List",
                 on_click=lambda: ui.navigate.to("/reports/agents"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Room List",
                 on_click=lambda: ui.navigate.to("/reports/rooms"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Evidence List (Full)",
                 on_click=lambda: ui.navigate.to("/reports/evidence"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Evidence List (By Room)",
                 on_click=lambda: ui.navigate.to("/reports/evidence_by_room"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Evidence List (Basic)",
                 on_click=lambda: ui.navigate.to("/reports/evidence_basic"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Persons List",
                 on_click=lambda: ui.navigate.to("/reports/persons"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Notes List",
                 on_click=lambda: ui.navigate.to("/reports/notes"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
 
 def render_report_page(html_content: str) -> None:
@@ -111,7 +109,6 @@ def render_report_page(html_content: str) -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
@@ -122,7 +119,7 @@ def render_report_page(html_content: str) -> None:
                 "Print Report",
                 on_click=open_report_window,
                 color="#1C69A8",
-            ).props("unelevated icon=print").classes("mb-4 no-print")
+            ).props("push icon=print").classes("mb-4 no-print")
 
             ui.html(html_content)
 
@@ -1282,105 +1279,104 @@ def print_notes_report() -> None:
     render_report_page(html_content=html)
 
 
-# ----- JSON Output -----
-@ui.page("/reports/json")
-def json_output_page() -> None:
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
+# # ----- JSON Output -----
+# @ui.page("/reports/json")
+# def json_output_page() -> None:
+#     if not is_authenticated():
+#         ui.navigate.to("/")
+#         return
 
-    build_navbar(
-        is_admin=get_is_admin(),
-        username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
-    )
+#     build_navbar(
+#         is_admin=get_is_admin(),
+#         username=get_current_user_name(),
+#     )
 
-    ui.label("JSON Data Output").classes("text-2xl font-bold m-4")
+#     ui.label("JSON Data Output").classes("text-2xl font-bold m-4")
 
-    with get_session() as session:
+#     with get_session() as session:
 
-        case = session.query(Cases).first()
+#         case = session.query(Cases).first()
 
-        data = {
-            "case": {
-                "CASENUMBER": case.CASENUMBER,
-                "LOCATION": case.LOCATION,
-                "JURISDICTION": case.JURISDICTION,
-                "CASEDATETIMEBEGIN": case.CASEDATETIMEBEGIN,
-                "CASEDATETIMEEND": case.CASEDATETIMEEND,
-            },
-            "agents": [
-                {
-                    "AGENTNAME": a.AGENTNAME,
-                    "AGENTPARENTAGENCY": a.AGENTPARENTAGENCY,
-                    "AGENTPRIMARYROLE": a.AGENTPRIMARYROLE,
-                    "AGENTROLESECONDARY": a.AGENTROLESECONDARY or "",
-                    "AGENTPHONE": a.AGENTPHONE,
-                    "AGENTEMAIL": a.AGENTEMAIL,
-                    "AGENTNOTE": a.AGENTNOTE or "",
-                }
-                for a in session.query(Agents).all()
-            ],
-            "evidence": [
-                {
-                    "EVIDNUM": e.EVIDNUM,
-                    "EVIDQTY": e.EVIDQTY,
-                    "EVIDDESC": e.EVIDDESC,
-                    "EVIDMODELNUMBER": e.EVIDMODELNUMBER,
-                    "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER,
-                    "EVIDLOCROOM": e.EVIDLOCROOM,
-                    "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
-                    "EVIDFOUNDBY": e.EVIDFOUNDBY,
-                    "EVIDFOUNDBYWITNESS": e.EVIDFOUNDBYWITNESS,
-                    "EVIDPICTAKEN": e.EVIDPICTAKEN,
-                    "EVIDTRIAGED": e.EVIDTRIAGED,
-                    "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY,
-                    "EVIDISCONTRABAND": e.EVIDISCONTRABAND,
-                    "EVIDNOTE": e.EVIDNOTE,
-                }
-                for e in session.query(Evidence).all()
-            ],
-            "rooms": [
-                {
-                    "ROOMLABEL": r.ROOMLABEL,
-                    "ROOMDESC": r.ROOMDESC,
-                    "ROOMFIRSTAGENT": r.ROOMFIRSTAGENT,
-                    "ROOMSECONDAGENT": r.ROOMSECONDAGENT,
-                }
-                for r in session.query(Rooms).all()
-            ],
-            "persons": [
-                {
-                    "PERSONNAME": p.PERSONNAME,
-                    "PERSONDOB": p.PERSONDOB or "",
-                    "PERSONADDRESS": p.PERSONADDRESS or "",
-                    "PERSONPHONE": p.PERSONPHONE or "",
-                    "SUSPECTNOTE": p.SUSPECTNOTE or "",
-                }
-                for p in session.query(Persons).all()
-            ],
-            "notes": [
-                {
-                    "NOTEDATETIME": n.NOTEDATETIME,
-                    "NOTEDATETIMEUPDATED": n.NOTEDATETIMEUPDATED or "",
-                    "NOTEAUTHOR": n.NOTEAUTHOR,
-                    "NOTETEXT": n.NOTETEXT,
-                }
-                for n in session.query(Notes).all()
-            ],
-        }
+#         data = {
+#             "case": {
+#                 "CASENUMBER": case.CASENUMBER,
+#                 "LOCATION": case.LOCATION,
+#                 "JURISDICTION": case.JURISDICTION,
+#                 "CASEDATETIMEBEGIN": case.CASEDATETIMEBEGIN,
+#                 "CASEDATETIMEEND": case.CASEDATETIMEEND,
+#             },
+#             "agents": [
+#                 {
+#                     "AGENTNAME": a.AGENTNAME,
+#                     "AGENTPARENTAGENCY": a.AGENTPARENTAGENCY,
+#                     "AGENTPRIMARYROLE": a.AGENTPRIMARYROLE,
+#                     "AGENTROLESECONDARY": a.AGENTROLESECONDARY or "",
+#                     "AGENTPHONE": a.AGENTPHONE,
+#                     "AGENTEMAIL": a.AGENTEMAIL,
+#                     "AGENTNOTE": a.AGENTNOTE or "",
+#                 }
+#                 for a in session.query(Agents).all()
+#             ],
+#             "evidence": [
+#                 {
+#                     "EVIDNUM": e.EVIDNUM,
+#                     "EVIDQTY": e.EVIDQTY,
+#                     "EVIDDESC": e.EVIDDESC,
+#                     "EVIDMODELNUMBER": e.EVIDMODELNUMBER,
+#                     "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER,
+#                     "EVIDLOCROOM": e.EVIDLOCROOM,
+#                     "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
+#                     "EVIDFOUNDBY": e.EVIDFOUNDBY,
+#                     "EVIDFOUNDBYWITNESS": e.EVIDFOUNDBYWITNESS,
+#                     "EVIDPICTAKEN": e.EVIDPICTAKEN,
+#                     "EVIDTRIAGED": e.EVIDTRIAGED,
+#                     "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY,
+#                     "EVIDISCONTRABAND": e.EVIDISCONTRABAND,
+#                     "EVIDNOTE": e.EVIDNOTE,
+#                 }
+#                 for e in session.query(Evidence).all()
+#             ],
+#             "rooms": [
+#                 {
+#                     "ROOMLABEL": r.ROOMLABEL,
+#                     "ROOMDESC": r.ROOMDESC,
+#                     "ROOMFIRSTAGENT": r.ROOMFIRSTAGENT,
+#                     "ROOMSECONDAGENT": r.ROOMSECONDAGENT,
+#                 }
+#                 for r in session.query(Rooms).all()
+#             ],
+#             "persons": [
+#                 {
+#                     "PERSONNAME": p.PERSONNAME,
+#                     "PERSONDOB": p.PERSONDOB or "",
+#                     "PERSONADDRESS": p.PERSONADDRESS or "",
+#                     "PERSONPHONE": p.PERSONPHONE or "",
+#                     "SUSPECTNOTE": p.SUSPECTNOTE or "",
+#                 }
+#                 for p in session.query(Persons).all()
+#             ],
+#             "notes": [
+#                 {
+#                     "NOTEDATETIME": n.NOTEDATETIME,
+#                     "NOTEDATETIMEUPDATED": n.NOTEDATETIMEUPDATED or "",
+#                     "NOTEAUTHOR": n.NOTEAUTHOR,
+#                     "NOTETEXT": n.NOTETEXT,
+#                 }
+#                 for n in session.query(Notes).all()
+#             ],
+#         }
 
-    json_str = json.dumps(data, indent=4)
+#     json_str = json.dumps(data, indent=4)
 
-    with ui.column().classes("w-full max-w-4xl mx-auto p-4"):
-        ui.button(
-            "Copy JSON",
-            on_click=lambda: ui.run_javascript(
-                f"navigator.clipboard.writeText('{json_str}')"
-            ),
-        ).props("outline icon=content_copy").classes("mb-4")
+#     with ui.column().classes("w-full max-w-4xl mx-auto p-4"):
+#         ui.button(
+#             "Copy JSON",
+#             on_click=lambda: ui.run_javascript(
+#                 f"navigator.clipboard.writeText('{json_str}')"
+#             ),
+#         ).props("outline icon=content_copy").classes("mb-4")
 
-        ui.code(json_str, language="json").classes("w-full")
+#         ui.code(json_str, language="json").classes("w-full")
 
 
 def open_report_window() -> None:
@@ -1400,7 +1396,7 @@ def open_report_window() -> None:
     ui.run_javascript(f"""
         const reportContent = document.getElementById('report-container');
         if (!reportContent) {{
-            alert('No report content found to print.');
+            alert('No report content found to print...');
             return;
         }}
 

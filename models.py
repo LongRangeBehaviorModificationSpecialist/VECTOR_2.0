@@ -10,6 +10,8 @@ Dependencies:
 import bcrypt
 from contextlib import contextmanager
 from datetime import datetime
+from functools import wraps
+from nicegui import ui
 from sqlalchemy import (
     create_engine,
     Column,
@@ -31,24 +33,21 @@ current_date = datetime.today().strftime("%Y-%m-%d")
 
 # ----- Main database -----
 DATABASE_URL = f"sqlite:///db/app_data.db"
-
 engine = create_engine(
     DATABASE_URL,
     echo=False,
     future=True,
     connect_args={"check_same_thread": False}
 )
-
 Session = sessionmaker(bind=engine)
+
 
 # ----- Users database -----
 USERS_DATABASE_URL = "sqlite:///db/users.db"
-
 users_engine = create_engine(
     USERS_DATABASE_URL,
     connect_args={"check_same_thread": False}
 )
-
 UsersSession = sessionmaker(bind=users_engine)
 
 
@@ -82,7 +81,6 @@ class Cases(Base):
 
 class CaseSchema(Schema):
     """Case schema."""
-
     CASENUMBER = fields.Str()
     LOCATION = fields.Str()
     JURISDICTION = fields.Str()
@@ -117,7 +115,6 @@ class Agents(Base):
 
 class AgentsSchema(Schema):
     """Agent schema."""
-
     AGENTNAME = fields.Str()
     AGENTPARENTAGENCY = fields.Str()
     AGENTPRIMARYROLE = fields.Str()
@@ -152,14 +149,12 @@ class Rooms(Base):
 
 class RoomsSchema(Schema):
     """Room schema."""
-
     ROOMLABEL = fields.Str()
     ROOMDESC = fields.Str()
     ROOMFIRSTAGENT = fields.Str()
     ROOMSECONDAGENT = fields.Str()
     ROOMNOTE = fields.Str()
     ENTEREDDATETIME = fields.Str()
-
 
 rooms_schema = RoomsSchema(many=True)
 
@@ -194,7 +189,6 @@ class Evidence(Base):
 
 class EvidenceSchema(Schema):
     """Evidence schema."""
-
     EVIDNUM = fields.Str()
     EVIDQTY = fields.Str()
     EVIDDESC = fields.Str()
@@ -236,7 +230,6 @@ class Persons(Base):
 
 class PersonSchema(Schema):
     """Person schema."""
-
     PERSONNAME = fields.Str()
     PERSONDOB = fields.Str()
     PERSONADDRESS = fields.Str()
@@ -267,7 +260,6 @@ class Notes(Base):
 
 class NotesSchema(Schema):
     """Notes schema."""
-
     NOTEDATETIME = fields.Str()
     NOTEDATETIMEUPDATED = fields.Str()
     NOTEAUTHOR = fields.Str()
@@ -299,7 +291,6 @@ class UploadedFiles(Base):
 
 class FileSchema(Schema):
     """File schema."""
-
     FILENAME = fields.Str()
     FILESIZE = fields.Int()
     FILEMIMETYPE = fields.Str()
@@ -401,3 +392,73 @@ def get_users_session():
         raise
     finally:
         session.close()
+
+
+def check_case_info() -> dict | None:
+    """Returns info about the currently active case as a dict, or None
+    if no case exists.
+    """
+
+    with get_session() as session:
+        case = session.query(Cases).first()
+        if not case:
+            return None
+        return {
+            "Z_PK": case.Z_PK,
+            "CASENUMBER": case.CASENUMBER,
+            "CASEDATETIMEBEGIN": (
+                case.CASEDATETIMEBEGIN if case.CASEDATETIMEBEGIN else None
+            ),
+        }
+
+
+def has_active_case() -> bool:
+    """Returns True if exactly one case exists in the database."""
+    with get_session() as session:
+        count = session.query(Cases).count()
+        return count > 0
+
+
+def clear_all_case_data():
+    """Deletes ALL rows from EVERY case-related table.
+
+    Call this BEFORE creating a new case.
+    """
+    from sqlalchemy import text
+
+    # Order matters — delete child tables first (FK constraints)
+    with get_session() as session:
+        try:
+            ui.notify("Old case data cleared", type="positive", timeout=0, position="center", close_button="OK")
+            ui.navigate.to("/")
+
+            # These tables have FKs to others — delete in reverse dependency order
+            session.query(Notes).delete()
+            session.query(Evidence).delete()
+            session.query(Persons).delete()
+            session.query(Rooms).delete()
+            session.query(UploadedFiles).delete()  # BLOBs
+            session.query(Agents).delete()
+            session.query(Cases).delete()
+
+            session.flush()
+
+        except Exception as err:
+            raise RuntimeError(f"Failed to clear case data → {err}")
+
+
+def require_active_case(func):
+    """Decorator that blocks the function if no case exists."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not has_active_case():
+            ui.notify(
+                "No active case!  Start a case before proceeding.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return
+        return func(*args, **kwargs)
+    return wrapper

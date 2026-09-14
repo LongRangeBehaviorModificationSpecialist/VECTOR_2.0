@@ -12,9 +12,8 @@ Consolidates five Flask routes into one interactive page:
 """
 
 from nicegui import ui
-from models import get_session, Agents
+from models import require_active_case, has_active_case, get_session, Agents
 
-from home_page import confirm_new_case_handler
 from main import get_current_user_name, get_is_admin
 from navbar import build_navbar
 from utils import (
@@ -41,7 +40,6 @@ def build_agents_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
@@ -93,9 +91,7 @@ def build_agents_page() -> None:
 
             # ----- Auto-populate on name selection -----
             def on_name_change(e) -> None:
-
                 selected = e.value
-
                 if not selected:
                     return
 
@@ -118,7 +114,6 @@ def build_agents_page() -> None:
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_agent_form() -> None:
-
                     AGENTNAME_input.value = None
                     AGENTPARENTAGENCY_input.value = None
                     AGENTPRIMARYROLE_input.value = None
@@ -127,9 +122,9 @@ def build_agents_page() -> None:
                     AGENTEMAIL_input.value = ""
                     AGENTNOTE_input.value = ""
 
+                @require_active_case
                 def on_submit() -> None:
                     """Handles form submission for new agents."""
-
                     AGENTNAME = AGENTNAME_input.value or ""
                     AGENTPARENTAGENCY = AGENTPARENTAGENCY_input.value or ""
                     AGENTPRIMARYROLE = AGENTPRIMARYROLE_input.value
@@ -192,14 +187,14 @@ def build_agents_page() -> None:
                                 close_button="OK",
                             )
 
-                        refresh_agent_table()
                         clear_agent_form()
+                        refresh_agent_table()
 
                     except Exception:
                         ui.notify(
-                            "Please check the Agent Information you just "
-                            "tried to enter/update — You may have entered a "
-                            "duplicate value. No changes were made.",
+                            "Please check the data you just tried to "
+                            "enter — an unknown error occured. "
+                            "No changes were made.",
                             type="negative",
                             timeout=0,
                             position="center",
@@ -211,21 +206,21 @@ def build_agents_page() -> None:
                 ui.button(
                     "Clear",
                     on_click=clear_agent_form,
-                    color="transparent",
-                ).props("flat").classes("text-[var(--vsp-blue)]")
+                    color="transparent",).props("flat"
+                ).classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Add Agent",
                     on_click=on_submit,
-                    color="var(--vsp-blue)",
-                ).props("unelevated").classes("text-[var(--vsp-white)]")
+                    color="var(--vsp-blue)").props("push"
+                ).classes("text-[var(--vsp-white)]")
 
         # ----- Agent List Table -----
         ui.separator().classes("mt-6 mb-3")
 
         with ui.column().classes("w-full items-center"):
 
-            ui.label("Agents List").classes("text-xl font-bold mb-3")
+            ui.label("Agents List").classes("text-xl font-bold mb-1")
 
             with ui.row().classes("w-full max-w-6xl items-center"):
 
@@ -238,7 +233,6 @@ def build_agents_page() -> None:
                     table_container.clear()
 
                     with get_session() as session:
-
                         agents = (
                             session.query(Agents)
                             .order_by(Agents.AGENTNAME)
@@ -248,8 +242,8 @@ def build_agents_page() -> None:
                         if not agents:
                             with table_container:
                                 ui.label(
-                                    "No agents in the database yet"
-                                ).classes("text-gray-500 italic")
+                                    "No agents have been entered"
+                                ).classes("text-red italic")
                             return
 
                         row_data = [
@@ -358,10 +352,9 @@ def build_agents_page() -> None:
                         )
 
                         # ----- Edit dialog -----
+                        @require_active_case
                         def open_edit_dialog(e) -> None:
-
                             row = e.args
-
                             with ui.dialog() as edit_dialog, ui.card(
                                 ).classes("w-full max-w-lg p-6"
                             ):
@@ -421,10 +414,8 @@ def build_agents_page() -> None:
                                     ui.button(
                                         "Cancel",
                                         on_click=edit_dialog.close,
-                                        color="transparent",
-                                        ).props("flat").classes(
-                                        "text-[var(--vsp-blue)]"
-                                    )
+                                        color="transparent").props("flat"
+                                    ).classes("text-[var(--vsp-blue)]")
 
                                     def on_save_update() -> None:
                                         """Handles form submission for
@@ -502,18 +493,15 @@ def build_agents_page() -> None:
                                     ui.button(
                                         "Update",
                                         on_click=on_save_update,
-                                        color="var(--vsp-blue)",
-                                        ).props("unelevated").classes(
-                                        "text-[var(--vsp-white)]"
-                                    )
+                                        color="var(--vsp-blue)").props("push"
+                                    ).classes("text-[var(--vsp-white)]")
 
                             edit_dialog.open()
 
                         # ----- Delete confirmation dialog -----
+                        @require_active_case
                         def open_delete_dialog(e) -> None:
-
                             row = e.args
-
                             with ui.dialog() as delete_dialog, ui.card(
                                 ).classes("max-w-sm p-6"
                             ):
@@ -543,14 +531,11 @@ def build_agents_page() -> None:
                                     ui.button(
                                         "Cancel",
                                         on_click=delete_dialog.close,
-                                        color="transparent",
-                                        ).props("flat"
+                                        color="transparent").props("flat"
                                     ).classes("text-[var(--vsp-blue)]")
 
                                     def confirm_agent_delete() -> None:
-
                                         with get_session() as session:
-
                                             agent = (
                                                 session.query(Agents)
                                                 .filter_by(Z_PK=row["Z_PK"])
@@ -576,10 +561,8 @@ def build_agents_page() -> None:
                                     ui.button(
                                         "Delete",
                                         on_click=confirm_agent_delete,
-                                        color="#EF4444",
-                                        ).props("unelevated").classes(
-                                        "text-[var(--vsp-white)]"
-                                    )
+                                        color="#EF4444").props("push"
+                                    ).classes("text-[var(--vsp-white)]")
 
                             delete_dialog.open()
 
@@ -589,10 +572,9 @@ def build_agents_page() -> None:
             with ui.row().classes("w-full justify-center my-2"):
 
                 # ----- DELETE ALL BUTTON -----
+                @require_active_case
                 def delete_all_agents() -> None:
-
                     with get_session() as session:
-
                         session.query(Agents).delete()
                         session.commit()
 
@@ -605,14 +587,15 @@ def build_agents_page() -> None:
 
                     refresh_agent_table()
 
+                case_exists = has_active_case()
+
                 ui.button(
                     "Delete All Agents",
                     on_click=lambda: confirm_delete_all(
                         "agents",
                         delete_all_agents
-                    ),
-                    color="#EF4444",
-                ).props("unelevated").classes("mb-2 items-center")
+                    ), color="#EF4444").props("push"
+                ).classes("mb-2 items-center").set_enabled(case_exists)
 
     # ----- Initial render -----
     refresh_agent_table()

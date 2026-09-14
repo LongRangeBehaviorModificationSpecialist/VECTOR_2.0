@@ -12,9 +12,8 @@ Consolidates four Flask routes into one interactive page:
 
 from nicegui import ui
 
-from models import get_session, Notes
+from models import require_active_case, has_active_case, get_session, Notes
 from navbar import build_navbar
-from home_page import confirm_new_case_handler
 from main import get_current_user_name, get_is_admin
 from utils import (
     required_select,
@@ -33,14 +32,11 @@ def build_notes_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label(
-            "Notes"
-        ).classes("text-2xl font-bold m-4")
+        ui.label("Notes").classes("text-2xl font-bold m-4")
 
         # ----- Add Note Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
@@ -76,14 +72,13 @@ def build_notes_page() -> None:
             # ----- Buttons -----
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
-                def clear_form() -> None:
-
+                def clear_notes_form() -> None:
                     NOTEDATETIME_input.value = get_current_timestamp()
                     NOTEAUTHOR_combo.value = None
                     NOTETEXT_input.value = ""
 
+                @require_active_case
                 def on_submit() -> None:
-
                     NOTEDATETIME = (
                         NOTEDATETIME_input.value or
                         get_current_timestamp()
@@ -97,44 +92,55 @@ def build_notes_page() -> None:
                     ):
                         return
 
-                    with get_session() as session:
-                        new_note = Notes(
-                            NOTEDATETIME=NOTEDATETIME,
-                            NOTEDATETIMEUPDATED="",
-                            NOTEAUTHOR=NOTEAUTHOR,
-                            NOTETEXT=NOTETEXT,
+                    try:
+                        with get_session() as session:
+                            new_note = Notes(
+                                NOTEDATETIME=NOTEDATETIME,
+                                NOTEDATETIMEUPDATED="",
+                                NOTEAUTHOR=NOTEAUTHOR,
+                                NOTETEXT=NOTETEXT,
+                            )
+                            session.add(new_note)
+
+                        ui.notify(
+                            f"Note from {NOTEAUTHOR} was added.",
+                            timeout=4000,
+                            position="bottom",
+                            close_button="OK",
                         )
-                        session.add(new_note)
 
-                    ui.notify(
-                        f"Note from {NOTEAUTHOR} was added.",
-                        timeout=4000,
-                        position="bottom",
-                        close_button="OK",
-                    )
+                        clear_notes_form()
+                        refresh_notes_table()
 
-                    clear_form()
-                    refresh_notes_table()
+                    except Exception:
+                        ui.notify(
+                            "Please check the data you just tried to "
+                            "enter — an unknown error occured. "
+                            "No changes were made.",
+                            type="negative",
+                            timeout=0,
+                            position="center",
+                            close_button="OK",
+                        )
+                        import traceback
+                        traceback.print_exc()
 
                 ui.button(
                     "Clear",
-                    on_click=clear_form,
-                    color="transparent",
-                    ).props("flat"
+                    on_click=clear_notes_form,
+                    color="transparent").props("flat"
                 ).classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Add Note",
                     on_click=on_submit,
-                    color="var(--vsp-blue)",
-                ).props("unelevated").classes("text-[var(--vsp-white)]")
+                    color="var(--vsp-blue)").props("push"
+                ).classes("text-[var(--vsp-white)]")
 
         # ----- Existing Notes Table -----
         ui.separator().classes("my-6")
 
-        ui.label(
-            "Notes List"
-        ).classes("text-xl font-bold mb-3")
+        ui.label("Notes List").classes("text-xl font-bold mb-1")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2"
@@ -145,7 +151,6 @@ def build_notes_page() -> None:
             table_container.clear()
 
             with get_session() as session:
-
                 notes = (
                     session.query(Notes)
                     .order_by(Notes.Z_PK)
@@ -155,8 +160,8 @@ def build_notes_page() -> None:
                 if not notes:
                     with table_container:
                         ui.label(
-                            "No notes in the database yet"
-                        ).classes("text-gray-500 italic")
+                            "No notes have been entered"
+                        ).classes("text-red italic")
                     return
 
                 row_data = [
@@ -243,10 +248,9 @@ def build_notes_page() -> None:
                 )
 
                 # ----- Edit dialog -----
+                @require_active_case
                 def open_edit_dialog(e) -> None:
-
                     row = e.args
-
                     current_agents = load_agent_names()
 
                     with ui.dialog() as edit_dialog, ui.card(
@@ -292,8 +296,8 @@ def build_notes_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=edit_dialog.close,
-                                color="transparent",
-                            ).props("flat").classes("text-[var(--vsp-blue)]")
+                                color="transparent").props("flat"
+                            ).classes("text-[var(--vsp-blue)]")
 
                             def on_save_update() -> None:
                                 NOTEDATETIMEUPDATED = (
@@ -336,18 +340,15 @@ def build_notes_page() -> None:
                             ui.button(
                                 "Update",
                                 on_click=on_save_update,
-                                color="var(--vsp-blue)",
-                                ).props("unelevated").classes(
-                                "text-[var(--vsp-white)]"
-                            )
+                                color="var(--vsp-blue)").props("push"
+                            ).classes("text-[var(--vsp-white)]")
 
                     edit_dialog.open()
 
                 # ----- Delete confirmation dialog -----
+                @require_active_case
                 def open_delete_dialog(e) -> None:
-
                     row = e.args
-
                     with ui.dialog() as delete_dialog, ui.card(
                         ).classes("max-w-sm p-6"
                     ):
@@ -384,13 +385,11 @@ def build_notes_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                                color="transparent",
-                            ).props("flat").classes("text-[var(--vsp-blue)]")
+                                color="transparent").props("flat"
+                            ).classes("text-[var(--vsp-blue)]")
 
                             def on_confirm_delete() -> None:
-
                                 with get_session() as session:
-
                                     note = (
                                         session.query(Notes)
                                         .filter_by(Z_PK=row["Z_PK"])
@@ -416,10 +415,8 @@ def build_notes_page() -> None:
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#EF4444",
-                                ).props("unelevated").classes(
-                                "text-[var(--vsp-white)]"
-                            )
+                                color="#EF4444").props("push"
+                            ).classes("text-[var(--vsp-white)]")
 
                     delete_dialog.open()
 
@@ -428,10 +425,10 @@ def build_notes_page() -> None:
 
         with ui.row().classes("w-full justify-center my-2"):
 
+            # ----- DELETE ALL BUTTON -----
+            @require_active_case
             def delete_all_notes() -> None:
-
                 with get_session() as session:
-
                     session.query(Notes).delete()
                     session.commit()
 
@@ -444,14 +441,15 @@ def build_notes_page() -> None:
 
                 refresh_notes_table()
 
+            case_exists = has_active_case()
+
             ui.button(
                 "Delete All Notes",
                 on_click=lambda: confirm_delete_all(
                     "notes",
                     delete_all_notes,
-                ),
-                color="#EF4444",
-            ).props("unelevated").classes("mb-2 items-center")
+                ), color="#EF4444").props("push"
+            ).classes("mb-2 items-center").set_enabled(case_exists)
 
     # ----- Initial render -----
     refresh_notes_table()

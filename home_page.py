@@ -20,16 +20,7 @@ from import_export import (
     import_vector_from_json,
 )
 from main import is_authenticated, get_current_user_name, get_is_admin
-from models import (
-    get_session,
-    get_users_session,
-    Agents,
-    Cases,
-    Evidence,
-    Notes,
-    Persons,
-    Rooms,
-)
+from models import get_users_session, has_active_case, clear_all_case_data
 from navbar import build_navbar
 from program.config import Config
 from utils import delete_all_data
@@ -39,15 +30,14 @@ from utils import delete_all_data
 @ui.page("/")
 @ui.page("/home")
 def home() -> None:
-    """Home/login page — shows menu if authenticated, login
-    form otherwise.
+    """Home/login page — shows menu if authenticated,
+    login form otherwise.
     """
     authenticated = is_authenticated()
 
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     if authenticated:
@@ -63,9 +53,7 @@ def build_authenticated_home() -> None:
 
         # ----- Page Title and Header -----
 
-        ui.image(
-            "/static/novadc_icac.png",
-        ).classes("w-[150px] h-[150px] mb-2")
+        ui.image("/static/novadc_icac.png").classes("w-[150px] h-[150px] mb-2")
 
         ui.label(
             "V·E·C·T·O·R Home"
@@ -76,12 +64,9 @@ def build_authenticated_home() -> None:
             "Organization, & Reporting Program"
         ).classes("text-base text-gray-400 text-center max-w-xl")
 
-    with ui.row().classes(
-        "flex justify-center items-center gap-6 w-full"):
+    with ui.row().classes("flex justify-center items-center gap-6 w-full"):
 
-        ui.label(
-            "Main Menu"
-        ).classes("text-xl items-center font-semibold py-1")
+        ui.label("Main Menu").classes("text-xl items-center font-semibold py-1")
 
     # ----- Action Buttons ROW 1: Start New Case | Add Agent | Add Room -----
 
@@ -90,56 +75,45 @@ def build_authenticated_home() -> None:
 
         ui.button(
             "Start New Case",
-            on_click=lambda: ui.navigate.to("/cases"),
-            color="var(--vsp-blue)",
-        ).props("unelevated").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+            on_click=lambda _: confirm_new_case_handler(),
+            color="var(--vsp-blue)").props("push"
+        ).classes("flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]")
+
+        # on_click=lambda: ui.navigate.to("/cases"),
 
         ui.button(
             "Add Agent",
             on_click=lambda: ui.navigate.to("/agents"),
-            color="var(--vsp-blue)",
-        ).props("unelevated").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+            color="var(--vsp-blue)").props("push"
+        ).classes("flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]")
 
         ui.button(
             "Add Room",
             on_click=lambda: ui.navigate.to("/rooms"),
-            color="var(--vsp-blue)",
-        ).props("unelevated").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+            color="var(--vsp-blue)").props("push"
+        ).classes("flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]")
 
     # ----- Action Buttons ROW 2: Add Evidence | Add Person | Add Note -----
 
-    with ui.row().classes(
-        "flex justify-center items-center gap-6 py-1 w-full"):
+    with ui.row().classes("flex justify-center items-center gap-6 py-1 w-full"):
 
         ui.button(
             "Add Evidence",
             on_click=lambda: ui.navigate.to("/evidence"),
-            color="var(--vsp-blue)",
-        ).props("unelevated").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+            color="var(--vsp-blue)").props("push"
+        ).classes("flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]")
 
         ui.button(
             "Add Person",
             on_click=lambda: ui.navigate.to("/persons"),
-            color="var(--vsp-blue)",
-        ).props("unelevated").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+            color="var(--vsp-blue)").props("push"
+        ).classes("flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]")
 
         ui.button(
             "Add Note",
             on_click=lambda: ui.navigate.to("/notes"),
-            color="var(--vsp-blue)",
-        ).props("unelevated").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+            color="var(--vsp-blue)").props("push"
+        ).classes("flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]")
 
     # ----- Action Buttons ROW 3: Add File | Useful Links -----
 
@@ -149,38 +123,28 @@ def build_authenticated_home() -> None:
         ui.button(
             "Add File",
             on_click=lambda: ui.navigate.to("/uploads"),
-            color="var(--vsp-blue)",
-        ).props("unelevated").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+            color="var(--vsp-blue)").props("push"
+        ).classes("flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]")
 
         ui.button(
             "Useful Links",
             on_click=lambda: ui.navigate.to("/links"),
-            color="var(--vsp-blue)",
-        ).props("unelevated").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+            color="var(--vsp-blue)").props("push"
+        ).classes("flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]")
 
         ui.button(
             "Reports",
             on_click=lambda: ui.navigate.to("/reports"),
-            color="var(--vsp-blue)",
-        ).props("unelevated").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+            color="var(--vsp-blue)").props("push"
+        ).classes("flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]")
 
     # ----- Import / Export ROW -----
 
     with ui.column().classes("items-center w-full py-2"):
 
-        with ui.row().classes(
-                "flex justify-center items-center gap-6 w-full"
-        ):
+        with ui.row().classes("flex justify-center items-center gap-6 w-full"):
 
-            ui.label(
-                "Data Management"
-            ).classes("text-lg font-bold py-1")
+            ui.label("Data Management").classes("text-lg font-bold py-1")
 
         # ----- Row to hold the Data Management buttons -----
         with ui.row().classes("flex justify-center items-center gap-6 w-full"):
@@ -192,9 +156,7 @@ def build_authenticated_home() -> None:
 
                     ui.label(
                         "Export Data..."
-                    ).classes(
-                        "text-lg font-bold text-[var(--vsp-blue)]"
-                    )
+                    ).classes("text-lg font-bold text-[var(--vsp-blue)]")
 
                     ui.label(
                         "Export all database tables and uploaded files "
@@ -240,7 +202,6 @@ def build_authenticated_home() -> None:
                     )
 
                     def do_export() -> None:
-
                         #  ----- Password validation -----
                         pwd = (
                             password_input.value
@@ -273,16 +234,14 @@ def build_authenticated_home() -> None:
                         ui.button(
                             "Cancel",
                             on_click=dialog.close,
-                            color="transparent",
-                        ).props("flat").classes("text-[var(--vsp-blue)]")
+                            color="transparent").props("flat"
+                        ).classes("text-[var(--vsp-blue)]")
 
                         ui.button(
                             "Export Now",
                             on_click=do_export,
-                            color="var(--vsp-blue)",
-                        ).props("unelevated").classes(
-                            "text-[var(--vsp-white)]"
-                        )
+                            color="var(--vsp-blue)").props("push"
+                        ).classes("text-[var(--vsp-white)]")
 
                 dialog.open()
 
@@ -318,7 +277,7 @@ def build_authenticated_home() -> None:
 
                     ui.label(text="This will REPLACE ALL existing data!").classes(
                         "close"
-                    )  # text-[var(--vsp-gray)]
+                    )
 
                     file_path_input = ui.input(
                         label="PATH TO FILE :"
@@ -374,6 +333,7 @@ def build_authenticated_home() -> None:
 
                         # ----- Extension sanity check -----
                         suffix = Path(path).suffix.lower()
+
                         if format_radio.value == "csv" and suffix != ".zip":
                             ui.notify(
                                 "Selected CSV import, but the file is "
@@ -418,11 +378,6 @@ def build_authenticated_home() -> None:
                         dialog.close()
 
                         # ----- Run the selected import -----
-                        # if csv_checkbox.value:
-                        #     import_vector_from_csv(path, password=pwd)
-                        # else:
-                        #     import_vector_from_json(path, password=pwd)
-
                         if format_radio.value == "csv":
                             import_vector_from_csv(path, password=pwd)
                         else:
@@ -433,25 +388,20 @@ def build_authenticated_home() -> None:
                         ui.button(
                             "Cancel",
                             on_click=dialog.close,
-                            color="transparent",
-                        ).props("flat").classes("text-[var(--vsp-blue)]")
+                            color="transparent",).props("flat"
+                        ).classes("text-[var(--vsp-blue)]")
 
                         ui.button(
                             "Import Now",
                             on_click=do_import,
-                            color="var(--vsp-blue)",
-                        ).props(
-                            "unelevated warning"
+                            color="var(--vsp-blue)").props("push"
                         ).classes("text-[var(--vsp-white)]")
 
                 dialog.open()
 
             # ----- DELETE ALL Button -----
-
             def open_delete_all_dialog() -> None:
-
                 with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
-
                     ui.label("Delete All Data?").classes(
                         "mb-3 text-lg font-bold text-[var(--vsp-blue)]"
                     )
@@ -459,12 +409,9 @@ def build_authenticated_home() -> None:
                     ui.label(
                         "Are you sure you want to delete all case "
                         "data for this case? This CANNOT be undone!"
-                    ).classes(
-                        "mb-3 text-base text-[var(--vsp-gray)]"
-                    )
+                    ).classes("mb-3 text-base text-[var(--vsp-gray)]")
 
                     # ----- User verification of destructive activity -----
-
                     affirm_checkbox = ui.checkbox(
                         "I understand the current data cannot be recovered.",
                         value=False,
@@ -474,9 +421,7 @@ def build_authenticated_home() -> None:
                         ui.input(
                             label="AFFIRM BY TYPING 'DELETE' BELOW",
                             password=False,
-                        )
-                        .classes("w-full yellow-label mb-3")
-                    )
+                    ).classes("w-full yellow-label mb-3"))
 
                     affirm_input.bind_visibility_from(
                         affirm_checkbox,
@@ -530,34 +475,34 @@ def build_authenticated_home() -> None:
                         ui.button(
                             "Cancel",
                             on_click=dialog.close,
-                            color="transparent",
-                        ).props("flat").classes("text-[var(--vsp-blue)]")
+                            color="transparent").props("flat"
+                        ).classes("text-[var(--vsp-blue)]")
 
                         ui.button(
                             "Delete all data",
                             on_click=do_delete,
-                            color="#EF4444",
-                        ).props("unelevated").classes("text-[var(--vsp-white)]")
+                            color="#EF4444").props("push"
+                        ).classes("text-[var(--vsp-white)]")
 
                 dialog.open()
 
             ui.button(
                 "📤 EXPORT CASE DATA",
                 on_click=open_export_dialog,
-                color="#379161",
-            ).props("unelevated").classes("w-56 py-3 text-[var(--vsp-white)]")
+                color="#379161").props("push"
+            ).classes("w-56 py-3 text-[var(--vsp-white)]")
 
             ui.button(
                 "📥 IMPORT CASE DATA",
                 on_click=open_import_dialog,
-                color="#379161",
-            ).props("unelevated").classes("w-56 py-3 text-[var(--vsp-white)]")
+                color="#379161").props("push"
+            ).classes("w-56 py-3 text-[var(--vsp-white)]")
 
             ui.button(
                 "DELETE ALL DATA",
                 on_click=open_delete_all_dialog,
-                color="#EF4444",
-            ).props("unelevated").classes("w-56 py-3 text-[var(--vsp-white)]")
+                color="#EF4444").props("push"
+            ).classes("w-56 py-3 text-[var(--vsp-white)]")
 
 
 def build_login_home() -> None:
@@ -595,7 +540,6 @@ def build_login_home() -> None:
         ).classes("w-full max-w-xs")
 
         def attempt_login() -> None:
-            # Wire this to your Users model authentication
             from models import Users
 
             entered_user = username_input.value.strip()
@@ -655,8 +599,8 @@ def build_login_home() -> None:
 
         ui.button(
             "Login",
-            on_click=attempt_login,
-        ).props("unelevated").classes("mt-4 px-8 py-3")
+            on_click=attempt_login).props("push"
+        ).classes("mt-4 px-8 py-3")
 
 
 # ----- About Page -----
@@ -669,17 +613,13 @@ def about_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("items-center w-full mt-8"):
 
-        ui.label(
-            "About V·E·C·T·O·R"
-        ).classes("text-2xl font-bold mb-6")
+        ui.label("About V·E·C·T·O·R").classes("text-2xl font-bold mb-6")
 
         with ui.card().classes("p-6"):
-
             ui.label(f"Version  :  {Config.version}").classes("mb-2")
             ui.label(f"Author  :  {Config.author}").classes("mb-2")
             ui.label(f"Department  :  {Config.dept}").classes("mb-2")
@@ -697,11 +637,9 @@ def help_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
-
         with ui.column().classes("items-center w-full mt-8 max-w-3xl"):
 
             ui.label(
@@ -746,65 +684,47 @@ Use the top menu to access different sections:\n
 
 # ----- Confirm New Case Handler -----
 def confirm_new_case_handler() -> None:
-    """Called when user clicks "Make New Case File".
+    """Called when user initiates a NEW CASE.
 
-    Clears ALL data from all tables (destructive operation!).
+    Prompts for confirmation if a case already exists, then clears data.
     """
-    with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
-        ui.label(
-            "⚠️ WARNING: Delete All Data"
-        ).classes("text-red-400 text-lg font-bold mb-2")
+    if has_active_case():
+        # Show warning dialog
+        with ui.dialog() as warn_dialog, ui.card().classes("max-w-md p-6"):
 
-        ui.label(
-            "This will DELETE ALL DATA from all database tables:\n"
-            "- Agents\n- Cases\n- Evidence\n- Notes\n- Persons\n"
-            "- Rooms\n\n. This action CANNOT be undone. Are you "
-            "absolutely sure?"
-        ).classes("text-sm mb-4")
+            ui.label(
+                "⚠️ New Case Warning"
+            ).classes("text-red-400 text-lg font-bold mb-2")
 
-        with ui.row().classes("w-full justify-end gap-2"):
+            ui.label(
+                "The existing case will be REMOVED and all associated data "
+                "(agents, rooms, evidence, persons, notes, and files) WILL "
+                "BE DELETED."
+            ).classes("text-sm mb-4")
 
-            ui.button(
-                "Cancel",
-                on_click=dialog.close,
-            ).props("flat")
+            ui.label(
+                "This action cannot be undone.  Please export the current "
+                "case data before proceeding if you need to preserve it."
+            ).classes("mb-4 text-sm")
 
-            def on_confirm_delete_all() -> None:
-                try:
-                    with get_session() as session:
-                        # Delete in order to avoid foreign key issues
-                        session.query(Evidence).delete()
-                        session.query(Notes).delete()
-                        session.query(Persons).delete()
-                        session.query(Rooms).delete()
-                        session.query(Agents).delete()
-                        session.query(Cases).delete()
-                        session.commit()
-                    ui.notify(
-                        "Data in the app database tables has been deleted.",
-                        timeout=0,
-                        position="center",
-                        close_button="OK",
-                    )
-                    ui.navigate.to("/")
-                except Exception as err:
-                    session.rollback()
-                    ui.notify(
-                        "The database information was rolled back.",
-                        timeout=4000,
-                        position="bottom",
-                        close_button="OK",
-                    )
-                finally:
-                    dialog.close()
+            with ui.row().classes("w-full justify-end gap-2"):
 
-            ui.button(
-                "DELETE ALL",
-                on_click=on_confirm_delete_all,
-            ).props("negative unelevated")
+                ui.button("Cancel", on_click=warn_dialog.close).props("flat")
 
-    dialog.open()
+                def on_proceed():
+                    warn_dialog.close()
+                    clear_all_case_data()
+
+                ui.button(
+                    "Proceed (Delete All Data)",
+                    on_click=lambda: on_proceed(),
+                    color="#EF4444").props("push"
+                ).classes("text-[var(--vsp-white)]")
+
+        warn_dialog.open()
+    else:
+        ui.navigate.to("/cases")
 
 
 @ui.page("/logout")

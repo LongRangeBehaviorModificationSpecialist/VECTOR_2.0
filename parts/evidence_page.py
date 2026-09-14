@@ -12,9 +12,8 @@ Consolidates four Flask routes into one interactive page:
 
 from nicegui import ui
 
-from home_page import confirm_new_case_handler
 from main import get_current_user_name, get_is_admin
-from models import get_session, Evidence
+from models import require_active_case, has_active_case, get_session, Evidence
 from navbar import build_navbar
 from utils import (
     required_input,
@@ -35,14 +34,11 @@ def build_evidence_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label(
-            "Evidence Management"
-        ).classes("text-2xl font-bold m-4")
+        ui.label("Evidence Management").classes("text-2xl font-bold m-4")
 
         # ----- TWO-COLUMN GRID LAYOUT -----
         with ui.card().classes("w-full max-w-6xl mx-auto p-6"):
@@ -135,7 +131,6 @@ def build_evidence_page() -> None:
 
             # ----- Triaged toggle logic -----
             def on_triage_change(e) -> None:
-
                 if e.value == "Yes":
                     EVIDTRIAGEDBY_combo.enable()
                 else:
@@ -164,6 +159,7 @@ def build_evidence_page() -> None:
                     EVIDISCONTRABAND_combo.value = None
                     EVIDNOTE_input.value = ""
 
+                @require_active_case
                 def on_submit() -> None:
                     """Handles form submission for new evidence items."""
                     EVIDNUM = EVIDNUM_input.value
@@ -191,64 +187,78 @@ def build_evidence_page() -> None:
                     ):
                         return
 
-                    with get_session() as session:
-                        # ----- Save to database -----
-                        new_evid = Evidence(
-                            EVIDNUM=EVIDNUM,
-                            EVIDQTY=EVIDQTY,
-                            EVIDDESC=EVIDDESC,
-                            EVIDMODELNUMBER=EVIDMODELNUMBER_input.value or "",
-                            EVIDSERIALNUMBER=(
-                                EVIDSERIALNUMBER_input.value or ""
-                            ),
-                            EVIDLOCROOM=EVIDLOCROOM,
-                            EVIDLOCROOMDETAIL=EVIDLOCROOMDETAIL,
-                            EVIDFOUNDBY=EVIDFOUNDBY,
-                            EVIDFOUNDBYWITNESS=EVIDFOUNDBYWITNESS,
-                            EVIDPICTAKEN=EVIDPICTAKEN_combo.value or "",
-                            EVIDTRIAGED=EVIDTRIAGED,
-                            EVIDTRIAGEDBY=EVIDTRIAGEDBY,
-                            EVIDISCONTRABAND=(
-                                EVIDISCONTRABAND_combo.value or ""
-                            ),
-                            EVIDNOTE=EVIDNOTE_input.value or "",
-                            ENTEREDDATETIME=(
-                                get_current_timestamp(format="entry")
-                            ),
+                    try:
+                        with get_session() as session:
+                            # ----- Save to database -----
+                            new_evid = Evidence(
+                                EVIDNUM=EVIDNUM,
+                                EVIDQTY=EVIDQTY,
+                                EVIDDESC=EVIDDESC,
+                                EVIDMODELNUMBER=(
+                                    EVIDMODELNUMBER_input.value or ""
+                                ),
+                                EVIDSERIALNUMBER=(
+                                    EVIDSERIALNUMBER_input.value or ""
+                                ),
+                                EVIDLOCROOM=EVIDLOCROOM,
+                                EVIDLOCROOMDETAIL=EVIDLOCROOMDETAIL,
+                                EVIDFOUNDBY=EVIDFOUNDBY,
+                                EVIDFOUNDBYWITNESS=EVIDFOUNDBYWITNESS,
+                                EVIDPICTAKEN=EVIDPICTAKEN_combo.value or "",
+                                EVIDTRIAGED=EVIDTRIAGED,
+                                EVIDTRIAGEDBY=EVIDTRIAGEDBY,
+                                EVIDISCONTRABAND=(
+                                    EVIDISCONTRABAND_combo.value or ""
+                                ),
+                                EVIDNOTE=EVIDNOTE_input.value or "",
+                                ENTEREDDATETIME=(
+                                    get_current_timestamp(format="entry")
+                                ),
+                            )
+                            session.add(new_evid)
+
+                        ui.notify(
+                            f"Evidence Item {EVIDNUM} ({EVIDDESC}) has been "
+                            "added.",
+                            timeout=4000,
+                            position="bottom",
+                            close_button="OK",
                         )
-                        session.add(new_evid)
 
-                    ui.notify(
-                        f"Evidence Item {EVIDNUM} ({EVIDDESC}) has been "
-                        "added.",
-                        timeout=4000,
-                        position="bottom",
-                        close_button="OK",
-                    )
+                        clear_form()
+                        refresh_evidence_table()
 
-                    clear_form()
-                    refresh_evidence_table()
+                    except Exception:
+                        ui.notify(
+                            "Please check the data you just tried to "
+                            "enter — an unknown error occured. "
+                            "No changes were made.",
+                            type="negative",
+                            timeout=0,
+                            position="center",
+                            close_button="OK",
+                        )
+                        import traceback
+                        traceback.print_exc()
 
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                    color="transparent",
-                ).props("flat").classes("text-[var(--vsp-blue)]")
+                    color="transparent").props("flat"
+                ).classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Add Evidence Item",
                     on_click=on_submit,
-                    color="var(--vsp-blue)",
-                ).props("unelevated").classes("text-[var(--vsp-white)]")
+                    color="var(--vsp-blue)").props("push"
+                ).classes("text-[var(--vsp-white)]")
 
         # ----- Existing Evidence Table -----
         ui.separator().classes("my-6")
 
         with ui.column().classes("w-full items-center"):
 
-            ui.label(
-                "Evidence List"
-            ).classes("text-xl font-bold mb-3")
+            ui.label("Evidence List").classes("text-xl font-bold mb-1")
 
             with ui.row().classes("w-full max-w-6xl items-center"):
 
@@ -261,7 +271,6 @@ def build_evidence_page() -> None:
                     table_container.clear()
 
                     with get_session() as session:
-
                         evidence = (
                             session.query(Evidence)
                             .order_by(Evidence.EVIDNUM)
@@ -271,8 +280,8 @@ def build_evidence_page() -> None:
                         if not evidence:
                             with table_container:
                                 ui.label(
-                                    "No evidence items in the database yet."
-                                ).classes("text-gray-500 italic")
+                                    "No evidence items have been entered"
+                                ).classes("text-red italic")
                             return
 
                         row_data = [
@@ -404,10 +413,9 @@ def build_evidence_page() -> None:
                         )
 
                         # ----- Edit dialog -----
+                        @require_active_case
                         def open_edit_dialog(e) -> None:
-
                             row = e.args
-
                             current_agents = load_agent_names()
                             current_rooms = load_room_labels()
 
@@ -474,7 +482,7 @@ def build_evidence_page() -> None:
                                 ).classes("w-full")
 
                                 EVIDPICTAKEN_combo = ui.select(
-                                    options=["Yes", "No"],
+                                    options=["", "Yes", "No"],
                                     label="Item Photographed",
                                     value=row["EVIDPICTAKEN"] or None,
                                 ).classes("w-full")
@@ -509,7 +517,7 @@ def build_evidence_page() -> None:
                                 )
 
                                 EVIDISCONTRABAND_combo = ui.select(
-                                    options=["","Yes","No","Unknown","N/A"],
+                                    options=["", "Yes", "No", "Unknown", "N/A"],
                                     label="Contains Contraband?",
                                     value=(
                                         row["EVIDISCONTRABAND"] or None
@@ -528,10 +536,8 @@ def build_evidence_page() -> None:
                                     ui.button(
                                         "Cancel",
                                         on_click=edit_dialog.close,
-                                        color="transparent",
-                                        ).props("flat").classes(
-                                        "text-[var(--vsp-blue)]"
-                                    )
+                                        color="transparent").props("flat"
+                                    ).classes("text-[var(--vsp-blue)]")
 
                                     def on_save_update() -> None:
                                         """Handles form submission for
@@ -539,8 +545,7 @@ def build_evidence_page() -> None:
                                         """
                                         EVIDNUM = EVIDNUM_input.value
                                         EVIDQTY = (
-                                            EVIDQTY_input.value
-                                            or ""
+                                            EVIDQTY_input.value or ""
                                         )
                                         EVIDDESC = EVIDDESC_input.value or ""
                                         EVIDMODELNUMBER = (
@@ -550,8 +555,7 @@ def build_evidence_page() -> None:
                                             EVIDSERIALNUMBER_input.value or ""
                                         )
                                         EVIDLOCROOM = (
-                                            EVIDLOCROOM_combo.value
-                                            or ""
+                                            EVIDLOCROOM_combo.value or ""
                                         )
                                         EVIDLOCROOMDETAIL = (
                                             EVIDLOCROOMDETAIL_input.value or ""
@@ -563,8 +567,7 @@ def build_evidence_page() -> None:
                                             EVIDFOUNDBYWITNESS_combo.value
                                         )
                                         EVIDPICTAKEN = (
-                                            EVIDPICTAKEN_combo.value
-                                            or ""
+                                            EVIDPICTAKEN_combo.value or ""
                                         )
                                         EVIDTRIAGED = (
                                             EVIDTRIAGED_combo.value
@@ -573,8 +576,7 @@ def build_evidence_page() -> None:
                                             EVIDTRIAGEDBY_combo.value
                                         )
                                         EVIDISCONTRABAND = (
-                                            EVIDISCONTRABAND_combo.value
-                                            or ""
+                                            EVIDISCONTRABAND_combo.value or ""
                                         )
                                         EVIDNOTE = EVIDNOTE_input.value or ""
 
@@ -593,7 +595,6 @@ def build_evidence_page() -> None:
                                             return
 
                                         with get_session() as session:
-
                                             evid = (
                                                 session.query(Evidence)
                                                 .filter_by(Z_PK=row["Z_PK"])
@@ -648,17 +649,15 @@ def build_evidence_page() -> None:
                                         "Update",
                                         on_click=on_save_update,
                                         color="var(--vsp-blue)",
-                                        ).props("unelevated").classes(
-                                        "text-[var(--vsp-white)]"
-                                    )
+                                        ).props("push"
+                                    ).classes("text-[var(--vsp-white)]")
 
                             edit_dialog.open()
 
                         # ----- Delete confirmation dialog -----
+                        @require_active_case
                         def open_delete_dialog(e) -> None:
-
                             row = e.args
-
                             with ui.dialog() as delete_dialog, ui.card(
                                 ).classes("max-w-sm p-6"
                             ):
@@ -690,14 +689,11 @@ def build_evidence_page() -> None:
                                     ui.button(
                                         "Cancel",
                                         on_click=delete_dialog.close,
-                                        color="transparent",
-                                        ).props("flat"
+                                        color="transparent").props("flat"
                                     ).classes("text-[var(--vsp-blue)]")
 
                                     def on_confirm_delete() -> None:
-
                                         with get_session() as session:
-
                                             evid = (
                                                 session.query(Evidence)
                                                 .filter_by(Z_PK=row["Z_PK"])
@@ -726,10 +722,8 @@ def build_evidence_page() -> None:
                                     ui.button(
                                         "Delete",
                                         on_click=on_confirm_delete,
-                                        color="#EF4444",
-                                        ).props("unelevated").classes(
-                                        "text-[var(--vsp-white)]"
-                                    )
+                                        color="#EF4444",).props("push"
+                                    ).classes("text-[var(--vsp-white)]")
 
                             delete_dialog.open()
 
@@ -739,6 +733,7 @@ def build_evidence_page() -> None:
             with ui.row().classes("w-full justify-center my-2"):
 
                 # ----- DELETE ALL BUTTON -----
+                @require_active_case
                 def delete_all_evidence() -> None:
 
                     with get_session() as session:
@@ -754,14 +749,15 @@ def build_evidence_page() -> None:
 
                     refresh_evidence_table()
 
+                case_exists = has_active_case()
+
                 ui.button(
                     "Delete All Evidence Items",
                     on_click=lambda: confirm_delete_all(
                         "evidence",
                         delete_all_evidence,
-                    ),
-                    color="#EF4444",
-                ).props("unelevated").classes("mb-2 items-center")
+                    ), color="#EF4444").props("push"
+                ).classes("mb-2 items-center").set_enabled(case_exists)
 
     # ----- Initial render -----
     refresh_evidence_table()

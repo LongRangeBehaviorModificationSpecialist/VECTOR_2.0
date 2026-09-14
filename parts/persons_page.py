@@ -12,9 +12,8 @@ Consolidates four Flask routes into one interactive page:
 
 from nicegui import ui
 
-from models import get_session, Persons
+from models import require_active_case, has_active_case, get_session, Persons
 from navbar import build_navbar
-from home_page import confirm_new_case_handler
 from main import get_current_user_name, get_is_admin
 from utils import (
     required_input,
@@ -31,14 +30,11 @@ def build_persons_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label(
-            "Person List"
-        ).classes("text-2xl font-bold m-4")
+        ui.label("Person List").classes("text-2xl font-bold m-4")
 
         # ----- Add Person Form -----
         with ui.card().classes("w-full max-w-lg mx-auto p-6"):
@@ -71,15 +67,14 @@ def build_persons_page() -> None:
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                 def clear_form() -> None:
-
                     PERSONNAME_input.value = ""
                     PERSONDOB_input.value = ""
                     PERSONADDRESS_input.value = ""
                     PERSONPHONE_input.value = ""
                     SUSPECTNOTE_input.value = ""
 
+                @require_active_case
                 def on_submit() -> None:
-
                     PERSONNAME = PERSONNAME_input.value
                     PERSONDOB = PERSONDOB_input.value or ""
                     PERSONADDRESS = PERSONADDRESS_input.value or ""
@@ -93,46 +88,57 @@ def build_persons_page() -> None:
                     ):
                         return
 
-                    with get_session() as session:
+                    try:
+                        with get_session() as session:
+                            new_person = Persons(
+                                PERSONNAME=PERSONNAME,
+                                PERSONDOB=PERSONDOB,
+                                PERSONADDRESS=PERSONADDRESS,
+                                PERSONPHONE=PERSONPHONE,
+                                SUSPECTNOTE=SUSPECTNOTE,
+                                ENTEREDDATETIME=get_current_timestamp(format="entry"),
+                            )
+                            session.add(new_person)
 
-                        new_person = Persons(
-                            PERSONNAME=PERSONNAME,
-                            PERSONDOB=PERSONDOB,
-                            PERSONADDRESS=PERSONADDRESS,
-                            PERSONPHONE=PERSONPHONE,
-                            SUSPECTNOTE=SUSPECTNOTE,
-                            ENTEREDDATETIME=get_current_timestamp(format="entry"),
+                        ui.notify(
+                            f"'{PERSONNAME}' was added.",
+                            timeout=4000,
+                            position="bottom",
+                            close_button="OK",
                         )
-                        session.add(new_person)
 
-                    ui.notify(
-                        f"'{PERSONNAME}' was added.",
-                        timeout=4000,
-                        position="bottom",
-                        close_button="OK",
-                    )
+                        clear_form()
+                        refresh_persons_table()
 
-                    clear_form()
-                    refresh_persons_table()
+                    except Exception:
+                        ui.notify(
+                            "Please check the data you just tried to "
+                            "enter — an unknown error occured. "
+                            "No changes were made.",
+                            type="negative",
+                            timeout=0,
+                            position="center",
+                            close_button="OK",
+                        )
+                        import traceback
+                        traceback.print_exc()
 
                 ui.button(
                     "Clear",
                     on_click=clear_form,
-                    color="transparent",
-                ).props("flat").classes("text-[var(--vsp-blue)]")
+                    color="transparent").props("flat"
+                ).classes("text-[var(--vsp-blue)]")
 
                 ui.button(
                     "Add Person",
                     on_click=on_submit,
-                    color="var(--vsp-blue)",
-                ).props("unelevated").classes("text-[var(--vsp-white)]")
+                    color="var(--vsp-blue)").props("push"
+                ).classes("text-[var(--vsp-white)]")
 
         # ----- Existing Persons Table -----
         ui.separator().classes("my-6")
 
-        ui.label(
-            "Persons List"
-        ).classes("text-xl font-bold mb-3")
+        ui.label("Persons List").classes("text-xl font-bold mb-1")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2"
@@ -143,7 +149,6 @@ def build_persons_page() -> None:
             table_container.clear()
 
             with get_session() as session:
-
                 persons = (
                     session.query(Persons)
                     .order_by(Persons.PERSONNAME)
@@ -153,8 +158,8 @@ def build_persons_page() -> None:
                 if not persons:
                     with table_container:
                         ui.label(
-                            "No persons in the database yet"
-                        ).classes("text-gray-500 italic")
+                            "No persons have been entered"
+                        ).classes("text-red italic")
                     return
 
                 row_data = [
@@ -249,10 +254,9 @@ def build_persons_page() -> None:
                 )
 
                 # ----- Edit dialog -----
+                @require_active_case
                 def open_edit_dialog(e) -> None:
-
                     row = e.args
-
                     with ui.dialog() as edit_dialog, ui.card(
                         ).classes("w-full max-w-lg p-6"
                     ):
@@ -295,8 +299,8 @@ def build_persons_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=edit_dialog.close,
-                                color="transparent",
-                            ).props("flat").classes("text-[var(--vsp-blue)]")
+                                color="transparent").props("flat"
+                            ).classes("text-[var(--vsp-blue)]")
 
                             def on_save_update() -> None:
                                 PERSONNAME = PERSONNAME_input.value or ""
@@ -351,18 +355,15 @@ def build_persons_page() -> None:
                             ui.button(
                                 "Update",
                                 on_click=on_save_update,
-                                color="var(--vsp-blue)",
-                                ).props("unelevated").classes(
-                                "text-[var(--vsp-white)]"
-                            )
+                                color="var(--vsp-blue)").props("push"
+                            ).classes("text-[var(--vsp-white)]")
 
                     edit_dialog.open()
 
                 # ----- Delete confirmation dialog -----
+                @require_active_case
                 def open_delete_dialog(e) -> None:
-
                     row = e.args
-
                     with ui.dialog() as delete_dialog, ui.card(
                         ).classes("max-w-sm p-6"
                     ):
@@ -389,13 +390,11 @@ def build_persons_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                                color="transparent",
-                            ).props("flat").classes("text-[var(--vsp-blue)]")
+                                color="transparent").props("flat"
+                            ).classes("text-[var(--vsp-blue)]")
 
                             def on_confirm_delete() -> None:
-
                                 with get_session() as session:
-
                                     person = (
                                         session.query(Persons)
                                         .filter_by(Z_PK=row["Z_PK"])
@@ -421,10 +420,8 @@ def build_persons_page() -> None:
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#EF4444",
-                                ).props("unelevated").classes(
-                                "text-[var(--vsp-white)]"
-                            )
+                                color="#EF4444").props("push"
+                            ).classes("text-[var(--vsp-white)]")
 
                     delete_dialog.open()
 
@@ -433,10 +430,10 @@ def build_persons_page() -> None:
 
         with ui.row().classes("w-full justify-center my-2"):
 
+            # ----- DELETE ALL BUTTON -----
+            @require_active_case
             def delete_all_persons() -> None:
-
                 with get_session() as session:
-
                     session.query(Persons).delete()
                     session.commit()
 
@@ -449,14 +446,15 @@ def build_persons_page() -> None:
 
                 refresh_persons_table()
 
+            case_exists = has_active_case()
+
             ui.button(
                 "Delete All Persons",
                 on_click=lambda: confirm_delete_all(
                     "persons",
                     delete_all_persons,
-                ),
-                color="#EF4444",
-            ).props("unelevated").classes("mb-2 items-center")
+                ), color="#EF4444",).props("push"
+            ).classes("mb-2 items-center").set_enabled(case_exists)
 
     # -----Initial render -----
     refresh_persons_table()

@@ -147,7 +147,6 @@ def seed_default_user() -> None:
                 close_button="OK",
             )
 
-
 seed_default_user()
 
 
@@ -250,6 +249,7 @@ def agents_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
+
     from parts.agents_page import build_agents_page
     build_agents_page()
 
@@ -259,6 +259,7 @@ def cases_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
+
     from parts.cases_page import build_cases_page
     build_cases_page()
 
@@ -268,6 +269,7 @@ def rooms_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
+
     from parts.rooms_page import build_rooms_page
     build_rooms_page()
 
@@ -277,6 +279,7 @@ def evidence_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
+
     from parts.evidence_page import build_evidence_page
     build_evidence_page()
 
@@ -286,6 +289,7 @@ def persons_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
+
     from parts.persons_page import build_persons_page
     build_persons_page()
 
@@ -295,6 +299,7 @@ def notes_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
+
     from parts.notes_page import build_notes_page
     build_notes_page()
 
@@ -304,6 +309,7 @@ def uploads_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
+
     from parts.files_page import build_uploads_page
     build_uploads_page()
 
@@ -313,6 +319,7 @@ def links_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
+
     from parts.links_page import build_links_page
     build_links_page()
 
@@ -322,6 +329,7 @@ def reports_route() -> None:
     if not is_authenticated():
         ui.navigate.to("/")
         return
+
     from parts.reports_page import build_reports_page
     build_reports_page()
 
@@ -358,9 +366,7 @@ def change_password_page() -> None:
 
     with ui.column().classes("items-center w-full mt-12"):
 
-        ui.label(
-            "Change Password"
-        ).classes("text-2xl font-bold mb-2")
+        ui.label("Change Password").classes("text-2xl font-bold mb-2")
 
         ui.label(
             "You must set a new password before continuing."
@@ -433,8 +439,8 @@ def change_password_page() -> None:
 
             ui.button(
                 "Save Password",
-                on_click=save_new_password,
-            ).props("unelevated").classes("w-full mt-4")
+                on_click=save_new_password).props("push"
+            ).classes("w-full mt-4")
 
 
 # ----- Run -----
