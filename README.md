@@ -17,7 +17,9 @@ VECTOR runs on your own machine. Nothing is sent anywhere.
 > This fork stays in step with that project and adds security
 > hardening, an audit trail, optional database encryption, a test suite
 > and a cross-platform install. See
-> [What this fork adds](#what-this-fork-adds).
+> [What this fork adds](#what-this-fork-adds), and the full list offered
+> back to the original project in
+> [pull request #2](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/2).
 
 ---
 
@@ -101,6 +103,10 @@ Everything the original does, plus:
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
 refreshed interface — with fixes made while bringing it across.
+
+Every change, with the reasoning behind it, is listed in
+[pull request #2](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/2)
+to the original project.
 
 ---
 
