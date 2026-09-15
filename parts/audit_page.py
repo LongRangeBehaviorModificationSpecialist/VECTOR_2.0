@@ -14,7 +14,6 @@ import json
 
 from nicegui import ui
 
-from home_page import confirm_new_case_handler
 from auth import get_current_user_name, get_is_admin
 from models import get_session, AuditLog
 from navbar import build_navbar
@@ -66,7 +65,6 @@ def build_audit_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):

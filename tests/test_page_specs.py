@@ -138,7 +138,7 @@ def test_evidence_number_is_not_user_editable():
 
 
 def test_cases_page_has_no_delete_all():
-    """Clearing the case goes through Make New Case File, which wipes
+    """Clearing the case goes through Start New Case, which wipes
     attachments too."""
     assert cases_page.SPEC.show_delete_all is False
 

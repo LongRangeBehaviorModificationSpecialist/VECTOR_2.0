@@ -6,11 +6,14 @@ utils.py
 File containing various functions used throughout the application.
 """
 from datetime import datetime, timezone
+from functools import wraps
+from inspect import iscoroutinefunction
 import json
 from nicegui import ui
 import mimetypes
 from models import (
     get_session,
+    has_active_case,
     record_audit,
     Agents,
     Cases,
@@ -288,6 +291,46 @@ def is_duplicate_agent_in_json(
     return False
 
 
+def _case_is_open() -> bool:
+    """True when a case is open; otherwise says so and returns False."""
+    if has_active_case():
+        return True
+    ui.notify(
+        "No active case!  Start a case before proceeding.",
+        type="warning",
+        timeout=0,
+        position="center",
+        close_button="OK",
+    )
+    return False
+
+
+def require_active_case(func):
+    """Stops an add, edit or delete when no case has been opened.
+
+    Agents, rooms, evidence and the rest belong to a case, and every
+    report is headed by one. An async handler -- the file upload -- stays
+    async, so NiceGUI still awaits it.
+    """
+    if iscoroutinefunction(func):
+        @wraps(func)
+        async def async_guarded(*args, **kwargs):
+            if not _case_is_open():
+                return None
+            return await func(*args, **kwargs)
+
+        return async_guarded
+
+    @wraps(func)
+    def guarded(*args, **kwargs):
+        if not _case_is_open():
+            return None
+        return func(*args, **kwargs)
+
+    return guarded
+
+
+@require_active_case
 def confirm_delete_all(action: str, callback):
     """Shows a confirmation dialog before executing a destructive action."""
     with ui.dialog() as dialog, ui.card().classes("max-w-sm p-6"):
@@ -309,8 +352,8 @@ def confirm_delete_all(action: str, callback):
             ui.button(
                 "Delete All",
                 on_click=on_confirm,
-                color="#1C69A8",
-            ).props("negative unelevated")
+                color="#ef4444",
+            ).props("unelevated")
 
     dialog.open()
 

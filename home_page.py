@@ -7,7 +7,8 @@ Handles:
     /                →   Home/Login page
     /about           →   About page
     /help            →   Help page
-    /make_new_case   →   Clear all data (dangerous!)
+    /logout          →   Sign out
+    /shutdown        →   Stop the app (admins only)
 """
 
 from datetime import datetime
@@ -35,7 +36,12 @@ from auth import (
     LOCK_AFTER_FAILURES,
     LOCKOUT_MINUTES,
 )
-from models import get_session, get_users_session, record_audit
+from models import (
+    get_session,
+    get_users_session,
+    has_active_case,
+    record_audit,
+)
 from navbar import build_navbar
 from program.config import Config
 from utils import delete_all_data
@@ -53,7 +59,6 @@ def home():
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     if authenticated:
@@ -96,8 +101,8 @@ def build_authenticated_home():
 
         ui.button(
             "Start New Case",
-            on_click=lambda: ui.navigate.to("/cases"),
-            color="#1C69A8",
+            on_click=confirm_new_case_handler,
+            color="var(--vsp-blue)",
         ).props("unelevated").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
@@ -695,7 +700,6 @@ def about_page():
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("items-center w-full mt-8"):
@@ -723,7 +727,6 @@ def help_page():
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
@@ -771,47 +774,46 @@ Use the top menu to access different sections:\n
 
 
 # ----- Confirm New Case Handler -----
-def confirm_new_case_handler():
-    """Called when user clicks "Make New Case File".
+def confirm_new_case_handler() -> None:
+    """Called when the user starts a new case.
 
-    Clears ALL data from all tables (destructive operation!).
+    With no case open this goes straight to the Cases page. With one open
+    it warns first, because the existing case and everything recorded
+    against it are removed.
     """
-    with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
+    if not has_active_case():
+        ui.navigate.to("/cases")
+        return
+
+    with ui.dialog() as warn_dialog, ui.card().classes("max-w-md p-6"):
 
         ui.label(
-            "⚠️ WARNING: Delete All Data"
+            "⚠️ New Case Warning"
         ).classes("text-red-400 text-lg font-bold mb-2")
 
         ui.label(
-            "This will DELETE ALL DATA from all database tables:\n"
-            "- Case\n- Agents\n- Rooms\n- Evidence\n- People\n"
-            "- Notes\n- Uploaded files\n\n"
-            "Export the case first if you need to keep it. "
-            "This action CANNOT be undone. Are you absolutely sure?"
-        ).classes("text-sm mb-4 whitespace-pre-line")
+            "The existing case will be REMOVED and all associated data "
+            "(agents, rooms, evidence, persons, notes, and files) WILL "
+            "BE DELETED."
+        ).classes("text-sm mb-4")
+
+        ui.label(
+            "This action cannot be undone.  Please export the current "
+            "case data before proceeding if you need to preserve it."
+        ).classes("mb-4 text-sm")
 
         with ui.row().classes("w-full justify-end gap-2"):
 
-            ui.button(
-                "Cancel",
-                on_click=dialog.close,
-            ).props("flat")
+            ui.button("Cancel", on_click=warn_dialog.close).props("flat")
 
-            def on_confirm_delete_all():
-                # Delegates to delete_all_data() rather than repeating the
-                # table list. The inline version here cleared six tables
-                # and omitted UploadedFiles, so starting a new case left
-                # the previous subject's photographs and documents in the
-                # database, to be swept into the next case's export.
+            def on_proceed() -> None:
+                # Through delete_all_data() rather than a table list of its
+                # own. An earlier inline list here left out UploadedFiles,
+                # so a new case inherited the last one's attachments; this
+                # path also records the wipe in the audit trail.
+                warn_dialog.close()
                 try:
                     delete_all_data()
-                    ui.notify(
-                        "Data in the app database tables has been deleted.",
-                        timeout=0,
-                        position="center",
-                        close_button="OK",
-                    )
-                    ui.navigate.to("/")
                 except Exception as err:
                     ui.notify(
                         f"Nothing was deleted — the database was rolled "
@@ -821,15 +823,24 @@ def confirm_new_case_handler():
                         position="center",
                         close_button="OK",
                     )
-                finally:
-                    dialog.close()
+                    return
+
+                ui.notify(
+                    "Old case data cleared",
+                    type="positive",
+                    timeout=4000,
+                    position="bottom",
+                    close_button="OK",
+                )
+                ui.navigate.to("/cases")
 
             ui.button(
-                "DELETE ALL",
-                on_click=on_confirm_delete_all,
-            ).props("negative unelevated")
+                "Proceed (Delete All Data)",
+                on_click=on_proceed,
+                color="#EF4444",
+            ).props("unelevated").classes("text-[var(--vsp-white)]")
 
-    dialog.open()
+    warn_dialog.open()
 
 
 @ui.page("/logout")

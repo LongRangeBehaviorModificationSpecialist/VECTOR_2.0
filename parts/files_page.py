@@ -11,16 +11,21 @@ from nicegui import ui
 import os
 import tempfile
 
-from models import get_session, UploadedFiles, audit_timestamp
+from models import (
+    get_session,
+    has_active_case,
+    UploadedFiles,
+    audit_timestamp,
+)
 from program.config import Config
 from navbar import build_navbar
-from home_page import confirm_new_case_handler
 from auth import get_current_user_name, get_is_admin
 from utils import (
     get_mime_type,
     is_allowed_file,
     format_file_size,
     confirm_delete_all,
+    require_active_case,
 )
 
 
@@ -32,7 +37,6 @@ def build_uploads_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
@@ -53,6 +57,7 @@ def build_uploads_page() -> None:
                 "and (4) Archive files."
             ).classes("text-sm text-gray-400 mb-2")
 
+            @require_active_case
             async def handle_upload(e) -> None:
                 """Handles file upload from ui.upload component."""
 
@@ -304,6 +309,7 @@ def build_uploads_page() -> None:
                             ui.download(temp_path)
 
                 # ----- Delete confirmation dialog -----
+                @require_active_case
                 def open_delete_dialog(e) -> None:
                     """Confirms and deletes a file."""
                     row = e.args
@@ -377,8 +383,11 @@ def build_uploads_page() -> None:
 
             def delete_all_files() -> None:
                 with get_session() as session:
-                    session.query(UploadedFiles).delete()
-                    session.commit()
+                    # One at a time, so each removal reaches the audit
+                    # trail. A bulk delete raises no ORM events, and the
+                    # files vanished without a record.
+                    for file_record in session.query(UploadedFiles).all():
+                        session.delete(file_record)
 
                 ui.notify(
                     "All Files has been deleted.",
@@ -389,7 +398,7 @@ def build_uploads_page() -> None:
 
                 refresh_files_table()
 
-            ui.button(
+            delete_all_button = ui.button(
                 "Delete All Files",
                 on_click=lambda: confirm_delete_all(
                     "files",
@@ -397,6 +406,7 @@ def build_uploads_page() -> None:
                 ),
                 color="#ef4444",
             ).props("unelevated").classes("mb-2 items-center")
+            delete_all_button.set_enabled(has_active_case())
 
     # ----- Initial render -----
     refresh_files_table()

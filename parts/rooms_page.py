@@ -8,7 +8,6 @@ to search each one.
 """
 
 from auth import get_current_user_name, get_is_admin
-from home_page import confirm_new_case_handler
 from models import Rooms
 from navbar import build_navbar
 from parts.crud import CrudSpec, Field, build_crud_page
@@ -84,6 +83,5 @@ def build_rooms_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
     build_crud_page(SPEC)

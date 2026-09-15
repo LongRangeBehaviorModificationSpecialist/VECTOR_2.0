@@ -39,7 +39,6 @@ def build_admin_page():
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=None,
     )
 
     with ui.column().classes("w-full items-center"):

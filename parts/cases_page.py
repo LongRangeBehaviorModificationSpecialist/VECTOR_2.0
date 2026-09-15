@@ -8,7 +8,6 @@ search began and ended.
 """
 
 from auth import get_current_user_name, get_is_admin
-from home_page import confirm_new_case_handler
 from models import Cases
 from navbar import build_navbar
 from parts.crud import CrudSpec, Field, build_crud_page
@@ -35,8 +34,10 @@ SPEC = CrudSpec(
     submit_label="Open New Case",
     order_by="CASENUMBER",
     validate=_validate,
-    # The case is deleted through "Make New Case File" on the navbar,
-    # which clears the whole case rather than this table alone.
+    # Where a case is opened, so it has to work before one exists.
+    requires_case=False,
+    # A case is cleared through Start New Case on the home page, which
+    # removes everything recorded against it rather than this table alone.
     show_delete_all=False,
     fields=[
         Field("CASENUMBER", "Case Number", required=True, props="autofocus"),
@@ -73,6 +74,5 @@ def build_cases_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
     build_crud_page(SPEC)

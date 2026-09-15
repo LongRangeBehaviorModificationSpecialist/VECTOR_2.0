@@ -10,7 +10,6 @@ No form needed — this is a read-only resource page.
 from nicegui import ui
 
 from navbar import build_navbar
-from home_page import confirm_new_case_handler
 from auth import get_current_user_name, get_is_admin
 
 # ----- Link Data -----
@@ -104,7 +103,6 @@ def build_links_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full max-w-4xl mx-auto p-4 gap-4"):

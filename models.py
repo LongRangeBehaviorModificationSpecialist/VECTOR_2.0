@@ -986,3 +986,23 @@ def get_users_session():
         raise
     finally:
         session.close()
+
+
+# ----- Active case -----
+def has_active_case() -> bool:
+    """Whether a case has been opened."""
+    with get_session() as session:
+        return session.query(Cases).count() > 0
+
+
+def check_case_info() -> dict | None:
+    """The open case's number and start time, or None if there is none."""
+    with get_session() as session:
+        case = session.query(Cases).order_by(Cases.Z_PK).first()
+        if not case:
+            return None
+        return {
+            "Z_PK": case.Z_PK,
+            "CASENUMBER": case.CASENUMBER,
+            "CASEDATETIMEBEGIN": case.CASEDATETIMEBEGIN or None,
+        }

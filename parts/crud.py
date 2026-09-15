@@ -26,8 +26,13 @@ from typing import Callable, Optional
 
 from nicegui import ui
 
-from models import get_session
-from utils import required_input, required_select, required_textarea
+from models import get_session, has_active_case
+from utils import (
+    require_active_case,
+    required_input,
+    required_select,
+    required_textarea,
+)
 
 
 # ----- Field description -----
@@ -92,6 +97,7 @@ class CrudSpec:
     form_columns:   1 for a single column, 2 for a side-by-side grid
     card_width:     Tailwind max-width class for the form card
     show_delete_all: whether to offer the delete-all button
+    requires_case:  whether adding, editing and deleting need an open case
     """
 
     model: type
@@ -111,6 +117,7 @@ class CrudSpec:
     form_columns: int = 1
     card_width: str = "max-w-lg"
     show_delete_all: bool = True
+    requires_case: bool = True
 
     def __post_init__(self):
         self.entity_plural = self.entity_plural or f"{self.entity}s"
@@ -205,6 +212,10 @@ def _values_from(widgets: dict) -> dict:
 def build_crud_page(spec: CrudSpec) -> None:
     """Renders the complete page for one entity."""
 
+    # Records belong to a case. The Cases page is the exception: it is
+    # where a case is opened, so it has to work before one exists.
+    guard = require_active_case if spec.requires_case else (lambda f: f)
+
     with ui.column().classes("w-full items-center"):
 
         ui.label(spec.title).classes("text-2xl font-bold m-4")
@@ -297,6 +308,8 @@ def build_crud_page(spec: CrudSpec) -> None:
             )
             _clear_form()
             refresh_table()
+
+        _submit = guard(_submit)
 
         # ----- Table -----
         ui.separator().classes("my-6")
@@ -460,6 +473,8 @@ def build_crud_page(spec: CrudSpec) -> None:
 
             edit_dialog.open()
 
+        _open_edit_dialog = guard(_open_edit_dialog)
+
         # ----- Delete one -----
         def _open_delete_dialog(event) -> None:
             row = event.args
@@ -518,6 +533,8 @@ def build_crud_page(spec: CrudSpec) -> None:
                     ).props("unelevated").classes("text-[var(--vsp-white)]")
 
             delete_dialog.open()
+
+        _open_delete_dialog = guard(_open_delete_dialog)
 
         # ----- Delete all -----
         if spec.show_delete_all:
@@ -580,10 +597,14 @@ def build_crud_page(spec: CrudSpec) -> None:
 
                     dialog.open()
 
-                ui.button(
+                _open_delete_all_dialog = guard(_open_delete_all_dialog)
+
+                delete_all_button = ui.button(
                     f"Delete All {spec.entity_plural.title()}",
                     on_click=_open_delete_all_dialog,
                     color="#ef4444",
                 ).props("unelevated")
+                if spec.requires_case:
+                    delete_all_button.set_enabled(has_active_case())
 
         refresh_table()

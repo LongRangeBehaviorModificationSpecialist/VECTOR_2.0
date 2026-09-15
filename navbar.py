@@ -15,6 +15,9 @@ the same question.
 
 from nicegui import ui
 
+from auth import is_authenticated
+from models import check_case_info
+
 
 # ----- Dropdown Helper -----
 def _nav_dropdown(label: str, items: list[tuple[str, callable]]) -> None:
@@ -32,18 +35,12 @@ def _nav_dropdown(label: str, items: list[tuple[str, callable]]) -> None:
 
 
 # ----- Main Navbar -----
-def build_navbar(
-    is_admin: bool = False,
-    username: str = "Guest",
-    on_new_case: callable = None,
-) -> None:
+def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
     """Builds the top navigation bar for authenticated users.
 
     Args:
         is_admin: Whether to show the Admin Panel link.
         username: The current user's display name.
-        on_new_case: Callback for the "Make New Case File" action.
-            If None, navigates to /cases/new.
     """
 
     with ui.header().classes("items-center bg-dark no-print"):
@@ -120,18 +117,33 @@ def build_navbar(
         ).props("flat color=white")
 
         # ----- Help Button -----
-        new_case_handler = on_new_case or (
-            lambda: ui.navigate.to("/cases/new")
-        )
         _nav_dropdown(
             "Help",
             [
                 ("About App", lambda: ui.navigate.to("/about")),
                 ("Help", lambda: ui.navigate.to("/help")),
-                ("---", None),
-                ("Make New Case File", new_case_handler),
             ],
         )
+
+        # ----- Active case -----
+        # Centred between the menus, so an agent can see at a glance which
+        # case an entry is going into. Only once signed in: the login page
+        # answers anyone who can reach the port, and a case number is not
+        # theirs to read.
+        ui.space()
+
+        if is_authenticated():
+            case_info = check_case_info()
+            if case_info:
+                ui.badge(
+                    f"Case No.: {case_info['CASENUMBER']}",
+                    color="positive",
+                ).classes("py-3 px-5")
+            else:
+                ui.badge(
+                    "No Active Case",
+                    color="#ef4444",
+                ).classes("py-3 px-5")
 
         # ----- Spacer -----
         ui.space()

@@ -36,7 +36,6 @@ import json
 
 from models import get_session, Agents, Cases, Evidence, Notes, Persons, Rooms
 from navbar import build_navbar
-from home_page import confirm_new_case_handler
 from auth import is_authenticated, get_current_user_name, get_is_admin
 from utils import get_print_date_time, get_case_info
 
@@ -60,7 +59,6 @@ def build_reports_page() -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("items-center w-full mt-4 mb-4"):
@@ -124,7 +122,6 @@ def render_report_page(html_content: str) -> None:
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     with ui.column().classes("w-full items-center"):
@@ -1316,7 +1313,6 @@ def json_output_page():
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
-        on_new_case=confirm_new_case_handler,
     )
 
     ui.label("JSON Data Output").classes("text-2xl font-bold m-4")
