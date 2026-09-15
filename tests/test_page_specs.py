@@ -150,6 +150,24 @@ def test_cases_page_holds_one_case():
     assert "Start New Case" in cases_page.SPEC.limit_message
 
 
+def test_the_case_row_has_no_delete_button():
+    """Deleting the case alone left its agents, rooms, evidence and notes
+    behind for the next case. Start New Case clears all of it."""
+    assert cases_page.SPEC.allow_delete is False
+
+
+def test_other_pages_keep_their_delete_buttons():
+    for name, spec in ALL_SPECS:
+        if name != "cases":
+            assert spec.allow_delete is True, name
+
+
+def test_notes_are_listed_in_the_order_written():
+    """NOTEDATETIME is text in two formats on an upgraded database, so
+    sorting on it put new notes above old ones."""
+    assert notes_page.SPEC.order_by == "Z_PK"
+
+
 def test_other_pages_have_no_record_limit():
     for name, spec in ALL_SPECS:
         if name != "cases":

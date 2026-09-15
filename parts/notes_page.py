@@ -38,7 +38,10 @@ SPEC = CrudSpec(
     table_title="Notes List",
     id_label="ID #",
     submit_label="Add Note",
-    order_by="NOTEDATETIME",
+    # The order the notes were written in. NOTEDATETIME is text, and an
+    # upgraded database holds two date formats, so sorting on it put a new
+    # note above the older ones.
+    order_by="Z_PK",
     validate=_validate,
     on_before_update=_stamp_edit,
     fields=[

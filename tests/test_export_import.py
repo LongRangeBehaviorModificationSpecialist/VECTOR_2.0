@@ -9,6 +9,7 @@ session that is a no-op, so nothing needs stubbing.
 
 import hashlib
 import json
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -31,12 +32,15 @@ PAYLOAD = b"\xff\xd8\xff\xe0" + b"photo-bytes" * 64
 
 
 @pytest.fixture
-def desktop(tmp_path, monkeypatch):
-    """Redirects the export away from the real Desktop."""
-    home = tmp_path / "home"
-    (home / "Desktop").mkdir(parents=True)
-    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
-    return home / "Desktop"
+def out_dir(tmp_path, monkeypatch):
+    """Where the finished export is written. Staging goes in a private
+    temp folder, so a test never touches the real one."""
+    temp_root = tmp_path / "temp"
+    temp_root.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(temp_root))
+    destination = tmp_path / "exports"
+    destination.mkdir()
+    return destination
 
 
 @pytest.fixture
@@ -65,23 +69,33 @@ def _counts():
         }
 
 
-def test_export_produces_an_archive(with_attachment, desktop):
-    import_export.export_vector_to_csv()
-    archives = list(desktop.glob("*.zip"))
+def test_export_produces_an_archive(with_attachment, out_dir):
+    import_export.export_vector_to_csv(destination=out_dir)
+    archives = list(out_dir.glob("*.zip"))
     assert len(archives) == 1
     assert with_attachment.replace("-", "-") in archives[0].name
 
 
-def test_export_cleans_up_its_staging_directory(with_attachment, desktop):
-    """The unzipped case must not be left sitting on the Desktop."""
-    import_export.export_vector_to_csv()
-    assert [p.name for p in desktop.iterdir()
-            if p.is_dir()] == []
+def test_export_cleans_up_its_staging_directory(with_attachment, out_dir):
+    """The unzipped case must not be left behind anywhere."""
+    archive = import_export.export_vector_to_csv(destination=out_dir)
+    assert [p.name for p in out_dir.iterdir()] == [archive.name]
+    assert list(Path(tempfile.gettempdir()).iterdir()) == []
 
 
-def test_manifest_records_the_ingest_hash(with_attachment, desktop):
-    import_export.export_vector_to_csv()
-    archive = next(desktop.glob("*.zip"))
+def test_export_without_a_destination_stages_for_download(with_attachment,
+                                                          out_dir):
+    """What the Export button does: build the file in a private staging
+    folder for the browser to download, never on the host's Desktop."""
+    archive = import_export.export_vector_to_csv()
+    assert archive.exists()
+    assert archive.parent.parent == Path(tempfile.gettempdir())
+    assert archive.parent.name.startswith("vector_export_")
+
+
+def test_manifest_records_the_ingest_hash(with_attachment, out_dir):
+    import_export.export_vector_to_csv(destination=out_dir)
+    archive = next(out_dir.glob("*.zip"))
 
     with zipfile.ZipFile(archive) as zf:
         manifest = json.loads(zf.read("export_manifest.json"))
@@ -94,17 +108,17 @@ def test_manifest_records_the_ingest_hash(with_attachment, desktop):
     assert manifest["integrity_failures"] == []
 
 
-def test_audit_trail_travels_with_the_export(with_attachment, desktop):
-    import_export.export_vector_to_csv()
-    archive = next(desktop.glob("*.zip"))
+def test_audit_trail_travels_with_the_export(with_attachment, out_dir):
+    import_export.export_vector_to_csv(destination=out_dir)
+    archive = next(out_dir.glob("*.zip"))
     with zipfile.ZipFile(archive) as zf:
         assert "AUDIT.csv" in zf.namelist()
 
 
-def test_round_trip_preserves_every_row(with_attachment, desktop):
+def test_round_trip_preserves_every_row(with_attachment, out_dir):
     before = _counts()
-    import_export.export_vector_to_csv()
-    archive = next(desktop.glob("*.zip"))
+    import_export.export_vector_to_csv(destination=out_dir)
+    archive = next(out_dir.glob("*.zip"))
 
     from utils import delete_all_data
     delete_all_data()
@@ -114,9 +128,9 @@ def test_round_trip_preserves_every_row(with_attachment, desktop):
     assert _counts() == before
 
 
-def test_round_trip_preserves_attachment_bytes(with_attachment, desktop):
-    import_export.export_vector_to_csv()
-    archive = next(desktop.glob("*.zip"))
+def test_round_trip_preserves_attachment_bytes(with_attachment, out_dir):
+    import_export.export_vector_to_csv(destination=out_dir)
+    archive = next(out_dir.glob("*.zip"))
 
     from utils import delete_all_data
     delete_all_data()
@@ -129,10 +143,10 @@ def test_round_trip_preserves_attachment_bytes(with_attachment, desktop):
             hashlib.sha256(PAYLOAD).hexdigest()
 
 
-def test_import_restores_provenance(with_attachment, desktop):
+def test_import_restores_provenance(with_attachment, out_dir):
     """Files used to come back as octet-stream, uploaded by "import"."""
-    import_export.export_vector_to_csv()
-    archive = next(desktop.glob("*.zip"))
+    import_export.export_vector_to_csv(destination=out_dir)
+    archive = next(out_dir.glob("*.zip"))
 
     from utils import delete_all_data
     delete_all_data()
@@ -145,10 +159,11 @@ def test_import_restores_provenance(with_attachment, desktop):
         assert restored.FILESHA256 == hashlib.sha256(PAYLOAD).hexdigest()
 
 
-def test_encrypted_round_trip(with_attachment, desktop):
+def test_encrypted_round_trip(with_attachment, out_dir):
     before = _counts()
-    import_export.export_vector_to_csv(password="correct horse battery")
-    archive = next(desktop.glob("*.zip"))
+    import_export.export_vector_to_csv(
+        destination=out_dir, password="correct horse battery")
+    archive = next(out_dir.glob("*.zip"))
 
     # The archive must genuinely be encrypted.
     with zipfile.ZipFile(archive) as zf:
@@ -162,11 +177,11 @@ def test_encrypted_round_trip(with_attachment, desktop):
     assert _counts() == before
 
 
-def test_import_detects_a_tampered_attachment(with_attachment, desktop,
+def test_import_detects_a_tampered_attachment(with_attachment, out_dir,
                                               tmp_path):
     """A file whose bytes no longer match the manifest must be flagged."""
-    import_export.export_vector_to_csv()
-    archive = next(desktop.glob("*.zip"))
+    import_export.export_vector_to_csv(destination=out_dir)
+    archive = next(out_dir.glob("*.zip"))
 
     # Rebuild the archive with one attachment altered.
     staging = tmp_path / "tampered"
@@ -195,9 +210,9 @@ def test_import_detects_a_tampered_attachment(with_attachment, desktop,
     assert any("scene_photo.jpg" in text for text in notices)
 
 
-def test_import_is_recorded_in_the_audit_trail(with_attachment, desktop):
-    import_export.export_vector_to_csv()
-    archive = next(desktop.glob("*.zip"))
+def test_import_is_recorded_in_the_audit_trail(with_attachment, out_dir):
+    import_export.export_vector_to_csv(destination=out_dir)
+    archive = next(out_dir.glob("*.zip"))
 
     from utils import delete_all_data
     from models import AuditLog
@@ -316,3 +331,65 @@ def test_an_archive_from_upstream_keeps_its_evidence(tmp_path):
         restored = session.query(UploadedFiles).one()
         assert restored.FILEDATA == photo
         assert restored.FILESHA256 == digest
+
+
+# ----- Attachments that share a name -----
+
+def test_attachments_sharing_a_name_all_survive_the_round_trip(case, out_dir):
+    """Two files called photo.jpg used to overwrite each other in the
+    archive, so one was silently lost. Windows also treats PHOTO.JPG as
+    the same file."""
+    attachments = [
+        ("photo.jpg", b"FRONT"),
+        ("photo.jpg", b"BACK"),
+        ("PHOTO.JPG", b"SIDE"),
+    ]
+    with get_session() as session:
+        for name, payload in attachments:
+            session.add(
+                UploadedFiles(
+                    FILENAME=name,
+                    FILESIZE=len(payload),
+                    FILEDATA=payload,
+                    FILEUPLOADEDBY="Doe, John",
+                )
+            )
+
+    archive = import_export.export_vector_to_csv(destination=out_dir)
+    with zipfile.ZipFile(archive) as zf:
+        stored = [n for n in zf.namelist() if n.startswith("files/")]
+    assert len({name.lower() for name in stored}) == 3
+
+    from utils import delete_all_data
+    delete_all_data()
+    import_export.import_vector_from_csv(str(archive))
+
+    with get_session() as session:
+        restored = sorted(
+            (f.FILENAME, bytes(f.FILEDATA))
+            for f in session.query(UploadedFiles).all()
+        )
+    assert restored == sorted(attachments)
+
+
+# ----- Staging cleanup -----
+
+def test_stale_staging_is_removed_and_recent_staging_kept(out_dir):
+    import os
+    import time
+
+    root = Path(tempfile.gettempdir())
+    stale = root / "vector_export_stale"
+    recent = root / "vector_import_upload_recent"
+    unrelated = root / "someone_elses_folder"
+    for folder in (stale, recent, unrelated):
+        folder.mkdir()
+
+    two_hours_ago = time.time() - 2 * 60 * 60
+    os.utime(stale, (two_hours_ago, two_hours_ago))
+    os.utime(unrelated, (two_hours_ago, two_hours_ago))
+
+    assert import_export.remove_stale_staging() == 1
+    assert not stale.exists()
+    assert recent.exists()
+    assert unrelated.exists()

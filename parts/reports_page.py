@@ -168,9 +168,9 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
         if not case.JURISDICTION or not str(case.JURISDICTION).strip():
             errors.append("Jurisdiction is required.")
 
-        # Check End Date/Time (required for complete reports)
+        # Check Start Date/Time (required for complete reports)
         if not case.CASEDATETIMEBEGIN:
-            errors.append("End Date/Time is required for reports.")
+            errors.append("Start Date/Time is required for reports.")
 
     return (len(errors) == 0, errors)
 
@@ -1282,7 +1282,8 @@ def print_notes_report():
                 "NOTEAUTHOR": n.NOTEAUTHOR,
                 "NOTETEXT": n.NOTETEXT or "",
             }
-            for n in session.query(Notes).order_by(Notes.NOTEDATETIME).all()
+            # In the order written: see the note on notes_page.SPEC.
+            for n in session.query(Notes).order_by(Notes.Z_PK).all()
         ]
 
     html = build_notes_report_html(

@@ -80,6 +80,10 @@ class Config:
     # Rejected in the browser before any bytes reach the server.
     MAX_UPLOAD_BYTES = _env_int("VECTOR_MAX_UPLOAD_MB", 512) * 1024 * 1024
 
+    # Largest export accepted back in through Import. Higher than an
+    # attachment, since an export carries every attachment in the case.
+    MAX_IMPORT_BYTES = _env_int("VECTOR_MAX_IMPORT_MB", 2048) * 1024 * 1024
+
     # ----- Paths (re-exported for convenience) -----
     PROJECT_ROOT = PROJECT_ROOT
     DB_DIR = DB_DIR

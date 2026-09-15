@@ -329,6 +329,7 @@ All optional, read from the environment:
 | `VECTOR_HOST`           | `127.0.0.1` | Interface to bind. `--lan` sets `0.0.0.0` |
 | `VECTOR_PORT`           | `8080`      | Port to listen on                        |
 | `VECTOR_MAX_UPLOAD_MB`  | `512`       | Largest accepted attachment              |
+| `VECTOR_MAX_IMPORT_MB`  | `2048`      | Largest export accepted back by Import   |
 | `VECTOR_NO_BROWSER`     | unset       | Set to `1` to not open a browser on start |
 | `VECTOR_DB_DIR`         | `db/`       | Where the databases live                 |
 | `VECTOR_DB_KEY`         | unset       | Passphrase for an encrypted database     |
@@ -361,8 +362,10 @@ case is open, the other pages refuse new entries and say why.
 
 ### Getting a case out
 
-**Export** offers two formats — or **Both** at once — saved to your
-Desktop and optionally sealed with an AES-256 password:
+**Export** offers two formats — or **Both** at once — downloaded through
+your browser and optionally sealed with an AES-256 password. The file
+arrives on whichever device you exported from, a tablet on `--lan`
+included, and lands wherever that browser saves downloads:
 
 | Format | What it is | Use it for |
 |--------|-----------|------------|
@@ -373,8 +376,8 @@ Both carry the audit trail, and both record the SHA-256 taken when each
 attachment was collected — so a file that has changed since is flagged
 on the way out, and again on the way back in.
 
-**Import** takes either format; it works out which from the file
-itself, so you do not have to say. It replaces everything currently
+**Import** takes either format: choose the file, and VECTOR works out
+which format it is from the file itself. It replaces everything currently
 loaded. The one thing it will not replace is this machine's audit
 trail: the import is appended to it instead, so the receiving machine
 keeps its own history of what happened here.
@@ -461,7 +464,9 @@ passphrase.
 
 **Either way:**
 
-- Always tick **Encrypt with password** when exporting.
+- Always tick **Encrypt with password** when exporting. An export
+  downloads to the browser's usual downloads folder — move it somewhere
+  your unit controls.
 - Delete `db/*.bak-*` and `db/*-backup-*` files once a case is verified;
   they are copies of the case.
 - Treat the whole `db/` directory as evidence, and wipe the machine's

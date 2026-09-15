@@ -12,7 +12,7 @@ import pytest
 
 import models
 import parts.cases_page as cases_page
-from models import AuditLog, Cases, Persons, get_session
+from models import AuditLog, Cases, Notes, Persons, get_session
 
 
 def _add_case(begin, end=None):
@@ -72,6 +72,24 @@ def test_anything_else_is_left_alone(value):
     _add_case("09-10-2026 08:00", value)
     assert models.normalise_legacy_dates() == 0
     assert _stored_case_times() == ("09-10-2026 08:00", value)
+
+
+def test_old_note_times_are_rewritten():
+    """A notes report mixing the two formats reads out of order."""
+    with get_session() as session:
+        session.add(
+            Notes(
+                NOTEDATETIME="2026-09-01 07:32:00",
+                NOTEDATETIMEUPDATED="2026-09-01 09:10:05",
+                NOTEAUTHOR="Doe, John",
+                NOTETEXT="Entry made.",
+            )
+        )
+    assert models.normalise_legacy_dates() == 2
+    with get_session() as session:
+        note = session.query(Notes).one()
+        assert note.NOTEDATETIME == "09-01-2026 07:32:00"
+        assert note.NOTEDATETIMEUPDATED == "09-01-2026 09:10:05"
 
 
 def test_the_rewrite_happens_once():
