@@ -100,6 +100,10 @@ class CrudSpec:
     requires_case:  whether adding, editing and deleting need an open case
     empty_text:     shown in place of the table when there are no rows
     id_label:       heading for an ID column; no ID column when blank
+    max_records:    most rows the table may hold, 0 for no limit. The add
+                    form closes once it is reached; the validator should
+                    refuse the extra row as well
+    limit_message:  shown on the add form while it is closed
     """
 
     model: type
@@ -122,6 +126,8 @@ class CrudSpec:
     requires_case: bool = True
     empty_text: str = ""
     id_label: str = ""
+    max_records: int = 0
+    limit_message: str = ""
 
     def __post_init__(self):
         self.entity_plural = self.entity_plural or f"{self.entity}s"
@@ -258,6 +264,11 @@ def build_crud_page(spec: CrudSpec) -> None:
             if spec.on_form_ready:
                 spec.on_form_ready(form_widgets)
 
+            limit_note = ui.label(spec.limit_message).classes(
+                "w-full text-sm text-[#F5B027]"
+            )
+            limit_note.set_visibility(False)
+
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
                 ui.button(
                     "Clear",
@@ -265,7 +276,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                     color="transparent",
                 ).props("flat").classes("text-[var(--vsp-blue)]")
 
-                ui.button(
+                submit_button = ui.button(
                     spec.submit_label,
                     on_click=lambda: _submit(),
                     color="var(--vsp-blue)",
@@ -334,6 +345,14 @@ def build_crud_page(spec: CrudSpec) -> None:
                 )
             return row
 
+        def _apply_record_limit(count: int) -> None:
+            """Closes the add form while the table holds all it may."""
+            if not spec.max_records:
+                return
+            full = count >= spec.max_records
+            submit_button.set_enabled(not full)
+            limit_note.set_visibility(full)
+
         def refresh_table() -> None:
             """Re-reads the table from the database."""
             table_container.clear()
@@ -346,6 +365,8 @@ def build_crud_page(spec: CrudSpec) -> None:
                 )
                 # Built inside the session, before it closes.
                 rows = [_row_dict(record) for record in records]
+
+            _apply_record_limit(len(rows))
 
             with table_container:
                 if not rows:

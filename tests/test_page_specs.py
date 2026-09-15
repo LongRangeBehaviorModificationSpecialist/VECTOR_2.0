@@ -143,6 +143,19 @@ def test_cases_page_has_no_delete_all():
     assert cases_page.SPEC.show_delete_all is False
 
 
+def test_cases_page_holds_one_case():
+    """The add form closes while a case is open; Start New Case is the
+    way to begin another."""
+    assert cases_page.SPEC.max_records == 1
+    assert "Start New Case" in cases_page.SPEC.limit_message
+
+
+def test_other_pages_have_no_record_limit():
+    for name, spec in ALL_SPECS:
+        if name != "cases":
+            assert spec.max_records == 0, name
+
+
 def test_spec_defaults_fill_themselves_in():
     """__post_init__ derives the labels a page did not spell out."""
     spec = CrudSpec(

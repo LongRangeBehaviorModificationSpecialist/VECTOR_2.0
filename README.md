@@ -542,8 +542,8 @@ Read these before relying on VECTOR for a case that will be charged.
 
 - **One case at a time.** The database holds a single case. **Start New
   Case** on the home page deletes the current one after a warning —
-  export first. Nothing yet stops a second case being opened from the
-  Cases page, and reports read only the first, so use Start New Case.
+  export first. While a case is open, the Cases page will not open a
+  second one.
 - **No soft delete.** A deleted record is gone from its table; it is
   recoverable from the audit trail, but by hand.
 - **Case start and end times are typed by the agent** as
@@ -571,6 +571,10 @@ is allowing Python.
 
 **A page refuses to save with "No active case!"** — open a case first
 with **Start New Case** on the home page.
+
+**"Open New Case" is greyed out** — a case is already open, and VECTOR
+holds one at a time. Export it if you need it, then use **Start New
+Case** on the home page to clear it and begin another.
 
 **A password change did not stick** — if `db/users.json` exists it
 seeds that account at startup only; it no longer overwrites a changed

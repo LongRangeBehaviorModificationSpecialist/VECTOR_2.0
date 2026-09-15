@@ -38,6 +38,14 @@ SPEC = CrudSpec(
     validate=_validate,
     # Where a case is opened, so it has to work before one exists.
     requires_case=False,
+    # One case per database. validate_case_entry refuses a second; this
+    # closes the form so nobody fills it in only to be turned away.
+    max_records=1,
+    limit_message=(
+        "A case is already open. To start a different one, use Start New "
+        "Case on the home page — it clears the current case after a "
+        "warning."
+    ),
     # A case is cleared through Start New Case on the home page, which
     # removes everything recorded against it rather than this table alone.
     show_delete_all=False,

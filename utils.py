@@ -12,6 +12,7 @@ import json
 from nicegui import ui
 import mimetypes
 from models import (
+    check_case_info,
     get_session,
     has_active_case,
     record_audit,
@@ -541,6 +542,23 @@ def validate_case_entry(
         CASEDATETIMEBEGIN: str,
         row: Optional[dict] = None,
 ) -> bool:
+
+    # One case per database. Every report reads the first case, so a
+    # second would be recorded but never printed. Starting a different
+    # case goes through Start New Case, which clears this one first.
+    if stage == "initial":
+        open_case = check_case_info()
+        if open_case:
+            ui.notify(
+                f"Case {open_case['CASENUMBER']} is already open. To start "
+                "a different case, use Start New Case on the home page — "
+                "it clears the current case after a warning.",
+                type="warning",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return True
 
     number = (CASENUMBER or "").strip()
     location = (LOCATION or "").strip()
