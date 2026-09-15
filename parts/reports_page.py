@@ -33,7 +33,7 @@ from nicegui import ui
 from sqlalchemy import func
 
 from models import get_session, Agents, Cases, Evidence, Notes, Persons, Rooms
-from navbar import build_navbar
+from navbar import build_navbar, unit_logo
 from auth import is_authenticated, get_current_user_name, get_is_admin
 from utils import get_print_date_time, get_case_info
 
@@ -61,9 +61,7 @@ def build_reports_page() -> None:
 
     with ui.column().classes("items-center w-full mt-4 mb-4"):
 
-        ui.image(
-            "/static/novadc_icac.png",
-        ).classes("w-[150px] h-[150px] mb-4")
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-4")
 
         ui.label(
             "V·E·C·T·O·R Reports Page"

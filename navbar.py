@@ -17,6 +17,7 @@ from nicegui import ui
 
 from auth import is_authenticated
 from models import check_case_info
+from program.config import STATIC_DIR
 
 
 # ----- Dropdown Helper -----
@@ -34,6 +35,29 @@ def _nav_dropdown(label: str, items: list[tuple[str, callable]]) -> None:
                     ui.menu_item(item_label, on_click=callback)
 
 
+# ----- Unit logo -----
+def static_url(filename: str) -> str | None:
+    """The /static address of a file that is present, or None.
+
+    The logo files are unit branding and are not distributed with the
+    source, so a fresh checkout has none of them.
+    """
+    if (STATIC_DIR / filename).is_file():
+        return f"/static/{filename}"
+    return None
+
+
+def unit_logo(filename: str, classes: str) -> None:
+    """Shows a logo from static/, or nothing when the file is missing.
+
+    Every logo sits beside a title, so leaving it out still leaves the
+    page named -- where a missing file used to show a broken-image icon.
+    """
+    url = static_url(filename)
+    if url:
+        ui.image(url).classes(classes)
+
+
 # ----- Main Navbar -----
 def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
     """Builds the top navigation bar for authenticated users.
@@ -46,9 +70,7 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
     with ui.header().classes("items-center bg-dark no-print"):
 
         # ----- Logo + Brand -----
-        ui.image(
-            "/static/novadc_icac.ico",
-        ).classes("w-[32px] h-[32px]")
+        unit_logo("novadc_icac.ico", "w-[32px] h-[32px]")
 
         ui.link(
             "V·E·C·T·O·R",
