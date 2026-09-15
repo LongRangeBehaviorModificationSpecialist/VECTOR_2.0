@@ -104,6 +104,7 @@ class CrudSpec:
                     form closes once it is reached; the validator should
                     refuse the extra row as well
     limit_message:  shown on the add form while it is closed
+    allow_delete:   whether each row offers a delete button
     """
 
     model: type
@@ -128,6 +129,7 @@ class CrudSpec:
     id_label: str = ""
     max_records: int = 0
     limit_message: str = ""
+    allow_delete: bool = True
 
     def __post_init__(self):
         self.entity_plural = self.entity_plural or f"{self.entity}s"
@@ -413,24 +415,30 @@ def build_crud_page(spec: CrudSpec) -> None:
                 table.props("dense flat")
 
                 # Defined once here, not pasted into six page modules.
+                delete_button = (
+                    """
+                            <q-btn dense flat color="negative"
+                                icon="delete" size="sm"
+                                @click="$parent.$emit('delete', props.row)" />"""
+                    if spec.allow_delete
+                    else ""
+                )
                 table.add_slot(
                     "body-cell-actions",
-                    """
+                    f"""
                     <q-td :props="props">
                         <div class="row no-wrap gap-1">
                             <q-btn dense flat color="primary"
                                 icon="edit" size="sm"
-                                @click="$parent.$emit('edit', props.row)" />
-                            <q-btn dense flat color="negative"
-                                icon="delete" size="sm"
-                                @click="$parent.$emit('delete', props.row)" />
+                                @click="$parent.$emit('edit', props.row)" />{delete_button}
                         </div>
                     </q-td>
                     """,
                 )
 
                 table.on("edit", _open_edit_dialog)
-                table.on("delete", _open_delete_dialog)
+                if spec.allow_delete:
+                    table.on("delete", _open_delete_dialog)
 
         # ----- Edit -----
         def _open_edit_dialog(event) -> None:
@@ -514,6 +522,10 @@ def build_crud_page(spec: CrudSpec) -> None:
 
         # ----- Delete one -----
         def _open_delete_dialog(event) -> None:
+            # No button is drawn when deletes are off, but a crafted
+            # event could still arrive, so refuse it here as well.
+            if not spec.allow_delete:
+                return
             row = event.args
             label = row.get(spec.label_field, "")
 

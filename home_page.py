@@ -13,6 +13,7 @@ Handles:
 
 from datetime import datetime
 from nicegui import ui
+import shutil
 import time
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from import_export import (
     import_vector_from_csv,
     import_vector_from_json,
     looks_like_json_export,
+    new_staging_dir,
 )
 from auth import (
     clear_login_failures,
@@ -207,9 +209,9 @@ def build_authenticated_home():
                     ).classes("text-lg font-bold text-[var(--vsp-blue)]")
 
                     ui.label(
-                        "Saves the whole case -- every table, every "
-                        "attachment, and the audit trail -- to your "
-                        "Desktop."
+                        "Downloads the whole case -- every table, every "
+                        "attachment, and the audit trail -- through your "
+                        "browser, on whichever device you are using."
                     ).classes("text-sm text-[var(--vsp-gray)]")
 
                     ui.label("The file will be named :").classes(
@@ -276,11 +278,22 @@ def build_authenticated_home():
                         dialog.close()
 
                         # ----- Run the selected exports -----
+                        # Each finished file goes to the browser, so it
+                        # arrives on the device the export was asked from.
+                        finished = []
                         if format_radio.value in ("csv", "both"):
-                            export_vector_to_csv(password=pwd)
+                            finished.append(
+                                export_vector_to_csv(password=pwd)
+                            )
 
                         if format_radio.value in ("json", "both"):
-                            export_vector_to_json(password=pwd)
+                            finished.append(
+                                export_vector_to_json(password=pwd)
+                            )
+
+                        for path in finished:
+                            if path is not None:
+                                ui.download.file(path)
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -326,10 +339,38 @@ def build_authenticated_home():
                         "text-sm text-[var(--vsp-gray)]"
                     )
 
-                    zip_path_input = ui.input(
-                        label="PATH TO FILE :",
-                        placeholder=r"...-1234_saved_results.zip",
-                    ).classes("w-full text-sm yellow-label")
+                    picked = {"path": None, "folder": None}
+
+                    def discard_picked() -> None:
+                        if picked["folder"] is not None:
+                            shutil.rmtree(picked["folder"], ignore_errors=True)
+                        picked["path"] = picked["folder"] = None
+
+                    async def on_file_picked(e) -> None:
+                        # Kept under the name it arrived with: the suffix is
+                        # part of how the format is recognised.
+                        discard_picked()
+                        folder = new_staging_dir("vector_import_upload_")
+                        name = Path(e.file.name).name or "import.zip"
+                        target = folder / name
+                        await e.file.save(target)
+                        picked["path"], picked["folder"] = target, folder
+                        picked_label.set_text(f"Chosen: {name}")
+                        import_button.enable()
+
+                    ui.upload(
+                        label="Choose the exported file (.zip or .json)",
+                        on_upload=on_file_picked,
+                        auto_upload=True,
+                        max_files=1,
+                        max_file_size=Config.MAX_IMPORT_BYTES,
+                    ).props('accept=".zip,.json" flat bordered').classes(
+                        "w-full"
+                    )
+
+                    picked_label = ui.label(
+                        "No file chosen yet."
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
                     encrypt_checkbox = ui.checkbox(
                         "File is encrypted (requires password)"
@@ -346,21 +387,11 @@ def build_authenticated_home():
                     )
 
                     def do_import():
-                        path = zip_path_input.value.strip("\"'")
-                        if not path:
+                        path = picked["path"]
+                        if path is None:
                             ui.notify(
-                                "Please enter file path.",
+                                "Choose the exported file first.",
                                 type="warning",
-                                timeout=0,
-                                position="center",
-                                close_button="OK",
-                            )
-                            return
-
-                        if not Path(path).exists():
-                            ui.notify(
-                                f"File at '{path}' not found.",
-                                type="negative",
                                 timeout=0,
                                 position="center",
                                 close_button="OK",
@@ -390,24 +421,36 @@ def build_authenticated_home():
                         # the JSON reader; the CSV archive is also a
                         # .zip, so the contents decide, not the suffix
                         # alone.
-                        if looks_like_json_export(path):
-                            import_vector_from_json(path, password=pwd)
-                        else:
-                            import_vector_from_csv(path, password=pwd)
+                        try:
+                            if looks_like_json_export(path):
+                                import_vector_from_json(
+                                    str(path), password=pwd
+                                )
+                            else:
+                                import_vector_from_csv(
+                                    str(path), password=pwd
+                                )
+                        finally:
+                            discard_picked()
+
+                    def cancel_import() -> None:
+                        discard_picked()
+                        dialog.close()
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
                         ui.button(
                             "Cancel",
-                            on_click=dialog.close,
+                            on_click=cancel_import,
                             color="transparent",
                         ).props("flat").classes("text-[var(--vsp-blue)]")
 
-                        ui.button(
+                        import_button = ui.button(
                             "Import Now",
                             on_click=do_import,
                             color="var(--vsp-blue)",
                         ).props("push").classes("text-[var(--vsp-white)]")
+                        import_button.disable()
 
                 dialog.open()
 
@@ -451,8 +494,8 @@ def build_authenticated_home():
                     def do_delete():
                         if not affirm_checkbox.value:
                             ui.notify(
-                                "Is it really that much trouble to click "
-                                "one simple box?  Let's try this again.",
+                                "Tick the box to confirm you understand "
+                                "the data cannot be recovered.",
                                 type="warning",
                                 timeout=0,
                                 position="center",
@@ -460,26 +503,9 @@ def build_authenticated_home():
                             )
                             return
 
-                        if affirm_input.value != "DELETE":
+                        if (affirm_input.value or "").strip() != "DELETE":
                             ui.notify(
-                                "Seriously, how difficult is it to type "
-                                "the word 'DELETE'?  You absolute noob!",
-                                type="warning",
-                                timeout=0,
-                                position="center",
-                                close_button="OK",
-                            )
-                            return
-
-                        affirm = (
-                            affirm_input.value
-                            if affirm_checkbox.value
-                            else None
-                        )
-
-                        if affirm_checkbox.value and not affirm:
-                            ui.notify(
-                                "Please indicate you understand...",
+                                "Type DELETE, in capital letters, to confirm.",
                                 type="warning",
                                 timeout=0,
                                 position="center",

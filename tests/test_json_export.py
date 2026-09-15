@@ -11,6 +11,7 @@ the import must reach the audit trail.
 import base64
 import hashlib
 import json
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -35,12 +36,15 @@ PAYLOAD = b"\xff\xd8\xff\xe0" + b"scene-photo-bytes" * 128
 
 
 @pytest.fixture
-def desktop(tmp_path, monkeypatch):
-    """Keeps the export away from the real Desktop."""
-    home = tmp_path / "home"
-    (home / "Desktop").mkdir(parents=True)
-    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
-    return home / "Desktop"
+def out_dir(tmp_path, monkeypatch):
+    """Where the finished export is written. Staging goes in a private
+    temp folder, so a test never touches the real one."""
+    temp_root = tmp_path / "temp"
+    temp_root.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(temp_root))
+    destination = tmp_path / "exports"
+    destination.mkdir()
+    return destination
 
 
 @pytest.fixture
@@ -71,24 +75,24 @@ def _counts():
 
 # ----- Export -----
 
-def test_export_writes_one_json_file(with_attachment, desktop):
-    import_export.export_vector_to_json()
-    files = list(desktop.glob("*.json"))
+def test_export_writes_one_json_file(with_attachment, out_dir):
+    import_export.export_vector_to_json(destination=out_dir)
+    files = list(out_dir.glob("*.json"))
     assert len(files) == 1
     assert with_attachment in files[0].name
 
 
-def test_export_leaves_nothing_staged_on_the_desktop(with_attachment,
-                                                     desktop):
-    import_export.export_vector_to_json()
-    assert [p.name for p in desktop.iterdir() if p.is_dir()] == []
+def test_export_leaves_nothing_staged(with_attachment, out_dir):
+    exported = import_export.export_vector_to_json(destination=out_dir)
+    assert [p.name for p in out_dir.iterdir()] == [exported.name]
+    assert list(Path(tempfile.gettempdir()).iterdir()) == []
 
 
 def test_the_file_is_valid_json_with_the_expected_shape(with_attachment,
-                                                        desktop):
-    import_export.export_vector_to_json()
+                                                        out_dir):
+    import_export.export_vector_to_json(destination=out_dir)
     payload = json.loads(
-        next(desktop.glob("*.json")).read_text(encoding="utf-8")
+        next(out_dir.glob("*.json")).read_text(encoding="utf-8")
     )
     assert payload["export_metadata"]["application"] == "VECTOR"
     assert payload["export_metadata"]["format_version"] == "1.1"
@@ -97,19 +101,19 @@ def test_the_file_is_valid_json_with_the_expected_shape(with_attachment,
     assert payload["files"]["record_count"] == 1
 
 
-def test_the_audit_trail_is_included(with_attachment, desktop):
+def test_the_audit_trail_is_included(with_attachment, out_dir):
     """A case handed on without its history cannot answer what changed."""
-    import_export.export_vector_to_json()
+    import_export.export_vector_to_json(destination=out_dir)
     payload = json.loads(
-        next(desktop.glob("*.json")).read_text(encoding="utf-8")
+        next(out_dir.glob("*.json")).read_text(encoding="utf-8")
     )
     assert "AUDIT" in payload["tables"]
 
 
-def test_attachments_carry_their_collection_hash(with_attachment, desktop):
-    import_export.export_vector_to_json()
+def test_attachments_carry_their_collection_hash(with_attachment, out_dir):
+    import_export.export_vector_to_json(destination=out_dir)
     payload = json.loads(
-        next(desktop.glob("*.json")).read_text(encoding="utf-8")
+        next(out_dir.glob("*.json")).read_text(encoding="utf-8")
     )
     entry = payload["files"]["records"][0]
     assert entry["FILENAME"] == "scene_photo.jpg"
@@ -118,10 +122,11 @@ def test_attachments_carry_their_collection_hash(with_attachment, desktop):
     assert base64.b64decode(entry["FILEDATA_b64"]) == PAYLOAD
 
 
-def test_an_encrypted_export_is_really_encrypted(with_attachment, desktop):
-    import_export.export_vector_to_json(password="correct horse battery")
-    archive = next(desktop.glob("*.json.zip"))
-    assert not list(desktop.glob("*.json"))  # no plaintext left beside it
+def test_an_encrypted_export_is_really_encrypted(with_attachment, out_dir):
+    import_export.export_vector_to_json(
+        destination=out_dir, password="correct horse battery")
+    archive = next(out_dir.glob("*.json.zip"))
+    assert not list(out_dir.glob("*.json"))  # no plaintext left beside it
 
     with zipfile.ZipFile(archive) as zf:
         with pytest.raises(RuntimeError):
@@ -130,10 +135,10 @@ def test_an_encrypted_export_is_really_encrypted(with_attachment, desktop):
 
 # ----- Round trip -----
 
-def test_round_trip_preserves_every_row(with_attachment, desktop):
+def test_round_trip_preserves_every_row(with_attachment, out_dir):
     before = _counts()
-    import_export.export_vector_to_json()
-    exported = next(desktop.glob("*.json"))
+    import_export.export_vector_to_json(destination=out_dir)
+    exported = next(out_dir.glob("*.json"))
 
     delete_all_data()
     assert _counts()["Evidence"] == 0
@@ -142,9 +147,9 @@ def test_round_trip_preserves_every_row(with_attachment, desktop):
     assert _counts() == before
 
 
-def test_round_trip_preserves_attachment_bytes(with_attachment, desktop):
-    import_export.export_vector_to_json()
-    exported = next(desktop.glob("*.json"))
+def test_round_trip_preserves_attachment_bytes(with_attachment, out_dir):
+    import_export.export_vector_to_json(destination=out_dir)
+    exported = next(out_dir.glob("*.json"))
 
     delete_all_data()
     import_export.import_vector_from_json(str(exported))
@@ -157,10 +162,10 @@ def test_round_trip_preserves_attachment_bytes(with_attachment, desktop):
         assert restored.FILESHA256 == hashlib.sha256(PAYLOAD).hexdigest()
 
 
-def test_round_trip_preserves_field_values(with_attachment, desktop):
+def test_round_trip_preserves_field_values(with_attachment, out_dir):
     """Values that break naive serialisation must survive."""
-    import_export.export_vector_to_json()
-    exported = next(desktop.glob("*.json"))
+    import_export.export_vector_to_json(destination=out_dir)
+    exported = next(out_dir.glob("*.json"))
 
     delete_all_data()
     import_export.import_vector_from_json(str(exported))
@@ -172,10 +177,11 @@ def test_round_trip_preserves_field_values(with_attachment, desktop):
         assert "&" in note.NOTETEXT and "<" in note.NOTETEXT
 
 
-def test_encrypted_round_trip(with_attachment, desktop):
+def test_encrypted_round_trip(with_attachment, out_dir):
     before = _counts()
-    import_export.export_vector_to_json(password="correct horse battery")
-    archive = next(desktop.glob("*.json.zip"))
+    import_export.export_vector_to_json(
+        destination=out_dir, password="correct horse battery")
+    archive = next(out_dir.glob("*.json.zip"))
 
     delete_all_data()
     import_export.import_vector_from_json(
@@ -186,9 +192,9 @@ def test_encrypted_round_trip(with_attachment, desktop):
 
 # ----- Integrity and safety -----
 
-def test_a_tampered_attachment_is_detected(with_attachment, desktop):
-    import_export.export_vector_to_json()
-    exported = next(desktop.glob("*.json"))
+def test_a_tampered_attachment_is_detected(with_attachment, out_dir):
+    import_export.export_vector_to_json(destination=out_dir)
+    exported = next(out_dir.glob("*.json"))
 
     payload = json.loads(exported.read_text(encoding="utf-8"))
     payload["files"]["records"][0]["FILEDATA_b64"] = base64.b64encode(
@@ -209,11 +215,11 @@ def test_a_tampered_attachment_is_detected(with_attachment, desktop):
     assert any("do not match" in text for text in notices)
 
 
-def test_the_local_audit_trail_is_not_overwritten(with_attachment, desktop):
+def test_the_local_audit_trail_is_not_overwritten(with_attachment, out_dir):
     """An import appends a record; it does not import someone else's
     history over the receiving machine's own."""
-    import_export.export_vector_to_json()
-    exported = next(desktop.glob("*.json"))
+    import_export.export_vector_to_json(destination=out_dir)
+    exported = next(out_dir.glob("*.json"))
 
     delete_all_data()
     import_export.import_vector_from_json(str(exported))
@@ -343,6 +349,31 @@ def test_an_upstream_export_imports(tmp_path):
         assert restored.FILEMIMETYPE == "image/jpeg"
 
 
+def test_attachments_sharing_a_name_all_survive_json(case, out_dir):
+    attachments = [("photo.jpg", b"FRONT"), ("photo.jpg", b"BACK")]
+    with get_session() as session:
+        for name, payload in attachments:
+            session.add(
+                UploadedFiles(
+                    FILENAME=name,
+                    FILESIZE=len(payload),
+                    FILEDATA=payload,
+                    FILEUPLOADEDBY="Doe, John",
+                )
+            )
+
+    exported = import_export.export_vector_to_json(destination=out_dir)
+    delete_all_data()
+    import_export.import_vector_from_json(str(exported))
+
+    with get_session() as session:
+        restored = sorted(
+            (f.FILENAME, bytes(f.FILEDATA))
+            for f in session.query(UploadedFiles).all()
+        )
+    assert restored == sorted(attachments)
+
+
 # ----- Format detection -----
 
 def test_a_json_file_is_recognised(tmp_path):
@@ -351,17 +382,18 @@ def test_a_json_file_is_recognised(tmp_path):
     assert import_export.looks_like_json_export(str(path)) is True
 
 
-def test_the_csv_archive_is_not_mistaken_for_json(with_attachment, desktop):
+def test_the_csv_archive_is_not_mistaken_for_json(with_attachment, out_dir):
     """The CSV archive also contains export_manifest.json, so the
     detection has to look at more than 'is there a .json in here'."""
-    import_export.export_vector_to_csv()
-    archive = next(desktop.glob("*.zip"))
+    import_export.export_vector_to_csv(destination=out_dir)
+    archive = next(out_dir.glob("*.zip"))
     assert import_export.looks_like_json_export(str(archive)) is False
 
 
-def test_a_json_zip_is_recognised(with_attachment, desktop):
-    import_export.export_vector_to_json(password="correct horse battery")
-    archive = next(desktop.glob("*.json.zip"))
+def test_a_json_zip_is_recognised(with_attachment, out_dir):
+    import_export.export_vector_to_json(
+        destination=out_dir, password="correct horse battery")
+    archive = next(out_dir.glob("*.json.zip"))
     assert import_export.looks_like_json_export(str(archive)) is True
 
 

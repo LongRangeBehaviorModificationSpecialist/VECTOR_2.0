@@ -179,6 +179,13 @@ def seed_default_user():
 seed_default_user()
 
 
+# Export and import staging left over from an earlier run: a download the
+# browser never collected, an import dialog closed before importing.
+from import_export import remove_stale_staging
+
+remove_stale_staging()
+
+
 # ----- Theme Configuration -----
 ui.add_css(
     """

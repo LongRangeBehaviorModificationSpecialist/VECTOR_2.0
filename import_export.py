@@ -107,6 +107,64 @@ def canonical_file_entry(entry: dict) -> dict:
     }
 
 
+# ----- Staging -----
+# Exports are built in the system temp folder and handed to the browser as
+# a download, so the file reaches whichever device asked for it -- a tablet
+# on --lan included -- and no copy is left on the host's Desktop. Imports
+# arrive the same way, as an upload. Neither is needed once the download or
+# the import has happened, so anything left for over an hour is removed.
+STAGING_PREFIXES = ("vector_export_", "vector_import_upload_")
+STAGING_MAX_AGE_SECONDS = 60 * 60
+
+
+def new_staging_dir(prefix: str) -> Path:
+    """A fresh private folder in the system temp directory."""
+    return Path(tempfile.mkdtemp(prefix=prefix))
+
+
+def remove_stale_staging(
+        max_age_seconds: int = STAGING_MAX_AGE_SECONDS,
+) -> int:
+    """Deletes staging folders older than max_age_seconds.
+
+    Returns how many were removed. A folder still in use -- a large
+    download in progress on Windows -- cannot be deleted, and is left for
+    the next pass.
+    """
+    import time
+
+    cutoff = time.time() - max_age_seconds
+    removed = 0
+    for entry in Path(tempfile.gettempdir()).iterdir():
+        if not entry.name.startswith(STAGING_PREFIXES):
+            continue
+        try:
+            if entry.is_dir() and entry.stat().st_mtime < cutoff:
+                shutil.rmtree(entry)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def _unique_archive_name(name: str, used: set) -> str:
+    """A name no other attachment in this archive has taken.
+
+    Two attachments can share a name -- two photographs both called
+    photo.jpg -- and written into one folder the second overwrote the
+    first, so one was lost from the export. Compared without regard to
+    case, since Windows treats Photo.jpg and photo.jpg as one file.
+    """
+    stem, suffix = Path(name).stem, Path(name).suffix
+    candidate = name
+    counter = 2
+    while candidate.lower() in used:
+        candidate = f"{stem} ({counter}){suffix}"
+        counter += 1
+    used.add(candidate.lower())
+    return candidate
+
+
 # ----- HELPER FUNCTIONS -----
 
 def get_case_info_for_folder_name() -> str:
@@ -204,10 +262,17 @@ def deserialize_value(value: str, column) -> str:
 # ----- EXPORT FUNCTION -----
 
 
-def export_vector_to_csv(password: Optional[str] = None) -> None:
-    """Exports all database tables to CSV files and file BLOBs to disk.
+def export_vector_to_csv(
+        password: Optional[str] = None,
+        destination: Optional[Path] = None,
+) -> Optional[Path]:
+    """Exports every table to CSV, with every attachment, as one ZIP.
 
-    Saves to ~/Desktop/<case-number>_<datetime>_saved_results/
+    Returns the finished archive's path, or None if the export failed.
+    The archive is written to `destination` -- a fresh staging folder when
+    none is given, for the caller to hand to the browser as a download.
+    The CSVs are assembled in a separate staging folder that is removed
+    afterwards, so no unencrypted copy of the case is left behind.
     """
     from models import UploadedFiles
 
@@ -215,15 +280,18 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
     folder_name = get_case_info_for_folder_name()
 
     if not folder_name:
-        return
+        return None
 
-    home_dir = Path.home()
-    desktop_dir = home_dir / "Desktop"
+    remove_stale_staging()
+    destination = (
+        Path(destination) if destination else new_staging_dir("vector_export_")
+    )
+    work_dir = new_staging_dir("vector_export_")
 
-    # ----- Create temporary dir for export before zipping -----
-    export_dir = desktop_dir / folder_name
+    # ----- Assemble the archive's contents before zipping -----
+    export_dir = work_dir / folder_name
     files_dir = export_dir / "files"
-    zip_path = desktop_dir / f"{folder_name}.zip"
+    zip_path = destination / f"{folder_name}.zip"
 
     try:
         export_dir.mkdir(parents=True, exist_ok=True)
@@ -236,7 +304,8 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
             position="center",
             close_button="OK",
         )
-        return
+        shutil.rmtree(work_dir, ignore_errors=True)
+        return None
 
     # ----- Export each table to CSV -----
     exported_tables = {}
@@ -274,12 +343,14 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
                 position="center",
                 close_button="OK",
             )
-            return
+            shutil.rmtree(work_dir, ignore_errors=True)
+            return None
 
     # ----- Export uploaded files -----
     files_list = []
     num_files = 0
     integrity_failures = []
+    used_names = set()
 
     try:
         with get_session() as session:
@@ -289,7 +360,8 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
                     # Sanitize filename
                     safe_name = uf.FILENAME or f"file_{uf.Z_PK}"
                     safe_name = safe_name.replace("/", "_").replace("\\", "_")
-                    file_path = files_dir / safe_name
+                    archive_name = _unique_archive_name(safe_name, used_names)
+                    file_path = files_dir / archive_name
 
                     with open(file_path, "wb") as f:
                         f.write(uf.FILEDATA)
@@ -303,14 +375,17 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
                     recorded = uf.FILESHA256 or ""
                     verified = (not recorded) or recorded == sha256_hash
                     if not verified:
-                        integrity_failures.append(safe_name)
+                        integrity_failures.append(archive_name)
 
                     # FILENAME, FILESIZE and FILEHASH are the keys
                     # upstream's manifest uses; the rest carry the
-                    # collection record this branch adds.
+                    # collection record this branch adds. FILEARCHIVENAME
+                    # is the file's name inside the archive, which differs
+                    # from FILENAME when two attachments shared a name.
                     files_list.append(
                         {
                             "FILENAME": safe_name,
+                            "FILEARCHIVENAME": archive_name,
                             "FILESIZE": uf.FILESIZE or len(uf.FILEDATA),
                             "FILEHASH": sha256_hash,
                             "FILESHA256": recorded or None,
@@ -335,7 +410,7 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
     # ----- Write a manifest file -----
     manifest = {
         "export_date": datetime.now().isoformat(),
-        "case_file": str(zip_path),
+        "case_file": zip_path.name,
         "tables": [
             {"name": table_name, "records": count}
             for table_name, count in exported_tables.items()
@@ -403,11 +478,11 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
             position="center",
             close_button="OK",
         )
-        shutil.rmtree(export_dir, ignore_errors=True)
-        return
+        shutil.rmtree(work_dir, ignore_errors=True)
+        return None
 
-    # ----- Delete the temporary directory -----
-    shutil.rmtree(export_dir, ignore_errors=True)
+    # ----- Delete the staging directory -----
+    shutil.rmtree(work_dir, ignore_errors=True)
 
     enc_text = " (AES-256 encrypted)" if password else ""
 
@@ -416,7 +491,7 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
         f"Export complete!{enc_text}\n"
         f"Tables: {', '.join(f'{n} ({c})' for n, c in exported_tables.items())}\n"
         f"Files: {num_files}\n"
-        f"Saved to: {zip_path}",
+        f"Downloading {zip_path.name}",
         timeout=0,
         position="bottom",
         close_button="OK",
@@ -430,6 +505,8 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
     print(f"  Total records: {total_records}")
     print(f"  Files exported: {num_files}")
     print(f"{'='*60}\n")
+
+    return zip_path
 
 
 # ----- IMPORT FUNCTION -----
@@ -632,8 +709,13 @@ def import_vector_from_csv(
     for entry in manifest.get("files", []):
         if isinstance(entry, dict):
             entry = canonical_file_entry(entry)
-            if entry.get("FILENAME"):
-                manifest_files[entry["FILENAME"]] = entry
+            # Keyed by the name inside the archive. Archives from before
+            # FILEARCHIVENAME, and upstream's, only have FILENAME.
+            archive_name = (
+                entry.get("FILEARCHIVENAME") or entry.get("FILENAME")
+            )
+            if archive_name:
+                manifest_files[archive_name] = entry
     hash_mismatches = []
     unlisted_files = []
 
@@ -660,7 +742,7 @@ def import_vector_from_csv(
 
                     details = entry or {}
                     new_file = UploadedFiles(
-                        FILENAME=file_path.name,
+                        FILENAME=details.get("FILENAME") or file_path.name,
                         FILEDATA=file_data,
                         FILESIZE=len(file_data),
                         FILEMIMETYPE=(
@@ -816,22 +898,26 @@ def _json_to_value(value, column):
     return value
 
 
-def export_vector_to_json(password: Optional[str] = None) -> None:
+def export_vector_to_json(
+        password: Optional[str] = None,
+        destination: Optional[Path] = None,
+) -> Optional[Path]:
     """Exports the whole case to a single JSON file.
 
     Attachments are embedded as base64 alongside the SHA-256 recorded
     when they were collected, so the file is self-contained and its
     contents can be checked on the way back in.
 
-    With a password the JSON is sealed in an AES-256 zip. It is built in
-    a temp directory either way, so an unencrypted copy is never written
-    to the Desktop and left sitting there.
+    With a password the JSON is sealed in an AES-256 zip. Returns the
+    finished file's path, or None if the export failed. It is written to
+    `destination` -- a fresh staging folder when none is given, for the
+    caller to hand to the browser as a download.
     """
     from models import UploadedFiles
 
     folder_name = get_case_info_for_folder_name()
     if not folder_name:
-        return
+        return None
 
     payload = {
         "export_metadata": {
@@ -862,7 +948,7 @@ def export_vector_to_json(password: Optional[str] = None) -> None:
                 position="center",
                 close_button="OK",
             )
-            return
+            return None
 
         payload["tables"][table_name] = {
             "record_count": len(rows),
@@ -932,9 +1018,12 @@ def export_vector_to_json(password: Optional[str] = None) -> None:
         )
 
     # ----- Write it, staging in a temp directory -----
-    desktop_dir = Path.home() / "Desktop"
-    staging = Path(tempfile.mkdtemp(prefix="vector_json_export_"))
-    staged_json = staging / f"{folder_name}.json"
+    remove_stale_staging()
+    destination = (
+        Path(destination) if destination else new_staging_dir("vector_export_")
+    )
+    work_dir = new_staging_dir("vector_export_")
+    staged_json = work_dir / f"{folder_name}.json"
 
     try:
         with open(staged_json, "w", encoding="utf-8") as handle:
@@ -943,7 +1032,7 @@ def export_vector_to_json(password: Optional[str] = None) -> None:
             )
 
         if password:
-            final_path = desktop_dir / f"{folder_name}.json.zip"
+            final_path = destination / f"{folder_name}.json.zip"
             with pyzipper.AESZipFile(
                 final_path,
                 "w",
@@ -954,7 +1043,7 @@ def export_vector_to_json(password: Optional[str] = None) -> None:
                 archive.setencryption(pyzipper.WZ_AES, nbits=256)
                 archive.write(staged_json, arcname=staged_json.name)
         else:
-            final_path = desktop_dir / staged_json.name
+            final_path = destination / staged_json.name
             shutil.copy2(staged_json, final_path)
 
     except Exception as err:
@@ -965,16 +1054,16 @@ def export_vector_to_json(password: Optional[str] = None) -> None:
             position="center",
             close_button="OK",
         )
-        return
+        return None
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        shutil.rmtree(work_dir, ignore_errors=True)
 
     encrypted_note = " (AES-256 encrypted)" if password else ""
     ui.notify(
         f"JSON export complete{encrypted_note}.\n"
         f"Records: {total_records}\n"
         f"Attachments embedded: {len(file_records)}\n"
-        f"Saved to: {final_path}",
+        f"Downloading {final_path.name}",
         timeout=0,
         position="bottom",
         close_button="OK",
@@ -985,6 +1074,8 @@ def export_vector_to_json(password: Optional[str] = None) -> None:
     print(f"  Location: {final_path}")
     print(f"  Records: {total_records}, files: {len(file_records)}")
     print(f"{'=' * 60}\n")
+
+    return final_path
 
 
 def import_vector_from_json(

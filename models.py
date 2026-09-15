@@ -930,6 +930,7 @@ def migrate_schema() -> None:
 # audit trail.
 _ISO_DATETIME = re.compile(r"^(\d{4})-(\d{2})-(\d{2})( \d{2}:\d{2})$")
 _ISO_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})()$")
+_ISO_TIMESTAMP = re.compile(r"^(\d{4})-(\d{2})-(\d{2})( \d{2}:\d{2}:\d{2})$")
 
 
 def _month_first(value, pattern):
@@ -942,7 +943,7 @@ def _month_first(value, pattern):
 
 
 def normalise_legacy_dates() -> int:
-    """Rewrites YYYY-MM-DD case times and birth dates as MM-DD-YYYY.
+    """Rewrites YYYY-MM-DD case times, birth dates and note times as MM-DD-YYYY.
 
     Anything not in exactly the old format is left alone. Returns how
     many values changed.
@@ -962,6 +963,16 @@ def normalise_legacy_dates() -> int:
             if new != person.PERSONDOB:
                 person.PERSONDOB = new
                 changed += 1
+
+        # Notes are stamped MM-DD-YYYY HH:MM:SS; older ones were stored the
+        # other way round, and a notes report mixing the two reads wrongly.
+        for note in session.query(Notes).all():
+            for column in ("NOTEDATETIME", "NOTEDATETIMEUPDATED"):
+                old = getattr(note, column)
+                new = _month_first(old, _ISO_TIMESTAMP)
+                if new != old:
+                    setattr(note, column, new)
+                    changed += 1
 
     if changed:
         print(f"Schema migration: {changed} date(s) rewritten as MM-DD-YYYY")
