@@ -957,10 +957,10 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 
     person_rows = "".join([f"""
         <tr>
-            <td class="personTableData font-10">{h(p["SUSPECTNAME"])}</td>
-            <td class="personTableData font-10">{h(p["SUSPECTDOB"])}</td>
-            <td class="personTableData font-10">{h(p["SUSPECTADDRESS"])}</td>
-            <td class="personTableData font-10">{h(p["SUSPECTPHONE"])}</td>
+            <td class="personTableData font-10">{h(p["PERSONNAME"])}</td>
+            <td class="personTableData font-10">{h(p["PERSONDOB"])}</td>
+            <td class="personTableData font-10">{h(p["PERSONADDRESS"])}</td>
+            <td class="personTableData font-10">{h(p["PERSONPHONE"])}</td>
             <td class="personTableData font-10">{h(p["SUSPECTNOTE"])}</td>
         </tr>"""
         for p in persons
@@ -1254,13 +1254,13 @@ def print_persons_report():
         active_case = get_case_info()
         persons = [
             {
-                "SUSPECTNAME": p.SUSPECTNAME,
-                "SUSPECTDOB": p.SUSPECTDOB or "",
-                "SUSPECTADDRESS": p.SUSPECTADDRESS or "",
-                "SUSPECTPHONE": p.SUSPECTPHONE or "",
+                "PERSONNAME": p.PERSONNAME,
+                "PERSONDOB": p.PERSONDOB or "",
+                "PERSONADDRESS": p.PERSONADDRESS or "",
+                "PERSONPHONE": p.PERSONPHONE or "",
                 "SUSPECTNOTE": p.SUSPECTNOTE or "",
             }
-            for p in session.query(Persons).order_by(Persons.SUSPECTNAME).all()
+            for p in session.query(Persons).order_by(Persons.PERSONNAME).all()
         ]
 
     html = build_persons_report_html(

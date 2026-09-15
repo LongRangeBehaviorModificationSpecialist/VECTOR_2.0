@@ -68,11 +68,11 @@ def test_the_same_photograph_can_be_attached_twice():
         for name in ("front.jpg", "back.jpg"):
             session.add(
                 UploadedFiles(
-                    file_name=name,
-                    file_size=len(payload),
-                    file_mime_type="image/jpeg",
-                    uploaded_by="Doe, John",
-                    file_data=payload,
+                    FILENAME=name,
+                    FILESIZE=len(payload),
+                    FILEMIMETYPE="image/jpeg",
+                    FILEUPLOADEDBY="Doe, John",
+                    FILEDATA=payload,
                 )
             )
     with get_session() as session:
@@ -118,7 +118,7 @@ def test_evidence_numbers_stay_unique():
 
 def test_person_names_stay_unique():
     with get_session() as session:
-        session.add(Persons(SUSPECTNAME="O'Brien, Sean"))
+        session.add(Persons(PERSONNAME="O'Brien, Sean"))
     with pytest.raises(IntegrityError):
         with get_session() as session:
-            session.add(Persons(SUSPECTNAME="O'Brien, Sean"))
+            session.add(Persons(PERSONNAME="O'Brien, Sean"))

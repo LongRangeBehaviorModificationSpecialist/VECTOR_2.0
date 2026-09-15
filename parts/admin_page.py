@@ -82,7 +82,7 @@ def build_admin_page():
 
                 with get_users_session() as session:
 
-                    if session.query(Users).filter_by(user_name=uname).first():
+                    if session.query(Users).filter_by(USERNAME=uname).first():
 
                         ui.notify(
                             "That username already exists.",
@@ -94,10 +94,10 @@ def build_admin_page():
                         return
 
                     new_user = Users(
-                        user_name=uname,
-                        is_admin=False,
-                        is_active=True,
-                        must_change_password=True,
+                        USERNAME=uname,
+                        ISADMIN=False,
+                        ISACTIVE=True,
+                        MUSTCHANGEPASSWORD=True,
                     )
 
                     one_time = generate_one_time_password()
@@ -144,22 +144,22 @@ def build_admin_page():
 
                         users = (
                             session.query(Users)
-                            .order_by(Users.user_name)
+                            .order_by(Users.USERNAME)
                             .all()
                         )
 
                         rows = [
                             {
-                                "id": u.id,
-                                "username": u.user_name,
-                                "is_admin": "Yes" if u.is_admin else "No",
-                                "is_active": "Yes" if u.is_active else "No",
-                                "must_change_pw": (
-                                    "Yes" if u.must_change_password else "No"
+                                "Z_PK": u.Z_PK,
+                                "USERNAME": u.USERNAME,
+                                "ISADMIN": "True" if u.ISADMIN else "False",
+                                "ISACTIVE": "True" if u.ISACTIVE else "False",
+                                "MUSTCHANGEPASSWORD": (
+                                    "True" if u.MUSTCHANGEPASSWORD else "False"
                                 ),
                                 "locked": (
                                     "LOCKED"
-                                    if lockout_seconds_remaining(u.user_name)
+                                    if lockout_seconds_remaining(u.USERNAME)
                                     else ""
                                 ),
                             }
@@ -169,28 +169,35 @@ def build_admin_page():
                     with table_container:
                         columns = [
                             {
-                                "name": "username",
-                                "label": "Username",
-                                "field": "username",
+                                "name": "Z_PK",
+                                "label": "User ID",
+                                "field": "Z_PK",
                                 "sortable": True,
                                 "align": "left",
                             },
                             {
-                                "name": "is_admin",
+                                "name": "USERNAME",
+                                "label": "Username",
+                                "field": "USERNAME",
+                                "sortable": True,
+                                "align": "left",
+                            },
+                            {
+                                "name": "ISADMIN",
                                 "label": "Admin",
-                                "field": "is_admin",
+                                "field": "ISADMIN",
                                 "align": "left",
                             },
                             {
-                                "name": "is_active",
+                                "name": "ISACTIVE",
                                 "label": "Active",
-                                "field": "is_active",
+                                "field": "ISACTIVE",
                                 "align": "left",
                             },
                             {
-                                "name": "must_change_pw",
+                                "name": "MUSTCHANGEPASSWORD",
                                 "label": "Must Change PW",
-                                "field": "must_change_pw",
+                                "field": "MUSTCHANGEPASSWORD",
                                 "align": "left",
                             },
                             {
@@ -210,7 +217,7 @@ def build_admin_page():
                         table = ui.table(
                             columns=columns,
                             rows=rows,
-                            row_key="id",
+                            row_key="Z_PK",
                         )
 
                         table.props("dense flat")
@@ -253,7 +260,7 @@ def build_admin_page():
                                     <q-btn dense flat color="negative" \
                                     icon="delete"
                                         size="sm" title="Delete User"
-                                        :disable="props.row.is_admin === 'Yes'"
+                                        :disable="props.row.ISADMIN === 'True'"
                                         @click="$parent.$emit('delete', \
                                         props.row)" />
                                 </div>
@@ -276,7 +283,7 @@ def build_admin_page():
 
                                 ui.label(
                                     f"Generate a new one-time password for "
-                                    f"{row['username']}?"
+                                    f"{row['USERNAME']}?"
                                 ).classes("mb-2")
 
                                 ui.label(
@@ -309,7 +316,7 @@ def build_admin_page():
 
                                             user = (
                                                 session.query(Users)
-                                                .filter_by(id=row["id"])
+                                                .filter_by(Z_PK=row["Z_PK"])
                                                 .first()
                                             )
 
@@ -318,18 +325,18 @@ def build_admin_page():
                                                     generate_one_time_password()
                                                 )
                                                 user.set_password(one_time)
-                                                user.must_change_password = True
+                                                user.MUSTCHANGEPASSWORD = True
 
                                         # A reset that leaves the old
                                         # session working is not a reset.
                                         invalidate_user_sessions(
-                                            row["username"]
+                                            row["USERNAME"]
                                         )
-                                        clear_login_failures(row["username"])
+                                        clear_login_failures(row["USERNAME"])
 
                                         ui.notify(
                                             f"Password for "
-                                            f"'{row['username']}' reset.\n\n"
+                                            f"'{row['USERNAME']}' reset.\n\n"
                                             f"One-time password:  "
                                             f"{one_time}\n\n"
                                             "Shown once, and cannot be "
@@ -359,7 +366,7 @@ def build_admin_page():
 
                             row = e.args
 
-                            if row["is_admin"] == "Yes":
+                            if row["ISADMIN"] == "True":
 
                                 ui.notify(
                                     "Cannot delete the admin account.",
@@ -380,7 +387,7 @@ def build_admin_page():
 
                                 ui.label(
                                     f"Are you sure you want to delete user "
-                                    f"'{row['username']}'? This cannot be "
+                                    f"'{row['USERNAME']}'? This cannot be "
                                     "undone."
                                 ).classes("mb-4")
 
@@ -406,14 +413,14 @@ def build_admin_page():
 
                                             user = (
                                                 session.query(Users)
-                                                .filter_by(id=row["id"])
+                                                .filter_by(Z_PK=row["Z_PK"])
                                                 .first()
                                             )
 
                                             # Admin status comes from the
                                             # database, never from the row
                                             # payload the browser sent.
-                                            if user and user.is_admin:
+                                            if user and user.ISADMIN:
                                                 ui.notify(
                                                     "Cannot delete an admin "
                                                     "account.",
@@ -432,12 +439,12 @@ def build_admin_page():
                                         # keeps working until its browser
                                         # is closed.
                                         invalidate_user_sessions(
-                                            row["username"]
+                                            row["USERNAME"]
                                         )
-                                        clear_login_failures(row["username"])
+                                        clear_login_failures(row["USERNAME"])
 
                                         ui.notify(
-                                            f"User \"{row['username']}\" "
+                                            f"User \"{row['USERNAME']}\" "
                                             "deleted.",
                                             timeout=4000,
                                             position="bottom",
@@ -464,10 +471,10 @@ def build_admin_page():
                                 ui.navigate.to("/")
                                 return
 
-                            clear_login_failures(row["username"])
+                            clear_login_failures(row["USERNAME"])
                             ui.notify(
                                 f"Sign-in lock cleared for "
-                                f"'{row['username']}'.",
+                                f"'{row['USERNAME']}'.",
                                 timeout=4000,
                                 position="bottom",
                                 close_button="OK",

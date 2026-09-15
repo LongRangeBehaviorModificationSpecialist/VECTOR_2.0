@@ -39,7 +39,7 @@ import crypto  # noqa: E402
 from program.config import APP_DB_PATH, USERS_DB_PATH  # noqa: E402
 
 TABLES_TO_COUNT = [
-    "CASES", "AGENTS", "ROOMS", "EVIDENCE", "PERSONS", "NOTES", "files",
+    "CASES", "AGENTS", "ROOMS", "EVIDENCE", "PERSONS", "NOTES", "FILES",
     "AUDIT",
 ]
 

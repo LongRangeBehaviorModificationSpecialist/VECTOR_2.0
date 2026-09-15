@@ -36,12 +36,12 @@ def test_no_shared_default_password_remains():
 
 def test_generated_password_round_trips_through_bcrypt():
     password = generate_one_time_password()
-    user = Users(user_name="demo", is_admin=False, is_active=True)
+    user = Users(USERNAME="demo", ISADMIN=False, ISACTIVE=True)
     user.set_password(password)
 
     assert user.check_password_correction(password) is True
     assert user.check_password_correction(password + "x") is False
-    assert password not in user.password_hash
+    assert password not in user.PASSWORDHASH
 
 
 # ----- Login throttling (S5) -----

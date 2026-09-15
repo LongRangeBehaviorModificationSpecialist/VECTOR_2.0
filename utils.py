@@ -443,7 +443,7 @@ def delete_all_data() -> None:
         (Evidence, "EVIDENCE"),
         (Persons, "PERSONS"),
         (Notes, "NOTES"),
-        (UploadedFiles, "files"),
+        (UploadedFiles, "FILES"),
     ]
 
     with get_session() as session:
@@ -789,12 +789,12 @@ def validate_room_entry(
 
 def validate_person_data(
         stage: str,
-        SUSPECTNAME: str = "",
+        PERSONNAME: str = "",
         SUSPECTNOTE: str = "",
         row: Optional[dict] = None,
 ) -> bool:
 
-    suspect = (SUSPECTNAME or "").strip()
+    suspect = (PERSONNAME or "").strip()
     note = (SUSPECTNOTE or "").strip()
 
     for field_label, value in [
@@ -815,7 +815,7 @@ def validate_person_data(
     with get_session() as session:
         if value_in_use(session,
                         Persons,
-                        "SUSPECTNAME",
+                        "PERSONNAME",
                         suspect,
                         exclude_pk=exclude_pk,
         ):

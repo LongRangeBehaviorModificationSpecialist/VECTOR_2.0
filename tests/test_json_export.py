@@ -48,13 +48,13 @@ def with_attachment(populated):
     with get_session() as session:
         session.add(
             UploadedFiles(
-                file_name="scene_photo.jpg",
-                file_size=len(PAYLOAD),
-                file_mime_type="image/jpeg",
-                uploaded_by="Roe, Jane",
-                file_data=PAYLOAD,
-                sha256=hashlib.sha256(PAYLOAD).hexdigest(),
-                hashed_at="2026-09-10T08:10:00Z",
+                FILENAME="scene_photo.jpg",
+                FILESIZE=len(PAYLOAD),
+                FILEMIMETYPE="image/jpeg",
+                FILEUPLOADEDBY="Roe, Jane",
+                FILEDATA=PAYLOAD,
+                FILESHA256=hashlib.sha256(PAYLOAD).hexdigest(),
+                FILEHASHEDAT="2026-09-10T08:10:00Z",
             )
         )
     return populated
@@ -72,7 +72,7 @@ def _counts():
 # ----- Export -----
 
 def test_export_writes_one_json_file(with_attachment, desktop):
-    import_export.export_database_json()
+    import_export.export_vector_to_json()
     files = list(desktop.glob("*.json"))
     assert len(files) == 1
     assert with_attachment in files[0].name
@@ -80,45 +80,46 @@ def test_export_writes_one_json_file(with_attachment, desktop):
 
 def test_export_leaves_nothing_staged_on_the_desktop(with_attachment,
                                                      desktop):
-    import_export.export_database_json()
+    import_export.export_vector_to_json()
     assert [p.name for p in desktop.iterdir() if p.is_dir()] == []
 
 
 def test_the_file_is_valid_json_with_the_expected_shape(with_attachment,
                                                         desktop):
-    import_export.export_database_json()
+    import_export.export_vector_to_json()
     payload = json.loads(
         next(desktop.glob("*.json")).read_text(encoding="utf-8")
     )
     assert payload["export_metadata"]["application"] == "VECTOR"
-    assert payload["export_metadata"]["format_version"] == "1.0"
+    assert payload["export_metadata"]["format_version"] == "1.1"
     assert "tables" in payload
-    assert payload["tables"]["evidence"]["record_count"] == 12
+    assert payload["tables"]["EVIDENCE"]["record_count"] == 12
+    assert payload["files"]["record_count"] == 1
 
 
 def test_the_audit_trail_is_included(with_attachment, desktop):
     """A case handed on without its history cannot answer what changed."""
-    import_export.export_database_json()
+    import_export.export_vector_to_json()
     payload = json.loads(
         next(desktop.glob("*.json")).read_text(encoding="utf-8")
     )
-    assert "audit" in payload["tables"]
+    assert "AUDIT" in payload["tables"]
 
 
 def test_attachments_carry_their_collection_hash(with_attachment, desktop):
-    import_export.export_database_json()
+    import_export.export_vector_to_json()
     payload = json.loads(
         next(desktop.glob("*.json")).read_text(encoding="utf-8")
     )
-    entry = payload["files"][0]
-    assert entry["file_name"] == "scene_photo.jpg"
-    assert entry["hash_at_ingest"] == hashlib.sha256(PAYLOAD).hexdigest()
-    assert entry["matches_ingest_hash"] is True
-    assert base64.b64decode(entry["data_base64"]) == PAYLOAD
+    entry = payload["files"]["records"][0]
+    assert entry["FILENAME"] == "scene_photo.jpg"
+    assert entry["FILESHA256"] == hashlib.sha256(PAYLOAD).hexdigest()
+    assert entry["FILEHASHMATCHES"] is True
+    assert base64.b64decode(entry["FILEDATA_b64"]) == PAYLOAD
 
 
 def test_an_encrypted_export_is_really_encrypted(with_attachment, desktop):
-    import_export.export_database_json(password="correct horse battery")
+    import_export.export_vector_to_json(password="correct horse battery")
     archive = next(desktop.glob("*.json.zip"))
     assert not list(desktop.glob("*.json"))  # no plaintext left beside it
 
@@ -131,53 +132,53 @@ def test_an_encrypted_export_is_really_encrypted(with_attachment, desktop):
 
 def test_round_trip_preserves_every_row(with_attachment, desktop):
     before = _counts()
-    import_export.export_database_json()
+    import_export.export_vector_to_json()
     exported = next(desktop.glob("*.json"))
 
     delete_all_data()
     assert _counts()["Evidence"] == 0
 
-    import_export.import_database_json(str(exported))
+    import_export.import_vector_from_json(str(exported))
     assert _counts() == before
 
 
 def test_round_trip_preserves_attachment_bytes(with_attachment, desktop):
-    import_export.export_database_json()
+    import_export.export_vector_to_json()
     exported = next(desktop.glob("*.json"))
 
     delete_all_data()
-    import_export.import_database_json(str(exported))
+    import_export.import_vector_from_json(str(exported))
 
     with get_session() as session:
         restored = session.query(UploadedFiles).one()
-        assert restored.file_data == PAYLOAD
-        assert restored.file_mime_type == "image/jpeg"
-        assert restored.uploaded_by == "Roe, Jane"
-        assert restored.sha256 == hashlib.sha256(PAYLOAD).hexdigest()
+        assert restored.FILEDATA == PAYLOAD
+        assert restored.FILEMIMETYPE == "image/jpeg"
+        assert restored.FILEUPLOADEDBY == "Roe, Jane"
+        assert restored.FILESHA256 == hashlib.sha256(PAYLOAD).hexdigest()
 
 
 def test_round_trip_preserves_field_values(with_attachment, desktop):
     """Values that break naive serialisation must survive."""
-    import_export.export_database_json()
+    import_export.export_vector_to_json()
     exported = next(desktop.glob("*.json"))
 
     delete_all_data()
-    import_export.import_database_json(str(exported))
+    import_export.import_vector_from_json(str(exported))
 
     with get_session() as session:
         person = session.query(Persons).one()
-        assert person.SUSPECTNAME == "O'Brien, Sean"
+        assert person.PERSONNAME == "O'Brien, Sean"
         note = session.query(Notes).one()
         assert "&" in note.NOTETEXT and "<" in note.NOTETEXT
 
 
 def test_encrypted_round_trip(with_attachment, desktop):
     before = _counts()
-    import_export.export_database_json(password="correct horse battery")
+    import_export.export_vector_to_json(password="correct horse battery")
     archive = next(desktop.glob("*.json.zip"))
 
     delete_all_data()
-    import_export.import_database_json(
+    import_export.import_vector_from_json(
         str(archive), password="correct horse battery"
     )
     assert _counts() == before
@@ -186,11 +187,11 @@ def test_encrypted_round_trip(with_attachment, desktop):
 # ----- Integrity and safety -----
 
 def test_a_tampered_attachment_is_detected(with_attachment, desktop):
-    import_export.export_database_json()
+    import_export.export_vector_to_json()
     exported = next(desktop.glob("*.json"))
 
     payload = json.loads(exported.read_text(encoding="utf-8"))
-    payload["files"][0]["data_base64"] = base64.b64encode(
+    payload["files"]["records"][0]["FILEDATA_b64"] = base64.b64encode(
         b"swapped content"
     ).decode("ascii")
     exported.write_text(json.dumps(payload), encoding="utf-8")
@@ -200,7 +201,7 @@ def test_a_tampered_attachment_is_detected(with_attachment, desktop):
     import_export.ui.notify = lambda message, **kw: notices.append(str(message))
     try:
         delete_all_data()
-        import_export.import_database_json(str(exported))
+        import_export.import_vector_from_json(str(exported))
     finally:
         import_export.ui.notify = original
 
@@ -211,11 +212,11 @@ def test_a_tampered_attachment_is_detected(with_attachment, desktop):
 def test_the_local_audit_trail_is_not_overwritten(with_attachment, desktop):
     """An import appends a record; it does not import someone else's
     history over the receiving machine's own."""
-    import_export.export_database_json()
+    import_export.export_vector_to_json()
     exported = next(desktop.glob("*.json"))
 
     delete_all_data()
-    import_export.import_database_json(str(exported))
+    import_export.import_vector_from_json(str(exported))
 
     with get_session() as session:
         assert session.query(AuditLog).filter_by(action="IMPORT").count() == 1
@@ -229,7 +230,7 @@ def test_a_file_that_is_not_an_export_is_refused(tmp_path):
     original = import_export.ui.notify
     import_export.ui.notify = lambda message, **kw: notices.append(str(message))
     try:
-        import_export.import_database_json(str(stray))
+        import_export.import_vector_from_json(str(stray))
     finally:
         import_export.ui.notify = original
 
@@ -242,10 +243,101 @@ def test_a_missing_file_is_refused(tmp_path):
     original = import_export.ui.notify
     import_export.ui.notify = lambda message, **kw: notices.append(str(message))
     try:
-        import_export.import_database_json(str(tmp_path / "absent.json"))
+        import_export.import_vector_from_json(str(tmp_path / "absent.json"))
     finally:
         import_export.ui.notify = original
     assert any("not found" in text for text in notices)
+
+
+# ----- Files written by other versions -----
+
+def test_a_1_0_export_still_imports(tmp_path):
+    """This branch's first layout: lowercase tables, SUSPECT* columns and
+    a bare list of attachments with lowercase keys."""
+    photo = b"version-one-photo"
+    digest = hashlib.sha256(photo).hexdigest()
+    payload = {
+        "export_metadata": {"format_version": "1.0", "application": "VECTOR"},
+        "tables": {
+            "cases": {"records": [{
+                "Z_PK": 1,
+                "CASENUMBER": "26-V1",
+                "LOCATION": "1 Old Road",
+                "JURISDICTION": "Fairfax County",
+                "CASEDATETIMEBEGIN": "09-01-2026 08:00",
+            }]},
+            "persons": {"records": [{
+                "Z_PK": 1,
+                "SUSPECTNAME": "O'Brien, Sean",
+                "SUSPECTDOB": "03-02-1984",
+                "SUSPECTNOTE": "Present at entry",
+            }]},
+        },
+        "files": [{
+            "file_name": "old.jpg",
+            "file_mime_type": "image/jpeg",
+            "uploaded_by": "Doe, John",
+            "hash_at_ingest": digest,
+            "file_hash": digest,
+            "data_base64": base64.b64encode(photo).decode("ascii"),
+        }],
+    }
+    path = tmp_path / "v1.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    import_export.import_vector_from_json(str(path))
+
+    with get_session() as session:
+        assert session.query(Cases).one().CASENUMBER == "26-V1"
+        assert session.query(Persons).one().PERSONNAME == "O'Brien, Sean"
+        restored = session.query(UploadedFiles).one()
+        assert restored.FILEDATA == photo
+        assert restored.FILEUPLOADEDBY == "Doe, John"
+        assert restored.FILESHA256 == digest
+
+
+def test_an_upstream_export_imports(tmp_path):
+    """Upstream's layout: EVIDENDCE for the evidence table, attachments
+    under files.records with the bytes in FILEDATA_b64."""
+    photo = b"upstream-photo"
+    payload = {
+        "export_metadata": {"format_version": "1.0"},
+        "tables": {
+            "CASES": {"record_count": 1, "records": [{
+                "Z_PK": 1,
+                "CASENUMBER": "26-UPSTREAM",
+                "LOCATION": "2 New Road",
+                "JURISDICTION": "Fairfax County",
+                "CASEDATETIMEBEGIN": "09-01-2026 08:00",
+            }]},
+            "EVIDENDCE": {"record_count": 1, "records": [{
+                "Z_PK": 1,
+                "EVIDNUM": "1",
+                "EVIDQTY": "1",
+                "EVIDDESC": "Laptop",
+                "EVIDLOCROOM": "Room A (Bedroom)",
+                "EVIDLOCROOMDETAIL": "shelf",
+                "EVIDFOUNDBY": "Doe, John",
+                "EVIDFOUNDBYWITNESS": "Roe, Jane",
+            }]},
+        },
+        "files": {"record_count": 1, "records": [{
+            "FILENAME": "a.jpg",
+            "FILESIZE": len(photo),
+            "FILEMIMETYPE": "image/jpeg",
+            "FILEDATA_b64": base64.b64encode(photo).decode("ascii"),
+        }]},
+    }
+    path = tmp_path / "upstream.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    import_export.import_vector_from_json(str(path))
+
+    with get_session() as session:
+        assert session.query(Evidence).one().EVIDDESC == "Laptop"
+        restored = session.query(UploadedFiles).one()
+        assert restored.FILEDATA == photo
+        assert restored.FILEMIMETYPE == "image/jpeg"
 
 
 # ----- Format detection -----
@@ -259,13 +351,13 @@ def test_a_json_file_is_recognised(tmp_path):
 def test_the_csv_archive_is_not_mistaken_for_json(with_attachment, desktop):
     """The CSV archive also contains export_manifest.json, so the
     detection has to look at more than 'is there a .json in here'."""
-    import_export.export_database()
+    import_export.export_vector_to_csv()
     archive = next(desktop.glob("*.zip"))
     assert import_export.looks_like_json_export(str(archive)) is False
 
 
 def test_a_json_zip_is_recognised(with_attachment, desktop):
-    import_export.export_database_json(password="correct horse battery")
+    import_export.export_vector_to_json(password="correct horse battery")
     archive = next(desktop.glob("*.json.zip"))
     assert import_export.looks_like_json_export(str(archive)) is True
 

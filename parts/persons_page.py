@@ -17,7 +17,7 @@ from utils import get_current_timestamp, validate_person_data
 def _validate(stage: str, values: dict, row: dict | None) -> bool:
     return validate_person_data(
         stage=stage,
-        SUSPECTNAME=values.get("SUSPECTNAME", ""),
+        PERSONNAME=values.get("PERSONNAME", ""),
         SUSPECTNOTE=values.get("SUSPECTNOTE", ""),
         row=row,
     )
@@ -28,22 +28,22 @@ SPEC = CrudSpec(
     title="Person List",
     entity="person",
     entity_plural="people",
-    label_field="SUSPECTNAME",
+    label_field="PERSONNAME",
     table_title="People Recorded",
     submit_label="Add Person",
-    order_by="SUSPECTNAME",
+    order_by="PERSONNAME",
     validate=_validate,
     fields=[
-        Field("SUSPECTNAME", "Name", required=True, props="autofocus"),
+        Field("PERSONNAME", "Name", required=True, props="autofocus"),
         Field(
-            "SUSPECTDOB",
+            "PERSONDOB",
             "DOB",
             placeholder="MM-DD-YYYY",
             props='mask="##-##-####"',
         ),
-        Field("SUSPECTADDRESS", "Address"),
+        Field("PERSONADDRESS", "Address"),
         Field(
-            "SUSPECTPHONE",
+            "PERSONPHONE",
             "Phone Number",
             placeholder="(###) ###-####",
             props='mask="(###) ###-####"',

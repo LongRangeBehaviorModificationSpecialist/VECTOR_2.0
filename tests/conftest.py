@@ -124,9 +124,9 @@ def populated(case):
                     ROOMSECONDAGENT="Roe, Jane",
                 ),
                 Persons(
-                    SUSPECTNAME="O'Brien, Sean",
-                    SUSPECTDOB="1984-03-02",
-                    SUSPECTADDRESS="14 Elm Street",
+                    PERSONNAME="O'Brien, Sean",
+                    PERSONDOB="1984-03-02",
+                    PERSONADDRESS="14 Elm Street",
                 ),
                 Notes(
                     NOTEDATETIME="2026-09-10 08:05",

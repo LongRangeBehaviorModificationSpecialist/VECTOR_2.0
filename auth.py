@@ -46,7 +46,12 @@ def is_authenticated() -> bool:
         ):
             return False
 
-        user_name = app.storage.user.get("user_name", "")
+        user_name = app.storage.user.get("USERNAME", "")
+        # A session stored before the keys were renamed has no USERNAME.
+        # Treat it as signed out rather than letting it through nameless.
+        if not user_name:
+            return False
+
         if app.storage.user.get("user_generation", 0) < user_generation(
             user_name
         ):
@@ -60,7 +65,7 @@ def is_authenticated() -> bool:
 def get_current_user_name() -> str:
     """Gets the current username (defaults to empty)."""
     try:
-        return app.storage.user.get("user_name", "")
+        return app.storage.user.get("USERNAME", "")
     except Exception:
         return ""
 
@@ -68,7 +73,7 @@ def get_current_user_name() -> str:
 def get_is_admin() -> bool:
     """Checks if the current user is an admin (defaults to False)."""
     try:
-        return app.storage.user.get("is_admin", False)
+        return app.storage.user.get("ISADMIN", False)
     except Exception:
         return False
 
@@ -81,8 +86,8 @@ def sign_in(user_name: str, is_admin: bool) -> None:
     remotely -- see invalidate_user_sessions().
     """
     app.storage.user["authenticated"] = True
-    app.storage.user["user_name"] = user_name
-    app.storage.user["is_admin"] = is_admin
+    app.storage.user["USERNAME"] = user_name
+    app.storage.user["ISADMIN"] = is_admin
     app.storage.user["session_generation"] = global_generation()
     app.storage.user["user_generation"] = user_generation(user_name)
 
@@ -90,8 +95,8 @@ def sign_in(user_name: str, is_admin: bool) -> None:
 def sign_out() -> None:
     """Clears the session."""
     app.storage.user["authenticated"] = False
-    app.storage.user["user_name"] = ""
-    app.storage.user["is_admin"] = False
+    app.storage.user["USERNAME"] = ""
+    app.storage.user["ISADMIN"] = False
     app.storage.user["session_generation"] = 0
     app.storage.user["user_generation"] = 0
 

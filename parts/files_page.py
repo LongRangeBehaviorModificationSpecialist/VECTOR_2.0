@@ -96,13 +96,13 @@ def build_uploads_page() -> None:
 
                     with get_session() as session:
                         new_file = UploadedFiles(
-                            file_name=file_name,
-                            file_data=file_data,
-                            file_size=file_size,
-                            file_mime_type=file_mime_type,
-                            uploaded_by=uploader,
-                            sha256=digest,
-                            hashed_at=hashed_at,
+                            FILENAME=file_name,
+                            FILEDATA=file_data,
+                            FILESIZE=file_size,
+                            FILEMIMETYPE=file_mime_type,
+                            FILEUPLOADEDBY=uploader,
+                            FILESHA256=digest,
+                            FILEHASHEDAT=hashed_at,
                         )
                         session.add(new_file)
 
@@ -157,7 +157,7 @@ def build_uploads_page() -> None:
             with get_session() as session:
                 files = (
                     session.query(UploadedFiles)
-                    .order_by(UploadedFiles.upload_date.desc())
+                    .order_by(UploadedFiles.FILEUPLOADDATE.desc())
                     .all()
                 )
                 if not files:
@@ -169,22 +169,22 @@ def build_uploads_page() -> None:
 
                 row_data = [
                     {
-                        "id": f.id,
-                        "file_name": f.file_name or "",
-                        "file_size": format_file_size(f.file_size or 0),
-                        "file_size_bytes": f.file_size or 0,
-                        "file_mime_type": f.file_mime_type or "unknown",
-                        "uploaded_by": f.uploaded_by or "",
-                        "sha256": (f.sha256 or "not recorded"),
+                        "Z_PK": f.Z_PK,
+                        "FILENAME": f.FILENAME or "",
+                        "FILESIZE": format_file_size(f.FILESIZE or 0),
+                        "file_size_bytes": f.FILESIZE or 0,
+                        "FILEMIMETYPE": f.FILEMIMETYPE or "unknown",
+                        "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
+                        "FILESHA256": (f.FILESHA256 or "not recorded"),
                         "sha256_short": (
-                            f"{f.sha256[:12]}…" if f.sha256
+                            f"{f.FILESHA256[:12]}…" if f.FILESHA256
                             else "not recorded"
                         ),
-                        "upload_date": (
-                            f.upload_date.strftime("%Y-%m-%d %H:%M:%S")
-                            if f.upload_date
+                        "FILEUPLOADDATE": (
+                            f.FILEUPLOADDATE.strftime("%Y-%m-%d %H:%M:%S")
+                            if f.FILEUPLOADDATE
                             else ""
-                        )
+                        ),
                     }
                     for f in files
                 ]
@@ -192,30 +192,37 @@ def build_uploads_page() -> None:
             with table_container:
                 column_defs = [
                     {
-                        "name": "file_name",
-                        "label": "file_name",
-                        "field": "file_name",
+                        "name": "Z_PK",
+                        "label": "ID #",
+                        "field": "Z_PK",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "file_size",
+                        "name": "FILENAME",
+                        "label": "File Name",
+                        "field": "FILENAME",
+                        "sortable": True,
+                        "align": "left",
+                    },
+                    {
+                        "name": "FILESIZE",
                         "label": "Size",
-                        "field": "file_size",
+                        "field": "FILESIZE",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "file_mime_type",
+                        "name": "FILEMIMETYPE",
                         "label": "Type",
-                        "field": "file_mime_type",
+                        "field": "FILEMIMETYPE",
                         "sortable": True,
                         "align": "left",
                     },
                     {
-                        "name": "uploaded_by",
+                        "name": "FILEUPLOADEDBY",
                         "label": "Uploaded By",
-                        "field": "uploaded_by",
+                        "field": "FILEUPLOADEDBY",
                         "sortable": True,
                         "align": "left",
                     },
@@ -227,9 +234,9 @@ def build_uploads_page() -> None:
                         "align": "left",
                     },
                     {
-                        "name": "upload_date",
+                        "name": "FILEUPLOADDATE",
                         "label": "Uploaded At (UTC)",
-                        "field": "upload_date",
+                        "field": "FILEUPLOADDATE",
                         "sortable": True,
                         "align": "left",
                     },
@@ -245,7 +252,7 @@ def build_uploads_page() -> None:
                 table = ui.table(
                     columns=column_defs,
                     rows=row_data,
-                    row_key="id",
+                    row_key="Z_PK",
                 )
 
                 table.props("dense flat")
@@ -275,7 +282,7 @@ def build_uploads_page() -> None:
                     with get_session() as session:
                         file_record = (
                             session.query(UploadedFiles)
-                            .filter_by(id=row["id"])
+                            .filter_by(Z_PK=row["Z_PK"])
                             .first()
                         )
 
@@ -284,8 +291,8 @@ def build_uploads_page() -> None:
                                 prefix="vector_dl_"
                             )
                             safe_name = (
-                                file_record.file_name
-                                or f"file_{file_record.id}"
+                                file_record.FILENAME
+                                or f"file_{file_record.Z_PK}"
                             )
                             safe_name = (
                                 safe_name.replace("/", "_").replace("\\", "_")
@@ -293,7 +300,7 @@ def build_uploads_page() -> None:
                             temp_path = os.path.join(temp_dir, safe_name)
 
                             with open(temp_path, "wb") as f:
-                                f.write(file_record.file_data)
+                                f.write(file_record.FILEDATA)
                             ui.download(temp_path)
 
                 # ----- Delete confirmation dialog -----
@@ -315,7 +322,7 @@ def build_uploads_page() -> None:
                         ).classes("mb-3 text-base text-[var(--vsp-gray)]")
 
                         ui.label(
-                            f"{row['file_name']}"
+                            f"{row['FILENAME']}"
                         ).classes(
                             "mb-3 text-base font-semibold text-[var(--vsp-blue)]"
                         )
@@ -336,14 +343,14 @@ def build_uploads_page() -> None:
                                 with get_session() as session:
                                     file_record = (
                                         session.query(UploadedFiles)
-                                        .filter_by(id=row["id"])
+                                        .filter_by(Z_PK=row["Z_PK"])
                                         .first()
                                     )
                                     if file_record:
                                         session.delete(file_record)
 
                                 ui.notify(
-                                    f"File: {row['file_name']} has been "
+                                    f"File: {row['FILENAME']} has been "
                                     "deleted.",
                                     timeout=4000,
                                     position="bottom",

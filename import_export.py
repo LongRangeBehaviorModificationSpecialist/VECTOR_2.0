@@ -18,7 +18,12 @@ import shutil
 import tempfile
 from typing import Optional
 
-from models import get_session, record_audit
+from models import (
+    LEGACY_COLUMN_NAMES,
+    LEGACY_TABLE_NAMES,
+    get_session,
+    record_audit,
+)
 
 
 # ----- MODEL REGISTRY -----
@@ -30,15 +35,15 @@ def get_exportable_models() -> list:
     )
 
     return [
-        (Cases, "cases"),
-        (Agents, "agents"),
-        (Rooms, "rooms"),
-        (Evidence, "evidence"),
-        (Persons, "persons"),
-        (Notes, "notes"),
+        (Cases, "CASES"),
+        (Agents, "AGENTS"),
+        (Rooms, "ROOMS"),
+        (Evidence, "EVIDENCE"),
+        (Persons, "PERSONS"),
+        (Notes, "NOTES"),
         # The audit trail travels with the case: an export that drops it
         # cannot answer what changed after collection.
-        (AuditLog, "audit"),
+        (AuditLog, "AUDIT"),
     ]
 
 
@@ -47,13 +52,57 @@ def get_all_models() -> dict:
     from models import Cases, Agents, Rooms, Evidence, Persons, Notes, UploadedFiles
 
     return {
-        "cases": Cases,
-        "agents": Agents,
-        "rooms": Rooms,
-        "evidence": Evidence,
-        "persons": Persons,
-        "notes": Notes,
-        "uploaded_files": UploadedFiles
+        "CASES": Cases,
+        "AGENTS": Agents,
+        "ROOMS": Rooms,
+        "EVIDENCE": Evidence,
+        "PERSONS": Persons,
+        "NOTES": Notes,
+        "FILES": UploadedFiles,
+    }
+
+
+# ----- Names used by older exports -----
+# Exports made before the column renames use lowercase table names and
+# the old column spellings, and upstream's exports write the evidence
+# table as "EVIDENDCE". All of them are read as the table they meant.
+_TABLE_ALIASES = {
+    **LEGACY_TABLE_NAMES,
+    "EVIDENDCE": "EVIDENCE",
+}
+
+# Keys describing each attachment in the manifest and the JSON export.
+_FILE_ENTRY_ALIASES = {
+    "file_name": "FILENAME",
+    "file_size": "FILESIZE",
+    "file_mime_type": "FILEMIMETYPE",
+    "mime_type": "FILEMIMETYPE",
+    "uploaded_by": "FILEUPLOADEDBY",
+    "hash_at_ingest": "FILESHA256",
+    "hashed_at": "FILEHASHEDAT",
+    "file_hash": "FILEHASH",
+    "matches_ingest_hash": "FILEHASHMATCHES",
+    "data_base64": "FILEDATA_b64",
+}
+
+
+def canonical_table_name(name: str) -> str:
+    """Maps any table name an export has used onto today's."""
+    name = str(name)
+    return _TABLE_ALIASES.get(name, name.upper())
+
+
+def canonical_row(table_name: str, row: dict) -> dict:
+    """Renames legacy column names in one exported row."""
+    renames = LEGACY_COLUMN_NAMES.get(table_name, {})
+    return {renames.get(key, key): value for key, value in row.items()}
+
+
+def canonical_file_entry(entry: dict) -> dict:
+    """Renames legacy keys in one attachment's manifest entry."""
+    return {
+        _FILE_ENTRY_ALIASES.get(key, key): value
+        for key, value in entry.items()
     }
 
 
@@ -154,7 +203,7 @@ def deserialize_value(value: str, column) -> str:
 # ----- EXPORT FUNCTION -----
 
 
-def export_database(password: Optional[str] = None) -> None:
+def export_vector_to_csv(password: Optional[str] = None) -> None:
     """Exports all database tables to CSV files and file BLOBs to disk.
 
     Saves to ~/Desktop/<case-number>_<datetime>_saved_results/
@@ -235,36 +284,39 @@ def export_database(password: Optional[str] = None) -> None:
         with get_session() as session:
             uploaded_files = session.query(UploadedFiles).all()
             for uf in uploaded_files:
-                if uf.file_data:
+                if uf.FILEDATA:
                     # Sanitize filename
-                    safe_name = uf.file_name or f"file_{uf.id}"
+                    safe_name = uf.FILENAME or f"file_{uf.Z_PK}"
                     safe_name = safe_name.replace("/", "_").replace("\\", "_")
                     file_path = files_dir / safe_name
 
                     with open(file_path, "wb") as f:
-                        f.write(uf.file_data)
+                        f.write(uf.FILEDATA)
 
-                    sha256_hash = hashlib.sha256(uf.file_data).hexdigest()
+                    sha256_hash = hashlib.sha256(uf.FILEDATA).hexdigest()
 
                     # The hash taken when the file was collected is the
                     # one that matters. Recomputing here only certifies
                     # the copy, so compare the two and say so if they
                     # disagree.
-                    recorded = uf.sha256 or ""
+                    recorded = uf.FILESHA256 or ""
                     verified = (not recorded) or recorded == sha256_hash
                     if not verified:
                         integrity_failures.append(safe_name)
 
+                    # FILENAME, FILESIZE and FILEHASH are the keys
+                    # upstream's manifest uses; the rest carry the
+                    # collection record this branch adds.
                     files_list.append(
                         {
-                            "file_name": safe_name,
-                            "file_size": uf.file_size or len(uf.file_data),
-                            "file_hash": sha256_hash,
-                            "hash_at_ingest": recorded or None,
-                            "hashed_at": uf.hashed_at or None,
-                            "mime_type": uf.file_mime_type or "",
-                            "uploaded_by": uf.uploaded_by or "",
-                            "matches_ingest_hash": verified,
+                            "FILENAME": safe_name,
+                            "FILESIZE": uf.FILESIZE or len(uf.FILEDATA),
+                            "FILEHASH": sha256_hash,
+                            "FILESHA256": recorded or None,
+                            "FILEHASHEDAT": uf.FILEHASHEDAT or None,
+                            "FILEMIMETYPE": uf.FILEMIMETYPE or "",
+                            "FILEUPLOADEDBY": uf.FILEUPLOADEDBY or "",
+                            "FILEHASHMATCHES": verified,
                         }
                     )
 
@@ -382,7 +434,10 @@ def export_database(password: Optional[str] = None) -> None:
 # ----- IMPORT FUNCTION -----
 
 
-def import_database(zip_path: str, password: Optional[str] = None) -> None:
+def import_vector_from_csv(
+        zip_path: str,
+        password: Optional[str] = None,
+) -> None:
     """Imports database tables from a .zip file.
 
     If the zip is encrypted, decrypts it with the provided password.
@@ -491,10 +546,13 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
     models = get_all_models()
     found_tables = []
 
-    for table_name, model_class in models.items():
-        csv_path = import_dir / f"{table_name}.csv"
-
-        if csv_path.exists():
+    # Matched from the files present rather than looked up by today's
+    # names, so an archive using an older or misspelled table name still
+    # imports.
+    for csv_path in sorted(import_dir.glob("*.csv")):
+        table_name = canonical_table_name(csv_path.stem)
+        model_class = models.get(table_name)
+        if model_class is not None:
             found_tables.append((table_name, model_class, csv_path))
 
     if not found_tables:
@@ -526,6 +584,7 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
                 with open(csv_path, "r", newline="", encoding="utf-8") as f:
                     reader = csv.DictReader(f)
                     for row in reader:
+                        row = canonical_row(table_name, row)
                         record_data = {}
                         for col_name in columns:
                             if col_name in row:
@@ -568,11 +627,12 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
     # The manifest records a SHA-256 per file. Verify against it rather
     # than trusting the archive, and carry the original provenance back
     # instead of stamping every file "import" / octet-stream.
-    manifest_files = {
-        entry.get("file_name"): entry
-        for entry in manifest.get("files", [])
-        if isinstance(entry, dict) and entry.get("file_name")
-    }
+    manifest_files = {}
+    for entry in manifest.get("files", []):
+        if isinstance(entry, dict):
+            entry = canonical_file_entry(entry)
+            if entry.get("FILENAME"):
+                manifest_files[entry["FILENAME"]] = entry
     hash_mismatches = []
     unlisted_files = []
 
@@ -593,22 +653,24 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
                     if entry is None:
                         unlisted_files.append(file_path.name)
                     else:
-                        expected = entry.get("file_hash")
+                        expected = entry.get("FILEHASH")
                         if expected and expected != actual_hash:
                             hash_mismatches.append(file_path.name)
 
+                    details = entry or {}
                     new_file = UploadedFiles(
-                        file_name=file_path.name,
-                        file_data=file_data,
-                        file_size=len(file_data),
-                        file_mime_type=(
-                            (entry or {}).get("mime_type")
+                        FILENAME=file_path.name,
+                        FILEDATA=file_data,
+                        FILESIZE=len(file_data),
+                        FILEMIMETYPE=(
+                            details.get("FILEMIMETYPE")
                             or "application/octet-stream"
                         ),
-                        uploaded_by=(entry or {}).get("uploaded_by") or "import",
-                        sha256=(entry or {}).get("hash_at_ingest")
-                        or actual_hash,
-                        hashed_at=(entry or {}).get("hashed_at"),
+                        FILEUPLOADEDBY=(
+                            details.get("FILEUPLOADEDBY") or "import"
+                        ),
+                        FILESHA256=details.get("FILESHA256") or actual_hash,
+                        FILEHASHEDAT=details.get("FILEHASHEDAT"),
                     )
                     session.add(new_file)
                     files_imported += 1
@@ -691,8 +753,12 @@ def import_database(zip_path: str, password: Optional[str] = None) -> None:
 # and an import is itself recorded, and the file is staged in a temp
 # directory rather than written to the Desktop in the clear and then
 # encrypted afterwards.
+#
+# The layout follows upstream's -- capitalised table names, attachments
+# under files.records with the bytes in FILEDATA_b64 -- and the importer
+# still reads this branch's earlier 1.0 layout.
 
-JSON_FORMAT_VERSION = "1.0"
+JSON_FORMAT_VERSION = "1.1"
 
 
 def _row_to_json(record, columns: list) -> dict:
@@ -745,7 +811,7 @@ def _json_to_value(value, column):
     return value
 
 
-def export_database_json(password: Optional[str] = None) -> None:
+def export_vector_to_json(password: Optional[str] = None) -> None:
     """Exports the whole case to a single JSON file.
 
     Attachments are embedded as base64 alongside the SHA-256 recorded
@@ -770,7 +836,7 @@ def export_database_json(password: Optional[str] = None) -> None:
             "application": "VECTOR",
         },
         "tables": {},
-        "files": [],
+        "files": {"record_count": 0, "records": []},
     }
 
     total_records = 0
@@ -806,29 +872,29 @@ def export_database_json(password: Optional[str] = None) -> None:
     try:
         with get_session() as session:
             for uploaded in session.query(UploadedFiles).all():
-                if not uploaded.file_data:
+                if not uploaded.FILEDATA:
                     continue
 
-                current_hash = hashlib.sha256(uploaded.file_data).hexdigest()
-                recorded = uploaded.sha256 or ""
+                current_hash = hashlib.sha256(uploaded.FILEDATA).hexdigest()
+                recorded = uploaded.FILESHA256 or ""
                 matches = (not recorded) or recorded == current_hash
                 if not matches:
                     integrity_failures.append(
-                        uploaded.file_name or "(unnamed)"
+                        uploaded.FILENAME or "(unnamed)"
                     )
 
-                payload["files"].append(
+                payload["files"]["records"].append(
                     {
-                        "file_name": uploaded.file_name,
-                        "file_size": uploaded.file_size,
-                        "file_mime_type": uploaded.file_mime_type,
-                        "uploaded_by": uploaded.uploaded_by,
-                        "hash_at_ingest": recorded or None,
-                        "hashed_at": uploaded.hashed_at,
-                        "file_hash": current_hash,
-                        "matches_ingest_hash": matches,
-                        "data_base64": base64.b64encode(
-                            uploaded.file_data
+                        "FILENAME": uploaded.FILENAME,
+                        "FILESIZE": uploaded.FILESIZE,
+                        "FILEMIMETYPE": uploaded.FILEMIMETYPE,
+                        "FILEUPLOADEDBY": uploaded.FILEUPLOADEDBY,
+                        "FILESHA256": recorded or None,
+                        "FILEHASHEDAT": uploaded.FILEHASHEDAT,
+                        "FILEHASH": current_hash,
+                        "FILEHASHMATCHES": matches,
+                        "FILEDATA_b64": base64.b64encode(
+                            uploaded.FILEDATA
                         ).decode("ascii"),
                     }
                 )
@@ -841,8 +907,10 @@ def export_database_json(password: Optional[str] = None) -> None:
             close_button="OK",
         )
 
+    file_records = payload["files"]["records"]
+    payload["files"]["record_count"] = len(file_records)
     payload["export_metadata"]["total_records"] = total_records
-    payload["export_metadata"]["total_files"] = len(payload["files"])
+    payload["export_metadata"]["total_files"] = len(file_records)
     payload["export_metadata"]["integrity_failures"] = integrity_failures
 
     if integrity_failures:
@@ -900,7 +968,7 @@ def export_database_json(password: Optional[str] = None) -> None:
     ui.notify(
         f"JSON export complete{encrypted_note}.\n"
         f"Records: {total_records}\n"
-        f"Attachments embedded: {len(payload['files'])}\n"
+        f"Attachments embedded: {len(file_records)}\n"
         f"Saved to: {final_path}",
         timeout=0,
         position="bottom",
@@ -910,11 +978,14 @@ def export_database_json(password: Optional[str] = None) -> None:
     print(f"\n{'=' * 60}")
     print("  JSON EXPORT COMPLETE")
     print(f"  Location: {final_path}")
-    print(f"  Records: {total_records}, files: {len(payload['files'])}")
+    print(f"  Records: {total_records}, files: {len(file_records)}")
     print(f"{'=' * 60}\n")
 
 
-def import_database_json(source: str, password: Optional[str] = None) -> None:
+def import_vector_from_json(
+        source: str,
+        password: Optional[str] = None,
+) -> None:
     """Restores a case from a JSON export, replacing what is loaded.
 
     Accepts the .json directly or the encrypted .json.zip. Attachments
@@ -1005,7 +1076,8 @@ def import_database_json(source: str, password: Optional[str] = None) -> None:
     table_name = ""
 
     try:
-        for table_name, table_data in payload["tables"].items():
+        for raw_name, table_data in payload["tables"].items():
+            table_name = canonical_table_name(raw_name)
             model_class = models_by_name.get(table_name)
             if model_class is None:
                 # The audit trail is exported but never restored over
@@ -1022,7 +1094,9 @@ def import_database_json(source: str, password: Optional[str] = None) -> None:
                 for row in table_data.get("records", []):
                     values = {
                         name: _json_to_value(value, column_objects[name])
-                        for name, value in row.items()
+                        for name, value in canonical_row(
+                            table_name, row
+                        ).items()
                         if name in column_objects
                     }
                     session.add(model_class(**values))
@@ -1050,31 +1124,40 @@ def import_database_json(source: str, password: Optional[str] = None) -> None:
     hash_mismatches = []
     files_imported = 0
 
+    # A 1.0 export held a bare list. Upstream's layout, and 1.1, wrap it
+    # as {"record_count": n, "records": [...]}.
+    file_entries = payload.get("files", [])
+    if isinstance(file_entries, dict):
+        file_entries = file_entries.get("records", [])
+
     try:
         with get_session() as session:
             session.query(UploadedFiles).delete()
-            for entry in payload.get("files", []):
-                raw = base64.b64decode(entry.get("data_base64", ""))
+            for raw_entry in file_entries:
+                entry = canonical_file_entry(raw_entry)
+                raw = base64.b64decode(entry.get("FILEDATA_b64", ""))
                 actual_hash = hashlib.sha256(raw).hexdigest()
 
-                expected = entry.get("file_hash")
+                expected = entry.get("FILEHASH")
                 if expected and expected != actual_hash:
                     hash_mismatches.append(
-                        entry.get("file_name") or "(unnamed)"
+                        entry.get("FILENAME") or "(unnamed)"
                     )
 
                 session.add(
                     UploadedFiles(
-                        file_name=entry.get("file_name") or "imported",
-                        file_data=raw,
-                        file_size=entry.get("file_size") or len(raw),
-                        file_mime_type=(
-                            entry.get("file_mime_type")
+                        FILENAME=entry.get("FILENAME") or "imported",
+                        FILEDATA=raw,
+                        FILESIZE=entry.get("FILESIZE") or len(raw),
+                        FILEMIMETYPE=(
+                            entry.get("FILEMIMETYPE")
                             or "application/octet-stream"
                         ),
-                        uploaded_by=entry.get("uploaded_by") or "import",
-                        sha256=entry.get("hash_at_ingest") or actual_hash,
-                        hashed_at=entry.get("hashed_at"),
+                        FILEUPLOADEDBY=(
+                            entry.get("FILEUPLOADEDBY") or "import"
+                        ),
+                        FILESHA256=entry.get("FILESHA256") or actual_hash,
+                        FILEHASHEDAT=entry.get("FILEHASHEDAT"),
                     )
                 )
                 files_imported += 1

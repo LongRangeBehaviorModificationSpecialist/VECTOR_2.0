@@ -30,7 +30,7 @@ def test_evidence_missing_room_is_reported_not_raised():
 def test_person_missing_note_is_reported_not_raised():
     assert utils.validate_person_data(
         stage="initial",
-        SUSPECTNAME="Doe, John",
+        PERSONNAME="Doe, John",
         SUSPECTNOTE=None,
     ) is True
 

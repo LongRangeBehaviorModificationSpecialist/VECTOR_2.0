@@ -16,10 +16,10 @@ import time
 from pathlib import Path
 
 from import_export import (
-    export_database,
-    export_database_json,
-    import_database,
-    import_database_json,
+    export_vector_to_csv,
+    export_vector_to_json,
+    import_vector_from_csv,
+    import_vector_from_json,
     looks_like_json_export,
 )
 from auth import (
@@ -262,9 +262,9 @@ def build_authenticated_home():
 
                         dialog.close()
                         if export_format.value == "json":
-                            export_database_json(password=pwd)
+                            export_vector_to_json(password=pwd)
                         else:
-                            export_database(password=pwd)
+                            export_vector_to_csv(password=pwd)
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -369,9 +369,9 @@ def build_authenticated_home():
                         # .zip, so the contents decide, not the suffix
                         # alone.
                         if looks_like_json_export(path):
-                            import_database_json(path, password=pwd)
+                            import_vector_from_json(path, password=pwd)
                         else:
-                            import_database(path, password=pwd)
+                            import_vector_from_csv(path, password=pwd)
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -599,8 +599,8 @@ def build_login_home():
                 user = (
                     session.query(Users)
                     .filter_by(
-                        user_name=entered_user,
-                        is_active=True,
+                        USERNAME=entered_user,
+                        ISACTIVE=True,
                     )
                     .first()
                 )
@@ -611,19 +611,19 @@ def build_login_home():
                             audit_session,
                             action="LOGIN",
                             table_name="users",
-                            row_pk=user.id,
-                            summary=user.user_name,
-                            actor=user.user_name,
+                            row_pk=user.Z_PK,
+                            summary=user.USERNAME,
+                            actor=user.USERNAME,
                         )
 
                     clear_login_failures(entered_user)
-                    sign_in(user.user_name, user.is_admin)
+                    sign_in(user.USERNAME, user.ISADMIN)
 
-                    if user.must_change_password:
+                    if user.MUSTCHANGEPASSWORD:
                         ui.navigate.to("/change-password")
                     else:
                         ui.notify(
-                            f"Welcome, {user.user_name}!",
+                            f"Welcome, {user.USERNAME}!",
                             timeout=4000,
                             position="bottom",
                             close_button="OK",

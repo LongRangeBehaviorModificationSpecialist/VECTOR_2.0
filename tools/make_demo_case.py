@@ -199,10 +199,10 @@ def rebuild_case() -> None:
         for name, dob, address, phone, note in DEMO_PERSONS:
             session.add(
                 Persons(
-                    SUSPECTNAME=name,
-                    SUSPECTDOB=dob,
-                    SUSPECTADDRESS=address,
-                    SUSPECTPHONE=phone,
+                    PERSONNAME=name,
+                    PERSONDOB=dob,
+                    PERSONADDRESS=address,
+                    PERSONPHONE=phone,
                     SUSPECTNOTE=note,
                     ENTEREDDATETIME="2026-09-01 08:05:00",
                 )
@@ -230,10 +230,10 @@ def reset_users() -> list:
         for name, is_admin in (("admin", True), ("agent", False)):
             password = generate_one_time_password()
             user = Users(
-                user_name=name,
-                is_admin=is_admin,
-                is_active=True,
-                must_change_password=True,
+                USERNAME=name,
+                ISADMIN=is_admin,
+                ISACTIVE=True,
+                MUSTCHANGEPASSWORD=True,
             )
             user.set_password(password)
             session.add(user)

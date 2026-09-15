@@ -147,7 +147,7 @@ class Cases(Base):
 
     __tablename__ = "CASES"
 
-    Z_PK = Column(Integer(), primary_key=True)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     CASENUMBER = Column(String(), nullable=False)
     LOCATION = Column(String(), nullable=False)
     JURISDICTION = Column(String(), nullable=False)
@@ -155,10 +155,10 @@ class Cases(Base):
     CASEDATETIMEEND = Column(String())
 
     def __repr__(self):
-        return f"Case Number: {self.CASENUMBER}"
+        return f"Case Number: {self.CASENUMBER}; Location: {self.LOCATION}"
 
     def __str__(self):
-        return f"Case Number: {self.CASENUMBER}"
+        return f"Case Number: {self.CASENUMBER}; Location: {self.LOCATION}"
 
 
 class CaseSchema(Schema):
@@ -179,7 +179,7 @@ class Agents(Base):
 
     __tablename__ = "AGENTS"
 
-    Z_PK = Column(Integer(), primary_key=True)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     AGENTNAME = Column(String(), nullable=False, unique=True)
     AGENTPARENTAGENCY = Column(String(), nullable=False)
     AGENTPRIMARYROLE = Column(String(), nullable=False)
@@ -192,10 +192,10 @@ class Agents(Base):
     ENTEREDDATETIME = Column(String())
 
     def __repr__(self):
-        return f"Agent {self.Z_PK}: {self.AGENTNAME}"
+        return f"Agent ID: {self.Z_PK}; Name: {self.AGENTNAME}"
 
     def __str__(self):
-        return f"Agent {self.Z_PK}: {self.AGENTNAME}"
+        return f"Agent ID: {self.Z_PK}; Name: {self.AGENTNAME}"
 
 
 class AgentsSchema(Schema):
@@ -218,7 +218,7 @@ class Rooms(Base):
 
     __tablename__ = "ROOMS"
 
-    Z_PK = Column(Integer(), primary_key=True)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     ROOMLABEL = Column(String(), nullable=False, unique=True)
     # Not unique: a house with two bedrooms is ordinary.
     ROOMDESC = Column(String(), nullable=False)
@@ -228,10 +228,10 @@ class Rooms(Base):
     ENTEREDDATETIME = Column(String())
 
     def __repr__(self):
-        return f"Room {self.ROOMLABEL}: {self.ROOMDESC}"
+        return f"Room {self.ROOMLABEL} ({self.ROOMDESC})"
 
     def __str__(self):
-        return f"Room {self.ROOMLABEL}: {self.ROOMDESC}"
+        return f"Room {self.ROOMLABEL} ({self.ROOMDESC})"
 
 
 class RoomsSchema(Schema):
@@ -253,7 +253,7 @@ class Evidence(Base):
 
     __tablename__ = "EVIDENCE"
 
-    Z_PK = Column(Integer(), primary_key=True)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     EVIDNUM = Column(String(), nullable=False, unique=True)
     EVIDQTY = Column(String(), nullable=False)
     EVIDDESC = Column(String(), nullable=False)
@@ -303,28 +303,28 @@ class Persons(Base):
 
     __tablename__ = "PERSONS"
 
-    Z_PK = Column(Integer(), primary_key=True)
-    SUSPECTNAME = Column(String(), nullable=False, unique=True)
-    SUSPECTDOB = Column(String())
-    SUSPECTADDRESS = Column(String())
-    SUSPECTPHONE = Column(String())
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
+    PERSONNAME = Column(String(), nullable=False, unique=True)
+    PERSONDOB = Column(String())
+    PERSONADDRESS = Column(String())
+    PERSONPHONE = Column(String())
     SUSPECTNOTE = Column(Text())
     ENTEREDDATETIME = Column(String())
 
     def __repr__(self):
-        return f"Person {self.Z_PK}: {self.SUSPECTNAME}"
+        return f"Person {self.Z_PK}: {self.PERSONNAME}"
 
     def __str__(self):
-        return f"Person {self.Z_PK}: {self.SUSPECTNAME}"
+        return f"Person {self.Z_PK}: {self.PERSONNAME}"
 
 
 class PersonSchema(Schema):
     """Person schema."""
 
-    SUSPECTNAME = fields.Str()
-    SUSPECTDOB = fields.Str()
-    SUSPECTADDRESS = fields.Str()
-    SUSPECTPHONE = fields.Str()
+    PERSONNAME = fields.Str()
+    PERSONDOB = fields.Str()
+    PERSONADDRESS = fields.Str()
+    PERSONPHONE = fields.Str()
     SUSPECTNOTE = fields.Str()
     ENTEREDDATETIME = fields.Str()
 
@@ -337,7 +337,7 @@ class Notes(Base):
 
     __tablename__ = "NOTES"
 
-    Z_PK = Column(Integer(), primary_key=True)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     NOTEDATETIME = Column(String(), nullable=False)
     NOTEDATETIMEUPDATED = Column(String())
     NOTEAUTHOR = Column(String(), nullable=False)
@@ -363,39 +363,42 @@ note_schema = NotesSchema(many=True)
 class UploadedFiles(Base):
     """Uploaded files table."""
 
-    __tablename__ = "files"
+    __tablename__ = "FILES"
 
-    id = Column(Integer(), primary_key=True, autoincrement=True)
-    file_name = Column(String(), nullable=False)
-    file_size = Column(Integer(), nullable=False)
-    file_mime_type = Column(String(50))
-    upload_date = Column(DateTime(), default=datetime.utcnow)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
+    FILENAME = Column(String(), nullable=False)
+    FILESIZE = Column(Integer(), nullable=False)
+    FILEMIMETYPE = Column(String(50))
+    FILEUPLOADDATE = Column(DateTime(), default=datetime.utcnow)
+    FILEUPLOADEDBY = Column(String(100), nullable=False)
     # Not unique: the same photograph may legitimately be attached
     # twice, and enforcing it made SQLite index every byte of every
-    # attachment. Duplicate detection belongs on sha256 below.
-    file_data = Column(LargeBinary(), nullable=False)
+    # attachment. Duplicate detection belongs on FILESHA256 below.
+    FILEDATA = Column(LargeBinary(), nullable=False)
+    FILENOTE = Column(String())
     # Computed when the file is received, not when it is exported, so
     # the recorded hash certifies the file as collected.
-    sha256 = Column(String(64), index=True)
-    hashed_at = Column(String())
-    uploaded_by = Column(String(100), nullable=False)
+    FILESHA256 = Column(String(64), index=True)
+    FILEHASHEDAT = Column(String())
 
     def __repr__(self):
-        return f"File Name: {self.file_name}, Uploaded at: {self.upload_date}"
+        return f"File: {self.FILENAME}, Uploaded at: {self.FILEUPLOADDATE}"
 
     def __str__(self):
-        return f"File Name: {self.file_name}, Uploaded at: {self.upload_date}"
+        return f"File: {self.FILENAME}, Uploaded at: {self.FILEUPLOADDATE}"
 
 
 class FileSchema(Schema):
     """File schema."""
 
-    file_name = fields.Str()
-    file_size = fields.Int()
-    file_mime_type = fields.Str()
-    file_note = fields.Str()
-    upload_date = fields.Str()
-    uploaded_by = fields.Str()
+    FILENAME = fields.Str()
+    FILESIZE = fields.Int()
+    FILEMIMETYPE = fields.Str()
+    FILEUPLOADDATE = fields.Str()
+    FILEUPLOADEDBY = fields.Str()
+    FILENOTE = fields.Str()
+    FILESHA256 = fields.Str()
+    FILEHASHEDAT = fields.Str()
 
 file_schema = FileSchema(many=True)
 
@@ -405,25 +408,25 @@ class Users(UsersBase):
 
     __tablename__ = "users"
 
-    id = Column(Integer(), primary_key=True, autoincrement=True)
-    user_name = Column(String(100), unique=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
-    is_admin = Column(Boolean(), default=False)
-    is_active = Column(Boolean(), default=True)
-    must_change_password = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
+    USERNAME = Column(String(100), unique=True, nullable=False)
+    PASSWORDHASH = Column(String(255), nullable=False)
+    ISADMIN = Column(Boolean(), default=False)
+    ISACTIVE = Column(Boolean(), default=True)
+    MUSTCHANGEPASSWORD = Column(Boolean, default=True)
+    ENTEREDDATETIME = Column(DateTime, default=datetime.utcnow)
 
     def __repr__(self):
-        return f"User Name: {self.user_name}"
+        return f"User Name: {self.USERNAME}"
 
     def __str__(self):
-        return f"User {self.id}: {self.user_name}"
+        return f"User {self.Z_PK}: {self.USERNAME}"
 
     def set_password(self, password: str):
-        """Hashes a plaintext password and stores it."""
+        """Hashes a plaintext password and stores the hash."""
         password_bytes = password.encode("utf-8")
         salt = bcrypt.gensalt()
-        self.password_hash = bcrypt.hashpw(
+        self.PASSWORDHASH = bcrypt.hashpw(
             password_bytes, salt
         ).decode("utf-8")
 
@@ -432,7 +435,7 @@ class Users(UsersBase):
         try:
             return bcrypt.checkpw(
                 attempted_password.encode("utf-8"),
-                self.password_hash.encode("utf-8"),
+                self.PASSWORDHASH.encode("utf-8"),
             )
         except (ValueError, TypeError):
             return False
@@ -467,9 +470,9 @@ class AuditLog(Base):
 
 
 # ----- Audit plumbing -----
-# Columns never worth recording: file_data would put every byte of every
+# Columns never worth recording: FILEDATA would put every byte of every
 # attachment into the log.
-_AUDIT_SKIP_COLUMNS = {"file_data"}
+_AUDIT_SKIP_COLUMNS = {"FILEDATA"}
 
 # Tables the listener watches. AUDIT itself is excluded -- it is
 # append-only and must never audit its own writes.
@@ -478,9 +481,9 @@ _AUDITED_TABLES = {
     "AGENTS": "AGENTNAME",
     "ROOMS": "ROOMLABEL",
     "EVIDENCE": "EVIDNUM",
-    "PERSONS": "SUSPECTNAME",
+    "PERSONS": "PERSONNAME",
     "NOTES": "NOTEAUTHOR",
-    "files": "file_name",
+    "FILES": "FILENAME",
 }
 
 
@@ -497,7 +500,7 @@ def current_actor() -> str:
     """
     try:
         from nicegui import app
-        name = app.storage.user.get("user_name", "")
+        name = app.storage.user.get("USERNAME", "")
         return name or "unauthenticated"
     except Exception:
         return "system"
@@ -635,8 +638,7 @@ def generate_one_time_password() -> str:
     unguarded admin panel, that was the whole exploit chain.
 
     Shown to the administrator once, never stored in plaintext, and
-    paired with must_change_password so it survives only until first
-    use.
+    paired with MUSTCHANGEPASSWORD so it survives only until first use.
     """
     return secrets.token_urlsafe(9)
 
@@ -647,26 +649,179 @@ def generate_one_time_password() -> str:
 _UNIQUE_DROPPED = {
     "AGENTS": {"AGENTPHONE", "AGENTEMAIL"},
     "ROOMS": {"ROOMDESC"},
-    "files": {"file_data"},
+    "FILES": {"FILEDATA"},
 }
+
+# Names from before the upstream project brought PERSONS, FILES and users
+# into line with the TABLE+FIELD capitals used everywhere else. Databases
+# and exports made earlier still carry them. The migration and both
+# importers read this one map, so they cannot disagree about what an old
+# name means.
+LEGACY_TABLE_NAMES = {
+    "files": "FILES",
+    "uploaded_files": "FILES",
+}
+
+LEGACY_COLUMN_NAMES = {
+    "PERSONS": {
+        "SUSPECTNAME": "PERSONNAME",
+        "SUSPECTDOB": "PERSONDOB",
+        "SUSPECTADDRESS": "PERSONADDRESS",
+        "SUSPECTPHONE": "PERSONPHONE",
+    },
+    "FILES": {
+        "id": "Z_PK",
+        "file_name": "FILENAME",
+        "file_size": "FILESIZE",
+        "file_mime_type": "FILEMIMETYPE",
+        "upload_date": "FILEUPLOADDATE",
+        "uploaded_by": "FILEUPLOADEDBY",
+        "file_data": "FILEDATA",
+        "file_note": "FILENOTE",
+        "sha256": "FILESHA256",
+        "hashed_at": "FILEHASHEDAT",
+    },
+    "users": {
+        "id": "Z_PK",
+        "user_name": "USERNAME",
+        "password_hash": "PASSWORDHASH",
+        "is_admin": "ISADMIN",
+        "is_active": "ISACTIVE",
+        "must_change_password": "MUSTCHANGEPASSWORD",
+        "created_at": "ENTEREDDATETIME",
+    },
+}
+
+
+def _stored_table_name(connection, table_name: str):
+    """The name a table is actually stored under, or None if absent.
+
+    SQLite matches table names without regard to case, but sqlite_master
+    keeps the spelling the table was created with -- so an older database
+    answers to "FILES" while still listing itself as "files".
+    """
+    from sqlalchemy import text
+
+    return connection.execute(
+        text(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name = :name COLLATE NOCASE"
+        ),
+        {"name": table_name},
+    ).scalar()
+
+
+def _column_names(connection, table_name: str) -> set:
+    """The columns a table currently has, as stored."""
+    from sqlalchemy import text
+
+    return {
+        row[1]
+        for row in connection.execute(
+            text(f'PRAGMA table_info("{table_name}")')
+        )
+    }
+
+
+def _backup_database(target_engine, path):
+    """Copies a database aside before a migration rewrites it.
+
+    The write-ahead log is folded in first. In WAL mode the most recent
+    writes live in the -wal file rather than the .db, so copying the .db
+    alone would quietly leave them out of the backup.
+    """
+    import shutil
+    from sqlalchemy import text
+
+    with target_engine.connect() as connection:
+        connection.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = path.with_suffix(f".db.bak-{stamp}")
+    counter = 1
+    while backup.exists():
+        backup = path.with_suffix(f".db.bak-{stamp}-{counter}")
+        counter += 1
+
+    shutil.copy2(path, backup)
+    print(f"Schema migration: backed up {path.name} to {backup.name}")
+    return backup
+
+
+def _rename_legacy_schema() -> None:
+    """Renames old table and column names in place.
+
+    ALTER TABLE ... RENAME COLUMN keeps every row, index and constraint,
+    so no rebuild is needed. Idempotent: a column is renamed only while
+    its old spelling is present and its new one is not.
+    """
+    from sqlalchemy import text
+
+    targets = (
+        (engine, APP_DB_PATH, Base.metadata),
+        (users_engine, USERS_DB_PATH, UsersBase.metadata),
+    )
+
+    for target_engine, path, metadata in targets:
+        plan = []
+        with target_engine.connect() as connection:
+            for table_name, renames in LEGACY_COLUMN_NAMES.items():
+                if table_name not in metadata.tables:
+                    continue
+                stored = _stored_table_name(connection, table_name)
+                if stored is None:
+                    continue
+                present = _column_names(connection, stored)
+                columns = [
+                    (old, new)
+                    for old, new in renames.items()
+                    if old in present and new not in present
+                ]
+                if columns or stored != table_name:
+                    plan.append((table_name, stored, columns))
+
+        if not plan:
+            continue
+
+        _backup_database(target_engine, path)
+
+        with target_engine.begin() as connection:
+            for table_name, stored, columns in plan:
+                for old, new in columns:
+                    connection.execute(
+                        text(
+                            f'ALTER TABLE "{stored}" '
+                            f'RENAME COLUMN "{old}" TO "{new}"'
+                        )
+                    )
+                if stored != table_name:
+                    # SQLite refuses a rename that differs only in case,
+                    # so it goes by way of a temporary name.
+                    interim = f"{table_name}__renaming"
+                    connection.execute(
+                        text(f'ALTER TABLE "{stored}" RENAME TO "{interim}"')
+                    )
+                    connection.execute(
+                        text(
+                            f'ALTER TABLE "{interim}" RENAME TO "{table_name}"'
+                        )
+                    )
+                print(
+                    f"Schema migration: {stored} -> {table_name}, "
+                    f"{len(columns)} column(s) renamed"
+                )
 
 
 def _stale_unique_columns(connection, table_name: str) -> set:
     """Returns the columns on `table_name` still carrying UNIQUE."""
     from sqlalchemy import text
 
-    exists = connection.execute(
-        text(
-            "SELECT 1 FROM sqlite_master "
-            "WHERE type='table' AND name=:name"
-        ),
-        {"name": table_name},
-    ).scalar()
-    if not exists:
+    stored = _stored_table_name(connection, table_name)
+    if stored is None:
         return set()
 
     stale = set()
-    for row in connection.execute(text(f'PRAGMA index_list("{table_name}")')):
+    for row in connection.execute(text(f'PRAGMA index_list("{stored}")')):
         index_name, is_unique = row[1], row[2]
         if not is_unique:
             continue
@@ -689,30 +844,20 @@ def _add_missing_columns() -> None:
     from sqlalchemy import text
 
     additions = {
-        "files": [
-            ("sha256", "VARCHAR(64)"),
-            ("hashed_at", "VARCHAR"),
+        "FILES": [
+            ("FILENOTE", "VARCHAR"),
+            ("FILESHA256", "VARCHAR(64)"),
+            ("FILEHASHEDAT", "VARCHAR"),
         ],
     }
 
     with engine.begin() as connection:
         for table_name, columns in additions.items():
-            exists = connection.execute(
-                text(
-                    "SELECT 1 FROM sqlite_master "
-                    "WHERE type='table' AND name=:name"
-                ),
-                {"name": table_name},
-            ).scalar()
-            if not exists:
+            stored = _stored_table_name(connection, table_name)
+            if stored is None:
                 continue
 
-            present = {
-                row[1]
-                for row in connection.execute(
-                    text(f'PRAGMA table_info("{table_name}")')
-                )
-            }
+            present = _column_names(connection, stored)
             for column_name, column_type in columns:
                 if column_name in present:
                     continue
@@ -738,7 +883,6 @@ def migrate_schema() -> None:
     The database is copied to a timestamped .bak alongside itself before
     anything is rewritten.
     """
-    import shutil
     from sqlalchemy import text
 
     with engine.connect() as connection:
@@ -751,10 +895,7 @@ def migrate_schema() -> None:
     if not pending:
         return
 
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup = APP_DB_PATH.with_suffix(f".db.bak-{stamp}")
-    shutil.copy2(APP_DB_PATH, backup)
-    print(f"Schema migration: backed up case database to {backup.name}")
+    _backup_database(engine, APP_DB_PATH)
 
     for table_name, columns in pending.items():
         table = Base.metadata.tables[table_name]
@@ -780,6 +921,18 @@ def migrate_schema() -> None:
         )
 
 
+def upgrade_database() -> None:
+    """Brings existing databases up to the current schema.
+
+    Order matters: names first, so the later steps see today's columns;
+    then columns added since; then the table rebuilds, which copy rows by
+    the current column list.
+    """
+    _rename_legacy_schema()
+    _add_missing_columns()
+    migrate_schema()
+
+
 # ----- Table Creation -----
 def init_db():
     """Initialize both databases."""
@@ -788,9 +941,8 @@ def init_db():
     # Create ONLY the Users table in users.db
     UsersBase.metadata.create_all(users_engine)
 
-    # Bring an existing case database up to the current schema.
-    _add_missing_columns()
-    migrate_schema()
+    # Bring existing databases up to the current schema.
+    upgrade_database()
 
 
 # ----- Convenience Context Manager -----

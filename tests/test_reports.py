@@ -163,7 +163,7 @@ def test_json_view_builds_from_model_columns(populated):
     assert restored["case"]["CASENUMBER"] == populated
     assert len(restored["evidence"]) == 12
     assert len(restored["agents"]) == 2
-    assert restored["persons"][0]["SUSPECTNAME"] == "O'Brien, Sean"
+    assert restored["persons"][0]["PERSONNAME"] == "O'Brien, Sean"
 
 
 def test_json_payload_survives_being_embedded_in_javascript():

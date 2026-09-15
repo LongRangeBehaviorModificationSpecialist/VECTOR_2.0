@@ -112,21 +112,37 @@ closing the message; it cannot be recovered, only reset again.
 
 ### Upgrading an existing database
 
-If you already have a `db/app_data.db` from an earlier version, the
-first start after upgrading rebuilds three tables to remove constraints
-that blocked ordinary scenes — a second agent with no email address, a
-house with two bedrooms, the same photograph attached twice:
+If you already have databases from an earlier version, the first start
+after upgrading brings them up to date. Each database is copied to a
+timestamped `.bak` beside it before anything changes, and every step
+runs once:
+
+- **Names.** PERSONS, FILES and users take the upstream project's
+  capitalised column names — `SUSPECTNAME` → `PERSONNAME`, `file_name`
+  → `FILENAME`, `user_name` → `USERNAME`, and so on. Columns are renamed
+  in place, so no row is copied and every password keeps working.
+- **Constraints.** A table still carrying a unique constraint that
+  blocked ordinary scenes — a second agent with no email address, a
+  house with two bedrooms, the same photograph attached twice — is
+  rebuilt without it.
+
+A database from before the renames prints:
 
 ```
-Schema migration: backed up case database to app_data.db.bak-20260910-164753
-Schema migration: dropped UNIQUE on AGENTS.AGENTEMAIL, AGENTPHONE
-Schema migration: dropped UNIQUE on ROOMS.ROOMDESC
-Schema migration: dropped UNIQUE on files.file_data
+Schema migration: backed up app_data.db to app_data.db.bak-20260915-000534
+Schema migration: PERSONS -> PERSONS, 4 column(s) renamed
+Schema migration: files -> FILES, 9 column(s) renamed
+Schema migration: backed up users.db to users.db.bak-20260915-000534
+Schema migration: users -> users, 7 column(s) renamed
+Schema migration: added FILES.FILENOTE
 ```
 
-Your case is copied to a timestamped `.bak` beside it first, and the
-migration runs once. Keep the backup until you have confirmed the case
-looks right, then delete it — it is an unencrypted copy of the case.
+The write-ahead log is folded in before the copy, so the backup holds
+the most recent entries too. Keep it until you have confirmed the case
+looks right, then delete it — it is a full copy of the case.
+
+Exports made by earlier versions, and by the upstream project, still
+import: old table and column names are read as the names they became.
 
 ---
 

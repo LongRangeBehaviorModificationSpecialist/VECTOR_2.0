@@ -77,18 +77,18 @@ def test_deleting_keeps_the_whole_row_for_recovery():
     with get_session() as session:
         session.add(
             Persons(
-                SUSPECTNAME="O'Brien, Sean",
-                SUSPECTDOB="1984-03-02",
-                SUSPECTADDRESS="14 Elm Street",
+                PERSONNAME="O'Brien, Sean",
+                PERSONDOB="1984-03-02",
+                PERSONADDRESS="14 Elm Street",
             )
         )
     with get_session() as session:
         session.delete(session.query(Persons).one())
 
     deleted = _entries("DELETE")[0]
-    assert deleted["before"]["SUSPECTNAME"] == "O'Brien, Sean"
-    assert deleted["before"]["SUSPECTDOB"] == "1984-03-02"
-    assert deleted["before"]["SUSPECTADDRESS"] == "14 Elm Street"
+    assert deleted["before"]["PERSONNAME"] == "O'Brien, Sean"
+    assert deleted["before"]["PERSONDOB"] == "1984-03-02"
+    assert deleted["before"]["PERSONADDRESS"] == "14 Elm Street"
 
 
 def test_a_no_op_save_writes_nothing():
@@ -119,22 +119,24 @@ def test_audit_survives_a_wipe(populated):
 
 
 def test_file_blobs_are_never_copied_into_the_log():
-    """file_data would put every byte of every attachment in the trail."""
+    """FILEDATA would put every byte of every attachment in the trail."""
     with get_session() as session:
         session.add(
             UploadedFiles(
-                file_name="photo.jpg",
-                file_size=10,
-                file_mime_type="image/jpeg",
-                uploaded_by="Doe, John",
-                file_data=b"SECRETPIXELBYTES",
-                sha256="a" * 64,
+                FILENAME="photo.jpg",
+                FILESIZE=10,
+                FILEMIMETYPE="image/jpeg",
+                FILEUPLOADEDBY="Doe, John",
+                FILEDATA=b"SECRETPIXELBYTES",
+                FILESHA256="a" * 64,
             )
         )
     entry = _entries("CREATE")[0]
-    assert "file_data" not in (entry["after"] or {})
+    assert entry["table_name"] == "FILES"
+    assert entry["summary"] == "photo.jpg"
+    assert "FILEDATA" not in (entry["after"] or {})
     assert "SECRETPIXELBYTES" not in json.dumps(entry["after"])
-    assert entry["after"]["sha256"] == "a" * 64
+    assert entry["after"]["FILESHA256"] == "a" * 64
 
 
 def test_timestamps_are_utc_and_marked():

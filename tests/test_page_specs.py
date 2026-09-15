@@ -149,9 +149,9 @@ def test_spec_defaults_fill_themselves_in():
         model=persons_page.Persons,
         title="T",
         entity="person",
-        fields=[Field("SUSPECTNAME", "Name")],
+        fields=[Field("PERSONNAME", "Name")],
         validate=lambda **kwargs: False,
     )
     assert spec.entity_plural == "persons"
-    assert spec.label_field == "SUSPECTNAME"
+    assert spec.label_field == "PERSONNAME"
     assert spec.submit_label == "Add Person"

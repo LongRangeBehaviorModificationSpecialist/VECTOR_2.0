@@ -86,10 +86,10 @@ def bootstrap_first_admin():
 
         password = secrets.token_urlsafe(12)
         admin = Users(
-            user_name="admin",
-            is_admin=True,
-            is_active=True,
-            must_change_password=True,
+            USERNAME="admin",
+            ISADMIN=True,
+            ISACTIVE=True,
+            MUSTCHANGEPASSWORD=True,
         )
         admin.set_password(password)
         session.add(admin)
@@ -133,7 +133,11 @@ def seed_default_user():
     with open(USERS_SEED_PATH, "r", encoding="utf-8") as f:
         user_data = json.load(f)
 
-    raw_hash = user_data.get("password_hash", "")
+    # Upstream's users.json moved to capitalised keys; older copies still
+    # use the lowercase ones.
+    raw_hash = user_data.get(
+        "PASSWORDHASH", user_data.get("password_hash", "")
+    )
 
     try:
         hash_bytes = ast.literal_eval(raw_hash)
@@ -147,13 +151,13 @@ def seed_default_user():
         if clean_hash.startswith("b'") and clean_hash.endswith("'"):
             clean_hash = clean_hash[2:-1]
 
-    user_name = user_data.get("user_name", "")
-    is_admin = user_data.get("is_admin", False)
+    user_name = user_data.get("USERNAME", user_data.get("user_name", ""))
+    is_admin = user_data.get("ISADMIN", user_data.get("is_admin", False))
 
     with get_users_session() as session:
         existing = (
             session.query(Users)
-            .filter_by(user_name=user_name)
+            .filter_by(USERNAME=user_name)
             .first()
         )
         if existing:
@@ -164,10 +168,10 @@ def seed_default_user():
         else:
             # Create new user
             new_user = Users(
-                user_name=user_name,
-                password_hash=clean_hash,
-                is_admin=is_admin,
-                is_active=True,
+                USERNAME=user_name,
+                PASSWORDHASH=clean_hash,
+                ISADMIN=is_admin,
+                ISACTIVE=True,
             )
             session.add(new_user)
             print(f"Created user '{user_name}' from users.json")
@@ -357,12 +361,12 @@ def change_password_page():
                 with get_users_session() as session:
                     user = (
                         session.query(Users)
-                        .filter_by(user_name=username)
+                        .filter_by(USERNAME=username)
                         .first()
                     )
                     if user:
                         user.set_password(new_pass.value)
-                        user.must_change_password = False
+                        user.MUSTCHANGEPASSWORD = False
                 ui.notify(
                     "Password changed.",
                     timeout=4000,
