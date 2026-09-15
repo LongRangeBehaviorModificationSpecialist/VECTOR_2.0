@@ -26,6 +26,8 @@ from typing import Callable, Optional
 
 from nicegui import ui
 
+from failures import explain, log
+from live import refresh_on_change
 from models import get_session, has_active_case
 from utils import (
     require_active_case,
@@ -165,6 +167,23 @@ def notify_done(message: str) -> None:
 
 
 # ----- Widget construction -----
+def options_including(options, value):
+    """A dropdown's options, with the record's own value among them.
+
+    A stored value need not be on today's list: an agent from an imported
+    case is not on this machine's roster, and a room can be relabelled or
+    an agent deleted after evidence was logged against them. NiceGUI
+    refuses a value missing from the options, so the edit dialog failed to
+    open, with nothing on screen to say why.
+    """
+    if value in (None, ""):
+        return options
+    if isinstance(options, dict):
+        return options if value in options else {**options, value: value}
+    options = list(options)
+    return options if value in options else options + [value]
+
+
 def _make_widget(spec_field: Field, value=None):
     """Builds the input for one field."""
     factory_required = {
@@ -185,7 +204,9 @@ def _make_widget(spec_field: Field, value=None):
         kwargs["placeholder"] = spec_field.placeholder
 
     if spec_field.kind == "select":
-        options = spec_field.options() if spec_field.options else []
+        options = options_including(
+            spec_field.options() if spec_field.options else [], value
+        )
         kwargs["with_input"] = True
         if spec_field.new_values:
             kwargs["new_value_mode"] = "add"
@@ -230,6 +251,9 @@ def build_crud_page(spec: CrudSpec) -> None:
     # Records belong to a case. The Cases page is the exception: it is
     # where a case is opened, so it has to work before one exists.
     guard = require_active_case if spec.requires_case else (lambda f: f)
+
+    # Column names as the page shows them, for explaining a failed save.
+    labels = {f.name: f.label for f in spec.fields}
 
     with ui.column().classes("w-full items-center"):
 
@@ -313,9 +337,10 @@ def build_crud_page(spec: CrudSpec) -> None:
                 with get_session() as session:
                     session.add(spec.model(**values))
             except Exception as err:
+                log.exception("Could not save a new %s", spec.entity)
                 notify_problem(
-                    f"Could not save this {spec.entity}. "
-                    f"Check the information and try again.\n\n{err}"
+                    f"Could not save this {spec.entity}.\n\n"
+                    f"{explain(err, labels)}"
                 )
                 return
 
@@ -355,10 +380,10 @@ def build_crud_page(spec: CrudSpec) -> None:
             submit_button.set_enabled(not full)
             limit_note.set_visibility(full)
 
+        shown = {"table": None}
+
         def refresh_table() -> None:
             """Re-reads the table from the database."""
-            table_container.clear()
-
             with get_session() as session:
                 records = (
                     session.query(spec.model)
@@ -369,6 +394,17 @@ def build_crud_page(spec: CrudSpec) -> None:
                 rows = [_row_dict(record) for record in records]
 
             _apply_record_limit(len(rows))
+
+            # Rows are swapped in place when the table is already showing,
+            # so a refresh keeps the sort order the user picked.
+            table = shown["table"]
+            if rows and table is not None and not table.is_deleted:
+                table.rows = rows
+                table.update()
+                return
+
+            table_container.clear()
+            shown["table"] = None
 
             with table_container:
                 if not rows:
@@ -413,6 +449,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                     row_key=spec.row_key,
                 )
                 table.props("dense flat")
+                shown["table"] = table
 
                 # Defined once here, not pasted into six page modules.
                 delete_button = (
@@ -497,9 +534,10 @@ def build_crud_page(spec: CrudSpec) -> None:
                                 for name, value in values.items():
                                     setattr(record, name, value)
                         except Exception as err:
+                            log.exception("Could not update a %s", spec.entity)
                             notify_problem(
                                 f"Could not update this {spec.entity}.\n\n"
-                                f"{err}"
+                                f"{explain(err, labels)}"
                             )
                             return
 
@@ -563,9 +601,10 @@ def build_crud_page(spec: CrudSpec) -> None:
                                 if record is not None:
                                     session.delete(record)
                         except Exception as err:
+                            log.exception("Could not delete a %s", spec.entity)
                             notify_problem(
                                 f"Could not delete this {spec.entity}.\n\n"
-                                f"{err}"
+                                f"{explain(err, labels)}"
                             )
                             return
 
@@ -624,8 +663,13 @@ def build_crud_page(spec: CrudSpec) -> None:
                                         ).all():
                                             session.delete(record)
                                 except Exception as err:
+                                    log.exception(
+                                        "Could not delete every %s",
+                                        spec.entity,
+                                    )
                                     notify_problem(
-                                        f"Nothing was deleted.\n\n{err}"
+                                        "Nothing was deleted.\n\n"
+                                        f"{explain(err, labels)}"
                                     )
                                     dialog.close()
                                     return
@@ -657,3 +701,11 @@ def build_crud_page(spec: CrudSpec) -> None:
                     delete_all_button.set_enabled(has_active_case())
 
         refresh_table()
+
+        # Entries made on another device appear without a reload.
+        def _live_refresh() -> None:
+            refresh_table()
+            if spec.show_delete_all and spec.requires_case:
+                delete_all_button.set_enabled(has_active_case())
+
+        refresh_on_change(_live_refresh)

@@ -92,11 +92,12 @@ Everything the original does, plus:
 | **Audit trail** | Every create, edit, delete, wipe, import and sign-in, with field-level before and after |
 | **Evidence integrity** | A SHA-256 taken when each file is uploaded, verified again at export and at import |
 | **Encryption** | Optional SQLCipher encryption of both databases, with tools to convert either way |
-| **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked" |
+| **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked"; imports that are all or nothing; failures explained in plain words |
+| **Several devices** | Open pages refresh on their own when another device saves, and the case badge follows |
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 255 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 275 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -315,7 +316,10 @@ on macOS.
 
 Any device that reaches the port gets the login page, so several agents
 can work the same case from tablets or laptops at once. The database is
-in WAL mode, so simultaneous entries do not collide.
+in WAL mode, so simultaneous entries do not collide, and open pages
+refresh on their own within a couple of seconds when another device
+saves. A page waits while you have a dialog open, so an edit in progress
+is never swept away.
 
 > **Before you use `--lan`, understand what it means.**
 >
@@ -327,8 +331,6 @@ in WAL mode, so simultaneous entries do not collide.
 > - **Your firewall will ask.** Windows shows a Defender prompt the
 >   first time — allow Python on **private** networks only. macOS
 >   prompts to allow incoming connections.
-> - **Pages do not live-update.** An entry made on one device appears
->   on another when that page is reloaded, not automatically.
 > - **Shut it down when you are finished**, and do not leave `--lan`
 >   in a shortcut you use by default.
 
@@ -396,6 +398,10 @@ which format it is from the file itself. It replaces everything currently
 loaded. The one thing it will not replace is this machine's audit
 trail: the import is appended to it instead, so the receiving machine
 keeps its own history of what happened here.
+
+An import is all or nothing. If any part of the file cannot be read,
+nothing is imported, the case is left exactly as it was, and the message
+says which table the problem was in.
 
 ---
 
@@ -575,8 +581,6 @@ Read these before relying on VECTOR for a case that will be charged.
 - **Case start and end times are typed by the agent** as
   `MM-DD-YYYY HH:MM`, with no time zone recorded. Everything the
   application generates itself is UTC and marked.
-- **No live refresh.** With several devices connected, a page shows
-  another agent's entry only after a reload.
 - **Network traffic is plain HTTP.** See
   [Access from another device](#access-from-another-device).
 
@@ -600,6 +604,10 @@ denied, run `chmod +x "Start VECTOR.command"` in the project folder once.
 
 **Setup stopped part-way** — usually a dropped connection. Double-click
 the launcher again; it installs whatever is still missing.
+
+**A message says something could not be saved, imported or exported** —
+it gives the reason in plain words. The full technical detail is printed
+in the VECTOR window, for whoever looks after the installation.
 
 **"No module named nicegui"** — the virtual environment is not being
 used. Run the full `.venv/bin/python` or `.venv\Scripts\python` path
@@ -646,7 +654,7 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-255 tests, about twelve seconds. They run against a temporary database
+275 tests, about twelve seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -664,6 +672,7 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
 | `test_json_export.py` | 22 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected; older and upstream layouts import |
 | `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
+| `test_failures_and_live.py` | 20 | Failures are explained without the SQL; a failed import leaves the case unchanged, and an import clears attachments the new case lacks; exports stop rather than leave attachments out; edit dialogs open for values no longer on a list; saves, wipes and imports move the change signal, while reads and sign-ins do not |
 | `test_numbering.py` | 17 | Evidence numbering past item 9; room labels past Z |
 | `test_validators.py` | 16 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time |
 | `test_export_import.py` | 15 | CSV round trip preserves rows, bytes and provenance, including attachments sharing a name; encrypted archives; tampering detected; older and upstream archives import; download staging is cleared |
@@ -705,6 +714,8 @@ main.py              startup, route table, first-run bootstrap
 auth.py              session state, sign-in throttling, route guards
 models.py            tables, the audit listener, schema upgrades
 crypto.py            SQLCipher detection and key handling
+failures.py          plain-language reasons for failures, and the log
+live.py              refreshes open pages when another device saves
 utils.py             validators, the active-case guard, shared helpers
 import_export.py     CSV and JSON export and import
 navbar.py            top navigation and the case badge

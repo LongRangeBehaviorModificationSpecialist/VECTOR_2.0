@@ -630,6 +630,49 @@ def _audit_before_flush(session, _flush_context, _instances) -> None:
         )
 
 
+# ----- Change signal -----
+# Open pages on other devices watch this number and reload what they show
+# when it moves, so an entry made on one tablet appears on the others
+# without anyone pressing reload. It counts commits of case data made by
+# this process, which is the only one writing to app_data.db while VECTOR
+# runs. The audit rows a sign-in writes do not count: nothing on screen
+# shows them.
+_data_version = 0
+
+
+def data_version() -> int:
+    """Goes up by one each time a change to case data is committed."""
+    return _data_version
+
+
+@event.listens_for(Session, "before_flush")
+def _note_case_change(session, _flush_context, _instances) -> None:
+    for group in (session.new, session.dirty, session.deleted):
+        if any(not isinstance(obj, AuditLog) for obj in group):
+            session.info["vector_changed"] = True
+            return
+
+
+@event.listens_for(Session, "do_orm_execute")
+def _note_bulk_change(orm_execute_state) -> None:
+    # query().delete() never flushes objects, so a wipe or an import is
+    # caught here instead.
+    if not orm_execute_state.is_select:
+        orm_execute_state.session.info["vector_changed"] = True
+
+
+@event.listens_for(Session, "after_commit")
+def _count_committed_change(session) -> None:
+    global _data_version
+    if session.info.pop("vector_changed", False):
+        _data_version += 1
+
+
+@event.listens_for(Session, "after_rollback")
+def _forget_rolled_back_change(session) -> None:
+    session.info.pop("vector_changed", None)
+
+
 def generate_one_time_password() -> str:
     """Makes a fresh password for a new or reset account.
 

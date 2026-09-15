@@ -14,8 +14,13 @@ until someone happened to visit /reports.
 
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+import logging
 
 from nicegui import app, ui
+
+# The same logger as failures.log, named directly so this module keeps
+# importing nothing from the rest of the application.
+log = logging.getLogger("vector")
 
 
 # ----- Login throttling -----
@@ -29,6 +34,11 @@ FAILURE_WINDOW_MINUTES = 30
 
 
 # ----- Session state -----
+# app.storage.user only exists inside a browser request. Outside one -- at
+# startup, in a background task, in the test suite -- the readers below
+# answer "not signed in" rather than raising. Ending sessions is different:
+# if that fails, an administrator would be told a session is over when it
+# is not, so those failures are logged and reported to the caller.
 def is_authenticated() -> bool:
     """Checks if the current user is signed in (defaults to False).
 
@@ -124,27 +134,35 @@ def user_generation(user_name: str) -> int:
         return 0
 
 
-def invalidate_user_sessions(user_name: str) -> None:
+def invalidate_user_sessions(user_name: str) -> bool:
     """Ends every active session for one account, immediately.
 
     Called when an account is deleted, deactivated, or has its password
     reset -- a password reset that leaves the old session working is not
-    a reset.
+    a reset. Returns False when the sessions could not be ended, so the
+    caller can say so.
     """
     try:
         generations = dict(app.storage.general.get("user_generations", {}))
         generations[user_name] = generations.get(user_name, 0) + 1
         app.storage.general["user_generations"] = generations
     except Exception:
-        pass
+        log.exception("Could not end the sessions of %s", user_name)
+        return False
+    return True
 
 
-def invalidate_all_sessions() -> None:
-    """Ends every active session for every account."""
+def invalidate_all_sessions() -> bool:
+    """Ends every active session for every account.
+
+    Returns False when the sessions could not be ended.
+    """
     try:
         app.storage.general["session_generation"] = global_generation() + 1
     except Exception:
-        pass
+        log.exception("Could not end every session")
+        return False
+    return True
 
 
 # ----- Login throttling -----
@@ -163,7 +181,8 @@ def _save_failures(failures: dict) -> None:
     try:
         app.storage.general["login_failures"] = failures
     except Exception:
-        pass
+        # Sign-in still works, but without the throttling, so say so.
+        log.exception("Could not record failed sign-ins")
 
 
 def lockout_seconds_remaining(user_name: str) -> int:

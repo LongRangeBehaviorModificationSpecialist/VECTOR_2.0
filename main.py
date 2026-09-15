@@ -17,8 +17,16 @@ Usage:
 import ast
 import json
 from nicegui import ui, app
+import logging
 import secrets
 import sys
+
+# Failures are explained on screen in plain words (see failures.py). The
+# full detail, for whoever has to fix one, is written to this console.
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s  %(levelname)s  %(name)s: %(message)s",
+)
 
 from auth import (
     get_current_user_name,
