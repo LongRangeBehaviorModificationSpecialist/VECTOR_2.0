@@ -44,6 +44,14 @@ from models import (  # noqa: E402
     record_audit,
 )
 
+def _scene_time(text: str) -> str:
+    """A demo time as VECTOR stamps it: local, with the offset from UTC."""
+    import clock
+    from datetime import datetime
+
+    return clock.stamp(datetime.strptime(text, "%m-%d-%Y %H:%M:%S").astimezone())
+
+
 DEMO_CASE = {
     "CASENUMBER": "26-DEMO-001",
     "LOCATION": "1 Example Way, Springfield",
@@ -157,7 +165,7 @@ def rebuild_case() -> None:
                     AGENTROLESECONDARY=second,
                     AGENTPHONE=phone,
                     AGENTEMAIL=email,
-                    ENTEREDDATETIME="2026-09-01 07:35:00",
+                    ENTEREDDATETIME=_scene_time("09-01-2026 07:35:00"),
                 )
             )
 
@@ -168,7 +176,7 @@ def rebuild_case() -> None:
                     ROOMDESC=desc,
                     ROOMFIRSTAGENT=first,
                     ROOMSECONDAGENT=second,
-                    ENTEREDDATETIME="2026-09-01 07:50:00",
+                    ENTEREDDATETIME=_scene_time("09-01-2026 07:50:00"),
                 )
             )
 
@@ -192,7 +200,7 @@ def rebuild_case() -> None:
                     EVIDTRIAGEDBY=triaged_by,
                     EVIDISCONTRABAND=contraband,
                     EVIDNOTE=note,
-                    ENTEREDDATETIME="2026-09-01 09:00:00",
+                    ENTEREDDATETIME=_scene_time("09-01-2026 09:00:00"),
                 )
             )
 
@@ -204,14 +212,14 @@ def rebuild_case() -> None:
                     PERSONADDRESS=address,
                     PERSONPHONE=phone,
                     SUSPECTNOTE=note,
-                    ENTEREDDATETIME="2026-09-01 08:05:00",
+                    ENTEREDDATETIME=_scene_time("09-01-2026 08:05:00"),
                 )
             )
 
         for when, author, text in DEMO_NOTES:
             session.add(
                 Notes(
-                    NOTEDATETIME=when,
+                    NOTEDATETIME=_scene_time(when),
                     NOTEDATETIMEUPDATED="",
                     NOTEAUTHOR=author,
                     NOTETEXT=text,

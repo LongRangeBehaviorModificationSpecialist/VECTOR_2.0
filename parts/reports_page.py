@@ -32,13 +32,17 @@ from html import escape
 from nicegui import ui
 from sqlalchemy import func
 
+import clock
+from failures import explain, log
 from models import get_session, Agents, Cases, Evidence, Notes, Persons, Rooms
 from navbar import build_navbar, unit_logo
 from auth import is_authenticated, get_current_user_name, get_is_admin
 from utils import (
+    CASE_TIME_FORMAT,
     evidence_number_key,
     get_case_info,
     get_print_date_time,
+    parse_entered_date,
     room_display_key,
     room_label_key,
 )
@@ -89,6 +93,100 @@ def rooms_with_item_counts(session) -> list[tuple[str, int]]:
     )
 
 
+# ----- The case's end time -----
+def fill_case_end_time(now_text: str | None = None) -> tuple[bool, str]:
+    """Sets the open case's end time to now, unless that would be wrong.
+
+    Returns (saved, message). Leaves the case alone when it already has an
+    end time -- another device may have filled it in -- and when its start
+    time is later than now, which means the start time needs checking.
+    """
+    now_text = now_text or clock.case_time_now()
+    with get_session() as session:
+        case = session.query(Cases).order_by(Cases.Z_PK).first()
+        if case is None:
+            return False, "There is no open case."
+        if (case.CASEDATETIMEEND or "").strip():
+            return False, (
+                f"The case already has an end date/time: "
+                f"{case.CASEDATETIMEEND}."
+            )
+        started = parse_entered_date(case.CASEDATETIMEBEGIN, CASE_TIME_FORMAT)
+        ended = parse_entered_date(now_text, CASE_TIME_FORMAT)
+        if started is not None and ended is not None and ended < started:
+            return False, (
+                f"The case starts at {case.CASEDATETIMEBEGIN}, which is later "
+                f"than the time now on this machine ({now_text}), so the end "
+                "time was not filled in. Check the start time on the Case page."
+            )
+        case.CASEDATETIMEEND = now_text
+    return True, f"The case's end date/time is now {now_text}."
+
+
+def _remind_about_end_time() -> None:
+    """Asks about the case's end time when it has none.
+
+    Every report's header prints when the search began and ended, and a
+    case with no end time printed that line blank. Fill it in from this
+    machine's clock, or carry on without it.
+    """
+    with get_session() as session:
+        case = session.query(Cases).order_by(Cases.Z_PK).first()
+        if case is None or (case.CASEDATETIMEEND or "").strip():
+            return
+        number = case.CASENUMBER
+        begin = case.CASEDATETIMEBEGIN or "at a time not recorded"
+
+    with ui.dialog() as reminder, ui.card().classes("max-w-md p-6"):
+        ui.label("This case has no end date/time yet").classes(
+            "text-lg font-bold text-[var(--vsp-blue)]"
+        )
+        ui.label(
+            f"Case {number} started {begin}. Every report prints the ending "
+            "date and time, and that line stays blank until one is entered."
+        ).classes("text-sm text-[var(--vsp-gray)]")
+
+        with ui.row().classes("w-full justify-end gap-2 mt-4"):
+            ui.button(
+                "Continue without it",
+                on_click=reminder.close,
+                color="transparent",
+            ).props("flat").classes("text-[var(--vsp-blue)]")
+
+            def fill_in_now() -> None:
+                try:
+                    saved, message = fill_case_end_time()
+                except Exception as err:
+                    log.exception("Could not fill in the case's end time")
+                    ui.notify(
+                        f"Could not save the end time.\n\n{explain(err)}",
+                        multi_line=True,
+                        type="negative",
+                        timeout=0,
+                        position="center",
+                        close_button="OK",
+                    )
+                    return
+                reminder.close()
+                ui.notify(
+                    message,
+                    multi_line=True,
+                    type="positive" if saved else "warning",
+                    timeout=4000 if saved else 0,
+                    position="bottom" if saved else "center",
+                    close_button="OK",
+                )
+
+            ui.button(
+                "Fill in with current date/time",
+                icon="schedule",
+                on_click=fill_in_now,
+                color="var(--vsp-blue)",
+            ).props("push").classes("text-[var(--vsp-white)]")
+
+    reminder.open()
+
+
 # ----- Report Page Wrapper -----
 def build_reports_page() -> None:
 
@@ -105,6 +203,8 @@ def build_reports_page() -> None:
         ui.label(
             "V·E·C·T·O·R Reports Page"
         ).classes("text-2xl font-normal text-center")
+
+    _remind_about_end_time()
 
     with ui.column().classes("w-full items-center gap-4"):
         with ui.column().classes("w-full max-w-xs"):

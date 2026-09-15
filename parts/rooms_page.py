@@ -63,6 +63,7 @@ SPEC = CrudSpec(
     # As text, room AA would be listed between A and B.
     sort_key=lambda row: room_label_key(row["ROOMLABEL"]),
     on_update=_carry_rename_to_evidence,
+    live_defaults=("ROOMLABEL",),
     validate=_validate,
     fields=[
         # Assigned automatically: the next unused letter, continuing
@@ -94,7 +95,7 @@ SPEC = CrudSpec(
         Field("ROOMNOTE", "Notes"),
         Field(
             "ENTEREDDATETIME",
-            "Entered (UTC)",
+            "Entered",
             in_form=False,
             in_edit=False,
             default=lambda: get_current_timestamp(format="entry"),

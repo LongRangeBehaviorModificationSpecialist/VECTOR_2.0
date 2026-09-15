@@ -47,8 +47,8 @@ SPEC = CrudSpec(
     fields=[
         Field(
             "NOTEDATETIME",
-            "Date/Time Added (UTC)",
-            table_label="Added (UTC)",
+            "Date/Time Added",
+            table_label="Added",
             readonly=True,
             in_edit=False,
             default=get_current_timestamp,
@@ -64,8 +64,8 @@ SPEC = CrudSpec(
         Field("NOTETEXT", "Note", required=True, props="autofocus"),
         Field(
             "NOTEDATETIMEUPDATED",
-            "Last Edited (UTC)",
-            table_label="Edited (UTC)",
+            "Last Edited",
+            table_label="Edited",
             readonly=True,
             in_form=False,
         ),

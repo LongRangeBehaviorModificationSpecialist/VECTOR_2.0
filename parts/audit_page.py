@@ -15,6 +15,7 @@ import json
 from nicegui import ui
 
 from auth import get_current_user_name, get_is_admin
+import clock
 from models import get_session, AuditLog
 from navbar import build_navbar
 
@@ -124,7 +125,9 @@ def build_audit_page() -> None:
                 rows = [
                     {
                         "id": entry.id,
-                        "ts_utc": entry.ts_utc or "",
+                        # Stored in UTC, as the trail always has been;
+                        # shown in this machine's time zone.
+                        "ts_utc": clock.show_utc(entry.ts_utc),
                         "actor": entry.actor or "",
                         "action": entry.action or "",
                         "table_name": entry.table_name or "",
@@ -151,9 +154,11 @@ def build_audit_page() -> None:
                 columns = [
                     {
                         "name": "ts_utc",
-                        "label": "When (UTC)",
+                        "label": "When",
                         "field": "ts_utc",
-                        "sortable": True,
+                        # Most recent first already; as text the dates
+                        # would sort by month, not by when.
+                        "sortable": False,
                         "align": "left",
                     },
                     {

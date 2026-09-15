@@ -26,6 +26,7 @@ from typing import Callable, Optional
 
 from nicegui import ui
 
+import clock
 from failures import explain, log
 from live import refresh_on_change
 from models import get_session, has_active_case
@@ -57,6 +58,8 @@ class Field:
     table_label: column heading, when it should differ from `label`
     default:     callable producing the value for a fresh form
     new_values:  let a select accept a value that is not in its options
+    now_button:  offer a button that fills the field with this machine's
+                 current date and time
     """
 
     name: str
@@ -73,6 +76,7 @@ class Field:
     table_label: Optional[str] = None
     default: Optional[Callable[[], str]] = None
     new_values: bool = False
+    now_button: bool = False
 
 
 @dataclass
@@ -114,6 +118,16 @@ class CrudSpec:
                     session, the record's values before the edit and the
                     values being written -- for changes that must happen
                     with it, such as renaming a room's evidence
+    on_before_create: hook given the values the add form is about to save,
+                    so a page can settle e.g. the next item number when the
+                    item is saved rather than when the form was opened
+    on_delete:      hook run inside a delete's transaction once the record
+                    has gone, given the session and the removed record's
+                    values; may return a sentence to add to the message
+    delete_note:    gives a sentence for the delete dialog, given the row
+    live_defaults:  add-form fields whose default is worked out again when
+                    another device changes the case, such as the next item
+                    number
     """
 
     model: type
@@ -141,6 +155,10 @@ class CrudSpec:
     allow_delete: bool = True
     sort_key: Optional[Callable[[dict], object]] = None
     on_update: Optional[Callable] = None
+    on_before_create: Optional[Callable[[dict], None]] = None
+    on_delete: Optional[Callable] = None
+    delete_note: Optional[Callable[[dict], str]] = None
+    live_defaults: tuple = ()
 
     def __post_init__(self):
         self.entity_plural = self.entity_plural or f"{self.entity}s"
@@ -204,7 +222,58 @@ def select_value(value):
     return None if value == "" else value
 
 
-def _make_widget(spec_field: Field, value=None):
+def typed_choice(text, options, current, allow_new: bool):
+    """What text typed into a dropdown becomes when the field is left.
+
+    An option matching the text, ignoring case -- or, where new values are
+    allowed, the text itself. None leaves the dropdown as it is.
+    """
+    text = (text or "").strip()
+    if not text or text == str(current or ""):
+        return None
+    choices = list(options.keys()) if isinstance(options, dict) else list(options)
+    for choice in choices:
+        if str(choice).lower() == text.lower():
+            return None if choice == current else choice
+    return text if allow_new else None
+
+
+def _keep_typed_text(select, allow_new: bool) -> None:
+    """Keeps what was typed into a dropdown when the field is left.
+
+    Quasar turns typed text into a value only on Enter. Clicking or tabbing
+    out of the field threw it away, so an agent's name that was not on the
+    roster had to be confirmed with Enter or it was lost.
+    """
+    typed = {"text": ""}
+
+    def remember(event) -> None:
+        typed["text"] = str(event.args or "")
+
+    def forget(_event=None) -> None:
+        # A choice picked from the list replaces whatever was typed.
+        typed["text"] = ""
+
+    def commit(_event=None) -> None:
+        text, typed["text"] = typed["text"], ""
+        choice = typed_choice(text, select.options, select.value, allow_new)
+        if choice is None:
+            return
+        options = select.options
+        present = options.keys() if isinstance(options, dict) else options
+        if choice not in present:
+            if isinstance(options, dict):
+                options = {**options, choice: choice}
+            else:
+                options = [*options, choice]
+        select.set_options(options, value=choice)
+
+    select.on("input-value", remember)
+    select.on_value_change(forget)
+    select.on("blur", commit)
+
+
+def _build_widget(spec_field: Field, value=None):
     """Builds the input for one field."""
     factory_required = {
         "input": required_input,
@@ -256,6 +325,26 @@ def _make_widget(spec_field: Field, value=None):
         widget.props(spec_field.props)
     if spec_field.readonly:
         widget.props("readonly")
+    if spec_field.kind == "select" and not spec_field.readonly:
+        _keep_typed_text(widget, allow_new=spec_field.new_values)
+    return widget
+
+
+def _make_widget(spec_field: Field, value=None):
+    """Builds the input for one field, with its fill button if it has one."""
+    if not spec_field.now_button:
+        return _build_widget(spec_field, value)
+
+    with ui.column().classes("w-full gap-0"):
+        widget = _build_widget(spec_field, value)
+        widget.props(f'hint="Times are this machine\'s: {clock.zone_label()}"')
+        ui.button(
+            "Fill with current date/time",
+            icon="schedule",
+            on_click=lambda: widget.set_value(clock.case_time_now()),
+        ).props("flat dense no-caps").classes(
+            "self-end text-[var(--vsp-blue)]"
+        )
     return widget
 
 
@@ -345,6 +434,9 @@ def build_crud_page(spec: CrudSpec) -> None:
 
         def _submit() -> None:
             values = _values_from(form_widgets)
+
+            if spec.on_before_create:
+                spec.on_before_create(values)
 
             if spec.validate(stage="initial", values=values, row=None):
                 return
@@ -608,6 +700,9 @@ def build_crud_page(spec: CrudSpec) -> None:
                 ui.label(
                     f"Delete {spec.entity} {label}?"
                 ).classes("mb-2")
+                note = spec.delete_note(row) if spec.delete_note else ""
+                if note:
+                    ui.label(note).classes("mb-2 text-sm text-[#F5B027]")
                 ui.label(
                     "The record is removed, but the deletion and its "
                     "contents are kept in the audit trail."
@@ -630,8 +725,21 @@ def build_crud_page(spec: CrudSpec) -> None:
                                     )
                                     .first()
                                 )
+                                follow_up = ""
                                 if record is not None:
+                                    removed = {
+                                        spec_field.name: getattr(
+                                            record, spec_field.name, None
+                                        )
+                                        for spec_field in spec.fields
+                                    }
                                     session.delete(record)
+                                    if spec.on_delete:
+                                        session.flush()
+                                        follow_up = (
+                                            spec.on_delete(session, removed)
+                                            or ""
+                                        )
                         except Exception as err:
                             log.exception("Could not delete a %s", spec.entity)
                             notify_problem(
@@ -642,6 +750,7 @@ def build_crud_page(spec: CrudSpec) -> None:
 
                         notify_done(
                             f"{spec.entity.title()} {label} was deleted."
+                            + (f" {follow_up}" if follow_up else "")
                         )
                         delete_dialog.close()
                         refresh_table()
@@ -737,6 +846,10 @@ def build_crud_page(spec: CrudSpec) -> None:
         # Entries made on another device appear without a reload.
         def _live_refresh() -> None:
             refresh_table()
+            # A number handed out on another device moves the next one on.
+            for name in spec.live_defaults:
+                spec_field = next(f for f in form_fields if f.name == name)
+                form_widgets[name].set_value(spec_field.default())
             if spec.show_delete_all and spec.requires_case:
                 delete_all_button.set_enabled(has_active_case())
 

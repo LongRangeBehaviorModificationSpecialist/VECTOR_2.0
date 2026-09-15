@@ -94,12 +94,13 @@ Everything the original does, plus:
 | **Audit trail** | Every create, edit, delete, wipe, import and sign-in, with field-level before and after |
 | **Evidence integrity** | A SHA-256 taken when each file is uploaded, verified again at export and at import |
 | **Encryption** | Optional SQLCipher encryption of both databases, with tools to convert either way |
-| **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked"; imports that are all or nothing; failures explained in plain words; reports in item-number order; dates checked before they are saved |
+| **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked"; imports that are all or nothing; failures explained in plain words; reports in item-number order; dates checked before they are saved; evidence numbers that close up when an item is removed |
+| **Times** | Stamped in the machine's own time zone, with the offset from UTC; case times fill in from the clock, and Reports asks about a missing end time |
 | **Several devices** | Open pages refresh on their own when another device saves, and the case badge follows; on a phone or a small tablet the page buttons fold into one menu |
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 317 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 342 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -273,6 +274,9 @@ runs once:
 - **Dates.** Case times and dates of birth stored as `YYYY-MM-DD` are
   rewritten as `MM-DD-YYYY`, the format the input masks now use. Each
   change is recorded in the audit trail.
+- **Times.** Note and entry times that earlier versions stamped in UTC
+  are rewritten in this machine's time zone, with the offset. Each change
+  is recorded in the audit trail.
 
 A database from before the renames prints:
 
@@ -365,19 +369,23 @@ All optional, read from the environment:
 Work top to bottom; each step feeds the next.
 
 1. **Case** — press **Start New Case** on the home page, then enter the
-   number, address, jurisdiction and start time (`MM-DD-YYYY HH:MM`).
-   If a case is already open, VECTOR warns before clearing it
+   number, address, jurisdiction and start time (`MM-DD-YYYY HH:MM`), or
+   press **Fill with current date/time**. If a case is already open,
+   VECTOR warns before clearing it
 2. **Agents** — everyone on site. Saved to a roster that
    auto-populates at the next scene
 3. **Rooms** — letter the premises A, B, C…, and assign two agents to
    each, now or later
 4. **Evidence** — item numbers are assigned automatically. Room and
-   agent fields are drawn from steps 2 and 3
+   agent fields are drawn from steps 2 and 3. Delete an item that was not
+   seized after all, and the later items move down one number, so the
+   list never skips
 5. **People** — suspects and others present
 6. **Notes** — timestamped narrative entries
 7. **Files** — photographs and documents, stored in the case database
 8. **Reports** — seven printable layouts, including the basic
-   inventory used as the return copy
+   inventory used as the return copy. If the case has no end time yet,
+   the page offers to fill it in from this machine's clock
 
 The open case's number is shown in the top bar on every page. Until a
 case is open, the other pages refuse new entries and say why.
@@ -453,7 +461,8 @@ Every change to case data is recorded — creations, edits, deletions,
 bulk wipes, imports, and both successful and failed logins. Admins read
 it at **Welcome → Audit Trail**.
 
-Each entry records when (UTC), who, what action, which record, and the
+Each entry records when (kept in UTC, shown in this machine's time
+zone), who, what action, which record, and the
 field-level before and after. Deletions keep the complete row, so a
 mis-click is recoverable from the trail even though the record is gone.
 
@@ -587,9 +596,9 @@ Read these before relying on VECTOR for a case that will be charged.
   second one.
 - **No soft delete.** A deleted record is gone from its table; it is
   recoverable from the audit trail, but by hand.
-- **Case start and end times are typed by the agent** as
-  `MM-DD-YYYY HH:MM`, with no time zone recorded. Everything the
-  application generates itself is UTC and marked.
+- **Case start and end times carry no time zone.** They are typed as
+  `MM-DD-YYYY HH:MM`, or filled in from the clock, in this machine's local
+  time. Everything VECTOR stamps itself carries its offset from UTC.
 - **Network traffic is plain HTTP.** See
   [Access from another device](#access-from-another-device).
 
@@ -663,7 +672,7 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-317 tests, about twelve seconds. They run against a temporary database
+342 tests, about twelve seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -678,6 +687,7 @@ export is round-tripped and compared row for row and byte for byte.
 |------|------:|--------|
 | `test_page_specs.py` | 53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written |
 | `test_order_dates_and_files.py` | 29 | Reports and tables list items and rooms in order; renaming a room moves its evidence; impossible or half-typed dates are refused; attachment contents load only when read, and downloads keep their names |
+| `test_times_and_numbers.py` | 25 | Stamps carry this machine's time zone and offset, and UTC stamps already saved are rewritten once; both case times offer the fill button, and the end-time reminder never fills in a time before the start; typed text in a dropdown is kept; removing an item moves the later numbers down, audited |
 | `test_reports.py` | 25 | All seven reports render, carry the case header, and escape their values |
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
 | `test_json_export.py` | 22 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected; older and upstream layouts import |
@@ -724,6 +734,7 @@ Start VECTOR.command double-click launcher for macOS
 main.py              startup, route table, first-run bootstrap
 auth.py              session state, sign-in throttling, route guards
 models.py            tables, the audit listener, schema upgrades
+clock.py             the machine's clock and time zone, for every stamp
 crypto.py            SQLCipher detection and key handling
 failures.py          plain-language reasons for failures, and the log
 live.py              refreshes open pages when another device saves

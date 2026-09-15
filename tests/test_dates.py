@@ -7,9 +7,11 @@ in exactly that old format.
 """
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 
+import clock
 import models
 import parts.cases_page as cases_page
 from models import AuditLog, Cases, Notes, Persons, get_session
@@ -88,8 +90,11 @@ def test_old_note_times_are_rewritten():
     assert models.normalise_legacy_dates() == 2
     with get_session() as session:
         note = session.query(Notes).one()
-        assert note.NOTEDATETIME == "09-01-2026 07:32:00"
-        assert note.NOTEDATETIMEUPDATED == "09-01-2026 09:10:05"
+        # Stamped in UTC, so they come back in this machine's time zone.
+        assert note.NOTEDATETIME == clock.stamp(
+            datetime(2026, 9, 1, 7, 32, tzinfo=timezone.utc).astimezone())
+        assert note.NOTEDATETIMEUPDATED == clock.stamp(
+            datetime(2026, 9, 1, 9, 10, 5, tzinfo=timezone.utc).astimezone())
 
 
 def test_the_rewrite_happens_once():

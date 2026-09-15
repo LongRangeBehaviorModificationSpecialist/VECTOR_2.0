@@ -9,6 +9,7 @@ Stores files as BLOBs in the SQLite database with download and delete capability
 import hashlib
 from urllib.parse import quote
 
+import clock
 from fastapi import Response
 from nicegui import app, ui
 
@@ -215,8 +216,9 @@ def build_uploads_page() -> None:
                             f"{f.FILESHA256[:12]}…" if f.FILESHA256
                             else "not recorded"
                         ),
+                        # Stored in UTC; shown in this machine's zone.
                         "FILEUPLOADDATE": (
-                            f.FILEUPLOADDATE.strftime("%Y-%m-%d %H:%M:%S")
+                            clock.show_utc(f.FILEUPLOADDATE)
                             if f.FILEUPLOADDATE
                             else ""
                         ),
@@ -288,9 +290,11 @@ def build_uploads_page() -> None:
                     },
                     {
                         "name": "FILEUPLOADDATE",
-                        "label": "Uploaded At (UTC)",
+                        "label": "Uploaded At",
                         "field": "FILEUPLOADDATE",
-                        "sortable": True,
+                        # Newest first already; as text the dates would
+                        # sort by month, not by when.
+                        "sortable": False,
                         "align": "left",
                     },
                     {
