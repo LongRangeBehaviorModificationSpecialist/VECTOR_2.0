@@ -7,8 +7,11 @@ V·E·C·T·O·R —
 Virginia Evidence Collection, Tracking, Organization, & Reporting Program
 
 Usage:
-    python main.py [--dev]
-    Open browser to http://localhost:8080
+    python main.py [--dev] [--lan]
+    Opens a browser at http://localhost:8080
+
+    Or double-click "Start VECTOR.bat" (Windows) or "Start VECTOR.command"
+    (macOS), which set up .venv on first use.
 """
 
 import ast
@@ -406,10 +409,18 @@ def change_password_page():
 # ----- Run -----
 if __name__ in {"__main__", "__mp_main__"}:
 
-    ui.add_head_html(
-        '<link rel="icon" type="image/x-icon" href="/static/favicon.ico">',
-        shared=True,
+    # The browser tab icon, when the unit's branding is in static/.
+    # Without one the browser shows NiceGUI's default icon.
+    _favicon = next(
+        (name for name in ("favicon.ico", "novadc_icac.ico")
+         if (STATIC_DIR / name).is_file()),
+        None,
     )
+    if _favicon:
+        ui.add_head_html(
+            f'<link rel="icon" type="image/x-icon" href="/static/{_favicon}">',
+            shared=True,
+        )
 
     if LAN_MODE:
         print(

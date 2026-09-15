@@ -44,7 +44,7 @@ from models import (
     has_active_case,
     record_audit,
 )
-from navbar import build_navbar
+from navbar import build_navbar, unit_logo
 from program.config import Config
 from utils import delete_all_data
 
@@ -76,9 +76,7 @@ def build_authenticated_home():
 
         # ----- Page Title and Header -----
 
-        ui.image(
-            "/static/novadc_icac.png",
-        ).classes("w-[150px] h-[150px] mb-2")
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-2")
 
         ui.label(
             "V·E·C·T·O·R Home"
@@ -575,9 +573,7 @@ def build_login_home():
 
     with ui.column().classes("items-center w-full mt-12"):
 
-        ui.image(
-            "/static/novadc_icac.png",
-        ).classes("w-[150px] h-[150px] mb-4")
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-4")
 
         ui.label(
             "-- V·E·C·T·O·R --"
@@ -759,6 +755,68 @@ def about_page():
 
 
 # ----- Help Page -----
+# Names in bold are the buttons and menus as they appear on screen. The
+# test suite checks each one still exists, so renaming a button fails a
+# test instead of leaving the help out of date.
+HELP_TEXT = f"""
+#### Working a search
+
+VECTOR holds one case at a time. Work through the pages in this order —
+each one feeds the next.
+
+1. **Start New Case** on the Home page opens the Case page. Enter the case
+   number, location, jurisdiction and start time (`MM-DD-YYYY HH:MM`), then
+   press **Open New Case**. The case number now shows at the top of every
+   page.
+2. **Agents** — everyone on site.
+3. **Rooms** — the next room letter is filled in for you.
+4. **Evidence** — the next item number is filled in for you, and rooms and
+   agents are picked from the lists you made.
+5. **People** — suspects and others present.
+6. **Notes** — timestamped, signed with your account, and listed in the
+   order they were written.
+7. **Files** — photographs and documents. Each file is fingerprinted
+   (SHA-256) when it is added, so a later change to it can be detected.
+8. **Reports** — seven printable lists, including the inventory used as
+   the return copy. If the case is missing a detail a report needs, the
+   page says which.
+
+Until a case is open, the top bar shows **No Active Case** and the other
+pages will not save.
+
+#### Getting the case out
+
+- **Export Case Data** on the Home page downloads the whole case to the
+  device you are using. CSV opens in Excel; JSON is a single file for other
+  systems. Tick the encryption box to protect the file with a password — a
+  forgotten password cannot be recovered.
+- **Import Case Data** replaces the case with a file exported earlier.
+  Choose the .zip or .json file, and tick the encryption box if it was
+  exported with a password.
+- **Delete All Data** empties the case; accounts and the audit trail are
+  kept. **Start New Case** does the same, after a warning, when a case is
+  already open. Neither can be undone, so export first.
+
+#### Accounts
+
+- Sign out from the **Welcome** menu at the top right, with **Logout**.
+- Administrators also see **Admin Panel** there, to add accounts, reset
+  passwords and clear a sign-in lock, and **Audit Trail**, a record of every
+  change. **Shutdown** stops VECTOR for everyone, and works for
+  administrators only.
+- After {LOCK_AFTER_FAILURES} wrong passwords an account is locked for
+  {LOCKOUT_MINUTES} minutes. An administrator can clear the lock sooner.
+- Passwords an administrator issues are shown once. Write them down before
+  closing the message.
+
+#### Other pages
+
+- **Tools** (or **Useful Links** on the Home page) — links to forensic
+  software, DFIR and OSINT resources.
+- **Help** → **About App** — the version, and who wrote VECTOR.
+"""
+
+
 @ui.page("/help")
 def help_page():
     if not is_authenticated():
@@ -778,40 +836,8 @@ def help_page():
                 "Help"
             ).classes("text-2xl font-bold mb-6")
 
-            with ui.card().classes("p-6"):
-
-                ui.markdown("""
-### V·E·C·T·O·R Help Documentation
-
----
-
-This application helps you manage evidence collection,
-tracking, organization, and reporting for law
-enforcement cases.
-
-#### Quick Start
-
-1.&ensp;**Start New Case**&ensp;→&ensp;Begin a fresh case file\n
-2.&ensp;**Add Agent**&ensp;→&ensp;Register agents who will work on cases\n
-3.&ensp;**Add Room**&ensp;→&ensp;Define rooms at search location\n
-4.&ensp;**Add Evidence**&ensp;→&ensp;Record evidence items\n
-5.&ensp;**Add Person**&ensp;→&ensp;Document suspects/witnesses\n
-6.&ensp;**Add Notes**&ensp;→&ensp;Write case notes\n
-7.&ensp;**Add Files**&ensp;→&ensp;Upload files to the case database\n
-
-#### Navigation
-
-Use the top menu to access different sections:\n
-1.&ensp;**Case Info**&ensp;→&ensp;View/edit case details\n
-2.&ensp;**Agents**&ensp;→&ensp;Manage agent roster\n
-3.&ensp;**Rooms**&ensp;→&ensp;Manage defined rooms\n
-4.&ensp;**Evidence**&ensp;→&ensp;Track evidence information\n
-5.&ensp;**People**&ensp;→&ensp;Document persons of interest\n
-6.&ensp;**Notes**&ensp;→&ensp;Write case documentation\n
-7.&ensp;**Files**&ensp;→&ensp;Upload a file to case\n
-8.&ensp;**Reports**&ensp;→&ensp;Print various reports\n
-"""
-                ).classes("text-sm")
+            with ui.card().classes("p-6 w-full"):
+                ui.markdown(HELP_TEXT).classes("text-sm")
 
 
 # ----- Confirm New Case Handler -----

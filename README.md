@@ -97,8 +97,8 @@ Everything the original does, plus:
 | **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked" |
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
-| **Install** | Pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 231 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
+| **Tests** | 255 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -111,6 +111,16 @@ to the original project.
 ---
 
 ## Quick start
+
+With [Python 3.10 or newer](#requirements) installed, double-click the
+launcher in the project folder:
+
+- **Windows** — `Start VECTOR.bat`
+- **macOS** — `Start VECTOR.command`
+
+The first start sets up a `.venv` folder and installs what VECTOR needs,
+which takes a few minutes and an internet connection; after that it
+starts straight away. The same by hand:
 
 **Windows**
 
@@ -191,13 +201,18 @@ Windows, Intel Mac and Apple Silicon.
 
 ### Unit branding (optional)
 
-The header logo and favicon are not distributed with the source. See
-[`static/README.md`](static/README.md) for the two filenames. VECTOR
-runs without them — the images just render as broken.
+The logos and the browser tab icon are not distributed with the
+source. See [`static/README.md`](static/README.md) for the filenames.
+VECTOR runs without them — each page shows just its title.
 
 ---
 
 ## Run
+
+Double-click `Start VECTOR.bat` (Windows) or `Start VECTOR.command`
+(macOS). It sets up `.venv` if it is missing, installs again if
+`requirements.txt` has changed since the last start — after an update,
+say — and then starts VECTOR. From a terminal instead:
 
 **macOS / Linux**
 
@@ -213,7 +228,7 @@ runs without them — the images just render as broken.
 
 Your browser opens at <http://localhost:8080>.
 
-VECTOR runs only while that terminal window is open. Closing it, or
+VECTOR runs only while that window is open. Closing it, or
 pressing `Ctrl+C`, stops the application; nothing is left running in
 the background.
 
@@ -297,6 +312,9 @@ To open it to other devices on the same network, add `--lan`:
 .venv\Scripts\python main.py --lan
 ```
 
+The launchers pass arguments on, so `"Start VECTOR.bat" --lan` or
+`"./Start VECTOR.command" --lan` from a terminal does the same.
+
 Then browse from the other device to `http://<host-ip>:8080`. Find the
 host's address with `ipconfig` on Windows or `ipconfig getifaddr en0`
 on macOS.
@@ -359,6 +377,9 @@ Work top to bottom; each step feeds the next.
 
 The open case's number is shown in the top bar on every page. Until a
 case is open, the other pages refuse new entries and say why.
+
+A one-page version of this, with export and Delete All Data, is under
+**Help → Help** in the top bar.
 
 ### Getting a case out
 
@@ -569,6 +590,23 @@ Read these before relying on VECTOR for a case that will be charged.
 
 ## Troubleshooting
 
+**The launcher says "Python 3.10 or newer is needed"** — install Python
+from [python.org](https://www.python.org/downloads/). On Windows, tick
+**"Add python.exe to PATH"** on the installer's first screen. Then
+double-click the launcher again.
+
+**Windows shows a security warning before `Start VECTOR.bat` runs** —
+this happens when the project came as a downloaded ZIP rather than a
+`git clone`. Choose **Run**, or **More info** then **Run anyway**.
+
+**macOS will not open `Start VECTOR.command`** — right-click it and
+choose **Open**; on recent macOS versions, allow it under **System
+Settings → Privacy & Security** instead. If Terminal says permission is
+denied, run `chmod +x "Start VECTOR.command"` in the project folder once.
+
+**Setup stopped part-way** — usually a dropped connection. Double-click
+the launcher again; it installs whatever is still missing.
+
 **"No module named nicegui"** — the virtual environment is not being
 used. Run the full `.venv/bin/python` or `.venv\Scripts\python` path
 rather than a bare `python`.
@@ -614,7 +652,7 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-231 tests, about twelve seconds. They run against a temporary database
+255 tests, about twelve seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -627,16 +665,17 @@ export is round-tripped and compared row for row and byte for byte.
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `test_page_specs.py` | 48 | Every page field names a real column; required columns are reachable; validators accept what the builder passes |
+| `test_page_specs.py` | 53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written |
 | `test_reports.py` | 25 | All seven reports render, carry the case header, and escape their values |
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
-| `test_json_export.py` | 21 | JSON round trip, embedded attachments, format detection, tampering detected; older and upstream layouts import |
+| `test_json_export.py` | 22 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected; older and upstream layouts import |
 | `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
 | `test_numbering.py` | 17 | Evidence numbering past item 9; room labels past Z |
-| `test_validators.py` | 14 | Every validator reports rather than crashing, and the domain rules hold |
+| `test_validators.py` | 16 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time |
+| `test_export_import.py` | 15 | CSV round trip preserves rows, bytes and provenance, including attachments sharing a name; encrypted archives; tampering detected; older and upstream archives import; download staging is cleared |
 | `test_active_case.py` | 13 | Pages refuse to record without an open case; the Cases page still works; async handlers stay async |
-| `test_export_import.py` | 12 | CSV round trip preserves rows, bytes and provenance; encrypted archives; tampering detected; older and upstream archives import |
-| `test_dates.py` | 11 | Old-format case times and birth dates are rewritten once and audited; nothing else is touched |
+| `test_dates.py` | 12 | Old-format case times, birth dates and note times are rewritten once and audited; nothing else is touched |
+| `test_logo_and_help.py` | 12 | A missing logo is left out rather than shown broken; every button the Help page names exists |
 | `test_migration.py` | 11 | Old-schema databases — old names, old constraints — upgrade without losing a row; backups include the write-ahead log |
 | `test_audit.py` | 9 | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
 | `test_constraints.py` | 8 | The constraints that were removed, and the four that must stay |
@@ -666,6 +705,8 @@ case data.
 ## How the code is laid out
 
 ```
+Start VECTOR.bat     double-click launcher for Windows
+Start VECTOR.command double-click launcher for macOS
 main.py              startup, route table, first-run bootstrap
 auth.py              session state, sign-in throttling, route guards
 models.py            tables, the audit listener, schema upgrades

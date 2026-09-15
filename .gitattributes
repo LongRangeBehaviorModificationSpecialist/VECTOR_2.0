@@ -1,0 +1,5 @@
+# Launchers. Pinned so a checkout on one system still runs on the other:
+# cmd.exe can misread labels in a batch file with LF endings, and bash
+# fails on a .command file with CRLF endings ($'\r': command not found).
+*.bat     text eol=crlf
+*.command text eol=lf
