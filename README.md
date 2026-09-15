@@ -95,11 +95,11 @@ Everything the original does, plus:
 | **Evidence integrity** | A SHA-256 taken when each file is uploaded, verified again at export and at import |
 | **Encryption** | Optional SQLCipher encryption of both databases, with tools to convert either way |
 | **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked"; imports that are all or nothing; failures explained in plain words; reports in item-number order; dates checked before they are saved |
-| **Several devices** | Open pages refresh on their own when another device saves, and the case badge follows |
+| **Several devices** | Open pages refresh on their own when another device saves, and the case badge follows; on a phone or a small tablet the page buttons fold into one menu |
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 304 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 317 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -325,7 +325,8 @@ can work the same case from tablets or laptops at once. The database is
 in WAL mode, so simultaneous entries do not collide, and open pages
 refresh on their own within a couple of seconds when another device
 saves. A page waits while you have a dialog open, so an edit in progress
-is never swept away.
+is never swept away. On a phone or a small tablet the page buttons fold
+into one menu button at the top left, so the bar stays on a single line.
 
 > **Before you use `--lan`, understand what it means.**
 >
@@ -368,7 +369,8 @@ Work top to bottom; each step feeds the next.
    If a case is already open, VECTOR warns before clearing it
 2. **Agents** — everyone on site. Saved to a roster that
    auto-populates at the next scene
-3. **Rooms** — letter the premises A, B, C…, assign two agents to each
+3. **Rooms** — letter the premises A, B, C…, and assign two agents to
+   each, now or later
 4. **Evidence** — item numbers are assigned automatically. Room and
    agent fields are drawn from steps 2 and 3
 5. **People** — suspects and others present
@@ -400,7 +402,8 @@ attachment was collected — so a file that has changed since is flagged
 on the way out, and again on the way back in.
 
 **Import** takes either format: choose the file, and VECTOR works out
-which format it is from the file itself. It replaces everything currently
+which format it is from the file itself — and whether it was exported
+with a password, asking for one only when it was. It replaces everything currently
 loaded. The one thing it will not replace is this machine's audit
 trail: the import is appended to it instead, so the receiving machine
 keeps its own history of what happened here.
@@ -660,7 +663,7 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-304 tests, about twelve seconds. They run against a temporary database
+317 tests, about twelve seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -684,6 +687,7 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_validators.py` | 16 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time |
 | `test_export_import.py` | 15 | CSV round trip preserves rows, bytes and provenance, including attachments sharing a name; encrypted archives; tampering detected; older and upstream archives import; download staging is cleared |
 | `test_active_case.py` | 13 | Pages refuse to record without an open case; the Cases page still works; async handlers stay async |
+| `test_menu_rooms_and_passwords.py` | 13 | The page buttons and the menu share one list, and only administrators are offered Shutdown; a room without agents can be edited and survives a CSV round trip; a dropdown saved blank opens blank; an import knows when a file needs a password |
 | `test_dates.py` | 12 | Old-format case times, birth dates and note times are rewritten once and audited; nothing else is touched |
 | `test_logo_and_help.py` | 12 | A missing logo is left out rather than shown broken; every button the Help page names exists |
 | `test_migration.py` | 11 | Old-schema databases — old names, old constraints — upgrade without losing a row; backups include the write-ahead log |

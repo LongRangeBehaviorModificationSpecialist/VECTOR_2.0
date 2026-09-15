@@ -256,12 +256,18 @@ def serialize_value(value) -> str:
 
 def deserialize_value(value: str, column) -> str:
     """Converts a CSV string back to the appropriate Python type."""
-    from sqlalchemy import Boolean, DateTime, Integer, Float
-
-    if value == "" or value is None:
-        return None
+    from sqlalchemy import Boolean, DateTime, Integer, Float, String
 
     col_type = column.type
+
+    if value == "" or value is None:
+        # A CSV cell cannot tell empty text from no value at all. A required
+        # text column gets its "" back: a room saved without agents holds ""
+        # there, and turning it into None failed the whole import. Anything
+        # else gets None, as before.
+        if not column.nullable and isinstance(col_type, String):
+            return ""
+        return None
 
     if isinstance(col_type, Boolean):
         return value.lower() in ("true", "1", "yes", "t")
@@ -1308,6 +1314,24 @@ def import_vector_from_json(
     print(f"  Tables: {imported}")
     print(f"  Records: {total_records}, files: {files_imported}")
     print(f"{'=' * 60}\n")
+
+
+def needs_password(path) -> bool:
+    """Whether an exported file is sealed with a password.
+
+    Read from the archive itself -- each entry in a ZIP records whether it
+    is encrypted -- so nobody has to remember, or guess, before importing.
+    """
+    candidate = Path(path)
+    if candidate.suffix.lower() != ".zip":
+        return False
+    try:
+        with pyzipper.AESZipFile(candidate, "r") as archive:
+            return any(info.flag_bits & 0x1 for info in archive.infolist())
+    except Exception:
+        # Anything unreadable is left to the importer, which opens it and
+        # says what is wrong with it.
+        return False
 
 
 def looks_like_json_export(path: str) -> bool:

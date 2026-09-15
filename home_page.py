@@ -24,6 +24,7 @@ from import_export import (
     import_vector_from_csv,
     import_vector_from_json,
     looks_like_json_export,
+    needs_password,
     new_staging_dir,
 )
 from auth import (
@@ -338,12 +339,13 @@ def build_authenticated_home():
                         "text-sm text-[var(--vsp-gray)]"
                     )
 
-                    picked = {"path": None, "folder": None}
+                    picked = {"path": None, "folder": None, "locked": False}
 
                     def discard_picked() -> None:
                         if picked["folder"] is not None:
                             shutil.rmtree(picked["folder"], ignore_errors=True)
                         picked["path"] = picked["folder"] = None
+                        picked["locked"] = False
 
                     async def on_file_picked(e) -> None:
                         # Kept under the name it arrived with: the suffix is
@@ -355,6 +357,12 @@ def build_authenticated_home():
                         await e.file.save(target)
                         picked["path"], picked["folder"] = target, folder
                         picked_label.set_text(f"Chosen: {name}")
+                        # Whether it needs a password is read from the file
+                        # itself, so nobody has to remember to say so.
+                        locked = needs_password(target)
+                        picked["locked"] = locked
+                        password_note.set_visibility(locked)
+                        password_input.set_visibility(locked)
                         import_button.enable()
 
                     ui.upload(
@@ -371,19 +379,18 @@ def build_authenticated_home():
                         "No file chosen yet."
                     ).classes("text-sm text-[var(--vsp-gray)]")
 
-                    encrypt_checkbox = ui.checkbox(
-                        "File is encrypted (requires password)"
-                    ).classes("text-sm text-[var(--vsp-gray)]")
+                    password_note = ui.label(
+                        "This file is protected with a password."
+                    ).classes("text-sm text-[#F5B027]")
 
                     password_input = ui.input(
-                        label="ENTER PASSWORD :",
+                        label="ENTER THE FILE'S PASSWORD :",
                         password=True,
                     ).classes("w-full yellow-label text-sm")
 
-                    password_input.bind_visibility_from(
-                        encrypt_checkbox,
-                        "value",
-                    )
+                    # Shown once a file that needs one has been chosen.
+                    password_note.set_visibility(False)
+                    password_input.set_visibility(False)
 
                     def do_import():
                         path = picked["path"]
@@ -397,16 +404,12 @@ def build_authenticated_home():
                             )
                             return
 
-                        pwd = (
-                            password_input.value
-                            if encrypt_checkbox.value
-                            else None
-                        )
+                        pwd = password_input.value if picked["locked"] else None
 
-                        if encrypt_checkbox.value and not pwd:
+                        if picked["locked"] and not pwd:
                             ui.notify(
-                                "Please enter the password to decrypt "
-                                "the file.",
+                                "This file is protected with a password. "
+                                "Enter it to import the file.",
                                 type="warning",
                                 timeout=0,
                                 position="center",
@@ -765,7 +768,8 @@ HELP_TEXT = f"""
 #### Working a search
 
 VECTOR holds one case at a time. Work through the pages in this order —
-each one feeds the next.
+each one feeds the next. On a phone or a small tablet, the pages are under
+the menu button (three lines) at the top left.
 
 1. **Start New Case** on the Home page opens the Case page. Enter the case
    number, location, jurisdiction and start time (`MM-DD-YYYY HH:MM`), then
@@ -794,8 +798,8 @@ pages will not save.
   systems. Tick the encryption box to protect the file with a password — a
   forgotten password cannot be recovered.
 - **Import Case Data** replaces the case with a file exported earlier.
-  Choose the .zip or .json file, and tick the encryption box if it was
-  exported with a password.
+  Choose the .zip or .json file; if it was exported with a password,
+  VECTOR asks for it.
 - **Delete All Data** empties the case; accounts and the audit trail are
   kept. **Start New Case** does the same, after a warning, when a case is
   already open. Neither can be undone, so export first.
@@ -804,9 +808,8 @@ pages will not save.
 
 - Sign out from the **Welcome** menu at the top right, with **Logout**.
 - Administrators also see **Admin Panel** there, to add accounts, reset
-  passwords and clear a sign-in lock, and **Audit Trail**, a record of every
-  change. **Shutdown** stops VECTOR for everyone, and works for
-  administrators only.
+  passwords and clear a sign-in lock; **Audit Trail**, a record of every
+  change; and **Shutdown**, which stops VECTOR for everyone.
 - After {LOCK_AFTER_FAILURES} wrong passwords an account is locked for
   {LOCKOUT_MINUTES} minutes. An administrator can clear the lock sooner.
 - Passwords an administrator issues are shown once. Write them down before
