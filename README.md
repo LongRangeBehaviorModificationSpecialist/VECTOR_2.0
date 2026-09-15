@@ -9,6 +9,125 @@ scene paperwork and exports the case as an encrypted archive.
 
 VECTOR runs on your own machine. Nothing is sent anywhere.
 
+`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `231 tests`
+
+> **About this fork.** VECTOR was created by SSA M. Sponheimer of the
+> Virginia State Police NOVA/DC ICAC
+> ([original repository](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0)).
+> This fork stays in step with that project and adds security
+> hardening, an audit trail, optional database encryption, a test suite
+> and a cross-platform install. See
+> [What this fork adds](#what-this-fork-adds).
+
+---
+
+## Contents
+
+- [What it does](#what-it-does)
+- [What this fork adds](#what-this-fork-adds)
+- [Quick start](#quick-start)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Run](#run)
+- [Access from another device](#access-from-another-device)
+- [Using it](#using-it)
+- [Accounts and sessions](#accounts-and-sessions)
+- [The audit trail](#the-audit-trail)
+- [How data is protected](#how-data-is-protected)
+- [Encrypting the case database](#encrypting-the-case-database)
+- [Known limitations](#known-limitations)
+- [Troubleshooting](#troubleshooting)
+- [Tests](#tests)
+- [Demo data](#demo-data)
+- [How the code is laid out](#how-the-code-is-laid-out)
+- [Development](#development)
+- [Credits](#credits)
+
+---
+
+## What it does
+
+**On scene**
+
+- **Case** — number, address, jurisdiction, and when the search began
+  and ended
+- **Agents** — everyone on site, kept in a roster that pre-fills the
+  next warrant
+- **Rooms** — the premises lettered A, B, C… and on to AA, AB, with two
+  agents assigned to each
+- **Evidence** — numbered automatically, with where it was found, who
+  found it, and a witness who must be someone else
+- **People** — suspects and others present
+- **Notes** — timestamped narrative, attributed to whoever is signed in
+- **Files** — photographs and documents, hashed the moment they arrive
+
+**Afterwards**
+
+- **Seven printable reports**, including the basic inventory left as
+  the return copy
+- **Export** as a ZIP of CSVs, a single JSON file, or both — optionally
+  AES-256 encrypted
+- **Import** either format back, with every attachment checked against
+  the hash taken when it was collected
+
+**Throughout**
+
+- **An append-only audit trail** of every change, sign-in and wipe
+- **Accounts** with one-time passwords, sign-in throttling and sessions
+  an admin can end
+- **Several devices at once** over a local network, when you choose to
+  allow it
+- **Optional encryption** of the case database itself
+
+---
+
+## What this fork adds
+
+Everything the original does, plus:
+
+| Area | Change |
+|------|--------|
+| **Access control** | The admin panel and shutdown require an admin account. Network access is off by default; `--lan` opts in |
+| **Passwords** | A one-time password per account instead of a shared default; throttling and lockout on failed sign-ins; sessions an admin can end |
+| **Audit trail** | Every create, edit, delete, wipe, import and sign-in, with field-level before and after |
+| **Evidence integrity** | A SHA-256 taken when each file is uploaded, verified again at export and at import |
+| **Encryption** | Optional SQLCipher encryption of both databases, with tools to convert either way |
+| **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked" |
+| **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups |
+| **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
+| **Install** | Pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
+| **Tests** | 231 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+
+It also carries the original project's most recent work — JSON export,
+the active-case badge and guard, the capitalised column names and the
+refreshed interface — with fixes made while bringing it across.
+
+---
+
+## Quick start
+
+**Windows**
+
+```
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python main.py
+```
+
+**macOS / Linux**
+
+```
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python main.py
+```
+
+Your browser opens at <http://localhost:8080>, and the console prints a
+one-time administrator password — see [First run](#first-run). To look
+around with a worked example first, load the [demo case](#demo-data).
+
+The sections below cover each step in full.
+
 ---
 
 ## Requirements
@@ -87,6 +206,10 @@ runs without them — the images just render as broken.
 ```
 
 Your browser opens at <http://localhost:8080>.
+
+VECTOR runs only while that terminal window is open. Closing it, or
+pressing `Ctrl+C`, stops the application; nothing is left running in
+the background.
 
 ### First run
 
@@ -213,7 +336,9 @@ All optional, read from the environment:
 
 Work top to bottom; each step feeds the next.
 
-1. **Case** — number, address, jurisdiction, start time
+1. **Case** — press **Start New Case** on the home page, then enter the
+   number, address, jurisdiction and start time (`MM-DD-YYYY HH:MM`).
+   If a case is already open, VECTOR warns before clearing it
 2. **Agents** — everyone on site. Saved to a roster that
    auto-populates at the next scene
 3. **Rooms** — letter the premises A, B, C…, assign two agents to each
@@ -224,6 +349,9 @@ Work top to bottom; each step feeds the next.
 7. **Files** — photographs and documents, stored in the case database
 8. **Reports** — seven printable layouts, including the basic
    inventory used as the return copy
+
+The open case's number is shown in the top bar on every page. Until a
+case is open, the other pages refuse new entries and say why.
 
 ### Getting a case out
 
@@ -329,7 +457,7 @@ passphrase.
 
 - Always tick **Encrypt with password** when exporting.
 - Delete `db/*.bak-*` and `db/*-backup-*` files once a case is verified;
-  they are unencrypted copies.
+  they are copies of the case.
 - Treat the whole `db/` directory as evidence, and wipe the machine's
   disk to policy when the case closes.
 - Full-disk encryption — BitLocker, FileVault — is still worth having.
@@ -419,10 +547,12 @@ Read these before relying on VECTOR for a case that will be charged.
 - **No soft delete.** A deleted record is gone from its table; it is
   recoverable from the audit trail, but by hand.
 - **Case start and end times are typed by the agent** as
-  `MM-DD-YYYY HH:MM`, with no time zone recorded. Everything the application generates itself is
-  UTC and marked.
+  `MM-DD-YYYY HH:MM`, with no time zone recorded. Everything the
+  application generates itself is UTC and marked.
 - **No live refresh.** With several devices connected, a page shows
   another agent's entry only after a reload.
+- **Network traffic is plain HTTP.** See
+  [Access from another device](#access-from-another-device).
 
 ---
 
@@ -439,12 +569,16 @@ another: `VECTOR_PORT=8099 .venv/bin/python main.py`.
 that both devices are on the same network, and that the host firewall
 is allowing Python.
 
+**A page refuses to save with "No active case!"** — open a case first
+with **Start New Case** on the home page.
+
 **A password change did not stick** — if `db/users.json` exists it
 seeds that account at startup only; it no longer overwrites a changed
 password. Delete `db/users.json` once every account is set up.
 
-**Everyone needs to be signed out** — delete `.secret` and restart.
-That regenerates the session key and invalidates every active session.
+**Everyone needs to be signed out** — use *Sign Everyone Out* in the
+Admin Panel. If no admin can sign in, delete `.secret` and restart,
+which regenerates the session key and invalidates every session.
 
 **Never delete `db/*.db-wal` or `db/*.db-shm`.** SQLite runs in
 write-ahead-logging mode, so recent changes may live in the `-wal` file
@@ -465,8 +599,8 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-200 tests, about six seconds. They run against a temporary database and
-never touch `db/`. The encryption tests skip themselves when the
+231 tests, about twelve seconds. They run against a temporary database
+and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
 The suite exists because of a specific failure: a variable rename
@@ -476,19 +610,21 @@ nothing to catch it. Coverage is aimed at that class of bug — each
 report is rendered and asserted to contain the case number, and the
 export is round-tripped and compared row for row and byte for byte.
 
-| File | Covers |
-|------|--------|
-| `test_reports.py` | All seven reports render, carry the case header, and escape their values |
-| `test_export_import.py` | CSV round trip preserves rows, bytes and provenance; encrypted archives; tampering is detected |
-| `test_json_export.py` | JSON round trip, embedded attachments, format detection, tampering is detected |
-| `test_audit.py` | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
-| `test_validators.py` | Every validator reports rather than crashing, and the domain rules hold |
-| `test_numbering.py` | Evidence numbering past item 9; room labels past Z |
-| `test_constraints.py` | The constraints that were removed, and the four that must stay |
-| `test_migration.py` | An old-schema database migrates without losing a row |
-| `test_page_specs.py` | Every page field names a real column; required columns are reachable; validators accept what the builder passes |
-| `test_auth.py` | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
-| `test_crypto.py` | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
+| File | Tests | Covers |
+|------|------:|--------|
+| `test_page_specs.py` | 48 | Every page field names a real column; required columns are reachable; validators accept what the builder passes |
+| `test_reports.py` | 25 | All seven reports render, carry the case header, and escape their values |
+| `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
+| `test_json_export.py` | 21 | JSON round trip, embedded attachments, format detection, tampering detected; older and upstream layouts import |
+| `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
+| `test_numbering.py` | 17 | Evidence numbering past item 9; room labels past Z |
+| `test_validators.py` | 14 | Every validator reports rather than crashing, and the domain rules hold |
+| `test_active_case.py` | 13 | Pages refuse to record without an open case; the Cases page still works; async handlers stay async |
+| `test_export_import.py` | 12 | CSV round trip preserves rows, bytes and provenance; encrypted archives; tampering detected; older and upstream archives import |
+| `test_dates.py` | 11 | Old-format case times and birth dates are rewritten once and audited; nothing else is touched |
+| `test_migration.py` | 11 | Old-schema databases — old names, old constraints — upgrade without losing a row; backups include the write-ahead log |
+| `test_audit.py` | 9 | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
+| `test_constraints.py` | 8 | The constraints that were removed, and the four that must stay |
 
 ---
 
@@ -516,16 +652,19 @@ case data.
 
 ```
 main.py              startup, route table, first-run bootstrap
-auth.py              session state and the require_login / require_admin guards
-models.py            tables, the audit listener, schema migrations
-utils.py             validators and shared helpers
-import_export.py     the encrypted archive
-navbar.py            top navigation
+auth.py              session state, sign-in throttling, route guards
+models.py            tables, the audit listener, schema upgrades
+crypto.py            SQLCipher detection and key handling
+utils.py             validators, the active-case guard, shared helpers
+import_export.py     CSV and JSON export and import
+navbar.py            top navigation and the case badge
 home_page.py         login, main menu, data management
 parts/crud.py        the table-driven builder every entity page uses
 parts/*_page.py      one file per screen
 program/config.py    paths, network and upload settings
 program/inc/         Virginia jurisdictions, agencies, agent roles
+tools/               demo case, database encryption and decryption
+tests/               the test suite
 ```
 
 ### Adding a field to an entity
@@ -564,3 +703,18 @@ anyone at all.
 ```
 
 Reloads on save. Note that a reload re-runs startup each time.
+
+---
+
+## Credits
+
+VECTOR was created by **SSA M. Sponheimer**, Virginia State Police
+NOVA/DC ICAC. The scene workflow — the lettered rooms, the separate
+witness, the return copy as its own report — comes from that original
+design.
+
+The changes in this fork are by
+[Hitman90210](https://github.com/Hitman90210).
+
+No license file has been published for the project. Ask the original
+author before reusing the code elsewhere.
