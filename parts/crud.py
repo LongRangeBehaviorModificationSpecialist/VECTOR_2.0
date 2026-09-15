@@ -107,6 +107,13 @@ class CrudSpec:
                     refuse the extra row as well
     limit_message:  shown on the add form while it is closed
     allow_delete:   whether each row offers a delete button
+    sort_key:       orders the table's rows when the column's own order is
+                    wrong for people -- item 10 after item 9, room AA after
+                    room Z. Given a row dict; applied after order_by
+    on_update:      hook run inside an edit's transaction, given the
+                    session, the record's values before the edit and the
+                    values being written -- for changes that must happen
+                    with it, such as renaming a room's evidence
     """
 
     model: type
@@ -132,6 +139,8 @@ class CrudSpec:
     max_records: int = 0
     limit_message: str = ""
     allow_delete: bool = True
+    sort_key: Optional[Callable[[dict], object]] = None
+    on_update: Optional[Callable] = None
 
     def __post_init__(self):
         self.entity_plural = self.entity_plural or f"{self.entity}s"
@@ -393,6 +402,9 @@ def build_crud_page(spec: CrudSpec) -> None:
                 # Built inside the session, before it closes.
                 rows = [_row_dict(record) for record in records]
 
+            if spec.sort_key:
+                rows.sort(key=spec.sort_key)
+
             _apply_record_limit(len(rows))
 
             # Rows are swapped in place when the table is already showing,
@@ -531,8 +543,14 @@ def build_crud_page(spec: CrudSpec) -> None:
                                     edit_dialog.close()
                                     refresh_table()
                                     return
+                                before = {
+                                    name: getattr(record, name)
+                                    for name in values
+                                }
                                 for name, value in values.items():
                                     setattr(record, name, value)
+                                if spec.on_update:
+                                    spec.on_update(session, before, values)
                         except Exception as err:
                             log.exception("Could not update a %s", spec.entity)
                             notify_problem(

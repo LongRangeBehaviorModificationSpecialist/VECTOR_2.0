@@ -11,6 +11,7 @@ from inspect import iscoroutinefunction
 import json
 from nicegui import ui
 import mimetypes
+import re
 from models import (
     check_case_info,
     get_session,
@@ -359,15 +360,56 @@ def confirm_delete_all(action: str, callback):
     dialog.open()
 
 
+# ----- Order -----
+# Item numbers and room labels are stored as text, and sorted as text the
+# return copy listed items 1, 10, 11, 12, 2 -- and room AA came between A
+# and B.
+def natural_key(value) -> tuple:
+    """Sorts text the way a person reads the numbers in it.
+
+    2 comes before 10, and a hand-entered 12A straight after 12.
+    """
+    parts = re.split(r"(\d+)", str(value or "").strip().lower())
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part)
+        for part in parts
+        if part
+    )
+
+
+evidence_number_key = natural_key
+
+
+def room_label_key(label) -> tuple:
+    """Orders room labels A to Z, then AA, AB -- as they are handed out."""
+    text = str(label or "").strip().upper()
+    if text.isalpha():
+        return (0, len(text), text)
+    return (1, natural_key(text))
+
+
+def room_display(label, description) -> str:
+    """A room as the evidence form shows it, and as evidence records it."""
+    return f"Room {label} ({description})"
+
+
+_ROOM_DISPLAY = re.compile(r"^Room (\S+) \(")
+
+
+def room_display_key(display) -> tuple:
+    """Orders "Room A (Hall)" style names by their room label."""
+    match = _ROOM_DISPLAY.match(str(display or ""))
+    if match:
+        return room_label_key(match.group(1))
+    return (2, natural_key(display))
+
+
 def load_room_labels() -> list[str]:
-    """Returns a list of all room labels from the Rooms table."""
+    """Returns every room as the evidence form shows it, in label order."""
     with get_session() as session:
-        rows = (
-            session.query(Rooms.ROOMLABEL, Rooms.ROOMDESC)
-            .order_by(Rooms.ROOMLABEL)
-            .all()
-        )
-        return [f"Room {r[0]} ({r[1]})" for r in rows]
+        rows = session.query(Rooms.ROOMLABEL, Rooms.ROOMDESC).all()
+    rows.sort(key=lambda row: room_label_key(row[0]))
+    return [room_display(row[0], row[1]) for row in rows]
 
 
 def get_next_evid_num() -> str:
@@ -534,6 +576,34 @@ def value_in_use(session, model, column_name, value, exclude_pk=None) -> bool:
     return session.query(q).scalar()
 
 
+# ----- Real dates -----
+# The input masks only put digits in the right places, so a half-typed or
+# impossible date -- 19-45-2026 25:99 -- was saved and printed as typed.
+CASE_TIME_FORMAT = "%m-%d-%Y %H:%M"
+DATE_FORMAT = "%m-%d-%Y"
+
+
+def parse_entered_date(value, fmt: str) -> Optional[datetime]:
+    """The date typed into a masked field, or None if it is not a real one."""
+    try:
+        parsed = datetime.strptime((value or "").strip(), fmt)
+    except ValueError:
+        return None
+    # A year before 1900 is a slip of the finger, not a date anyone means.
+    return parsed if parsed.year >= 1900 else None
+
+
+def _refuse(message: str) -> bool:
+    ui.notify(
+        message,
+        type="warning",
+        timeout=0,
+        position="center",
+        close_button="OK",
+    )
+    return True
+
+
 def validate_case_entry(
         stage: str,
         CASENUMBER: str,
@@ -541,6 +611,7 @@ def validate_case_entry(
         JURISDICTION: str,
         CASEDATETIMEBEGIN: str,
         row: Optional[dict] = None,
+        CASEDATETIMEEND: str = "",
 ) -> bool:
 
     # One case per database. Every report reads the first case, so a
@@ -577,6 +648,26 @@ def validate_case_entry(
                 type="warning", timeout=0, position="center", close_button="OK",
             )
             return True
+
+    started = parse_entered_date(begin, CASE_TIME_FORMAT)
+    if started is None:
+        return _refuse(
+            "'Date/Time Started' is not a real date and time. Enter it as "
+            "MM-DD-YYYY HH:MM, for example 09-15-2026 07:30."
+        )
+
+    end = (CASEDATETIMEEND or "").strip()
+    if end:
+        ended = parse_entered_date(end, CASE_TIME_FORMAT)
+        if ended is None:
+            return _refuse(
+                "'Date/Time Ended' is not a real date and time. Enter it as "
+                "MM-DD-YYYY HH:MM, or leave it blank."
+            )
+        if ended < started:
+            return _refuse(
+                "'Date/Time Ended' is earlier than 'Date/Time Started'."
+            )
 
     exclude_pk = (
         row["Z_PK"] if (stage == "update" and row is not None) else None
@@ -853,6 +944,7 @@ def validate_person_data(
         PERSONNAME: str = "",
         SUSPECTNOTE: str = "",
         row: Optional[dict] = None,
+        PERSONDOB: str = "",
 ) -> bool:
 
     suspect = (PERSONNAME or "").strip()
@@ -868,6 +960,15 @@ def validate_person_data(
                 type="warning", timeout=0, position="center", close_button="OK",
             )
             return True
+
+    dob = (PERSONDOB or "").strip()
+    if dob:
+        born = parse_entered_date(dob, DATE_FORMAT)
+        if born is None or born > datetime.now():
+            return _refuse(
+                "'DOB' is not a real date of birth. Enter it as MM-DD-YYYY, "
+                "or leave it blank."
+            )
 
     exclude_pk = (
             row["Z_PK"] if (stage == "update" and row is not None) else None

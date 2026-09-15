@@ -41,7 +41,7 @@ def test_case_missing_jurisdiction_is_reported_not_raised():
         CASENUMBER="26-1",
         LOCATION="14 Elm Street",
         JURISDICTION=None,
-        CASEDATETIMEBEGIN="2026-09-10 08:00",
+        CASEDATETIMEBEGIN="09-10-2026 08:00",
     ) is True
 
 
@@ -69,7 +69,7 @@ def test_complete_case_is_accepted():
         CASENUMBER="26-1",
         LOCATION="14 Elm Street",
         JURISDICTION="Fairfax County",
-        CASEDATETIMEBEGIN="2026-09-10 08:00",
+        CASEDATETIMEBEGIN="09-10-2026 08:00",
     ) is False
 
 

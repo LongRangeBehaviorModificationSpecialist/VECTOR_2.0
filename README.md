@@ -92,12 +92,12 @@ Everything the original does, plus:
 | **Audit trail** | Every create, edit, delete, wipe, import and sign-in, with field-level before and after |
 | **Evidence integrity** | A SHA-256 taken when each file is uploaded, verified again at export and at import |
 | **Encryption** | Optional SQLCipher encryption of both databases, with tools to convert either way |
-| **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked"; imports that are all or nothing; failures explained in plain words |
+| **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked"; imports that are all or nothing; failures explained in plain words; reports in item-number order; dates checked before they are saved |
 | **Several devices** | Open pages refresh on their own when another device saves, and the case badge follows |
-| **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups |
+| **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 275 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 304 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -654,7 +654,7 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-275 tests, about twelve seconds. They run against a temporary database
+304 tests, about twelve seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -668,6 +668,7 @@ export is round-tripped and compared row for row and byte for byte.
 | File | Tests | Covers |
 |------|------:|--------|
 | `test_page_specs.py` | 53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written |
+| `test_order_dates_and_files.py` | 29 | Reports and tables list items and rooms in order; renaming a room moves its evidence; impossible or half-typed dates are refused; attachment contents load only when read, and downloads keep their names |
 | `test_reports.py` | 25 | All seven reports render, carry the case header, and escape their values |
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
 | `test_json_export.py` | 22 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected; older and upstream layouts import |
