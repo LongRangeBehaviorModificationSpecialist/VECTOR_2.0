@@ -8,6 +8,7 @@ Dependencies:
 """
 
 import bcrypt
+import clock
 from contextlib import contextmanager
 import secrets
 from datetime import datetime, timezone
@@ -989,11 +990,36 @@ def _month_first(value, pattern):
     return f"{month}-{day}-{year}{time_part}"
 
 
-def normalise_legacy_dates() -> int:
-    """Rewrites YYYY-MM-DD case times, birth dates and note times as MM-DD-YYYY.
+_BARE_STAMP = re.compile(r"^\d{2,4}-\d{2}-\d{2,4} \d{2}:\d{2}:\d{2}$")
+_UTC_STAMP_FORMATS = ("%m-%d-%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S")
 
-    Anything not in exactly the old format is left alone. Returns how
-    many values changed.
+
+def _utc_stamp_to_local(value):
+    """Rewrites a stamp VECTOR wrote in UTC as a local one, with its offset.
+
+    Only a complete stamp with no offset qualifies. One that already
+    carries its offset -- which is what marks it as done -- and anything a
+    person typed are left as they are.
+    """
+    text = value or ""
+    if not _BARE_STAMP.match(text):
+        return value
+    for fmt in _UTC_STAMP_FORMATS:
+        try:
+            moment = datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+        return clock.stamp(clock.from_utc(moment))
+    return value
+
+
+def normalise_legacy_dates() -> int:
+    """Brings stored dates and times into today's formats.
+
+    YYYY-MM-DD case times, birth dates and note times become MM-DD-YYYY,
+    and stamps VECTOR wrote in UTC become local time with their offset.
+    Anything not in exactly an old format is left alone. Returns how many
+    values changed.
     """
     changed = 0
     with get_session() as session:
@@ -1011,18 +1037,29 @@ def normalise_legacy_dates() -> int:
                 person.PERSONDOB = new
                 changed += 1
 
-        # Notes are stamped MM-DD-YYYY HH:MM:SS; older ones were stored the
-        # other way round, and a notes report mixing the two reads wrongly.
+        # Notes and entry times were stamped in UTC, with no offset: notes
+        # as MM-DD-YYYY HH:MM:SS (older ones the other way round), entry
+        # times as YYYY-MM-DD HH:MM:SS. Each is rewritten once in this
+        # machine's time zone, with the offset.
         for note in session.query(Notes).all():
             for column in ("NOTEDATETIME", "NOTEDATETIMEUPDATED"):
                 old = getattr(note, column)
-                new = _month_first(old, _ISO_TIMESTAMP)
+                new = _utc_stamp_to_local(_month_first(old, _ISO_TIMESTAMP))
                 if new != old:
                     setattr(note, column, new)
                     changed += 1
 
+        for model in (Agents, Rooms, Evidence, Persons):
+            for record in session.query(model).all():
+                old = record.ENTEREDDATETIME
+                new = _utc_stamp_to_local(old)
+                if new != old:
+                    record.ENTEREDDATETIME = new
+                    changed += 1
+
     if changed:
-        print(f"Schema migration: {changed} date(s) rewritten as MM-DD-YYYY")
+        print(f"Schema migration: {changed} date(s) and time(s) brought "
+              "up to date")
     return changed
 
 

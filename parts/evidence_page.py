@@ -11,7 +11,7 @@ case does not stop counting correctly at item ten.
 """
 
 from auth import get_current_user_name, get_is_admin
-from models import Evidence
+from models import Evidence, get_session
 from navbar import build_navbar
 from parts.crud import CrudSpec, Field, build_crud_page
 from utils import evidence_number_key
@@ -63,6 +63,81 @@ def _wire_triage_toggle(widgets: dict) -> None:
     triaged.on_value_change(on_triage_change)
 
 
+# ----- Item numbers that never skip -----
+def _plain_number(value) -> int | None:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _later_items(session, removed: int) -> list:
+    """(number, item) for every plainly numbered item above `removed`,
+    lowest first."""
+    later = []
+    for item in session.query(Evidence).all():
+        number = _plain_number(item.EVIDNUM)
+        if number is not None and number > removed:
+            later.append((number, item))
+    return sorted(later, key=lambda pair: pair[0])
+
+
+def _renumber_sentence(numbers: list, done: bool) -> str:
+    if not numbers:
+        return ""
+    first, last = numbers[0], numbers[-1]
+    if len(numbers) == 1:
+        if done:
+            return f"Item {first} is now item {first - 1}."
+        return f"Item {first} will become item {first - 1}, so the numbers do not skip."
+    if done:
+        return (
+            f"The {len(numbers)} later items each moved down one number: "
+            f"{first} is now {first - 1}, and {last} is now {last - 1}."
+        )
+    return (
+        f"The {len(numbers)} later items will each move down one number -- "
+        f"{first} becomes {first - 1} and {last} becomes {last - 1} -- so "
+        "the numbers do not skip."
+    )
+
+
+def _close_the_gap(session, removed: dict) -> str:
+    """Moves every later item down one number, so the list never skips.
+
+    Removing item 4 of 7 -- an item that was not seized after all -- left
+    1, 2, 3, 5, 6, 7. Items 5 to 7 now become 4 to 6, in the same
+    transaction as the deletion, and each change reaches the audit trail.
+    A hand-entered number such as 12A is left as it is.
+    """
+    gone = _plain_number(removed.get("EVIDNUM"))
+    if gone is None:
+        return ""
+    later = _later_items(session, gone)
+    # Lowest first, one at a time: item numbers are unique, so 6 can only
+    # become 5 once 5 has become 4.
+    for number, item in later:
+        item.EVIDNUM = str(number - 1)
+        session.flush()
+    return _renumber_sentence([number for number, _item in later], done=True)
+
+
+def _renumber_warning(row: dict) -> str:
+    """What deleting this item will do to the numbers after it."""
+    gone = _plain_number(row.get("EVIDNUM"))
+    if gone is None:
+        return ""
+    with get_session() as session:
+        numbers = [number for number, _item in _later_items(session, gone)]
+    return _renumber_sentence(numbers, done=False)
+
+
+def _take_next_number(values: dict) -> None:
+    """Settles the item number when the item is saved, not when the form
+    opened: another device may have added or removed an item meanwhile."""
+    values["EVIDNUM"] = get_next_evid_num()
+
+
 SPEC = CrudSpec(
     model=Evidence,
     title="Evidence Management",
@@ -74,6 +149,10 @@ SPEC = CrudSpec(
     order_by="Z_PK",
     # By item number as a person reads it: item 10 after item 9.
     sort_key=lambda row: evidence_number_key(row["EVIDNUM"]),
+    on_before_create=_take_next_number,
+    on_delete=_close_the_gap,
+    delete_note=_renumber_warning,
+    live_defaults=("EVIDNUM",),
     validate=_validate,
     on_form_ready=_wire_triage_toggle,
     form_columns=2,
@@ -132,7 +211,7 @@ SPEC = CrudSpec(
         Field("EVIDNOTE", "Notes"),
         Field(
             "ENTEREDDATETIME",
-            "Entered (UTC)",
+            "Entered",
             in_form=False,
             in_edit=False,
             in_table=False,

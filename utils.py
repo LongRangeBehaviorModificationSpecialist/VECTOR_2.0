@@ -5,7 +5,8 @@ utils.py
 
 File containing various functions used throughout the application.
 """
-from datetime import datetime, timezone
+import clock
+from datetime import datetime
 from functools import wraps
 from inspect import iscoroutinefunction
 import json
@@ -92,21 +93,19 @@ mimetypes.add_type("application/x-xz", ".xz")
 
 
 def get_current_timestamp(format: str = "") -> str:
-    """Gets the current date and time.
+    """The time now on this machine's clock, with its offset from UTC.
 
-    Returns:
-        [str] current UTC date/time formatted as MM-DD-YYYY HH:MM:SS."""
-    if format == "entry":
-        return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    else:
-        return datetime.now(timezone.utc).strftime("%m-%d-%Y %H:%M:%S")
+    Both forms used to be UTC, so a note written at 08:45 at the scene read
+    12:45. `format` is still accepted from older callers; every stamp now
+    has the one form, "09-15-2026 08:45:12 UTC-04:00".
+    """
+    return clock.stamp()
 
 
 def get_print_date_time() -> str:
-    """Returns date and time separately for template compatibility."""
-    now = datetime.now()
-    print_date_time = now.strftime("%Y-%m-%d %H:%M")
-    return print_date_time
+    """When a report is printed, in the date format the rest of it uses."""
+    moment = clock.now()
+    return f"{moment.strftime('%m-%d-%Y %H:%M')} {clock.zone_label(moment)}"
 
 
 def required_input(label: str, **kwargs):

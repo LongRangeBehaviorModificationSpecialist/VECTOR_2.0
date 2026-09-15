@@ -134,7 +134,7 @@ SPEC = CrudSpec(
         Field("AGENTNOTE", "Notes"),
         Field(
             "ENTEREDDATETIME",
-            "Entered (UTC)",
+            "Entered",
             in_form=False,
             in_edit=False,
             default=lambda: get_current_timestamp(format="entry"),

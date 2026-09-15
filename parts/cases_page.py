@@ -71,6 +71,7 @@ SPEC = CrudSpec(
             required=True,
             placeholder="MM-DD-YYYY HH:MM",
             props='mask="##-##-#### ##:##"',
+            now_button=True,
         ),
         Field(
             "CASEDATETIMEEND",
@@ -78,6 +79,7 @@ SPEC = CrudSpec(
             table_label="Ended",
             placeholder="MM-DD-YYYY HH:MM",
             props='mask="##-##-#### ##:##"',
+            now_button=True,
         ),
     ],
 )

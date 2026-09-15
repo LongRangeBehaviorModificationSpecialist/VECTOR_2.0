@@ -772,13 +772,15 @@ each one feeds the next. On a phone or a small tablet, the pages are under
 the menu button (three lines) at the top left.
 
 1. **Start New Case** on the Home page opens the Case page. Enter the case
-   number, location, jurisdiction and start time (`MM-DD-YYYY HH:MM`), then
-   press **Open New Case**. The case number now shows at the top of every
-   page.
+   number, location, jurisdiction and start time (`MM-DD-YYYY HH:MM`) — or
+   press **Fill with current date/time** — then press **Open New Case**.
+   The case number now shows at the top of every page.
 2. **Agents** — everyone on site.
 3. **Rooms** — the next room letter is filled in for you.
 4. **Evidence** — the next item number is filled in for you, and rooms and
-   agents are picked from the lists you made.
+   agents are picked from the lists you made. Delete an item that was not
+   seized after all, and the items after it move down one number, so the
+   list never skips.
 5. **People** — suspects and others present.
 6. **Notes** — timestamped, signed with your account, and listed in the
    order they were written.
@@ -786,10 +788,15 @@ the menu button (three lines) at the top left.
    (SHA-256) when it is added, so a later change to it can be detected.
 8. **Reports** — seven printable lists, including the inventory used as
    the return copy. If the case is missing a detail a report needs, the
-   page says which.
+   page says which, and if it has no end time yet the page offers to fill
+   it in from this machine's clock.
 
 Until a case is open, the top bar shows **No Active Case** and the other
 pages will not save.
+
+Times follow this machine's clock and time zone. The times VECTOR records
+itself — notes, entries, uploads — carry their offset from UTC, such as
+`UTC-04:00`.
 
 #### Getting the case out
 
