@@ -35,7 +35,13 @@ from sqlalchemy import func
 from models import get_session, Agents, Cases, Evidence, Notes, Persons, Rooms
 from navbar import build_navbar, unit_logo
 from auth import is_authenticated, get_current_user_name, get_is_admin
-from utils import get_print_date_time, get_case_info
+from utils import (
+    evidence_number_key,
+    get_case_info,
+    get_print_date_time,
+    room_display_key,
+    room_label_key,
+)
 
 
 # ----- HTML Escaping -----
@@ -48,6 +54,39 @@ def h(value) -> str:
     """
     return escape("" if value is None else str(value))
 
+
+
+# ----- Order -----
+# Item numbers and room labels are text. Ordered by the database, the
+# return copy listed items 1, 10, 11, 12, 2, and room AA came between A
+# and B.
+def evidence_in_order(session) -> list:
+    """Every evidence item, by item number as a person reads it."""
+    return sorted(
+        session.query(Evidence).all(),
+        key=lambda item: evidence_number_key(item.EVIDNUM),
+    )
+
+
+def rooms_in_order(session) -> list:
+    """Every room, A to Z and then AA."""
+    return sorted(
+        session.query(Rooms).all(),
+        key=lambda room: room_label_key(room.ROOMLABEL),
+    )
+
+
+def rooms_with_item_counts(session) -> list[tuple[str, int]]:
+    """Each room evidence was found in, with its item count, in label order."""
+    counts = (
+        session.query(Evidence.EVIDLOCROOM, func.count(Evidence.EVIDLOCROOM))
+        .group_by(Evidence.EVIDLOCROOM)
+        .all()
+    )
+    return sorted(
+        ((room, count) for room, count in counts),
+        key=lambda pair: room_display_key(pair[0]),
+    )
 
 
 # ----- Report Page Wrapper -----
@@ -1113,7 +1152,7 @@ def print_evidence_report():
                 "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY,
                 "EVIDNOTE": e.EVIDNOTE,
             }
-            for e in session.query(Evidence).order_by(Evidence.EVIDNUM).all()
+            for e in evidence_in_order(session)
         ]
 
     html = build_evidence_report_html(
@@ -1135,18 +1174,7 @@ def print_evidence_by_room_report():
     with get_session() as session:
         active_case = get_case_info()
 
-        # Get unique rooms with item counts (matches Flask route query)
-        unique_rooms = (
-            session.query(
-                Evidence.EVIDLOCROOM,
-                func.count(Evidence.EVIDLOCROOM),
-            )
-            .group_by(Evidence.EVIDLOCROOM)
-            .all()
-        )
-
-        # Convert to list of tuples for the template
-        unique_rooms_list = [(r[0], r[1]) for r in unique_rooms]
+        unique_rooms_list = rooms_with_item_counts(session)
 
         evidence = [
             {
@@ -1164,7 +1192,7 @@ def print_evidence_by_room_report():
                 "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY,
                 "EVIDNOTE": e.EVIDNOTE,
             }
-            for e in session.query(Evidence).order_by(Evidence.EVIDNUM).all()
+            for e in evidence_in_order(session)
         ]
 
     html = build_evidence_by_room_report_html(
@@ -1196,7 +1224,7 @@ def print_basic_evidence_report():
                 "EVIDMODELNUMBER": e.EVIDMODELNUMBER,
                 "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER,
             }
-            for e in session.query(Evidence).order_by(Evidence.EVIDNUM).all()
+            for e in evidence_in_order(session)
         ]
 
     html = build_basic_evidence_report_html(
@@ -1225,7 +1253,7 @@ def print_rooms_report():
                 "ROOMSECONDAGENT": r.ROOMSECONDAGENT,
                 "ROOMNOTE": r.ROOMNOTE,
             }
-            for r in session.query(Rooms).order_by(Rooms.ROOMLABEL).all()
+            for r in rooms_in_order(session)
         ]
 
     html = build_rooms_report_html(

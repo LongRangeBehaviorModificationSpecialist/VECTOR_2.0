@@ -21,6 +21,7 @@ def _validate(stage: str, values: dict, row: dict | None) -> bool:
         LOCATION=values.get("LOCATION", ""),
         JURISDICTION=values.get("JURISDICTION", ""),
         CASEDATETIMEBEGIN=values.get("CASEDATETIMEBEGIN", ""),
+        CASEDATETIMEEND=values.get("CASEDATETIMEEND", ""),
         row=row,
     )
 

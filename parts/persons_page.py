@@ -17,6 +17,7 @@ def _validate(stage: str, values: dict, row: dict | None) -> bool:
     return validate_person_data(
         stage=stage,
         PERSONNAME=values.get("PERSONNAME", ""),
+        PERSONDOB=values.get("PERSONDOB", ""),
         SUSPECTNOTE=values.get("SUSPECTNOTE", ""),
         row=row,
     )

@@ -14,6 +14,7 @@ from auth import get_current_user_name, get_is_admin
 from models import Evidence
 from navbar import build_navbar
 from parts.crud import CrudSpec, Field, build_crud_page
+from utils import evidence_number_key
 from utils import (
     get_current_timestamp,
     get_next_evid_num,
@@ -71,6 +72,8 @@ SPEC = CrudSpec(
     table_title="Evidence List",
     submit_label="Add Evidence",
     order_by="Z_PK",
+    # By item number as a person reads it: item 10 after item 9.
+    sort_key=lambda row: evidence_number_key(row["EVIDNUM"]),
     validate=_validate,
     on_form_ready=_wire_triage_toggle,
     form_columns=2,

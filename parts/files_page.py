@@ -7,9 +7,10 @@ Stores files as BLOBs in the SQLite database with download and delete capability
 """
 
 import hashlib
-from nicegui import ui
-import os
-import tempfile
+from urllib.parse import quote
+
+from fastapi import Response
+from nicegui import app, ui
 
 from models import (
     get_session,
@@ -21,7 +22,7 @@ from program.config import Config
 from failures import explain, log
 from live import refresh_on_change
 from navbar import build_navbar
-from auth import get_current_user_name, get_is_admin
+from auth import get_current_user_name, get_is_admin, is_authenticated
 from utils import (
     get_mime_type,
     is_allowed_file,
@@ -29,6 +30,41 @@ from utils import (
     confirm_delete_all,
     require_active_case,
 )
+
+
+# ----- Downloads -----
+def content_disposition(filename: str) -> str:
+    """An attachment header that keeps the file's own name, accents and all."""
+    fallback = "".join(
+        char if 32 <= ord(char) < 127 and char not in '"\\' else "_"
+        for char in filename
+    ) or "attachment"
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename)}"
+
+
+@app.get("/attachments/{file_id}")
+async def download_attachment(file_id: int) -> Response:
+    """Sends one attachment straight from the database to the browser.
+
+    A download used to write the file to the temp folder first and hand
+    the browser that copy, and nothing ever removed it -- an unencrypted
+    copy of the evidence left on disk even when the database itself is
+    encrypted. Signed-in users only, like every page.
+    """
+    if not is_authenticated():
+        return Response(status_code=403)
+
+    with get_session() as session:
+        record = session.get(UploadedFiles, file_id)
+        if record is None:
+            return Response(status_code=404)
+        name = (record.FILENAME or f"file_{record.Z_PK}")
+        name = name.replace("/", "_").replace("\\", "_")
+        return Response(
+            content=record.FILEDATA,
+            media_type=record.FILEMIMETYPE or "application/octet-stream",
+            headers={"Content-Disposition": content_disposition(name)},
+        )
 
 
 # ----- Main Page Builder -----
@@ -296,30 +332,9 @@ def build_uploads_page() -> None:
 
                 # ----- Download handler -----
                 def on_download(e) -> None:
-                    row = e.args
-                    with get_session() as session:
-                        file_record = (
-                            session.query(UploadedFiles)
-                            .filter_by(Z_PK=row["Z_PK"])
-                            .first()
-                        )
-
-                        if file_record:
-                            temp_dir = tempfile.mkdtemp(
-                                prefix="vector_dl_"
-                            )
-                            safe_name = (
-                                file_record.FILENAME
-                                or f"file_{file_record.Z_PK}"
-                            )
-                            safe_name = (
-                                safe_name.replace("/", "_").replace("\\", "_")
-                            )
-                            temp_path = os.path.join(temp_dir, safe_name)
-
-                            with open(temp_path, "wb") as f:
-                                f.write(file_record.FILEDATA)
-                            ui.download(temp_path)
+                    # Served by /attachments above, straight from the
+                    # database, so no copy of the file is written to disk.
+                    ui.download.from_url(f"/attachments/{e.args['Z_PK']}")
 
                 # ----- Delete confirmation dialog -----
                 @require_active_case

@@ -24,7 +24,7 @@ from sqlalchemy import (
     DateTime,
     LargeBinary,
 )
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, deferred, sessionmaker
 from marshmallow import Schema, fields
 
 import crypto
@@ -375,7 +375,11 @@ class UploadedFiles(Base):
     # Not unique: the same photograph may legitimately be attached
     # twice, and enforcing it made SQLite index every byte of every
     # attachment. Duplicate detection belongs on FILESHA256 below.
-    FILEDATA = Column(LargeBinary(), nullable=False)
+    # Deferred: loaded only when the bytes themselves are read. The Files
+    # page lists names and sizes, and it refreshes whenever another device
+    # saves -- loading every attachment each time read the whole case from
+    # disk to show a table of file names.
+    FILEDATA = deferred(Column(LargeBinary(), nullable=False))
     FILENOTE = Column(String())
     # Computed when the file is received, not when it is exported, so
     # the recorded hash certifies the file as collected.
