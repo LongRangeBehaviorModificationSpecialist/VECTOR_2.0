@@ -193,6 +193,17 @@ def options_including(options, value):
     return options if value in options else options + [value]
 
 
+def select_value(value):
+    """The value a dropdown opens with.
+
+    A dropdown left blank is saved as "", which is never one of its
+    options. NiceGUI refuses a value that is not an option, so the edit
+    dialog for any record with a blank dropdown -- a room with no agents
+    yet, an item nobody triaged -- failed to open, with nothing on screen.
+    """
+    return None if value == "" else value
+
+
 def _make_widget(spec_field: Field, value=None):
     """Builds the input for one field."""
     factory_required = {
@@ -205,6 +216,9 @@ def _make_widget(spec_field: Field, value=None):
         "select": ui.select,
         "textarea": ui.textarea,
     }
+
+    if spec_field.kind == "select":
+        value = select_value(value)
 
     kwargs = {}
     if value is not None:

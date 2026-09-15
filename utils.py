@@ -861,7 +861,7 @@ def validate_room_entry(
 
     Rules:
         - Room Label and Room Description: always required
-        - Agents: on initial entry, both or neither; on update, both required
+        - Agents: both or neither, when the room is added and when edited
         - The same agent may not occupy both agent fields
         - Room label must be unique (excluding the row being updated)
     """
@@ -882,33 +882,20 @@ def validate_room_entry(
             )
             return True
 
-    if stage == "update":
-        # Both agents are mandatory on update
-        for field_label, value in [
-            ("First Agent Name", first),
-            ("Second Agent Name", second),
-        ]:
-            if not value:
-                ui.notify(
-                    f"The '{field_label}' field is required.",
-                    type="warning",
-                    timeout=0,
-                    position="center",
-                    close_button="OK",
-                )
-                return True
-    else:
-        # On initial entry: both or neither
-        if bool(first) != bool(second):
-            ui.notify(
-                "Agents must be entered as a pair: fill both 'First Agent "
-                "Name' and 'Second Agent Name', or leave both blank.",
-                type="warning",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
-            return True
+    # Both agents or neither, whether the room is new or being edited. A
+    # room can be recorded before anyone is assigned to it, and demanding
+    # both agents on an edit meant a room saved without them could not have
+    # so much as its description corrected.
+    if bool(first) != bool(second):
+        ui.notify(
+            "Agents must be entered as a pair: fill both 'First Agent "
+            "Name' and 'Second Agent Name', or leave both blank.",
+            type="warning",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        return True
 
     # ----- Same agent checks -----
     if first and first == second:
