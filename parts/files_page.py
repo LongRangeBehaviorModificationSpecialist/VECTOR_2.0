@@ -18,6 +18,8 @@ from models import (
     audit_timestamp,
 )
 from program.config import Config
+from failures import explain, log
+from live import refresh_on_change
 from navbar import build_navbar
 from auth import get_current_user_name, get_is_admin
 from utils import (
@@ -123,16 +125,16 @@ def build_uploads_page() -> None:
                     refresh_files_table()
 
                 except Exception as err:
+                    name = getattr(e.file, "name", "") or "the file"
+                    log.exception("Could not upload %s", name)
                     ui.notify(
-                        f"Error uploading file → {str(err)}",
+                        f"Could not upload {name}.\n\n{explain(err)}",
                         multi_line=True,
                         type="negative",
                         timeout=0,
                         position="center",
                         close_button="OK",
                     )
-                    import traceback
-                    traceback.print_exc()
 
             ui.upload(
                 on_upload=handle_upload,
@@ -153,10 +155,10 @@ def build_uploads_page() -> None:
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2")
 
+        shown = {"table": None}
+
         def refresh_files_table() -> None:
             """Re-renders the files table from the database."""
-
-            table_container.clear()
 
             with get_session() as session:
                 files = (
@@ -164,13 +166,6 @@ def build_uploads_page() -> None:
                     .order_by(UploadedFiles.FILEUPLOADDATE.desc())
                     .all()
                 )
-                if not files:
-                    with table_container:
-                        ui.label(
-                            "No files have been uploaded"
-                        ).classes("text-red italic")
-                    return
-
                 row_data = [
                     {
                         "Z_PK": f.Z_PK,
@@ -192,6 +187,24 @@ def build_uploads_page() -> None:
                     }
                     for f in files
                 ]
+
+            # Rows are swapped in place when the table is already showing,
+            # so a refresh keeps the sort order the user picked.
+            table = shown["table"]
+            if row_data and table is not None and not table.is_deleted:
+                table.rows = row_data
+                table.update()
+                return
+
+            table_container.clear()
+            shown["table"] = None
+
+            if not row_data:
+                with table_container:
+                    ui.label(
+                        "No files have been uploaded"
+                    ).classes("text-red italic")
+                return
 
             with table_container:
                 column_defs = [
@@ -260,6 +273,7 @@ def build_uploads_page() -> None:
                 )
 
                 table.props("dense flat")
+                shown["table"] = table
 
                 table.add_slot(
                     "body-cell-actions",
@@ -345,14 +359,30 @@ def build_uploads_page() -> None:
                             ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_confirm_delete() -> None:
-                                with get_session() as session:
-                                    file_record = (
-                                        session.query(UploadedFiles)
-                                        .filter_by(Z_PK=row["Z_PK"])
-                                        .first()
+                                try:
+                                    with get_session() as session:
+                                        file_record = (
+                                            session.query(UploadedFiles)
+                                            .filter_by(Z_PK=row["Z_PK"])
+                                            .first()
+                                        )
+                                        if file_record:
+                                            session.delete(file_record)
+                                except Exception as err:
+                                    log.exception(
+                                        "Could not delete %s", row["FILENAME"]
                                     )
-                                    if file_record:
-                                        session.delete(file_record)
+                                    ui.notify(
+                                        f"Could not delete {row['FILENAME']}."
+                                        f"\n\n{explain(err)}",
+                                        multi_line=True,
+                                        type="negative",
+                                        timeout=0,
+                                        position="center",
+                                        close_button="OK",
+                                    )
+                                    delete_dialog.close()
+                                    return
 
                                 ui.notify(
                                     f"File: {row['FILENAME']} has been "
@@ -381,15 +411,27 @@ def build_uploads_page() -> None:
         with ui.row().classes("w-full justify-center my-2"):
 
             def delete_all_files() -> None:
-                with get_session() as session:
-                    # One at a time, so each removal reaches the audit
-                    # trail. A bulk delete raises no ORM events, and the
-                    # files vanished without a record.
-                    for file_record in session.query(UploadedFiles).all():
-                        session.delete(file_record)
+                try:
+                    with get_session() as session:
+                        # One at a time, so each removal reaches the audit
+                        # trail. A bulk delete raises no ORM events, and the
+                        # files vanished without a record.
+                        for file_record in session.query(UploadedFiles).all():
+                            session.delete(file_record)
+                except Exception as err:
+                    log.exception("Could not delete every file")
+                    ui.notify(
+                        f"Nothing was deleted.\n\n{explain(err)}",
+                        multi_line=True,
+                        type="negative",
+                        timeout=0,
+                        position="center",
+                        close_button="OK",
+                    )
+                    return
 
                 ui.notify(
-                    "All Files has been deleted.",
+                    "All files have been deleted.",
                     timeout=4000,
                     position="bottom",
                     close_button="OK",
@@ -409,3 +451,10 @@ def build_uploads_page() -> None:
 
     # ----- Initial render -----
     refresh_files_table()
+
+    # Files added or removed on another device appear without a reload.
+    def live_refresh() -> None:
+        refresh_files_table()
+        delete_all_button.set_enabled(has_active_case())
+
+    refresh_on_change(live_refresh)

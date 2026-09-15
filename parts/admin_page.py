@@ -329,7 +329,7 @@ def build_admin_page():
 
                                         # A reset that leaves the old
                                         # session working is not a reset.
-                                        invalidate_user_sessions(
+                                        ended = invalidate_user_sessions(
                                             row["USERNAME"]
                                         )
                                         clear_login_failures(row["USERNAME"])
@@ -340,8 +340,15 @@ def build_admin_page():
                                             f"One-time password:  "
                                             f"{one_time}\n\n"
                                             "Shown once, and cannot be "
-                                            "recovered. Any session they "
-                                            "had open has been ended.",
+                                            "recovered. "
+                                            + (
+                                                "Any session they had open "
+                                                "has been ended."
+                                                if ended else
+                                                "Their open sessions could "
+                                                "NOT be ended; use Sign "
+                                                "Everyone Out below."
+                                            ),
                                             multi_line=True,
                                             type="warning",
                                             timeout=0,
@@ -440,15 +447,21 @@ def build_admin_page():
                                         # Otherwise the deleted account
                                         # keeps working until its browser
                                         # is closed.
-                                        invalidate_user_sessions(
+                                        ended = invalidate_user_sessions(
                                             row["USERNAME"]
                                         )
                                         clear_login_failures(row["USERNAME"])
 
                                         ui.notify(
                                             f"User \"{row['USERNAME']}\" "
-                                            "deleted.",
-                                            timeout=4000,
+                                            "deleted."
+                                            + (
+                                                "" if ended else
+                                                " Their open sessions could "
+                                                "NOT be ended; use Sign "
+                                                "Everyone Out below."
+                                            ),
+                                            timeout=4000 if ended else 0,
                                             position="bottom",
                                             close_button="OK",
                                         )
@@ -521,7 +534,18 @@ def build_admin_page():
                             if not get_is_admin():
                                 ui.navigate.to("/")
                                 return
-                            invalidate_all_sessions()
+                            if not invalidate_all_sessions():
+                                ui.notify(
+                                    "The sessions could NOT be ended. The "
+                                    "details are in the VECTOR console "
+                                    "window.",
+                                    type="negative",
+                                    timeout=0,
+                                    position="center",
+                                    close_button="OK",
+                                )
+                                dialog.close()
+                                return
                             dialog.close()
                             ui.navigate.to("/")
 

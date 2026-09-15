@@ -18,6 +18,7 @@ import shutil
 import tempfile
 from typing import Optional
 
+from failures import explain, log
 from models import (
     LEGACY_COLUMN_NAMES,
     LEGACY_TABLE_NAMES,
@@ -105,6 +106,30 @@ def canonical_file_entry(entry: dict) -> dict:
         _FILE_ENTRY_ALIASES.get(key, key): value
         for key, value in entry.items()
     }
+
+
+def _report_failure(message: str, err: BaseException) -> None:
+    """Explains a failed export or import on screen, and logs the detail."""
+    log.error("%s", message, exc_info=err)
+    ui.notify(
+        f"{message}\n\n{explain(err)}",
+        multi_line=True,
+        type="negative",
+        timeout=0,
+        position="center",
+        close_button="OK",
+    )
+
+
+def _clear_case_tables(session) -> None:
+    """Empties every case table, inside the import's own transaction.
+
+    An import replaces the whole case. Clearing only the tables an export
+    happened to contain kept whatever it lacked -- the previous case's
+    attachments, for one, when the archive had none.
+    """
+    for model_class in get_all_models().values():
+        session.query(model_class).delete()
 
 
 # ----- Staging -----
@@ -297,13 +322,7 @@ def export_vector_to_csv(
         export_dir.mkdir(parents=True, exist_ok=True)
         files_dir.mkdir(parents=True, exist_ok=True)
     except OSError as err:
-        ui.notify(
-            f"Error creating export directory → {err}",
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
+        _report_failure("Could not start the export. Nothing was downloaded.", err)
         shutil.rmtree(work_dir, ignore_errors=True)
         return None
 
@@ -336,12 +355,10 @@ def export_vector_to_csv(
                 exported_tables[table_name] = count
 
         except Exception as err:
-            ui.notify(
-                f"Error exporting {table_name} → {err}",
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
+            _report_failure(
+                f"The export stopped while reading {table_name}. "
+                "Nothing was downloaded.",
+                err,
             )
             shutil.rmtree(work_dir, ignore_errors=True)
             return None
@@ -399,13 +416,15 @@ def export_vector_to_csv(
                     num_files += 1
 
     except Exception as err:
-        ui.notify(
-            f"Error exporting files → {err}",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
+        # Carrying on would hand over an export without its attachments,
+        # under a message saying it was complete.
+        _report_failure(
+            "The export stopped while copying the attachments. Nothing "
+            "was downloaded.",
+            err,
         )
+        shutil.rmtree(work_dir, ignore_errors=True)
+        return None
 
     # ----- Write a manifest file -----
     manifest = {
@@ -471,13 +490,7 @@ def export_vector_to_csv(
                         zf.write(file_path, arcname)
 
     except Exception as err:
-        ui.notify(
-            f"Error creating zip file → {err}",
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
+        _report_failure("Could not create the ZIP file. Nothing was downloaded.", err)
         shutil.rmtree(work_dir, ignore_errors=True)
         return None
 
@@ -585,12 +598,10 @@ def import_vector_from_csv(
                 return
 
     except Exception as err:
-        ui.notify(
-            f"Error extracting ZIP → {err}",
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
+        _report_failure(
+            "Could not open that file. Nothing was imported, and the case "
+            "is unchanged.",
+            err,
         )
         shutil.rmtree(temp_dir, ignore_errors=True)
         return
@@ -644,62 +655,16 @@ def import_vector_from_csv(
         shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
-    # ----- Import each table -----
-    imported_tables = []
-    total_records = 0
-
-    for table_name, model_class, csv_path in found_tables:
-        columns = get_column_names(model_class)
-        column_objects = (
-            {col.name: col for col in model_class.__table__.columns}
-        )
-
-        try:
-            with get_session() as session:
-                # ----- Clear existing data -----
-                session.query(model_class).delete()
-
-                with open(csv_path, "r", newline="", encoding="utf-8") as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        row = canonical_row(table_name, row)
-                        record_data = {}
-                        for col_name in columns:
-                            if col_name in row:
-                                raw_value = row[col_name]
-                                if raw_value == "[BINARY_DATA]":
-                                    continue  # Skip binary columns
-                                record_data[col_name] = deserialize_value(
-                                    raw_value,
-                                    column_objects[col_name],
-                                )
-                        # Preserve original IDs for relational integrity
-                        # (don't delete the id field — keep it)
-                        new_record = model_class(**record_data)
-                        session.add(new_record)
-
-            # Count imported records
-            with get_session() as session:
-                count = session.query(model_class).count()
-
-            imported_tables.append(f"{table_name} ({count})")
-            total_records += count
-
-        except Exception as err:
-            ui.notify(
-                f"Error importing {table_name} → {err}",
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            return
-
-    # ----- Import files -----
+    # ----- Replace the case, all or nothing -----
+    # Every table, the attachments and the audit record go in one
+    # transaction. Each table used to be replaced in a transaction of its
+    # own, so a failure part-way left a case that was half the old one and
+    # half the new, under a message naming only the table that failed.
     from models import UploadedFiles
 
     files_dir = import_dir / "files"
+    imported_tables = []
+    total_records = 0
     files_imported = 0
 
     # The manifest records a SHA-256 per file. Verify against it rather
@@ -718,10 +683,47 @@ def import_vector_from_csv(
                 manifest_files[archive_name] = entry
     hash_mismatches = []
     unlisted_files = []
+    stage = "the case"
 
-    if files_dir.exists():
-        try:
-            with get_session() as session:
+    try:
+        with get_session() as session:
+            _clear_case_tables(session)
+
+            for table_name, model_class, csv_path in found_tables:
+                stage = table_name
+                columns = get_column_names(model_class)
+                column_objects = (
+                    {col.name: col for col in model_class.__table__.columns}
+                )
+                count = 0
+
+                with open(csv_path, "r", newline="", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        row = canonical_row(table_name, row)
+                        record_data = {}
+                        for col_name in columns:
+                            if col_name in row:
+                                raw_value = row[col_name]
+                                if raw_value == "[BINARY_DATA]":
+                                    continue  # Skip binary columns
+                                record_data[col_name] = deserialize_value(
+                                    raw_value,
+                                    column_objects[col_name],
+                                )
+                        # Preserve original IDs for relational integrity
+                        # (don't delete the id field — keep it)
+                        session.add(model_class(**record_data))
+                        count += 1
+
+                # Flushed table by table, so a bad row is reported against
+                # the table it is in.
+                session.flush()
+                imported_tables.append(f"{table_name} ({count})")
+                total_records += count
+
+            stage = "the attachments"
+            if files_dir.exists():
                 session.query(UploadedFiles).delete()
                 for file_path in sorted(files_dir.iterdir()):
                     if not file_path.is_file():
@@ -757,28 +759,30 @@ def import_vector_from_csv(
                     )
                     session.add(new_file)
                     files_imported += 1
+                session.flush()
 
-                record_audit(
-                    session,
-                    action="IMPORT",
-                    table_name="(all case tables)",
-                    summary=f"{total_records} rows, {files_imported} files",
-                    after={
-                        "source": str(zip_file),
-                        "exported": manifest.get("export_date", "unknown"),
-                        "hash_mismatches": hash_mismatches,
-                        "files_not_in_manifest": unlisted_files,
-                    },
-                )
-
-        except Exception as err:
-            ui.notify(
-                f"Error importing files → {err}",
-                type="warning",
-                timeout=0,
-                position="center",
-                close_button="OK",
+            stage = "the audit record"
+            record_audit(
+                session,
+                action="IMPORT",
+                table_name="(all case tables)",
+                summary=f"{total_records} rows, {files_imported} files",
+                after={
+                    "source": str(zip_file),
+                    "exported": manifest.get("export_date", "unknown"),
+                    "hash_mismatches": hash_mismatches,
+                    "files_not_in_manifest": unlisted_files,
+                },
             )
+
+    except Exception as err:
+        _report_failure(
+            "Nothing was imported, and the case is unchanged. The problem "
+            f"was in {stage}.",
+            err,
+        )
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return
 
     if hash_mismatches or unlisted_files:
         problems = []
@@ -941,12 +945,10 @@ def export_vector_to_json(
                     for record in session.query(model_class).all()
                 ]
         except Exception as err:
-            ui.notify(
-                f"Error exporting {table_name} - {err}",
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
+            _report_failure(
+                f"The export stopped while reading {table_name}. "
+                "Nothing was downloaded.",
+                err,
             )
             return None
 
@@ -990,13 +992,14 @@ def export_vector_to_json(
                     }
                 )
     except Exception as err:
-        ui.notify(
-            f"Error embedding attachments - {err}",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
+        # Carrying on would hand over an export without its attachments,
+        # under a message saying it was complete.
+        _report_failure(
+            "The export stopped while adding the attachments. Nothing "
+            "was downloaded.",
+            err,
         )
+        return None
 
     file_records = payload["files"]["records"]
     payload["files"]["record_count"] = len(file_records)
@@ -1047,13 +1050,7 @@ def export_vector_to_json(
             shutil.copy2(staged_json, final_path)
 
     except Exception as err:
-        ui.notify(
-            f"Error writing the JSON export - {err}",
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
+        _report_failure("Could not write the JSON export. Nothing was downloaded.", err)
         return None
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -1166,28 +1163,43 @@ def import_vector_from_json(
         )
         return
 
+    import base64
+
     models_by_name = get_all_models()
     imported = []
     total_records = 0
-    table_name = ""
+    hash_mismatches = []
+    files_imported = 0
+    stage = "the case"
 
+    # A 1.0 export held a bare list. Upstream's layout, and 1.1, wrap it
+    # as {"record_count": n, "records": [...]}.
+    file_entries = payload.get("files", [])
+    if isinstance(file_entries, dict):
+        file_entries = file_entries.get("records", [])
+
+    # ----- Replace the case, all or nothing -----
+    # One transaction, as in the CSV import, so a failure leaves the case
+    # exactly as it was.
     try:
-        for raw_name, table_data in payload["tables"].items():
-            table_name = canonical_table_name(raw_name)
-            model_class = models_by_name.get(table_name)
-            if model_class is None:
-                # The audit trail is exported but never restored over
-                # the local one; anything else unknown is skipped.
-                continue
+        with get_session() as session:
+            _clear_case_tables(session)
 
-            column_objects = {
-                column.name: column
-                for column in model_class.__table__.columns
-            }
+            for raw_name, table_data in payload["tables"].items():
+                table_name = canonical_table_name(raw_name)
+                model_class = models_by_name.get(table_name)
+                if model_class is None:
+                    # The audit trail is exported but never restored over
+                    # the local one; anything else unknown is skipped.
+                    continue
+                stage = table_name
 
-            with get_session() as session:
-                session.query(model_class).delete()
-                for row in table_data.get("records", []):
+                column_objects = {
+                    column.name: column
+                    for column in model_class.__table__.columns
+                }
+                records = table_data.get("records", [])
+                for row in records:
                     values = {
                         name: _json_to_value(value, column_objects[name])
                         for name, value in canonical_row(
@@ -1197,37 +1209,13 @@ def import_vector_from_json(
                     }
                     session.add(model_class(**values))
 
-            with get_session() as session:
-                count = session.query(model_class).count()
-            imported.append(f"{table_name} ({count})")
-            total_records += count
+                # Flushed table by table, so a bad row is reported against
+                # the table it is in.
+                session.flush()
+                imported.append(f"{table_name} ({len(records)})")
+                total_records += len(records)
 
-    except Exception as err:
-        if staging:
-            shutil.rmtree(staging, ignore_errors=True)
-        ui.notify(
-            f"Error importing {table_name} - {err}",
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return
-
-    # ----- Attachments -----
-    import base64
-
-    hash_mismatches = []
-    files_imported = 0
-
-    # A 1.0 export held a bare list. Upstream's layout, and 1.1, wrap it
-    # as {"record_count": n, "records": [...]}.
-    file_entries = payload.get("files", [])
-    if isinstance(file_entries, dict):
-        file_entries = file_entries.get("records", [])
-
-    try:
-        with get_session() as session:
+            stage = "the attachments"
             session.query(UploadedFiles).delete()
             for raw_entry in file_entries:
                 entry = canonical_file_entry(raw_entry)
@@ -1257,7 +1245,9 @@ def import_vector_from_json(
                     )
                 )
                 files_imported += 1
+            session.flush()
 
+            stage = "the audit record"
             record_audit(
                 session,
                 action="IMPORT",
@@ -1274,14 +1264,16 @@ def import_vector_from_json(
                     "hash_mismatches": hash_mismatches,
                 },
             )
+
     except Exception as err:
-        ui.notify(
-            f"Error importing attachments - {err}",
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
+        if staging:
+            shutil.rmtree(staging, ignore_errors=True)
+        _report_failure(
+            "Nothing was imported, and the case is unchanged. The problem "
+            f"was in {stage}.",
+            err,
         )
+        return
 
     normalise_legacy_dates()
 
@@ -1340,6 +1332,8 @@ def looks_like_json_export(path: str) -> bool:
         with pyzipper.AESZipFile(candidate, "r") as archive:
             names = [name.lower() for name in archive.namelist()]
     except Exception:
+        # Anything unreadable is not a JSON export. The CSV importer then
+        # opens it, and says what is wrong with it.
         return False
 
     has_json = any(name.endswith(".json") for name in names)

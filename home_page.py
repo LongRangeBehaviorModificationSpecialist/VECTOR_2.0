@@ -17,6 +17,7 @@ import shutil
 import time
 from pathlib import Path
 
+from failures import explain, log
 from import_export import (
     export_vector_to_csv,
     export_vector_to_json,
@@ -515,9 +516,11 @@ def build_authenticated_home():
                         try:
                             delete_all_data()
                         except Exception as err:
+                            log.exception("Delete All Data failed")
                             ui.notify(
-                                f"Nothing was deleted — the database was "
-                                f"rolled back. → {err}",
+                                "Nothing was deleted, and the case is "
+                                f"unchanged.\n\n{explain(err)}",
+                                multi_line=True,
                                 type="negative",
                                 timeout=0,
                                 position="center",
@@ -882,9 +885,11 @@ def confirm_new_case_handler() -> None:
                 try:
                     delete_all_data()
                 except Exception as err:
+                    log.exception("Start New Case could not clear the case")
                     ui.notify(
-                        f"Nothing was deleted — the database was rolled "
-                        f"back. → {err}",
+                        "Nothing was deleted, and the case is unchanged."
+                        f"\n\n{explain(err)}",
+                        multi_line=True,
                         type="negative",
                         timeout=0,
                         position="center",

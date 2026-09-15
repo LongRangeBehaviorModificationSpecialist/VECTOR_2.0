@@ -16,6 +16,7 @@ the same question.
 from nicegui import ui
 
 from auth import is_authenticated
+from live import refresh_on_change
 from models import check_case_info
 from program.config import STATIC_DIR
 
@@ -155,17 +156,24 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
         ui.space()
 
         if is_authenticated():
-            case_info = check_case_info()
-            if case_info:
-                ui.badge(
-                    f"Case No.: {case_info['CASENUMBER']}",
-                    color="positive",
-                ).classes("py-3 px-5")
-            else:
-                ui.badge(
-                    "No Active Case",
-                    color="#ef4444",
-                ).classes("py-3 px-5")
+
+            @ui.refreshable
+            def case_badge() -> None:
+                case_info = check_case_info()
+                if case_info:
+                    ui.badge(
+                        f"Case No.: {case_info['CASENUMBER']}",
+                        color="positive",
+                    ).classes("py-3 px-5")
+                else:
+                    ui.badge(
+                        "No Active Case",
+                        color="#ef4444",
+                    ).classes("py-3 px-5")
+
+            case_badge()
+            # Follows a case opened or cleared on another device.
+            refresh_on_change(case_badge.refresh)
 
         # ----- Spacer -----
         ui.space()
