@@ -125,6 +125,9 @@ runs once:
   blocked ordinary scenes — a second agent with no email address, a
   house with two bedrooms, the same photograph attached twice — is
   rebuilt without it.
+- **Dates.** Case times and dates of birth stored as `YYYY-MM-DD` are
+  rewritten as `MM-DD-YYYY`, the format the input masks now use. Each
+  change is recorded in the audit trail.
 
 A database from before the renames prints:
 
@@ -224,13 +227,13 @@ Work top to bottom; each step feeds the next.
 
 ### Getting a case out
 
-**Export** offers two formats, both saved to your Desktop and both
-optionally sealed with an AES-256 password:
+**Export** offers two formats — or **Both** at once — saved to your
+Desktop and optionally sealed with an AES-256 password:
 
 | Format | What it is | Use it for |
 |--------|-----------|------------|
-| **ZIP of CSVs** | One CSV per table, attachments as files, plus a SHA-256 manifest | Opening in Excel, or reading the case without VECTOR |
-| **Single JSON** | One self-contained file, attachments embedded as base64 | Handing the case to another tool or system |
+| **CSV** | A ZIP with one CSV per table, attachments as files, plus a SHA-256 manifest | Opening in Excel, or reading the case without VECTOR |
+| **JSON** | One self-contained file, attachments embedded as base64 | Handing the case to another tool or system |
 
 Both carry the audit trail, and both record the SHA-256 taken when each
 attachment was collected — so a file that has changed since is flagged
@@ -293,7 +296,7 @@ Three properties worth knowing:
   an entry, including an administrator.
 - **It survives "Delete All Data".** A wipe is exactly the event the
   trail exists to record, so it is never cleared.
-- **It travels with the case.** Exports include `audit.csv`. An import
+- **It travels with the case.** Exports include `AUDIT.csv`. An import
   does *not* overwrite the local trail — it appends a record of the
   import instead, so the receiving machine's own history stays intact.
 
@@ -409,12 +412,14 @@ works.
 
 Read these before relying on VECTOR for a case that will be charged.
 
-- **One case at a time.** The database holds a single case. "Make New
-  Case File" deletes the current one — export first.
+- **One case at a time.** The database holds a single case. **Start New
+  Case** on the home page deletes the current one after a warning —
+  export first. Nothing yet stops a second case being opened from the
+  Cases page, and reports read only the first, so use Start New Case.
 - **No soft delete.** A deleted record is gone from its table; it is
   recoverable from the audit trail, but by hand.
-- **Case start and end times are free text**, typed by the agent, with
-  no time zone recorded. Everything the application generates itself is
+- **Case start and end times are typed by the agent** as
+  `MM-DD-YYYY HH:MM`, with no time zone recorded. Everything the application generates itself is
   UTC and marked.
 - **No live refresh.** With several devices connected, a page shows
   another agent's entry only after a reload.

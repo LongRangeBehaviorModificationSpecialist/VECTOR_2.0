@@ -22,6 +22,7 @@ from models import (
     LEGACY_COLUMN_NAMES,
     LEGACY_TABLE_NAMES,
     get_session,
+    normalise_legacy_dates,
     record_audit,
 )
 
@@ -720,6 +721,10 @@ def import_vector_from_csv(
             close_button="OK",
         )
 
+    # An archive from before the date format changed would otherwise be
+    # scrambled the first time someone edits a case time or a birth date.
+    normalise_legacy_dates()
+
     # ----- Clean up temporary directory -----
     shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -1186,6 +1191,8 @@ def import_vector_from_json(
             position="center",
             close_button="OK",
         )
+
+    normalise_legacy_dates()
 
     if staging:
         shutil.rmtree(staging, ignore_errors=True)

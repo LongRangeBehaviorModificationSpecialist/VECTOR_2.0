@@ -98,6 +98,8 @@ class CrudSpec:
     card_width:     Tailwind max-width class for the form card
     show_delete_all: whether to offer the delete-all button
     requires_case:  whether adding, editing and deleting need an open case
+    empty_text:     shown in place of the table when there are no rows
+    id_label:       heading for an ID column; no ID column when blank
     """
 
     model: type
@@ -118,6 +120,8 @@ class CrudSpec:
     card_width: str = "max-w-lg"
     show_delete_all: bool = True
     requires_case: bool = True
+    empty_text: str = ""
+    id_label: str = ""
 
     def __post_init__(self):
         self.entity_plural = self.entity_plural or f"{self.entity}s"
@@ -125,6 +129,9 @@ class CrudSpec:
         self.table_title = self.table_title or f"Current {self.entity_plural}"
         self.submit_label = self.submit_label or f"Add {self.entity.title()}"
         self.order_by = self.order_by or self.row_key
+        self.empty_text = (
+            self.empty_text or f"No {self.entity_plural} have been entered"
+        )
 
 
 # ----- Notification helpers -----
@@ -262,7 +269,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                     spec.submit_label,
                     on_click=lambda: _submit(),
                     color="var(--vsp-blue)",
-                ).props("unelevated").classes("text-[var(--vsp-white)]")
+                ).props("push").classes("text-[var(--vsp-white)]")
 
         def _clear_form() -> None:
             for spec_field in spec.fields:
@@ -313,7 +320,7 @@ def build_crud_page(spec: CrudSpec) -> None:
 
         # ----- Table -----
         ui.separator().classes("my-6")
-        ui.label(spec.table_title).classes("text-xl font-bold mb-3")
+        ui.label(spec.table_title).classes("text-xl font-bold mb-1")
 
         table_container = ui.column().classes(
             "w-full max-w-6xl mx-auto items-center gap-2"
@@ -342,9 +349,7 @@ def build_crud_page(spec: CrudSpec) -> None:
 
             with table_container:
                 if not rows:
-                    ui.label(
-                        f"No {spec.entity_plural} in the database yet."
-                    ).classes("text-gray-500 italic")
+                    ui.label(spec.empty_text).classes("text-red italic")
                     return
 
                 columns = [
@@ -358,6 +363,17 @@ def build_crud_page(spec: CrudSpec) -> None:
                     for spec_field in spec.fields
                     if spec_field.in_table
                 ]
+                if spec.id_label:
+                    columns.insert(
+                        0,
+                        {
+                            "name": spec.row_key,
+                            "label": spec.id_label,
+                            "field": spec.row_key,
+                            "sortable": True,
+                            "align": "left",
+                        },
+                    )
                 columns.append(
                     {
                         "name": "actions",
@@ -469,7 +485,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                         "Update",
                         on_click=on_save_update,
                         color="var(--vsp-blue)",
-                    ).props("unelevated").classes("text-[var(--vsp-white)]")
+                    ).props("push").classes("text-[var(--vsp-white)]")
 
             edit_dialog.open()
 
@@ -530,7 +546,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                         "Delete",
                         on_click=on_confirm_delete,
                         color="#ef4444",
-                    ).props("unelevated").classes("text-[var(--vsp-white)]")
+                    ).props("push").classes("text-[var(--vsp-white)]")
 
             delete_dialog.open()
 
@@ -591,7 +607,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                                 "Delete All",
                                 on_click=on_confirm_delete_all,
                                 color="#ef4444",
-                            ).props("unelevated").classes(
+                            ).props("push").classes(
                                 "text-[var(--vsp-white)]"
                             )
 
@@ -603,7 +619,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                     f"Delete All {spec.entity_plural.title()}",
                     on_click=_open_delete_all_dialog,
                     color="#ef4444",
-                ).props("unelevated")
+                ).props("push")
                 if spec.requires_case:
                     delete_all_button.set_enabled(has_active_case())
 

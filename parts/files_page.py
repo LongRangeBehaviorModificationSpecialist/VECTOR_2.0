@@ -124,7 +124,8 @@ def build_uploads_page() -> None:
 
                 except Exception as err:
                     ui.notify(
-                        f"Error uploading file → {str(err)}.",
+                        f"Error uploading file → {str(err)}",
+                        multi_line=True,
                         type="negative",
                         timeout=0,
                         position="center",
@@ -147,9 +148,7 @@ def build_uploads_page() -> None:
         # ----- Existing Files Table -----
         ui.separator().classes("my-6")
 
-        ui.label(
-            "Uploaded Files"
-        ).classes("text-xl font-bold mb-3")
+        ui.label("Files List").classes("text-xl font-bold mb-1")
 
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2")
@@ -168,8 +167,8 @@ def build_uploads_page() -> None:
                 if not files:
                     with table_container:
                         ui.label(
-                            "No files uploaded yet"
-                        ).classes("text-gray-500 italic")
+                            "No files have been uploaded"
+                        ).classes("text-red italic")
                     return
 
                 row_data = [
@@ -325,16 +324,16 @@ def build_uploads_page() -> None:
                         ui.label(
                             f"The following file will be removed from the "
                             "case file :"
-                        ).classes("mb-3 text-base text-[var(--vsp-gray)]")
+                        ).classes("mb-3 text-sm text-[var(--vsp-gray)]")
 
                         ui.label(
                             f"{row['FILENAME']}"
                         ).classes(
-                            "mb-3 text-base font-semibold text-[var(--vsp-blue)]"
+                            "mb-3 text-sm font-semibold text-[var(--vsp-blue)]"
                         )
 
                         ui.label("This cannot be undone!").classes(
-                            "mb-3 text-base text-[var(--vsp-gray)]"
+                            "mb-3 text-sm text-[var(--vsp-gray)]"
                         )
 
                         with ui.row().classes("w-full justify-end gap-2"):
@@ -370,7 +369,7 @@ def build_uploads_page() -> None:
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                            ).props("unelevated").classes(
+                            ).props("push").classes(
                                 "text-[var(--vsp-white)]"
                             )
 
@@ -405,7 +404,7 @@ def build_uploads_page() -> None:
                     delete_all_files,
                 ),
                 color="#ef4444",
-            ).props("unelevated").classes("mb-2 items-center")
+            ).props("push").classes("mb-2 items-center")
             delete_all_button.set_enabled(has_active_case())
 
     # ----- Initial render -----

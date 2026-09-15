@@ -340,7 +340,7 @@ def confirm_delete_all(action: str, callback):
         ui.label(
             f"This will permanently delete ALL {action} from the database. "
             "This action cannot be undone."
-        ).classes("mb-4 text-[#D4D4D8]")
+        ).classes("mb-4 text-base text-[#D4D4D8]")
 
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button("Cancel", on_click=dialog.close).props("flat")
@@ -353,7 +353,7 @@ def confirm_delete_all(action: str, callback):
                 "Delete All",
                 on_click=on_confirm,
                 color="#ef4444",
-            ).props("unelevated")
+            ).props("push")
 
     dialog.open()
 

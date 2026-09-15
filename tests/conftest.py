@@ -80,8 +80,8 @@ def case():
                 CASENUMBER="26-004711",
                 LOCATION="14 Elm Street, Apt 3",
                 JURISDICTION="Fairfax County",
-                CASEDATETIMEBEGIN="2026-09-10 08:00",
-                CASEDATETIMEEND="2026-09-10 16:30",
+                CASEDATETIMEBEGIN="09-10-2026 08:00",
+                CASEDATETIMEEND="09-10-2026 16:30",
             )
         )
     return "26-004711"
@@ -125,7 +125,7 @@ def populated(case):
                 ),
                 Persons(
                     PERSONNAME="O'Brien, Sean",
-                    PERSONDOB="1984-03-02",
+                    PERSONDOB="03-02-1984",
                     PERSONADDRESS="14 Elm Street",
                 ),
                 Notes(

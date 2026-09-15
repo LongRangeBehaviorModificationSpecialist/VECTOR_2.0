@@ -48,8 +48,8 @@ DEMO_CASE = {
     "CASENUMBER": "26-DEMO-001",
     "LOCATION": "1 Example Way, Springfield",
     "JURISDICTION": "Fairfax County",
-    "CASEDATETIMEBEGIN": "2026-09-01 07:30",
-    "CASEDATETIMEEND": "2026-09-01 15:45",
+    "CASEDATETIMEBEGIN": "09-01-2026 07:30",
+    "CASEDATETIMEEND": "09-01-2026 15:45",
 }
 
 DEMO_AGENTS = [
@@ -116,22 +116,22 @@ DEMO_EVIDENCE = [
 ]
 
 DEMO_PERSONS = [
-    ("Fictional, Jordan", "1985-04-17", "1 Example Way, Springfield",
+    ("Fictional, Jordan", "04-17-1985", "1 Example Way, Springfield",
      "555-0110", "Named on the warrant. Present at entry."),
-    ("Invented, Morgan", "1991-11-02", "1 Example Way, Springfield",
+    ("Invented, Morgan", "11-02-1991", "1 Example Way, Springfield",
      "555-0111", "Resident. Cooperative throughout."),
 ]
 
 DEMO_NOTES = [
-    ("2026-09-01 07:32:00", "Demo, Alex",
+    ("09-01-2026 07:32:00", "Demo, Alex",
      "Entry made at 0730. Premises secured. Two occupants present and "
      "identified."),
-    ("2026-09-01 08:15:00", "Sample, Bailey",
+    ("09-01-2026 08:15:00", "Sample, Bailey",
      "Photographs taken of all rooms prior to search commencing."),
-    ("2026-09-01 11:40:00", "Placeholder, Casey",
+    ("09-01-2026 11:40:00", "Placeholder, Casey",
      "Triage completed on items 1, 2, 5 and 12. No further action on "
      "item 5."),
-    ("2026-09-01 15:40:00", "Demo, Alex",
+    ("09-01-2026 15:40:00", "Demo, Alex",
      "Search concluded. Property receipt provided to occupant. "
      "Twelve items seized."),
 ]

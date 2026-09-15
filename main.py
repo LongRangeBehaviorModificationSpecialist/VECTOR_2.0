@@ -196,6 +196,7 @@ ui.add_css(
     --q-vspblue: #2984D1;
 
     --vsp-blue: #2984D1;
+    --vsp-blue-2: #1C69A8;
     --vsp-gray: #D4D4D8;
     --vsp-red: #FF0000;
     --vsp-green: #31C950;
@@ -219,6 +220,18 @@ textarea.q-field__native {
 .required {
     color: #ef4444 !important;
     margin-left: 2px;
+}
+
+.q-field--labeled .q-field__native {
+    padding-bottom: 0px;
+}
+
+/* Amber labels on the inputs that need care: passwords, file paths and
+   the DELETE affirmation */
+.yellow-label .q-field__label {
+    color: #F5B027;
+    font-size: 10pt;
+    font-weight: normal;
 }
 
 /* Print styles */
@@ -380,7 +393,7 @@ def change_password_page():
             ui.button(
                 "Save Password",
                 on_click=save_new_password,
-            ).props("unelevated").classes("w-full mt-4")
+            ).props("push").classes("w-full mt-4")
 
 
 # ----- Run -----

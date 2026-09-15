@@ -8,7 +8,6 @@ Flask templates. Uses window.print() for native browser printing.
 
 
 Routes:
-    /reports/json              →  JSON data viewer
     /reports/agents            →  Agent list report
     /reports/evidence_basic    →  Basic evidence inventory (return copy)
     /reports/rooms             →  Room list (pending template)
@@ -32,7 +31,6 @@ Workflow for report creation:
 from html import escape
 from nicegui import ui
 from sqlalchemy import func
-import json
 
 from models import get_session, Agents, Cases, Evidence, Notes, Persons, Rooms
 from navbar import build_navbar
@@ -78,43 +76,43 @@ def build_reports_page() -> None:
                 "Print Agent List",
                 on_click=lambda: ui.navigate.to("/reports/agents"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Room List",
                 on_click=lambda: ui.navigate.to("/reports/rooms"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Evidence List (Full)",
                 on_click=lambda: ui.navigate.to("/reports/evidence"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Evidence List (By Room)",
                 on_click=lambda: ui.navigate.to("/reports/evidence_by_room"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Evidence List (Basic)",
                 on_click=lambda: ui.navigate.to("/reports/evidence_basic"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Persons List",
                 on_click=lambda: ui.navigate.to("/reports/persons"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
             ui.button(
                 "Print Notes List",
                 on_click=lambda: ui.navigate.to("/reports/notes"),
                 color="#1C69A8",
-            ).props("unelevated").classes("w-full py-3")
+            ).props("push").classes("w-full py-3")
 
 
 def render_report_page(html_content: str) -> None:
@@ -132,7 +130,7 @@ def render_report_page(html_content: str) -> None:
                 "Print Report",
                 on_click=open_report_window,
                 color="#1C69A8",
-            ).props("unelevated icon=print").classes("mb-4 no-print")
+            ).props("push icon=print").classes("mb-4 no-print")
 
             ui.html(html_content)
 
@@ -1293,77 +1291,6 @@ def print_notes_report():
     )
 
     render_report_page(html_content=html)
-
-
-# ----- JSON Output -----
-@ui.page("/reports/json")
-def json_output_page():
-    """Raw case data as JSON, for feeding another tool.
-
-    Rows are built from each model's own column list rather than a
-    hand-written field map. The hand-written version listed thirty
-    pre-rename attributes and raised AttributeError on the first one --
-    a map that has to be updated by hand every time a column changes
-    will eventually not be.
-    """
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
-
-    build_navbar(
-        is_admin=get_is_admin(),
-        username=get_current_user_name(),
-    )
-
-    ui.label("JSON Data Output").classes("text-2xl font-bold m-4")
-
-    def rows_for(model) -> list:
-        columns = [column.name for column in model.__table__.columns]
-        return [
-            {name: getattr(record, name) for name in columns}
-            for record in session.query(model).all()
-        ]
-
-    with get_session() as session:
-        case = session.query(Cases).first()
-
-        data = {
-            "case": (
-                {
-                    column.name: getattr(case, column.name)
-                    for column in Cases.__table__.columns
-                }
-                if case
-                else None
-            ),
-            "agents": rows_for(Agents),
-            "rooms": rows_for(Rooms),
-            "evidence": rows_for(Evidence),
-            "persons": rows_for(Persons),
-            "notes": rows_for(Notes),
-        }
-
-    json_str = json.dumps(data, indent=4, default=str)
-
-    with ui.column().classes("w-full max-w-4xl mx-auto p-4"):
-
-        if case is None:
-            ui.label(
-                "No case in the database yet."
-            ).classes("text-gray-500 italic mb-4")
-
-        # json.dumps supplies the JavaScript string literal. Splicing
-        # the payload into quotes directly could never work: indent=4
-        # puts newlines in it, which terminate a JS string, and an
-        # apostrophe in a name breaks out of one.
-        ui.button(
-            "Copy JSON",
-            on_click=lambda: ui.run_javascript(
-                f"navigator.clipboard.writeText({json.dumps(json_str)})"
-            ),
-        ).props("outline icon=content_copy").classes("mb-4")
-
-        ui.code(json_str, language="json").classes("w-full")
 
 
 def open_report_window():

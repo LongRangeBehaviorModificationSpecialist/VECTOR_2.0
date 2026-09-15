@@ -264,7 +264,7 @@ def test_a_1_0_export_still_imports(tmp_path):
                 "CASENUMBER": "26-V1",
                 "LOCATION": "1 Old Road",
                 "JURISDICTION": "Fairfax County",
-                "CASEDATETIMEBEGIN": "09-01-2026 08:00",
+                "CASEDATETIMEBEGIN": "2026-09-01 08:00",
             }]},
             "persons": {"records": [{
                 "Z_PK": 1,
@@ -288,7 +288,10 @@ def test_a_1_0_export_still_imports(tmp_path):
     import_export.import_vector_from_json(str(path))
 
     with get_session() as session:
-        assert session.query(Cases).one().CASENUMBER == "26-V1"
+        case = session.query(Cases).one()
+        assert case.CASENUMBER == "26-V1"
+        # Stored before the date format changed; rewritten on the way in.
+        assert case.CASEDATETIMEBEGIN == "09-01-2026 08:00"
         assert session.query(Persons).one().PERSONNAME == "O'Brien, Sean"
         restored = session.query(UploadedFiles).one()
         assert restored.FILEDATA == photo

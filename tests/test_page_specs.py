@@ -153,5 +153,6 @@ def test_spec_defaults_fill_themselves_in():
         validate=lambda **kwargs: False,
     )
     assert spec.entity_plural == "persons"
+    assert spec.empty_text == "No persons have been entered"
     assert spec.label_field == "PERSONNAME"
     assert spec.submit_label == "Add Person"

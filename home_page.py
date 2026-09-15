@@ -103,7 +103,7 @@ def build_authenticated_home():
             "Start New Case",
             on_click=confirm_new_case_handler,
             color="var(--vsp-blue)",
-        ).props("unelevated").classes(
+        ).props("push").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
 
@@ -111,7 +111,7 @@ def build_authenticated_home():
             "Add Agent",
             on_click=lambda: ui.navigate.to("/agents"),
             color="var(--vsp-blue)",
-        ).props("unelevated").classes(
+        ).props("push").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
 
@@ -119,7 +119,7 @@ def build_authenticated_home():
             "Add Room",
             on_click=lambda: ui.navigate.to("/rooms"),
             color="var(--vsp-blue)",
-        ).props("unelevated").classes(
+        ).props("push").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
 
@@ -132,7 +132,7 @@ def build_authenticated_home():
             "Add Evidence",
             on_click=lambda: ui.navigate.to("/evidence"),
             color="var(--vsp-blue)",
-        ).props("unelevated").classes(
+        ).props("push").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
 
@@ -140,7 +140,7 @@ def build_authenticated_home():
             "Add Person",
             on_click=lambda: ui.navigate.to("/persons"),
             color="var(--vsp-blue)",
-        ).props("unelevated").classes(
+        ).props("push").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
 
@@ -148,7 +148,7 @@ def build_authenticated_home():
             "Add Note",
             on_click=lambda: ui.navigate.to("/notes"),
             color="var(--vsp-blue)",
-        ).props("unelevated").classes(
+        ).props("push").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
 
@@ -161,7 +161,7 @@ def build_authenticated_home():
             "Add File",
             on_click=lambda: ui.navigate.to("/uploads"),
             color="var(--vsp-blue)",
-        ).props("unelevated").classes(
+        ).props("push").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
 
@@ -169,7 +169,7 @@ def build_authenticated_home():
             "Useful Links",
             on_click=lambda: ui.navigate.to("/links"),
             color="var(--vsp-blue)",
-        ).props("unelevated").classes(
+        ).props("push").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
 
@@ -177,7 +177,7 @@ def build_authenticated_home():
             "Reports",
             on_click=lambda: ui.navigate.to("/reports"),
             color="var(--vsp-blue)",
-        ).props("unelevated").classes(
+        ).props("push").classes(
             "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
         )
 
@@ -202,45 +202,53 @@ def build_authenticated_home():
 
                 with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
-                    ui.label("Export All Data...").classes(
-                        "text-lg font-bold mb-1 text-[var(--vsp-blue)]"
-                    )
+                    ui.label(
+                        "Export Data..."
+                    ).classes("text-lg font-bold text-[var(--vsp-blue)]")
 
                     ui.label(
                         "Saves the whole case -- every table, every "
                         "attachment, and the audit trail -- to your "
                         "Desktop."
-                    ).classes("mb-2 text-base text-[var(--vsp-gray)]")
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
-                    export_format = ui.radio(
+                    ui.label("The file will be named :").classes(
+                        "text-sm text-[var(--vsp-gray)]"
+                    )
+
+                    ui.label(
+                        "'<case-number>_<datetime>_saved_results'"
+                    ).classes("text-base text-[var(--vsp-blue)]")
+
+                    # ----- Export format selection -----
+                    ui.label("Export format:").classes(
+                        "mt-2 text-sm font-semibold text-[var(--vsp-gray)]"
+                    )
+
+                    format_radio = ui.radio(
                         {
-                            "zip": "ZIP archive of CSV files  (spreadsheets)",
-                            "json": "Single JSON file  (other tools)",
+                            "csv": "CSV — one file per database table",
+                            "json": "JSON — all data in a single file",
+                            "both": "Both — export CSV ZIP and JSON together",
                         },
-                        value="zip",
-                    ).props("inline=false").classes("mb-1")
+                        value="csv",
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
                     ui.label(
                         "CSV opens in Excel. JSON is one self-contained "
                         "file with the attachments embedded, for handing "
                         "the case to another system."
-                    ).classes("mb-2 text-xs text-gray-400")
-
-                    ui.label("Named '<case-number>_<datetime>_saved_results'"
-                             ).classes(
-                        "mb-1 text-xs text-[var(--vsp-gray)]"
-                    )
+                    ).classes("text-xs text-gray-400")
 
                     # ----- Password option -----
-
                     encrypt_checkbox = ui.checkbox(
                         "Encrypt with password (AES-256)"
-                    ).classes("mb-1 mt-1 text-base text-[var(--vsp-gray)]")
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
                     password_input = ui.input(
-                        label="Password",
+                        label="ENTER PASSWORD :",
                         password=True,
-                    ).classes("w-full")
+                    ).classes("w-full yellow-label text-sm")
 
                     password_input.bind_visibility_from(
                         encrypt_checkbox,
@@ -266,10 +274,13 @@ def build_authenticated_home():
                             return
 
                         dialog.close()
-                        if export_format.value == "json":
-                            export_vector_to_json(password=pwd)
-                        else:
+
+                        # ----- Run the selected exports -----
+                        if format_radio.value in ("csv", "both"):
                             export_vector_to_csv(password=pwd)
+
+                        if format_radio.value in ("json", "both"):
+                            export_vector_to_json(password=pwd)
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -283,7 +294,7 @@ def build_authenticated_home():
                             "Export Now",
                             on_click=do_export,
                             color="var(--vsp-blue)",
-                        ).props("unelevated").classes(
+                        ).props("push").classes(
                             "text-[var(--vsp-white)]"
                         )
 
@@ -295,34 +306,39 @@ def build_authenticated_home():
                 with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
                     ui.label("Import Data...").classes(
-                        "text-lg font-bold mb-1 text-[var(--vsp-blue)]"
+                        "text-lg font-bold text-[var(--vsp-blue)]"
                     )
 
+                    # No format to choose. The CSV archive and the JSON
+                    # export are told apart from the file itself, so
+                    # picking the wrong one cannot fail an import.
                     ui.label(
                         "Select a file previously exported from VECTOR -- "
                         "either the ZIP archive or the JSON file. The "
                         "format is detected from the file itself."
-                    ).classes("mb-1 text-base text-[var(--vsp-gray)]")
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
-                    ui.label("WARNING :").classes("mb-1 text-base text-[var(--vsp-blue)]")
+                    ui.label(
+                        "WARNING :"
+                    ).classes("text-sm font-bold text-[#EF4444]")
 
-                    ui.label("This will REPLACE all existing data!").classes(
-                        "mb-1 text-base text-[var(--vsp-gray)]"
+                    ui.label("This will REPLACE ALL existing data!").classes(
+                        "text-sm text-[var(--vsp-gray)]"
                     )
 
                     zip_path_input = ui.input(
-                        label="Path to the exported file",
+                        label="PATH TO FILE :",
                         placeholder=r"...-1234_saved_results.zip",
-                    ).classes("w-full")
+                    ).classes("w-full text-sm yellow-label")
 
                     encrypt_checkbox = ui.checkbox(
-                        "ZIP is encrypted (requires password)"
-                    ).classes("mb-1 mt-1 text-base text-[var(--vsp-gray)]")
+                        "File is encrypted (requires password)"
+                    ).classes("text-sm text-[var(--vsp-gray)]")
 
                     password_input = ui.input(
-                        label="Password",
+                        label="ENTER PASSWORD :",
                         password=True,
-                    ).classes("w-full")
+                    ).classes("w-full yellow-label text-sm")
 
                     password_input.bind_visibility_from(
                         encrypt_checkbox,
@@ -333,7 +349,7 @@ def build_authenticated_home():
                         path = zip_path_input.value.strip("\"'")
                         if not path:
                             ui.notify(
-                                "Please enter file path to ZIP file.",
+                                "Please enter file path.",
                                 type="warning",
                                 timeout=0,
                                 position="center",
@@ -343,7 +359,7 @@ def build_authenticated_home():
 
                         if not Path(path).exists():
                             ui.notify(
-                                "ZIP file not found.",
+                                f"File at '{path}' not found.",
                                 type="negative",
                                 timeout=0,
                                 position="center",
@@ -359,7 +375,8 @@ def build_authenticated_home():
 
                         if encrypt_checkbox.value and not pwd:
                             ui.notify(
-                                "Please enter the password.",
+                                "Please enter the password to decrypt "
+                                "the file.",
                                 type="warning",
                                 timeout=0,
                                 position="center",
@@ -390,9 +407,7 @@ def build_authenticated_home():
                             "Import Now",
                             on_click=do_import,
                             color="var(--vsp-blue)",
-                        ).props(
-                            "unelevated warning"
-                        ).classes("text-[var(--vsp-white)]")
+                        ).props("push").classes("text-[var(--vsp-white)]")
 
                 dialog.open()
 
@@ -422,10 +437,10 @@ def build_authenticated_home():
 
                     affirm_input = (
                         ui.input(
-                            label="Affirm by typing 'DELETE' on the line below",
+                            label="AFFIRM BY TYPING 'DELETE' BELOW",
                             password=False,
                         )
-                        .classes("w-full mb-3")
+                        .classes("w-full yellow-label mb-3")
                     )
 
                     affirm_input.bind_visibility_from(
@@ -506,27 +521,27 @@ def build_authenticated_home():
                             "Delete all data",
                             on_click=do_delete,
                             color="#EF4444",
-                        ).props("unelevated").classes("text-[var(--vsp-white)]")
+                        ).props("push").classes("text-[var(--vsp-white)]")
 
                 dialog.open()
 
             ui.button(
-                "📤 Export All Data",
+                "📤 EXPORT CASE DATA",
                 on_click=open_export_dialog,
-                color="#2AA63E",
-            ).props("unelevated").classes("w-56 py-3 text-[var(--vsp-white)]")
+                color="#379161",
+            ).props("push").classes("w-56 py-3 text-[var(--vsp-white)]")
 
             ui.button(
-                "📥 Import Data",
+                "📥 IMPORT CASE DATA",
                 on_click=open_import_dialog,
-                color="#2AA63E",
-            ).props("unelevated").classes("w-56 py-3 text-[var(--vsp-white)]")
+                color="#379161",
+            ).props("push").classes("w-56 py-3 text-[var(--vsp-white)]")
 
             ui.button(
-                "Delete All Data",
+                "DELETE ALL DATA",
                 on_click=open_delete_all_dialog,
                 color="#EF4444",
-            ).props("unelevated").classes("w-56 py-3 text-[var(--vsp-white)]")
+            ).props("push").classes("w-56 py-3 text-[var(--vsp-white)]")
 
 
 def build_login_home():
@@ -687,7 +702,7 @@ def build_login_home():
         ui.button(
             "Login",
             on_click=attempt_login,
-        ).props("unelevated").classes("mt-4 px-8 py-3")
+        ).props("push").classes("mt-4 px-8 py-3")
 
 
 # ----- About Page -----
@@ -838,7 +853,7 @@ def confirm_new_case_handler() -> None:
                 "Proceed (Delete All Data)",
                 on_click=on_proceed,
                 color="#EF4444",
-            ).props("unelevated").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("text-[var(--vsp-white)]")
 
     warn_dialog.open()
 

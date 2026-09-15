@@ -261,7 +261,7 @@ def require_admin(page_builder):
             return None
         if not get_is_admin():
             ui.notify(
-                "Admin access required.",
+                "Admin access is required to access this page.",
                 type="negative",
                 timeout=0,
                 position="center",

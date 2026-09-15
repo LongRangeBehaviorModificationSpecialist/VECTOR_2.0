@@ -12,6 +12,7 @@ from contextlib import contextmanager
 import secrets
 from datetime import datetime, timezone
 import json
+import re
 from sqlalchemy import (
     create_engine,
     event,
@@ -921,16 +922,64 @@ def migrate_schema() -> None:
         )
 
 
+# ----- Date format -----
+# Case times and dates of birth are entered as MM-DD-YYYY, the format the
+# upstream project settled on. A value stored earlier as YYYY-MM-DD would
+# be scrambled by the input mask the first time someone edited it, so it
+# is rewritten once -- through the ORM, which puts each change in the
+# audit trail.
+_ISO_DATETIME = re.compile(r"^(\d{4})-(\d{2})-(\d{2})( \d{2}:\d{2})$")
+_ISO_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})()$")
+
+
+def _month_first(value, pattern):
+    """Rewrites one value if it matches `pattern` exactly."""
+    match = pattern.match(value or "")
+    if not match:
+        return value
+    year, month, day, time_part = match.groups()
+    return f"{month}-{day}-{year}{time_part}"
+
+
+def normalise_legacy_dates() -> int:
+    """Rewrites YYYY-MM-DD case times and birth dates as MM-DD-YYYY.
+
+    Anything not in exactly the old format is left alone. Returns how
+    many values changed.
+    """
+    changed = 0
+    with get_session() as session:
+        for case in session.query(Cases).all():
+            for column in ("CASEDATETIMEBEGIN", "CASEDATETIMEEND"):
+                old = getattr(case, column)
+                new = _month_first(old, _ISO_DATETIME)
+                if new != old:
+                    setattr(case, column, new)
+                    changed += 1
+
+        for person in session.query(Persons).all():
+            new = _month_first(person.PERSONDOB, _ISO_DATE)
+            if new != person.PERSONDOB:
+                person.PERSONDOB = new
+                changed += 1
+
+    if changed:
+        print(f"Schema migration: {changed} date(s) rewritten as MM-DD-YYYY")
+    return changed
+
+
 def upgrade_database() -> None:
     """Brings existing databases up to the current schema.
 
     Order matters: names first, so the later steps see today's columns;
     then columns added since; then the table rebuilds, which copy rows by
-    the current column list.
+    the current column list; and last the stored dates, which need the
+    current columns to exist.
     """
     _rename_legacy_schema()
     _add_missing_columns()
     migrate_schema()
+    normalise_legacy_dates()
 
 
 # ----- Table Creation -----

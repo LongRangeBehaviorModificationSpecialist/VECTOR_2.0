@@ -93,7 +93,7 @@ def build_audit_page() -> None:
                 "Search",
                 on_click=lambda: refresh_audit_table(),
                 color="var(--vsp-blue)",
-            ).props("unelevated").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("text-[var(--vsp-white)]")
 
         table_container = ui.column().classes(
             "w-full max-w-6xl mx-auto items-center gap-2"

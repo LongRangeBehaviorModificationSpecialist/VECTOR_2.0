@@ -72,7 +72,7 @@ def build_admin_page():
                 if not uname:
                     ui.notify(
                         "A username is required.",
-                        type="negative",
+                        type="warning",
                         timeout=0,
                         position="center",
                         close_button="OK",
@@ -122,7 +122,7 @@ def build_admin_page():
                 "Create User",
                 on_click=create_user,
                 color="var(--vsp-blue)",
-            ).props("unelevated").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("text-[var(--vsp-white)]")
 
         # ----- Existing Users Table -----
         ui.separator().classes("my-6")
@@ -276,8 +276,9 @@ def build_admin_page():
                                 ).classes("max-w-sm p-6"
                             ):
 
-                                ui.label("Reset Password"
-                                    ).classes("text-lg font-semibold mb-2"
+                                ui.label("Reset Password").classes(
+                                    "mb-3 text-lg font-semibold "
+                                    "text-[var(--vsp-blue)]"
                                 )
 
                                 ui.label(
@@ -341,6 +342,7 @@ def build_admin_page():
                                             "Shown once, and cannot be "
                                             "recovered. Any session they "
                                             "had open has been ended.",
+                                            multi_line=True,
                                             type="warning",
                                             timeout=0,
                                             position="center",
@@ -354,7 +356,7 @@ def build_admin_page():
                                         "Reset",
                                         on_click=on_confirm_reset,
                                         color="var(--vsp-blue)",
-                                        ).props("unelevated").classes(
+                                        ).props("push").classes(
                                         "text-[var(--vsp-white)]"
                                     )
 
@@ -380,9 +382,10 @@ def build_admin_page():
                                 ).classes("max-w-sm p-6"
                             ):
 
-                                ui.label(
-                                    "Confirm Deletion"
-                                ).classes("text-lg font-semibold mb-2")
+                                ui.label("Confirm Deletion").classes(
+                                    "mb-3 text-lg font-semibold "
+                                    "text-[var(--vsp-blue)]"
+                                )
 
                                 ui.label(
                                     f"Are you sure you want to delete user "
@@ -457,7 +460,7 @@ def build_admin_page():
                                         "Delete",
                                         on_click=on_confirm_delete,
                                         color="#ef4444",
-                                        ).props("unelevated").classes(
+                                        ).props("push").classes(
                                         "text-[var(--vsp-white)]"
                                     )
 
@@ -526,7 +529,7 @@ def build_admin_page():
                             "Sign Everyone Out",
                             on_click=confirm_sign_out_all,
                             color="#ef4444",
-                        ).props("unelevated").classes(
+                        ).props("push").classes(
                             "text-[var(--vsp-white)]"
                         )
 
@@ -536,7 +539,7 @@ def build_admin_page():
                 "Sign Everyone Out",
                 on_click=open_sign_out_all_dialog,
                 color="#ef4444",
-            ).props("unelevated")
+            ).props("push")
 
     # Initial render
     refresh_users_table()
