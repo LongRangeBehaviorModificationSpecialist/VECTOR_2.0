@@ -148,13 +148,61 @@ def test_agent_primary_and_secondary_roles_must_differ():
 
 
 def test_duplicate_case_number_is_rejected(case):
+    """Only reachable on a database that already holds two cases, from
+    before one case at a time was enforced."""
+    with get_session() as session:
+        second = Cases(
+            CASENUMBER="26-000002",
+            LOCATION="Somewhere else",
+            JURISDICTION="Fairfax County",
+            CASEDATETIMEBEGIN="09-11-2026 08:00",
+        )
+        session.add(second)
+        session.flush()
+        second_pk = second.Z_PK
+
     assert utils.validate_case_entry(
-        stage="initial",
+        stage="update",
         CASENUMBER=case,
         LOCATION="Somewhere else",
         JURISDICTION="Fairfax County",
-        CASEDATETIMEBEGIN="2026-09-11 08:00",
+        CASEDATETIMEBEGIN="09-11-2026 08:00",
+        row={"Z_PK": second_pk},
     ) is True
+
+
+# ----- one case at a time -----
+
+def test_a_second_case_cannot_be_opened(case, monkeypatch):
+    """Reports read the first case only, so a second would be recorded
+    and never printed."""
+    notices = []
+    monkeypatch.setattr(
+        utils.ui, "notify", lambda message, **kw: notices.append(str(message))
+    )
+
+    assert utils.validate_case_entry(
+        stage="initial",
+        CASENUMBER="26-999999",
+        LOCATION="Somewhere else",
+        JURISDICTION="Fairfax County",
+        CASEDATETIMEBEGIN="09-11-2026 08:00",
+    ) is True
+    assert any(case in text and "Start New Case" in text for text in notices)
+
+
+def test_the_open_case_can_still_be_edited(case):
+    with get_session() as session:
+        pk = session.query(Cases).one().Z_PK
+
+    assert utils.validate_case_entry(
+        stage="update",
+        CASENUMBER=case,
+        LOCATION="14 Elm Street, Apt 4",
+        JURISDICTION="Fairfax County",
+        CASEDATETIMEBEGIN="09-10-2026 08:00",
+        row={"Z_PK": pk},
+    ) is False
 
 
 def test_duplicate_evidence_number_is_rejected(populated):
