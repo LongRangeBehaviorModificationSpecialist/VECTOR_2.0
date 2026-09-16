@@ -10,7 +10,7 @@ No form needed — this is a read-only resource page.
 from nicegui import ui
 
 from navbar import build_navbar
-from main import get_current_user_name, get_is_admin
+from auth import get_current_user_name, get_is_admin
 
 # ----- Link Data -----
 starter_links = {
@@ -79,19 +79,20 @@ def build_link_section(title: str, icon: str, links: dict[str, str]) -> None:
     with ui.expansion(
         title,
         icon=icon,
-    ).props("default-opened").classes("w-full"):
+    ).classes("w-full").props("default-opened"):
 
         with ui.row().classes("w-full flex-wrap gap-2"):
 
             for name, url in links.items():
+
                 ui.button(
                     name,
                     on_click=lambda u=url: ui.navigate.to(
                         u,
                         new_tab=True,
-                    ), color="blue-6"
-                ).props("outline no-caps"
-            ).classes("text-left text-sm")
+                    ),
+                    color="blue-6",
+                ).props("outline no-caps").classes("text-left text-sm")
 
 
 # ----- Main Page Builder -----
@@ -106,7 +107,9 @@ def build_links_page() -> None:
 
     with ui.column().classes("w-full max-w-4xl mx-auto p-4 gap-4"):
 
-        ui.label("Useful Links").classes("text-2xl font-bold mb-4")
+        ui.label(
+            "Useful Links"
+        ).classes("text-2xl font-bold mb-4")
 
         ui.label(
             "Quick access to frequently used resources. "

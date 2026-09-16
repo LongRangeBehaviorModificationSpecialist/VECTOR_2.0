@@ -1,7 +1,16 @@
-#!/usr/bin/env python3
+# VECTOR runtime dependencies.
+#
+# Versions are pinned to a compatible minor range. The previous
+# unbounded "nicegui>=1.4.0" meant a fresh install picked up whatever
+# major version happened to be current, which silently broke file
+# uploads when NiceGUI 3.x changed its upload API.
+#
+#     python -m venv .venv
+#     .venv/bin/pip install -r requirements.txt      (macOS / Linux)
+#     .venv\Scripts\pip install -r requirements.txt  (Windows)
 
-nicegui>=1.4.0
-SQLAlchemy>=2.0.0
-marshmallow>=3.20.0
-bcrypt>=4.0.0
-pyzipper>=0.4.0
+nicegui~=3.16
+SQLAlchemy~=2.0
+marshmallow~=4.3
+bcrypt~=5.0
+pyzipper~=0.4

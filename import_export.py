@@ -15,40 +15,43 @@ from nicegui import ui
 from pathlib import Path
 import pyzipper
 import shutil
-import sys
 import tempfile
 from typing import Optional
 
-from models import get_session
+from failures import explain, log
+from models import (
+    LEGACY_COLUMN_NAMES,
+    LEGACY_TABLE_NAMES,
+    get_session,
+    normalise_legacy_dates,
+    record_audit,
+)
 
 
 # ----- MODEL REGISTRY -----
 # [Add or remove tables here as your app grows]
 def get_exportable_models() -> list:
     """Returns a list of (model_class, model_name) tuples for CSV export."""
-    from models import Cases, Agents, Rooms, Evidence, Persons, Notes
+    from models import (
+        Cases, Agents, Rooms, Evidence, Persons, Notes, AuditLog,
+    )
 
     return [
         (Cases, "CASES"),
         (Agents, "AGENTS"),
         (Rooms, "ROOMS"),
-        (Evidence, "EVIDENDCE"),
+        (Evidence, "EVIDENCE"),
         (Persons, "PERSONS"),
-        (Notes, "NOTES")
+        (Notes, "NOTES"),
+        # The audit trail travels with the case: an export that drops it
+        # cannot answer what changed after collection.
+        (AuditLog, "AUDIT"),
     ]
 
 
 def get_all_models() -> dict:
     """Returns ALL models including UploadedFiles for import."""
-    from models import (
-        Cases,
-        Agents,
-        Rooms,
-        Evidence,
-        Persons,
-        Notes,
-        UploadedFiles,
-    )
+    from models import Cases, Agents, Rooms, Evidence, Persons, Notes, UploadedFiles
 
     return {
         "CASES": Cases,
@@ -57,8 +60,134 @@ def get_all_models() -> dict:
         "EVIDENCE": Evidence,
         "PERSONS": Persons,
         "NOTES": Notes,
-        "FILES": UploadedFiles
+        "FILES": UploadedFiles,
     }
+
+
+# ----- Names used by older exports -----
+# Exports made before the column renames use lowercase table names and
+# the old column spellings, and upstream's exports write the evidence
+# table as "EVIDENDCE". All of them are read as the table they meant.
+_TABLE_ALIASES = {
+    **LEGACY_TABLE_NAMES,
+    "EVIDENDCE": "EVIDENCE",
+}
+
+# Keys describing each attachment in the manifest and the JSON export.
+_FILE_ENTRY_ALIASES = {
+    "file_name": "FILENAME",
+    "file_size": "FILESIZE",
+    "file_mime_type": "FILEMIMETYPE",
+    "mime_type": "FILEMIMETYPE",
+    "uploaded_by": "FILEUPLOADEDBY",
+    "hash_at_ingest": "FILESHA256",
+    "hashed_at": "FILEHASHEDAT",
+    "file_hash": "FILEHASH",
+    "matches_ingest_hash": "FILEHASHMATCHES",
+    "data_base64": "FILEDATA_b64",
+}
+
+
+def canonical_table_name(name: str) -> str:
+    """Maps any table name an export has used onto today's."""
+    name = str(name)
+    return _TABLE_ALIASES.get(name, name.upper())
+
+
+def canonical_row(table_name: str, row: dict) -> dict:
+    """Renames legacy column names in one exported row."""
+    renames = LEGACY_COLUMN_NAMES.get(table_name, {})
+    return {renames.get(key, key): value for key, value in row.items()}
+
+
+def canonical_file_entry(entry: dict) -> dict:
+    """Renames legacy keys in one attachment's manifest entry."""
+    return {
+        _FILE_ENTRY_ALIASES.get(key, key): value
+        for key, value in entry.items()
+    }
+
+
+def _report_failure(message: str, err: BaseException) -> None:
+    """Explains a failed export or import on screen, and logs the detail."""
+    log.error("%s", message, exc_info=err)
+    ui.notify(
+        f"{message}\n\n{explain(err)}",
+        multi_line=True,
+        type="negative",
+        timeout=0,
+        position="center",
+        close_button="OK",
+    )
+
+
+def _clear_case_tables(session) -> None:
+    """Empties every case table, inside the import's own transaction.
+
+    An import replaces the whole case. Clearing only the tables an export
+    happened to contain kept whatever it lacked -- the previous case's
+    attachments, for one, when the archive had none.
+    """
+    for model_class in get_all_models().values():
+        session.query(model_class).delete()
+
+
+# ----- Staging -----
+# Exports are built in the system temp folder and handed to the browser as
+# a download, so the file reaches whichever device asked for it -- a tablet
+# on --lan included -- and no copy is left on the host's Desktop. Imports
+# arrive the same way, as an upload. Neither is needed once the download or
+# the import has happened, so anything left for over an hour is removed.
+STAGING_PREFIXES = ("vector_export_", "vector_import_upload_")
+STAGING_MAX_AGE_SECONDS = 60 * 60
+
+
+def new_staging_dir(prefix: str) -> Path:
+    """A fresh private folder in the system temp directory."""
+    return Path(tempfile.mkdtemp(prefix=prefix))
+
+
+def remove_stale_staging(
+        max_age_seconds: int = STAGING_MAX_AGE_SECONDS,
+) -> int:
+    """Deletes staging folders older than max_age_seconds.
+
+    Returns how many were removed. A folder still in use -- a large
+    download in progress on Windows -- cannot be deleted, and is left for
+    the next pass.
+    """
+    import time
+
+    cutoff = time.time() - max_age_seconds
+    removed = 0
+    for entry in Path(tempfile.gettempdir()).iterdir():
+        if not entry.name.startswith(STAGING_PREFIXES):
+            continue
+        try:
+            if entry.is_dir() and entry.stat().st_mtime < cutoff:
+                shutil.rmtree(entry)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def _unique_archive_name(name: str, used: set) -> str:
+    """A name no other attachment in this archive has taken.
+
+    Two attachments can share a name -- two photographs both called
+    photo.jpg -- and written into one folder the second overwrote the
+    first, so one was lost from the export. Compared without regard to
+    case, since Windows treats Photo.jpg and photo.jpg as one file.
+    """
+    stem, suffix = Path(name).stem, Path(name).suffix
+    candidate = name
+    counter = 2
+    while candidate.lower() in used:
+        candidate = f"{stem} ({counter}){suffix}"
+        counter += 1
+    used.add(candidate.lower())
+    return candidate
 
 
 # ----- HELPER FUNCTIONS -----
@@ -127,12 +256,18 @@ def serialize_value(value) -> str:
 
 def deserialize_value(value: str, column) -> str:
     """Converts a CSV string back to the appropriate Python type."""
-    from sqlalchemy import Boolean, DateTime, Integer, Float
-
-    if value == "" or value is None:
-        return None
+    from sqlalchemy import Boolean, DateTime, Integer, Float, String
 
     col_type = column.type
+
+    if value == "" or value is None:
+        # A CSV cell cannot tell empty text from no value at all. A required
+        # text column gets its "" back: a room saved without agents holds ""
+        # there, and turning it into None failed the whole import. Anything
+        # else gets None, as before.
+        if not column.nullable and isinstance(col_type, String):
+            return ""
+        return None
 
     if isinstance(col_type, Boolean):
         return value.lower() in ("true", "1", "yes", "t")
@@ -158,10 +293,17 @@ def deserialize_value(value: str, column) -> str:
 # ----- EXPORT FUNCTION -----
 
 
-def export_vector_to_csv(password: Optional[str] = None) -> None:
-    """Exports all database tables to CSV files and file BLOBs to disk.
+def export_vector_to_csv(
+        password: Optional[str] = None,
+        destination: Optional[Path] = None,
+) -> Optional[Path]:
+    """Exports every table to CSV, with every attachment, as one ZIP.
 
-    Saves to ~/Desktop/<case-number>_<datetime>_saved_results/
+    Returns the finished archive's path, or None if the export failed.
+    The archive is written to `destination` -- a fresh staging folder when
+    none is given, for the caller to hand to the browser as a download.
+    The CSVs are assembled in a separate staging folder that is removed
+    afterwards, so no unencrypted copy of the case is left behind.
     """
     from models import UploadedFiles
 
@@ -169,29 +311,26 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
     folder_name = get_case_info_for_folder_name()
 
     if not folder_name:
-        return
+        return None
 
-    home_dir = Path.home()
-    desktop_dir = home_dir / "Desktop"
+    remove_stale_staging()
+    destination = (
+        Path(destination) if destination else new_staging_dir("vector_export_")
+    )
+    work_dir = new_staging_dir("vector_export_")
 
-    # ----- Create temporary dir for export before zipping -----
-    export_dir = desktop_dir / folder_name
+    # ----- Assemble the archive's contents before zipping -----
+    export_dir = work_dir / folder_name
     files_dir = export_dir / "files"
-    zip_path = desktop_dir / f"{folder_name}.zip"
+    zip_path = destination / f"{folder_name}.zip"
 
     try:
         export_dir.mkdir(parents=True, exist_ok=True)
         files_dir.mkdir(parents=True, exist_ok=True)
     except OSError as err:
-        ui.notify(
-            f"Error creating export directory → {err}",
-            multi_line=True,
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        return
+        _report_failure("Could not start the export. Nothing was downloaded.", err)
+        shutil.rmtree(work_dir, ignore_errors=True)
+        return None
 
     # ----- Export each table to CSV -----
     exported_tables = {}
@@ -222,19 +361,19 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
                 exported_tables[table_name] = count
 
         except Exception as err:
-            ui.notify(
-                f"Error exporting {table_name} → {err}",
-                multi_line=True,
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
+            _report_failure(
+                f"The export stopped while reading {table_name}. "
+                "Nothing was downloaded.",
+                err,
             )
-            return
+            shutil.rmtree(work_dir, ignore_errors=True)
+            return None
 
     # ----- Export uploaded files -----
     files_list = []
     num_files = 0
+    integrity_failures = []
+    used_names = set()
 
     try:
         with get_session() as session:
@@ -244,39 +383,59 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
                     # Sanitize filename
                     safe_name = uf.FILENAME or f"file_{uf.Z_PK}"
                     safe_name = safe_name.replace("/", "_").replace("\\", "_")
-                    file_path = files_dir / safe_name
+                    archive_name = _unique_archive_name(safe_name, used_names)
+                    file_path = files_dir / archive_name
 
                     with open(file_path, "wb") as f:
                         f.write(uf.FILEDATA)
 
                     sha256_hash = hashlib.sha256(uf.FILEDATA).hexdigest()
 
+                    # The hash taken when the file was collected is the
+                    # one that matters. Recomputing here only certifies
+                    # the copy, so compare the two and say so if they
+                    # disagree.
+                    recorded = uf.FILESHA256 or ""
+                    verified = (not recorded) or recorded == sha256_hash
+                    if not verified:
+                        integrity_failures.append(archive_name)
+
+                    # FILENAME, FILESIZE and FILEHASH are the keys
+                    # upstream's manifest uses; the rest carry the
+                    # collection record this branch adds. FILEARCHIVENAME
+                    # is the file's name inside the archive, which differs
+                    # from FILENAME when two attachments shared a name.
                     files_list.append(
                         {
                             "FILENAME": safe_name,
+                            "FILEARCHIVENAME": archive_name,
                             "FILESIZE": uf.FILESIZE or len(uf.FILEDATA),
-                            "FILEHASH": sha256_hash
+                            "FILEHASH": sha256_hash,
+                            "FILESHA256": recorded or None,
+                            "FILEHASHEDAT": uf.FILEHASHEDAT or None,
+                            "FILEMIMETYPE": uf.FILEMIMETYPE or "",
+                            "FILEUPLOADEDBY": uf.FILEUPLOADEDBY or "",
+                            "FILEHASHMATCHES": verified,
                         }
                     )
 
                     num_files += 1
 
     except Exception as err:
-        ui.notify(
-            f"Error exporting files → {err}",
-            multi_line=True,
-            type="warning",
-            timeout=0,
-            position="center",
-            close_button="OK",
+        # Carrying on would hand over an export without its attachments,
+        # under a message saying it was complete.
+        _report_failure(
+            "The export stopped while copying the attachments. Nothing "
+            "was downloaded.",
+            err,
         )
-
-    print(f"DEBUG: zip_path = {zip_path}")
+        shutil.rmtree(work_dir, ignore_errors=True)
+        return None
 
     # ----- Write a manifest file -----
     manifest = {
         "export_date": datetime.now().isoformat(),
-        "case_file": str(zip_path),
+        "case_file": zip_path.name,
         "tables": [
             {"name": table_name, "records": count}
             for table_name, count in exported_tables.items()
@@ -284,8 +443,22 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
         "total_records": total_records,
         "files": files_list,
         "total_files": num_files,
+        "integrity_failures": integrity_failures,
         "encrypted": password is not None and len(password) > 0,
     }
+
+    if integrity_failures:
+        ui.notify(
+            "WARNING: these attachments no longer match the SHA-256 "
+            "recorded when they were collected:\n"
+            + "\n".join(integrity_failures)
+            + "\nThe export still completed. Investigate before relying "
+            "on these files.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
 
     manifest_path = export_dir / "export_manifest.json"
 
@@ -323,19 +496,12 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
                         zf.write(file_path, arcname)
 
     except Exception as err:
-        ui.notify(
-            f"Error creating zip file → {err}",
-            multi_line=True,
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        shutil.rmtree(export_dir, ignore_errors=True)
-        return
+        _report_failure("Could not create the ZIP file. Nothing was downloaded.", err)
+        shutil.rmtree(work_dir, ignore_errors=True)
+        return None
 
-    # ----- Delete the temporary directory -----
-    shutil.rmtree(export_dir, ignore_errors=True)
+    # ----- Delete the staging directory -----
+    shutil.rmtree(work_dir, ignore_errors=True)
 
     enc_text = " (AES-256 encrypted)" if password else ""
 
@@ -344,176 +510,22 @@ def export_vector_to_csv(password: Optional[str] = None) -> None:
         f"Export complete!{enc_text}\n"
         f"Tables: {', '.join(f'{n} ({c})' for n, c in exported_tables.items())}\n"
         f"Files: {num_files}\n"
-        f"Saved to: {export_dir}",
-        multi_line=True,
+        f"Downloading {zip_path.name}",
         timeout=0,
         position="bottom",
         close_button="OK",
     )
 
+    # Also show in terminal
+    print(f"\n{'='*60}")
+    print(f"  EXPORT COMPLETE")
+    print(f"  Location: {zip_path}")
+    print(f"  Tables: {exported_tables}")
+    print(f"  Total records: {total_records}")
+    print(f"  Files exported: {num_files}")
+    print(f"{'='*60}\n")
 
-def export_vector_to_json(password: Optional[str] = None):
-    """Exports ALL database tables into ONE .json file.
-
-    If a password is provided, the .json is placed inside an
-    AES-256 encrypted .zip with the same naming convention.
-
-    Saves to ~/<case-number>_<datetime>_saved_results.json
-    """
-    from models import UploadedFiles
-
-    folder_name = get_case_info_for_folder_name()
-    if not folder_name:
-        return
-
-    home_dir = Path.home()
-    desktop_dir = home_dir / "Desktop"
-
-    # ----- Build the complete data structure -----
-    all_data = {
-        "export_metadata": {
-            "export_date": datetime.now().isoformat(),
-            "format_version": "1.0",
-            "case_folder": folder_name,
-        },
-        "tables": {},
-    }
-
-    total_records = 0
-
-    # ----- Case tables → JSON -----
-    for model_class, table_name in get_exportable_models():
-
-        columns = get_column_names(model_class)
-
-        try:
-            with get_session() as session:
-                records = session.query(model_class).all()
-
-                table_rows = []
-                for record in records:
-                    row = {}
-                    for col in columns:
-                        value = getattr(record, col)
-                        if isinstance(value, datetime):
-                            row[col] = value.isoformat()
-                        elif isinstance(value, bytes):
-                            # Binary BLOBs encoded as base64 text
-                            import base64
-
-                            row[col] = base64.b64encode(value).decode("ascii")
-                        elif isinstance(value, bool):
-                            row[col] = value
-                        else:
-                            row[col] = value
-                    table_rows.append(row)
-
-                all_data["tables"][table_name] = {
-                    "record_count": len(table_rows),
-                    "records": table_rows,
-                }
-                total_records += len(table_rows)
-
-        except Exception as err:
-            ui.notify(
-                f"Error exporting {table_name} → {err}",
-                multi_line=True,
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
-            return
-
-    # ----- Uploaded files → base64 inside the JSON -----
-    import base64
-
-    files_list = []
-    try:
-        with get_session() as session:
-            for uf in session.query(UploadedFiles).all():
-                if uf.FILEDATA:
-                    safe_name = (
-                        (uf.FILENAME or f"file_{uf.Z_PK}")
-                        .replace("/", "_")
-                        .replace("\\", "_")
-                    )
-                    files_list.append(
-                        {
-                            "FILENAME": safe_name,
-                            "FILESIZE": uf.FILESIZE or len(uf.FILEDATA),
-                            "FILEMIMETYPE": uf.FILEMIMETYPE or "application/octet-stream",
-                            "FILEDATA_b64": base64.b64encode(uf.FILEDATA).decode("ascii"),
-                        }
-                    )
-    except Exception as err:
-        ui.notify(
-            f"Error exporting files → {err}",
-            type="warning",
-            timeout=5000,
-            position="center",
-            close_button="OK",
-        )
-
-    all_data["files"] = {
-        "record_count": len(files_list),
-        "records": files_list,
-    }
-
-    # ----- Write the .json file -----
-    json_path = desktop_dir / f"{folder_name}.json"
-    try:
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(all_data, f, indent=4, ensure_ascii=False)
-    except OSError as err:
-        ui.notify(
-            f"Error writing JSON → {err}",
-            multi_line=True,
-            type="negative",
-            timeout=5000,
-            position="center",
-            close_button="OK",
-        )
-        return
-
-    # ----- Optional: encrypt the .json inside a .zip -----
-    final_path = json_path
-    if password:
-        zip_path = desktop_dir / f"{folder_name}.json.zip"
-        try:
-            with pyzipper.AESZipFile(
-                zip_path,
-                "w",
-                compression=pyzipper.ZIP_DEFLATED,
-                encryption=pyzipper.WZ_AES,
-            ) as zf:
-                zf.setpassword(password.encode("utf-8"))
-                zf.setencryption(pyzipper.WZ_AES, nbits=256)
-                zf.write(json_path, arcname=json_path.name)
-
-            json_path.unlink()  # Remove the plain .json
-            final_path = zip_path
-        except Exception as err:
-            ui.notify(
-                f"Error creating encrypted zip → {err}",
-                multi_line=True,
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
-            return
-
-    ui.notify(
-        f"JSON export complete! \n"
-        f"Total records: {total_records} \n"
-        f"Files embedded: {len(files_list)} \n"
-        f"Saved to: {final_path}",
-        multi_line=True,
-        timeout=0,
-        position="bottom",
-        close_button="OK",
-    )
+    return zip_path
 
 
 # ----- IMPORT FUNCTION -----
@@ -521,7 +533,7 @@ def export_vector_to_json(password: Optional[str] = None):
 
 def import_vector_from_csv(
         zip_path: str,
-        password: Optional[str] = None
+        password: Optional[str] = None,
 ) -> None:
     """Imports database tables from a .zip file.
 
@@ -564,9 +576,8 @@ def import_vector_from_csv(
                     zf.extractall(temp_dir)
             except RuntimeError as err:
                 ui.notify(
-                    f"Failed to decrypt ZIP file → {err}. \n"
+                    f"Failed to decrypt ZIP file → {err}.\n"
                     "Check your password and try again.",
-                    multi_line=True,
                     type="negative",
                     timeout=0,
                     position="center",
@@ -593,13 +604,10 @@ def import_vector_from_csv(
                 return
 
     except Exception as err:
-        ui.notify(
-            f"Error extracting ZIP → {err}",
-            multi_line=True,
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
+        _report_failure(
+            "Could not open that file. Nothing was imported, and the case "
+            "is unchanged.",
+            err,
         )
         shutil.rmtree(temp_dir, ignore_errors=True)
         return
@@ -633,10 +641,13 @@ def import_vector_from_csv(
     models = get_all_models()
     found_tables = []
 
-    for table_name, model_class in models.items():
-        csv_path = import_dir / f"{table_name}.csv"
-
-        if csv_path.exists():
+    # Matched from the files present rather than looked up by today's
+    # names, so an archive using an older or misspelled table name still
+    # imports.
+    for csv_path in sorted(import_dir.glob("*.csv")):
+        table_name = canonical_table_name(csv_path.stem)
+        model_class = models.get(table_name)
+        if model_class is not None:
             found_tables.append((table_name, model_class, csv_path))
 
     if not found_tables:
@@ -650,24 +661,52 @@ def import_vector_from_csv(
         shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
-    # ----- Import each table -----
+    # ----- Replace the case, all or nothing -----
+    # Every table, the attachments and the audit record go in one
+    # transaction. Each table used to be replaced in a transaction of its
+    # own, so a failure part-way left a case that was half the old one and
+    # half the new, under a message naming only the table that failed.
+    from models import UploadedFiles
+
+    files_dir = import_dir / "files"
     imported_tables = []
     total_records = 0
+    files_imported = 0
 
-    for table_name, model_class, csv_path in found_tables:
-        columns = get_column_names(model_class)
-        column_objects = (
-            {col.name: col for col in model_class.__table__.columns}
-        )
+    # The manifest records a SHA-256 per file. Verify against it rather
+    # than trusting the archive, and carry the original provenance back
+    # instead of stamping every file "import" / octet-stream.
+    manifest_files = {}
+    for entry in manifest.get("files", []):
+        if isinstance(entry, dict):
+            entry = canonical_file_entry(entry)
+            # Keyed by the name inside the archive. Archives from before
+            # FILEARCHIVENAME, and upstream's, only have FILENAME.
+            archive_name = (
+                entry.get("FILEARCHIVENAME") or entry.get("FILENAME")
+            )
+            if archive_name:
+                manifest_files[archive_name] = entry
+    hash_mismatches = []
+    unlisted_files = []
+    stage = "the case"
 
-        try:
-            with get_session() as session:
-                # ----- Clear existing data -----
-                session.query(model_class).delete()
+    try:
+        with get_session() as session:
+            _clear_case_tables(session)
+
+            for table_name, model_class, csv_path in found_tables:
+                stage = table_name
+                columns = get_column_names(model_class)
+                column_objects = (
+                    {col.name: col for col in model_class.__table__.columns}
+                )
+                count = 0
 
                 with open(csv_path, "r", newline="", encoding="utf-8") as f:
                     reader = csv.DictReader(f)
                     for row in reader:
+                        row = canonical_row(table_name, row)
                         record_data = {}
                         for col_name in columns:
                             if col_name in row:
@@ -680,302 +719,650 @@ def import_vector_from_csv(
                                 )
                         # Preserve original IDs for relational integrity
                         # (don't delete the id field — keep it)
-                        new_record = model_class(**record_data)
-                        session.add(new_record)
+                        session.add(model_class(**record_data))
+                        count += 1
 
-            # Count imported records
-            with get_session() as session:
-                count = session.query(model_class).count()
+                # Flushed table by table, so a bad row is reported against
+                # the table it is in.
+                session.flush()
+                imported_tables.append(f"{table_name} ({count})")
+                total_records += count
 
-            imported_tables.append(f"{table_name} ({count})")
-            total_records += count
-
-        except Exception as err:
-            ui.notify(
-                f"Error importing {table_name} → {err}",
-                multi_line=True,
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            return
-
-    # ----- Import files -----
-    from models import UploadedFiles
-
-    files_dir = import_dir / "files"
-    files_imported = 0
-
-    if files_dir.exists():
-        try:
-            with get_session() as session:
+            stage = "the attachments"
+            if files_dir.exists():
                 session.query(UploadedFiles).delete()
-                for file_path in files_dir.iterdir():
-                    if file_path.is_file():
-                        with open(file_path, "rb") as f:
-                            file_data = f.read()
+                for file_path in sorted(files_dir.iterdir()):
+                    if not file_path.is_file():
+                        continue
 
-                        new_file = UploadedFiles(
-                            FILENAME=file_path.name,
-                            FILEDATA=file_data,
-                            FILESIZE=len(file_data),
-                            FILEMIMETYPE="application/octet-stream",
-                            FILEUPLOADEDBY="import",
-                        )
-                        session.add(new_file)
-                        files_imported += 1
+                    with open(file_path, "rb") as f:
+                        file_data = f.read()
 
-        except Exception as err:
-            ui.notify(
-                f"Error importing files → {err}",
-                multi_line=True,
-                type="warning",
-                timeout=0,
-                position="center",
-                close_button="OK",
+                    actual_hash = hashlib.sha256(file_data).hexdigest()
+                    entry = manifest_files.get(file_path.name)
+
+                    if entry is None:
+                        unlisted_files.append(file_path.name)
+                    else:
+                        expected = entry.get("FILEHASH")
+                        if expected and expected != actual_hash:
+                            hash_mismatches.append(file_path.name)
+
+                    details = entry or {}
+                    new_file = UploadedFiles(
+                        FILENAME=details.get("FILENAME") or file_path.name,
+                        FILEDATA=file_data,
+                        FILESIZE=len(file_data),
+                        FILEMIMETYPE=(
+                            details.get("FILEMIMETYPE")
+                            or "application/octet-stream"
+                        ),
+                        FILEUPLOADEDBY=(
+                            details.get("FILEUPLOADEDBY") or "import"
+                        ),
+                        FILESHA256=details.get("FILESHA256") or actual_hash,
+                        FILEHASHEDAT=details.get("FILEHASHEDAT"),
+                    )
+                    session.add(new_file)
+                    files_imported += 1
+                session.flush()
+
+            stage = "the audit record"
+            record_audit(
+                session,
+                action="IMPORT",
+                table_name="(all case tables)",
+                summary=f"{total_records} rows, {files_imported} files",
+                after={
+                    "source": str(zip_file),
+                    "exported": manifest.get("export_date", "unknown"),
+                    "hash_mismatches": hash_mismatches,
+                    "files_not_in_manifest": unlisted_files,
+                },
             )
+
+    except Exception as err:
+        _report_failure(
+            "Nothing was imported, and the case is unchanged. The problem "
+            f"was in {stage}.",
+            err,
+        )
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return
+
+    if hash_mismatches or unlisted_files:
+        problems = []
+        if hash_mismatches:
+            problems.append(
+                "Files whose contents do not match the manifest hash:\n"
+                + "\n".join(hash_mismatches)
+            )
+        if unlisted_files:
+            problems.append(
+                "Files present in the archive but absent from the "
+                "manifest:\n" + "\n".join(unlisted_files)
+            )
+        ui.notify(
+            "WARNING — this archive failed integrity checks.\n\n"
+            + "\n\n".join(problems)
+            + "\n\nThe import completed and has been recorded in the "
+            "audit trail. Treat these files as unverified.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+
+    # An archive from before the date format changed would otherwise be
+    # scrambled the first time someone edits a case time or a birth date.
+    normalise_legacy_dates()
 
     # ----- Clean up temporary directory -----
     shutil.rmtree(temp_dir, ignore_errors=True)
 
     # ----- Success notification -----
     ui.notify(
-        f"Import complete! \n"
-        f"Tables: {', '.join(imported_tables)} \n"
-        f"Files: {files_imported} \n"
+        f"Import complete!\n"
+        f"Tables: {', '.join(imported_tables)}\n"
+        f"Files: {files_imported}\n"
         f"Total records: {total_records}",
-        multi_line=True,
         timeout=0,
         position="bottom",
         close_button="OK",
     )
 
+    print(f"\n{'='*60}")
+    print(f"  IMPORT COMPLETE")
+    print(f"  Tables: {imported_tables}")
+    print(f"  Total records: {total_records}")
+    print(f"  Files imported: {files_imported}")
+    print(f"{'='*60}\n")
 
-def import_vector_from_json(source: str, password: Optional[str] = None):
-    """Imports all tables from a single VECTOR .json export file.
 
-    Accepts a .json file directly, or an encrypted .zip containing one.
+# ----- JSON EXPORT / IMPORT -----
+# A second format alongside the CSV archive: one file rather than a
+# folder, with attachments embedded, so a case can be handed to another
+# tool or another system as a single artifact.
+#
+# Ported from the upstream project and rebuilt to match this branch. The
+# SHA-256 recorded at collection travels with each attachment and is
+# checked on the way back in, the audit trail is included in the export
+# and an import is itself recorded, and the file is staged in a temp
+# directory rather than written to the Desktop in the clear and then
+# encrypted afterwards.
+#
+# The layout follows upstream's -- capitalised table names, attachments
+# under files.records with the bytes in FILEDATA_b64 -- and the importer
+# still reads this branch's earlier 1.0 layout.
 
-    Clears existing data before importing.
-    """
+JSON_FORMAT_VERSION = "1.1"
+
+
+def _row_to_json(record, columns: list) -> dict:
+    """Converts one row to JSON-safe values."""
     import base64
-    import tempfile
-    from sqlalchemy import Boolean, DateTime, Integer, Float
 
-    source_path = Path(source)
-    if not source_path.exists():
-        ui.notify(
-            f"{source_path.name} File not found.", type="negative")
-        return
-
-    temp_dir_to_clean = None
-
-    # ----- If a zip was given, extract it first -----
-    if source_path.suffix.lower() == ".zip":
-        temp_dir = Path(tempfile.mkdtemp(prefix="vector_json_import_"))
-        temp_dir_to_clean = temp_dir
-        try:
-            with pyzipper.AESZipFile(source_path, "r") as zf:
-                if password:
-                    zf.setpassword(password.encode("utf-8"))
-                zf.extractall(temp_dir)
-        except RuntimeError:
-            ui.notify(
-                "Failed to decrypt — check your password.",
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            return
-
-        json_files = list(temp_dir.rglob("*.json"))
-        if not json_files:
-            ui.notify(
-                "No .json file found inside the archive.",
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            return
-        source_path = json_files[0]
-
-    try:
-        with open(source_path, "r", encoding="utf-8") as f:
-            all_data = json.load(f)
-    except (json.JSONDecodeError, OSError) as err:
-        ui.notify(
-            f"Error reading JSON file → {err}",
-            multi_line=True,
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        if temp_dir_to_clean:
-            shutil.rmtree(temp_dir_to_clean, ignore_errors=True)
-        return
-
-    # ----- Validate format -----
-    if "tables" not in all_data:
-        ui.notify(
-            "Not a valid VECTOR JSON export (missing 'tables' key).",
-            type="negative",
-            timeout=0,
-            position="center",
-            close_button="OK",
-        )
-        if temp_dir_to_clean:
-            shutil.rmtree(temp_dir_to_clean, ignore_errors=True)
-        return
-
-    def json_to_value(value, column):
-        """Converts a JSON value back to the right Python type."""
-        if value is None:
-            if column.nullable:
-                return None
-            if isinstance(column.type, Boolean):
-                return False
-            return ""
-        col_type = column.type
-        if isinstance(col_type, Boolean):
-            if isinstance(value, bool):
-                return value
-            return str(value).lower() in ("true", "1", "yes", "t")
-        elif isinstance(col_type, (Integer, Float)):
-            return value
-        elif isinstance(col_type, DateTime):
-            try:
-                return datetime.fromisoformat(str(value))
-            except (ValueError, TypeError):
-                return None
+    row = {}
+    for name in columns:
+        value = getattr(record, name)
+        if isinstance(value, datetime):
+            row[name] = value.isoformat()
+        elif isinstance(value, (bytes, bytearray)):
+            row[name] = base64.b64encode(bytes(value)).decode("ascii")
         else:
-            # Detect base64-encoded BLOBs heuristically: they are long
-            # ASCII strings stored by export_vector_to_csv_json
-            if isinstance(value, str) and len(value) > 0:
-                try:
-                    import base64
+            row[name] = value
+    return row
 
-                    decoded = base64.b64decode(value, validate=True)
-                    # Heuristic: only treat as binary if mostly non-text
-                    if (
-                        decoded[:4] not in (b"[BIN", b"")
-                        and not value.isprintable() is False
-                    ):
-                        return decoded
-                except Exception:
-                    pass
+
+def _json_to_value(value, column):
+    """Converts a JSON value back to the column's Python type."""
+    import base64
+    from sqlalchemy import Boolean, DateTime, Float, Integer, LargeBinary
+
+    if value is None:
+        return None
+
+    column_type = column.type
+
+    if isinstance(column_type, LargeBinary):
+        return base64.b64decode(value)
+    if isinstance(column_type, Boolean):
+        if isinstance(value, bool):
             return value
-
-    models = get_all_models()
-    imported_tables = []
-    total_records = 0
-
-    # ----- Import each table -----
-    for table_name, table_payload in all_data["tables"].items():
-        if table_name not in models:
-            print(f"Skipping unknown table: {table_name}")
-            continue
-
-        model_class = models[table_name]
-        records = table_payload.get("records", [])
-        columns = {col.name: col for col in model_class.__table__.columns}
-
+        return str(value).lower() in ("true", "1", "yes", "t")
+    if isinstance(column_type, Integer):
         try:
-            with get_session() as session:
-                session.query(model_class).delete()
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+    if isinstance(column_type, Float):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+    if isinstance(column_type, DateTime):
+        try:
+            return datetime.fromisoformat(str(value))
+        except (TypeError, ValueError):
+            return None
+    return value
 
-                for rec in records:
-                    record_data = {}
-                    for col_name, col_obj in columns.items():
-                        if col_name == "Z_PK":
-                            continue  # Let autoincrement reassign
-                        raw = rec.get(col_name)
-                        record_data[col_name] = json_to_value(raw, col_obj)
 
-                    session.add(model_class(**record_data))
+def export_vector_to_json(
+        password: Optional[str] = None,
+        destination: Optional[Path] = None,
+) -> Optional[Path]:
+    """Exports the whole case to a single JSON file.
 
-            with get_session() as session:
-                count = session.query(models[table_name]).count()
+    Attachments are embedded as base64 alongside the SHA-256 recorded
+    when they were collected, so the file is self-contained and its
+    contents can be checked on the way back in.
 
-            imported_tables.append(f"{table_name} ({count})")
-            total_records += count
-
-        except Exception as err:
-            ui.notify(
-                f"Error importing {table_name} → {err}",
-                multi_line=True,
-                type="negative",
-                timeout=0,
-                position="center",
-                close_button="OK",
-            )
-            if temp_dir_to_clean:
-                shutil.rmtree(temp_dir_to_clean, ignore_errors=True)
-            return
-
-    # ----- Import uploaded files -----
+    With a password the JSON is sealed in an AES-256 zip. Returns the
+    finished file's path, or None if the export failed. It is written to
+    `destination` -- a fresh staging folder when none is given, for the
+    caller to hand to the browser as a download.
+    """
     from models import UploadedFiles
 
-    files_imported = 0
+    folder_name = get_case_info_for_folder_name()
+    if not folder_name:
+        return None
 
-    files_payload = all_data.get("files", {})
-    if files_payload.get("records"):
+    payload = {
+        "export_metadata": {
+            "export_date": datetime.now().isoformat(),
+            "format_version": JSON_FORMAT_VERSION,
+            "case_folder": folder_name,
+            "application": "VECTOR",
+        },
+        "tables": {},
+        "files": {"record_count": 0, "records": []},
+    }
+
+    total_records = 0
+
+    for model_class, table_name in get_exportable_models():
+        columns = get_column_names(model_class)
         try:
             with get_session() as session:
-                session.query(UploadedFiles).delete()
-
-                for rec in files_payload["records"]:
-                    file_bytes = base64.b64decode(rec["FILEDATA_b64"])
-                    session.add(
-                        UploadedFiles(
-                            FILENAME=rec["FILENAME"],
-                            FILEDATA=FILEDATA if False else file_bytes,
-                            FILESIZE=rec.get("FILESIZE") or len(file_bytes),
-                            FILEMIMETYPE=rec.get(
-                                "FILEMIMETYPE",
-                                "application/octet-stream"
-                            ),
-                            FILEUPLOADEDBY="json-import",
-                        )
-                    )
-                    files_imported_count = (
-                        files_imported_count + 1
-                        if "files_imported_count" in dir()
-                        else 1
-                    )
-
-            files_imported = len(files_payload["records"])
-
+                rows = [
+                    _row_to_json(record, columns)
+                    for record in session.query(model_class).all()
+                ]
         except Exception as err:
-            ui.notify(
-                f"Error importing files → {err}",
-                multi_line=True,
-                type="warning",
-                timeout=0,
-                position="center",
-                close_button="OK",
+            _report_failure(
+                f"The export stopped while reading {table_name}. "
+                "Nothing was downloaded.",
+                err,
             )
-            files_imported = 0
-    else:
-        files_imported = 0
+            return None
 
-    # ----- Cleanup & success -----
-    if temp_dir_to_clean:
-        shutil.rmtree(temp_dir_to_clean, ignore_errors=True)
+        payload["tables"][table_name] = {
+            "record_count": len(rows),
+            "records": rows,
+        }
+        total_records += len(rows)
 
+    # ----- Attachments, with their collection hashes -----
+    import base64
+
+    integrity_failures = []
+    try:
+        with get_session() as session:
+            for uploaded in session.query(UploadedFiles).all():
+                if not uploaded.FILEDATA:
+                    continue
+
+                current_hash = hashlib.sha256(uploaded.FILEDATA).hexdigest()
+                recorded = uploaded.FILESHA256 or ""
+                matches = (not recorded) or recorded == current_hash
+                if not matches:
+                    integrity_failures.append(
+                        uploaded.FILENAME or "(unnamed)"
+                    )
+
+                payload["files"]["records"].append(
+                    {
+                        "FILENAME": uploaded.FILENAME,
+                        "FILESIZE": uploaded.FILESIZE,
+                        "FILEMIMETYPE": uploaded.FILEMIMETYPE,
+                        "FILEUPLOADEDBY": uploaded.FILEUPLOADEDBY,
+                        "FILESHA256": recorded or None,
+                        "FILEHASHEDAT": uploaded.FILEHASHEDAT,
+                        "FILEHASH": current_hash,
+                        "FILEHASHMATCHES": matches,
+                        "FILEDATA_b64": base64.b64encode(
+                            uploaded.FILEDATA
+                        ).decode("ascii"),
+                    }
+                )
+    except Exception as err:
+        # Carrying on would hand over an export without its attachments,
+        # under a message saying it was complete.
+        _report_failure(
+            "The export stopped while adding the attachments. Nothing "
+            "was downloaded.",
+            err,
+        )
+        return None
+
+    file_records = payload["files"]["records"]
+    payload["files"]["record_count"] = len(file_records)
+    payload["export_metadata"]["total_records"] = total_records
+    payload["export_metadata"]["total_files"] = len(file_records)
+    payload["export_metadata"]["integrity_failures"] = integrity_failures
+
+    if integrity_failures:
+        ui.notify(
+            "WARNING: these attachments no longer match the SHA-256 "
+            "recorded when they were collected:\n"
+            + "\n".join(integrity_failures)
+            + "\nThe export still completed. Investigate before relying "
+            "on these files.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+
+    # ----- Write it, staging in a temp directory -----
+    remove_stale_staging()
+    destination = (
+        Path(destination) if destination else new_staging_dir("vector_export_")
+    )
+    work_dir = new_staging_dir("vector_export_")
+    staged_json = work_dir / f"{folder_name}.json"
+
+    try:
+        with open(staged_json, "w", encoding="utf-8") as handle:
+            json.dump(
+                payload, handle, indent=4, ensure_ascii=False, default=str
+            )
+
+        if password:
+            final_path = destination / f"{folder_name}.json.zip"
+            with pyzipper.AESZipFile(
+                final_path,
+                "w",
+                compression=pyzipper.ZIP_DEFLATED,
+                encryption=pyzipper.WZ_AES,
+            ) as archive:
+                archive.setpassword(password.encode("utf-8"))
+                archive.setencryption(pyzipper.WZ_AES, nbits=256)
+                archive.write(staged_json, arcname=staged_json.name)
+        else:
+            final_path = destination / staged_json.name
+            shutil.copy2(staged_json, final_path)
+
+    except Exception as err:
+        _report_failure("Could not write the JSON export. Nothing was downloaded.", err)
+        return None
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+    encrypted_note = " (AES-256 encrypted)" if password else ""
     ui.notify(
-        f"JSON import complete! \n"
-        f"Tables: {', '.join(imported_tables)} \n"
-        f"Files: {files_imported} \n"
-        f"Total records: {total_records}",
-        multi_line=True,
+        f"JSON export complete{encrypted_note}.\n"
+        f"Records: {total_records}\n"
+        f"Attachments embedded: {len(file_records)}\n"
+        f"Downloading {final_path.name}",
         timeout=0,
         position="bottom",
         close_button="OK",
     )
+
+    print(f"\n{'=' * 60}")
+    print("  JSON EXPORT COMPLETE")
+    print(f"  Location: {final_path}")
+    print(f"  Records: {total_records}, files: {len(file_records)}")
+    print(f"{'=' * 60}\n")
+
+    return final_path
+
+
+def import_vector_from_json(
+        source: str,
+        password: Optional[str] = None,
+) -> None:
+    """Restores a case from a JSON export, replacing what is loaded.
+
+    Accepts the .json directly or the encrypted .json.zip. Attachments
+    are checked against the hash recorded in the file, and the import
+    itself is written to the audit trail -- which is never overwritten
+    by the one in the export, so the receiving machine keeps its own
+    history.
+    """
+    from models import UploadedFiles
+
+    source_path = Path(str(source).strip("\"'"))
+    if not source_path.exists():
+        ui.notify(
+            f"{source_path.name} not found.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        return
+
+    staging = None
+
+    # ----- Unwrap an encrypted archive -----
+    if source_path.suffix.lower() == ".zip":
+        staging = Path(tempfile.mkdtemp(prefix="vector_json_import_"))
+        try:
+            with pyzipper.AESZipFile(source_path, "r") as archive:
+                if password:
+                    archive.setpassword(password.encode("utf-8"))
+                archive.extractall(staging)
+        except RuntimeError:
+            shutil.rmtree(staging, ignore_errors=True)
+            ui.notify(
+                "Could not open that archive. If it is encrypted, check "
+                "the password.",
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return
+
+        candidates = list(staging.rglob("*.json"))
+        if not candidates:
+            shutil.rmtree(staging, ignore_errors=True)
+            ui.notify(
+                "No .json file inside that archive.",
+                type="negative",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+            return
+        source_path = candidates[0]
+
+    try:
+        with open(source_path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (json.JSONDecodeError, OSError) as err:
+        if staging:
+            shutil.rmtree(staging, ignore_errors=True)
+        ui.notify(
+            f"Could not read that file - {err}",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        return
+
+    if not isinstance(payload, dict) or "tables" not in payload:
+        if staging:
+            shutil.rmtree(staging, ignore_errors=True)
+        ui.notify(
+            "That is not a VECTOR JSON export - it has no 'tables' "
+            "section.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+        return
+
+    import base64
+
+    models_by_name = get_all_models()
+    imported = []
+    total_records = 0
+    hash_mismatches = []
+    files_imported = 0
+    stage = "the case"
+
+    # A 1.0 export held a bare list. Upstream's layout, and 1.1, wrap it
+    # as {"record_count": n, "records": [...]}.
+    file_entries = payload.get("files", [])
+    if isinstance(file_entries, dict):
+        file_entries = file_entries.get("records", [])
+
+    # ----- Replace the case, all or nothing -----
+    # One transaction, as in the CSV import, so a failure leaves the case
+    # exactly as it was.
+    try:
+        with get_session() as session:
+            _clear_case_tables(session)
+
+            for raw_name, table_data in payload["tables"].items():
+                table_name = canonical_table_name(raw_name)
+                model_class = models_by_name.get(table_name)
+                if model_class is None:
+                    # The audit trail is exported but never restored over
+                    # the local one; anything else unknown is skipped.
+                    continue
+                stage = table_name
+
+                column_objects = {
+                    column.name: column
+                    for column in model_class.__table__.columns
+                }
+                records = table_data.get("records", [])
+                for row in records:
+                    values = {
+                        name: _json_to_value(value, column_objects[name])
+                        for name, value in canonical_row(
+                            table_name, row
+                        ).items()
+                        if name in column_objects
+                    }
+                    session.add(model_class(**values))
+
+                # Flushed table by table, so a bad row is reported against
+                # the table it is in.
+                session.flush()
+                imported.append(f"{table_name} ({len(records)})")
+                total_records += len(records)
+
+            stage = "the attachments"
+            session.query(UploadedFiles).delete()
+            for raw_entry in file_entries:
+                entry = canonical_file_entry(raw_entry)
+                raw = base64.b64decode(entry.get("FILEDATA_b64", ""))
+                actual_hash = hashlib.sha256(raw).hexdigest()
+
+                expected = entry.get("FILEHASH")
+                if expected and expected != actual_hash:
+                    hash_mismatches.append(
+                        entry.get("FILENAME") or "(unnamed)"
+                    )
+
+                session.add(
+                    UploadedFiles(
+                        FILENAME=entry.get("FILENAME") or "imported",
+                        FILEDATA=raw,
+                        FILESIZE=entry.get("FILESIZE") or len(raw),
+                        FILEMIMETYPE=(
+                            entry.get("FILEMIMETYPE")
+                            or "application/octet-stream"
+                        ),
+                        FILEUPLOADEDBY=(
+                            entry.get("FILEUPLOADEDBY") or "import"
+                        ),
+                        FILESHA256=entry.get("FILESHA256") or actual_hash,
+                        FILEHASHEDAT=entry.get("FILEHASHEDAT"),
+                    )
+                )
+                files_imported += 1
+            session.flush()
+
+            stage = "the audit record"
+            record_audit(
+                session,
+                action="IMPORT",
+                table_name="(all case tables)",
+                summary=f"JSON: {total_records} rows, {files_imported} files",
+                after={
+                    "source": str(source),
+                    "exported": payload.get("export_metadata", {}).get(
+                        "export_date", "unknown"
+                    ),
+                    "format_version": payload.get("export_metadata", {}).get(
+                        "format_version", "unknown"
+                    ),
+                    "hash_mismatches": hash_mismatches,
+                },
+            )
+
+    except Exception as err:
+        if staging:
+            shutil.rmtree(staging, ignore_errors=True)
+        _report_failure(
+            "Nothing was imported, and the case is unchanged. The problem "
+            f"was in {stage}.",
+            err,
+        )
+        return
+
+    normalise_legacy_dates()
+
+    if staging:
+        shutil.rmtree(staging, ignore_errors=True)
+
+    if hash_mismatches:
+        ui.notify(
+            "WARNING - these attachments do not match the hash recorded "
+            "in the file:\n"
+            + "\n".join(hash_mismatches)
+            + "\n\nThe import completed and has been recorded in the "
+            "audit trail. Treat these files as unverified.",
+            type="negative",
+            timeout=0,
+            position="center",
+            close_button="OK",
+        )
+
+    ui.notify(
+        f"JSON import complete.\n"
+        f"Tables: {', '.join(imported)}\n"
+        f"Attachments: {files_imported}\n"
+        f"Total records: {total_records}",
+        timeout=0,
+        position="bottom",
+        close_button="OK",
+    )
+
+    print(f"\n{'=' * 60}")
+    print("  JSON IMPORT COMPLETE")
+    print(f"  Tables: {imported}")
+    print(f"  Records: {total_records}, files: {files_imported}")
+    print(f"{'=' * 60}\n")
+
+
+def needs_password(path) -> bool:
+    """Whether an exported file is sealed with a password.
+
+    Read from the archive itself -- each entry in a ZIP records whether it
+    is encrypted -- so nobody has to remember, or guess, before importing.
+    """
+    candidate = Path(path)
+    if candidate.suffix.lower() != ".zip":
+        return False
+    try:
+        with pyzipper.AESZipFile(candidate, "r") as archive:
+            return any(info.flag_bits & 0x1 for info in archive.infolist())
+    except Exception:
+        # Anything unreadable is left to the importer, which opens it and
+        # says what is wrong with it.
+        return False
+
+
+def looks_like_json_export(path: str) -> bool:
+    """Whether a file is a JSON export rather than the CSV archive.
+
+    Both formats can arrive as a .zip, so the suffix alone does not
+    settle it. An encrypted archive cannot be read without the password,
+    but its entry names are still listed, which is enough.
+
+    Anything unreadable falls back to False -- the CSV reader gives the
+    clearer message when handed something it does not recognise.
+    """
+    candidate = Path(str(path).strip("\"'"))
+
+    if candidate.suffix.lower() == ".json":
+        return True
+
+    if candidate.suffix.lower() != ".zip":
+        return False
+
+    try:
+        with pyzipper.AESZipFile(candidate, "r") as archive:
+            names = [name.lower() for name in archive.namelist()]
+    except Exception:
+        # Anything unreadable is not a JSON export. The CSV importer then
+        # opens it, and says what is wrong with it.
+        return False
+
+    has_json = any(name.endswith(".json") for name in names)
+    has_csv = any(name.endswith(".csv") for name in names)
+
+    # The CSV archive also carries export_manifest.json, so a JSON
+    # export is the one with JSON and no CSVs.
+    return has_json and not has_csv

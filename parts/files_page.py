@@ -6,24 +6,66 @@ files_page.py — File upload and management page.
 Stores files as BLOBs in the SQLite database with download and delete capability.
 """
 
-from nicegui import ui
-import os
-import tempfile
+import hashlib
+from urllib.parse import quote
+
+import clock
+from fastapi import Response
+from nicegui import app, ui
 
 from models import (
-    require_active_case,
-    has_active_case,
     get_session,
+    has_active_case,
     UploadedFiles,
+    audit_timestamp,
 )
+from program.config import Config
+from failures import explain, log
+from live import refresh_on_change
 from navbar import build_navbar
-from main import get_current_user_name, get_is_admin
+from auth import get_current_user_name, get_is_admin, is_authenticated
 from utils import (
     get_mime_type,
     is_allowed_file,
     format_file_size,
     confirm_delete_all,
+    require_active_case,
 )
+
+
+# ----- Downloads -----
+def content_disposition(filename: str) -> str:
+    """An attachment header that keeps the file's own name, accents and all."""
+    fallback = "".join(
+        char if 32 <= ord(char) < 127 and char not in '"\\' else "_"
+        for char in filename
+    ) or "attachment"
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename)}"
+
+
+@app.get("/attachments/{file_id}")
+async def download_attachment(file_id: int) -> Response:
+    """Sends one attachment straight from the database to the browser.
+
+    A download used to write the file to the temp folder first and hand
+    the browser that copy, and nothing ever removed it -- an unencrypted
+    copy of the evidence left on disk even when the database itself is
+    encrypted. Signed-in users only, like every page.
+    """
+    if not is_authenticated():
+        return Response(status_code=403)
+
+    with get_session() as session:
+        record = session.get(UploadedFiles, file_id)
+        if record is None:
+            return Response(status_code=404)
+        name = (record.FILENAME or f"file_{record.Z_PK}")
+        name = name.replace("/", "_").replace("\\", "_")
+        return Response(
+            content=record.FILEDATA,
+            media_type=record.FILEMIMETYPE or "application/octet-stream",
+            headers={"Content-Disposition": content_disposition(name)},
+        )
 
 
 # ----- Main Page Builder -----
@@ -38,12 +80,16 @@ def build_uploads_page() -> None:
 
     with ui.column().classes("w-full items-center"):
 
-        ui.label("File Upload & Management").classes("text-2xl font-bold m-4")
+        ui.label(
+            "File Upload & Management"
+        ).classes("text-2xl font-bold m-4")
 
         # ----- Upload Section -----
         with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
 
-            ui.label("Upload New File").classes("text-lg font-semibold mb-2")
+            ui.label(
+                "Upload New File"
+            ).classes("text-lg font-semibold mb-2")
 
             ui.label(
                 "Allowed file types → (1) Images, (2) Videos, (3) Documents, "
@@ -57,8 +103,11 @@ def build_uploads_page() -> None:
                 try:
                     uploaded_file = e.file
                     file_name = uploaded_file.name
-                    # SmallFileUpload stores the data as bytes in _data
-                    file_data = uploaded_file._data
+                    # read() is the public API and works for both the
+                    # in-memory and spooled-to-disk cases. The private
+                    # _data attribute only exists on small uploads, so
+                    # reading it failed for anything over ~1 MB.
+                    file_data = await uploaded_file.read()
                     file_size = len(file_data)
                     file_mime_type = (
                         uploaded_file.content_type
@@ -83,6 +132,12 @@ def build_uploads_page() -> None:
 
                     uploader = get_current_user_name()
 
+                    # Hashed on arrival, not at export time: the stored
+                    # digest then certifies the file as collected rather
+                    # than whatever the database holds later.
+                    digest = hashlib.sha256(file_data).hexdigest()
+                    hashed_at = audit_timestamp()
+
                     with get_session() as session:
                         new_file = UploadedFiles(
                             FILENAME=file_name,
@@ -90,13 +145,16 @@ def build_uploads_page() -> None:
                             FILESIZE=file_size,
                             FILEMIMETYPE=file_mime_type,
                             FILEUPLOADEDBY=uploader,
+                            FILESHA256=digest,
+                            FILEHASHEDAT=hashed_at,
                         )
                         session.add(new_file)
 
                     ui.notify(
-                        f"'{file_name}' uploaded successfully ("
-                        f"{file_size:,} bytes), {file_mime_type}.",
-                        timeout=4000,
+                        f"'{file_name}' uploaded ({file_size:,} bytes, "
+                        f"{file_mime_type}).\n"
+                        f"SHA-256: {digest}",
+                        timeout=0,
                         position="bottom",
                         close_button="OK",
                     )
@@ -104,22 +162,23 @@ def build_uploads_page() -> None:
                     refresh_files_table()
 
                 except Exception as err:
+                    name = getattr(e.file, "name", "") or "the file"
+                    log.exception("Could not upload %s", name)
                     ui.notify(
-                        f"Error uploading file → {str(err)}",
+                        f"Could not upload {name}.\n\n{explain(err)}",
                         multi_line=True,
                         type="negative",
                         timeout=0,
                         position="center",
                         close_button="OK",
                     )
-                    import traceback
-                    traceback.print_exc()
 
             ui.upload(
                 on_upload=handle_upload,
                 auto_upload=True,
                 label="Drag files here or click to browse",
                 multiple=True,
+                max_file_size=Config.MAX_UPLOAD_BYTES,
                 ).props("accept=image/*, video/*,"
                     ".pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, .txt, .rtf,"
                     ".zip, .7z, .tar, .tgz, .gz, .tar.gz, .rar, .bz2, .xz"
@@ -131,13 +190,12 @@ def build_uploads_page() -> None:
         ui.label("Files List").classes("text-xl font-bold mb-1")
 
         table_container = ui.column().classes(
-            "w-full max-w-5xl mx-auto items-center gap-2"
-        )
+            "w-full max-w-5xl mx-auto items-center gap-2")
+
+        shown = {"table": None}
 
         def refresh_files_table() -> None:
             """Re-renders the files table from the database."""
-
-            table_container.clear()
 
             with get_session() as session:
                 files = (
@@ -145,14 +203,6 @@ def build_uploads_page() -> None:
                     .order_by(UploadedFiles.FILEUPLOADDATE.desc())
                     .all()
                 )
-
-                if not files:
-                    with table_container:
-                        ui.label(
-                            "No files have been uploaded"
-                        ).classes("text-red italic")
-                    return
-
                 row_data = [
                     {
                         "Z_PK": f.Z_PK,
@@ -161,14 +211,38 @@ def build_uploads_page() -> None:
                         "file_size_bytes": f.FILESIZE or 0,
                         "FILEMIMETYPE": f.FILEMIMETYPE or "unknown",
                         "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
+                        "FILESHA256": (f.FILESHA256 or "not recorded"),
+                        "sha256_short": (
+                            f"{f.FILESHA256[:12]}…" if f.FILESHA256
+                            else "not recorded"
+                        ),
+                        # Stored in UTC; shown in this machine's zone.
                         "FILEUPLOADDATE": (
-                            f.FILEUPLOADDATE.strftime("%Y-%m-%d %H:%M:%S")
+                            clock.show_utc(f.FILEUPLOADDATE)
                             if f.FILEUPLOADDATE
                             else ""
                         ),
                     }
                     for f in files
                 ]
+
+            # Rows are swapped in place when the table is already showing,
+            # so a refresh keeps the sort order the user picked.
+            table = shown["table"]
+            if row_data and table is not None and not table.is_deleted:
+                table.rows = row_data
+                table.update()
+                return
+
+            table_container.clear()
+            shown["table"] = None
+
+            if not row_data:
+                with table_container:
+                    ui.label(
+                        "No files have been uploaded"
+                    ).classes("text-red italic")
+                return
 
             with table_container:
                 column_defs = [
@@ -208,10 +282,19 @@ def build_uploads_page() -> None:
                         "align": "left",
                     },
                     {
+                        "name": "sha256_short",
+                        "label": "SHA-256",
+                        "field": "sha256_short",
+                        "sortable": False,
+                        "align": "left",
+                    },
+                    {
                         "name": "FILEUPLOADDATE",
-                        "label": "Uploaded At (UTC)",
+                        "label": "Uploaded At",
                         "field": "FILEUPLOADDATE",
-                        "sortable": True,
+                        # Newest first already; as text the dates would
+                        # sort by month, not by when.
+                        "sortable": False,
                         "align": "left",
                     },
                     {
@@ -230,6 +313,7 @@ def build_uploads_page() -> None:
                 )
 
                 table.props("dense flat")
+                shown["table"] = table
 
                 table.add_slot(
                     "body-cell-actions",
@@ -251,30 +335,10 @@ def build_uploads_page() -> None:
                 )
 
                 # ----- Download handler -----
-                @require_active_case
                 def on_download(e) -> None:
-                    row = e.args
-                    with get_session() as session:
-                        file_record = (
-                            session.query(UploadedFiles)
-                            .filter_by(Z_PK=row["Z_PK"])
-                            .first()
-                        )
-
-                        if file_record:
-                            temp_dir = tempfile.gettempdir()
-                            safe_name = (
-                                file_record.FILENAME
-                                or f"file_{file_record.Z_PK}"
-                            )
-                            safe_name = (
-                                safe_name.replace("/", "_").replace("\\", "_")
-                            )
-                            temp_path = os.path.join(temp_dir, safe_name)
-
-                            with open(temp_path, "wb") as f:
-                                f.write(file_record.FILEDATA)
-                            ui.download(temp_path)
+                    # Served by /attachments above, straight from the
+                    # database, so no copy of the file is written to disk.
+                    ui.download.from_url(f"/attachments/{e.args['Z_PK']}")
 
                 # ----- Delete confirmation dialog -----
                 @require_active_case
@@ -310,19 +374,34 @@ def build_uploads_page() -> None:
                             ui.button(
                                 "Cancel",
                                 on_click=delete_dialog.close,
-                                color="transparent").props("flat"
-                            ).classes("text-[var(--vsp-blue)]")
+                                color="transparent",
+                            ).props("flat").classes("text-[var(--vsp-blue)]")
 
                             def on_confirm_delete() -> None:
-                                with get_session() as session:
-                                    file_record = (
-                                        session.query(UploadedFiles)
-                                        .filter_by(Z_PK=row["Z_PK"])
-                                        .first()
+                                try:
+                                    with get_session() as session:
+                                        file_record = (
+                                            session.query(UploadedFiles)
+                                            .filter_by(Z_PK=row["Z_PK"])
+                                            .first()
+                                        )
+                                        if file_record:
+                                            session.delete(file_record)
+                                except Exception as err:
+                                    log.exception(
+                                        "Could not delete %s", row["FILENAME"]
                                     )
-
-                                    if file_record:
-                                        session.delete(file_record)
+                                    ui.notify(
+                                        f"Could not delete {row['FILENAME']}."
+                                        f"\n\n{explain(err)}",
+                                        multi_line=True,
+                                        type="negative",
+                                        timeout=0,
+                                        position="center",
+                                        close_button="OK",
+                                    )
+                                    delete_dialog.close()
+                                    return
 
                                 ui.notify(
                                     f"File: {row['FILENAME']} has been "
@@ -338,8 +417,10 @@ def build_uploads_page() -> None:
                             ui.button(
                                 "Delete",
                                 on_click=on_confirm_delete,
-                                color="#EF4444").props("push"
-                            ).classes("text-[var(--vsp-white)]")
+                                color="#ef4444",
+                            ).props("push").classes(
+                                "text-[var(--vsp-white)]"
+                            )
 
                     delete_dialog.open()
 
@@ -348,15 +429,28 @@ def build_uploads_page() -> None:
 
         with ui.row().classes("w-full justify-center my-2"):
 
-            # ----- DELETE ALL BUTTON -----
-            @require_active_case
             def delete_all_files() -> None:
-                with get_session() as session:
-                    session.query(UploadedFiles).delete()
-                    session.commit()
+                try:
+                    with get_session() as session:
+                        # One at a time, so each removal reaches the audit
+                        # trail. A bulk delete raises no ORM events, and the
+                        # files vanished without a record.
+                        for file_record in session.query(UploadedFiles).all():
+                            session.delete(file_record)
+                except Exception as err:
+                    log.exception("Could not delete every file")
+                    ui.notify(
+                        f"Nothing was deleted.\n\n{explain(err)}",
+                        multi_line=True,
+                        type="negative",
+                        timeout=0,
+                        position="center",
+                        close_button="OK",
+                    )
+                    return
 
                 ui.notify(
-                    "All Files has been deleted.",
+                    "All files have been deleted.",
                     timeout=4000,
                     position="bottom",
                     close_button="OK",
@@ -364,15 +458,22 @@ def build_uploads_page() -> None:
 
                 refresh_files_table()
 
-            case_exists = has_active_case()
-
-            ui.button(
+            delete_all_button = ui.button(
                 "Delete All Files",
                 on_click=lambda: confirm_delete_all(
                     "files",
                     delete_all_files,
-                ), color="#EF4444",).props("push"
-            ).classes("mb-2 items-center").set_enabled(case_exists)
+                ),
+                color="#ef4444",
+            ).props("push").classes("mb-2 items-center")
+            delete_all_button.set_enabled(has_active_case())
 
     # ----- Initial render -----
     refresh_files_table()
+
+    # Files added or removed on another device appear without a reload.
+    def live_refresh() -> None:
+        refresh_files_table()
+        delete_all_button.set_enabled(has_active_case())
+
+    refresh_on_change(live_refresh)

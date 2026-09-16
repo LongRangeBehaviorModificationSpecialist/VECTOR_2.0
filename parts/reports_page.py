@@ -8,7 +8,6 @@ Flask templates. Uses window.print() for native browser printing.
 
 
 Routes:
-    /reports/json              →  JSON data viewer
     /reports/agents            →  Agent list report
     /reports/evidence_basic    →  Basic evidence inventory (return copy)
     /reports/rooms             →  Room list (pending template)
@@ -29,14 +28,163 @@ Workflow for report creation:
 
 """
 
+from html import escape
 from nicegui import ui
 from sqlalchemy import func
-import json
 
+import clock
+from failures import explain, log
 from models import get_session, Agents, Cases, Evidence, Notes, Persons, Rooms
-from navbar import build_navbar
-from main import is_authenticated, get_current_user_name, get_is_admin
-from utils import get_print_date_time, get_case_info
+from navbar import build_navbar, unit_logo
+from auth import is_authenticated, get_current_user_name, get_is_admin
+from utils import (
+    CASE_TIME_FORMAT,
+    evidence_number_key,
+    get_case_info,
+    get_print_date_time,
+    parse_entered_date,
+    room_display_key,
+    room_label_key,
+)
+
+
+# ----- HTML Escaping -----
+def h(value) -> str:
+    """Escapes a database value for safe interpolation into report HTML.
+
+    Without this, a description containing "&" or "<" corrupts the
+    printed exhibit list, and a "<script>" tag executes in the print
+    window.
+    """
+    return escape("" if value is None else str(value))
+
+
+
+# ----- Order -----
+# Item numbers and room labels are text. Ordered by the database, the
+# return copy listed items 1, 10, 11, 12, 2, and room AA came between A
+# and B.
+def evidence_in_order(session) -> list:
+    """Every evidence item, by item number as a person reads it."""
+    return sorted(
+        session.query(Evidence).all(),
+        key=lambda item: evidence_number_key(item.EVIDNUM),
+    )
+
+
+def rooms_in_order(session) -> list:
+    """Every room, A to Z and then AA."""
+    return sorted(
+        session.query(Rooms).all(),
+        key=lambda room: room_label_key(room.ROOMLABEL),
+    )
+
+
+def rooms_with_item_counts(session) -> list[tuple[str, int]]:
+    """Each room evidence was found in, with its item count, in label order."""
+    counts = (
+        session.query(Evidence.EVIDLOCROOM, func.count(Evidence.EVIDLOCROOM))
+        .group_by(Evidence.EVIDLOCROOM)
+        .all()
+    )
+    return sorted(
+        ((room, count) for room, count in counts),
+        key=lambda pair: room_display_key(pair[0]),
+    )
+
+
+# ----- The case's end time -----
+def fill_case_end_time(now_text: str | None = None) -> tuple[bool, str]:
+    """Sets the open case's end time to now, unless that would be wrong.
+
+    Returns (saved, message). Leaves the case alone when it already has an
+    end time -- another device may have filled it in -- and when its start
+    time is later than now, which means the start time needs checking.
+    """
+    now_text = now_text or clock.case_time_now()
+    with get_session() as session:
+        case = session.query(Cases).order_by(Cases.Z_PK).first()
+        if case is None:
+            return False, "There is no open case."
+        if (case.CASEDATETIMEEND or "").strip():
+            return False, (
+                f"The case already has an end date/time: "
+                f"{case.CASEDATETIMEEND}."
+            )
+        started = parse_entered_date(case.CASEDATETIMEBEGIN, CASE_TIME_FORMAT)
+        ended = parse_entered_date(now_text, CASE_TIME_FORMAT)
+        if started is not None and ended is not None and ended < started:
+            return False, (
+                f"The case starts at {case.CASEDATETIMEBEGIN}, which is later "
+                f"than the time now on this machine ({now_text}), so the end "
+                "time was not filled in. Check the start time on the Case page."
+            )
+        case.CASEDATETIMEEND = now_text
+    return True, f"The case's end date/time is now {now_text}."
+
+
+def _remind_about_end_time() -> None:
+    """Asks about the case's end time when it has none.
+
+    Every report's header prints when the search began and ended, and a
+    case with no end time printed that line blank. Fill it in from this
+    machine's clock, or carry on without it.
+    """
+    with get_session() as session:
+        case = session.query(Cases).order_by(Cases.Z_PK).first()
+        if case is None or (case.CASEDATETIMEEND or "").strip():
+            return
+        number = case.CASENUMBER
+        begin = case.CASEDATETIMEBEGIN or "at a time not recorded"
+
+    with ui.dialog() as reminder, ui.card().classes("max-w-md p-6"):
+        ui.label("This case has no end date/time yet").classes(
+            "text-lg font-bold text-[var(--vsp-blue)]"
+        )
+        ui.label(
+            f"Case {number} started {begin}. Every report prints the ending "
+            "date and time, and that line stays blank until one is entered."
+        ).classes("text-sm text-[var(--vsp-gray)]")
+
+        with ui.row().classes("w-full justify-end gap-2 mt-4"):
+            ui.button(
+                "Continue without it",
+                on_click=reminder.close,
+                color="transparent",
+            ).props("flat").classes("text-[var(--vsp-blue)]")
+
+            def fill_in_now() -> None:
+                try:
+                    saved, message = fill_case_end_time()
+                except Exception as err:
+                    log.exception("Could not fill in the case's end time")
+                    ui.notify(
+                        f"Could not save the end time.\n\n{explain(err)}",
+                        multi_line=True,
+                        type="negative",
+                        timeout=0,
+                        position="center",
+                        close_button="OK",
+                    )
+                    return
+                reminder.close()
+                ui.notify(
+                    message,
+                    multi_line=True,
+                    type="positive" if saved else "warning",
+                    timeout=4000 if saved else 0,
+                    position="bottom" if saved else "center",
+                    close_button="OK",
+                )
+
+            ui.button(
+                "Fill in with current date/time",
+                icon="schedule",
+                on_click=fill_in_now,
+                color="var(--vsp-blue)",
+            ).props("push").classes("text-[var(--vsp-white)]")
+
+    reminder.open()
 
 
 # ----- Report Page Wrapper -----
@@ -50,13 +198,13 @@ def build_reports_page() -> None:
 
     with ui.column().classes("items-center w-full mt-4 mb-4"):
 
-        ui.image(
-            "/static/novadc_icac.png",
-        ).classes("w-[150px] h-[150px] mb-4")
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-4")
 
         ui.label(
             "V·E·C·T·O·R Reports Page"
         ).classes("text-2xl font-normal text-center")
+
+    _remind_about_end_time()
 
     with ui.column().classes("w-full items-center gap-4"):
         with ui.column().classes("w-full max-w-xs"):
@@ -157,9 +305,9 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
         if not case.JURISDICTION or not str(case.JURISDICTION).strip():
             errors.append("Jurisdiction is required.")
 
-        # Check End Date/Time (required for complete reports)
+        # Check Start Date/Time (required for complete reports)
         if not case.CASEDATETIMEBEGIN:
-            errors.append("End Date/Time is required for reports.")
+            errors.append("Start Date/Time is required for reports.")
 
     return (len(errors) == 0, errors)
 
@@ -407,7 +555,8 @@ def build_case_header_html(
         sub_title: str
 ) -> str:
     """Generates the standard report title + case info header HTML."""
-    active_case = get_case_info()
+    if not active_case:
+        active_case = get_case_info()
 
     if not active_case:
         ui.notify(
@@ -419,6 +568,9 @@ def build_case_header_html(
         )
         # Redirect to case creation page
         ui.navigate.to("/cases")
+        # Stop here: without this the header below subscripts None and
+        # the whole report route returns a 500 instead of redirecting.
+        return ""
 
     print_date_time = get_print_date_time()
 
@@ -427,23 +579,23 @@ def build_case_header_html(
         <table class="headerTable">
             <tr>
                 <td class="header font-11">Investigation Number:</td>
-                <td class="data font-11">{active_case["CASENUMBER"]}</td>
+                <td class="data font-11">{h(active_case["CASENUMBER"])}</td>
             </tr>
             <tr>
                 <td class="header font-11">Site Address:</td>
-                <td class="data font-11">{active_case["LOCATION"]}</td>
+                <td class="data font-11">{h(active_case["LOCATION"])}</td>
             </tr>
             <tr>
                 <td class="header font-11">Jurisdiction:</td>
-                <td class="data font-11">{active_case["JURISDICTION"]}</td>
+                <td class="data font-11">{h(active_case["JURISDICTION"])}</td>
             </tr>
             <tr>
                 <td class="header font-11">Starting Date and Time:</td>
-                <td class="data font-11">{active_case["CASEDATETIMEBEGIN"]}</td>
+                <td class="data font-11">{h(active_case["CASEDATETIMEBEGIN"])}</td>
             </tr>
             <tr>
                 <td class="header font-11">Ending Date and Time:</td>
-                <td class="data font-11">{active_case["CASEDATETIMEEND"]}</td>
+                <td class="data font-11">{h(active_case["CASEDATETIMEEND"])}</td>
             </tr>
             <tr>
                 <td class="header font-11">Report Printed Date:</td>
@@ -477,11 +629,11 @@ def build_agents_report_html(active_case: dict, agents: list) -> str:
 
     agent_rows = "".join([f"""
         <tr>
-            <td class="agentTableData font-10">{a["AGENTNAME"]}</td>
-            <td class="agentTableData font-10">{a["AGENTPARENTAGENCY"]}</td>
-            <td class="agentTableData font-10">{a["AGENTPRIMARYROLE"]}</td>
-            <td class="agentTableData font-10">{a["AGENTPHONE"]}</td>
-            <td class="agentTableData font-10">{a["AGENTEMAIL"]}</td>
+            <td class="agentTableData font-10">{h(a["AGENTNAME"])}</td>
+            <td class="agentTableData font-10">{h(a["AGENTPARENTAGENCY"])}</td>
+            <td class="agentTableData font-10">{h(a["AGENTPRIMARYROLE"])}</td>
+            <td class="agentTableData font-10">{h(a["AGENTPHONE"])}</td>
+            <td class="agentTableData font-10">{h(a["AGENTEMAIL"])}</td>
         </tr>"""
         for a in agents]
     )
@@ -531,81 +683,81 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
 
     Each item is displayed as vertical label/value rows with ALL fields.
 
-    This is the agent's version.
+    This is the "AGENT COPY" version.
     """
 
     evid_rows = "".join([f"""
             <tr class="evidTableItemRow">
                 <td colspan="2" class="evidTableData">
-                    Item #:&ensp;{e["EVIDNUM"]}
+                    Item #:&ensp;{h(e["EVIDNUM"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
-                <td class="evidTableDataColTwo px-6">{e["EVIDQTY"]}</td>
+                <td class="evidTableDataColTwo px-6">{h(e["EVIDQTY"])}</td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Description:</td>
-                <td class="evidTableDataColTwo px-6">{e["EVIDDESC"]}</td>
+                <td class="evidTableDataColTwo px-6">{h(e["EVIDDESC"])}</td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Model #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDMODELNUMBER"]}
+                    {h(e["EVIDMODELNUMBER"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Serial #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDSERIALNUMBER"]}
+                    {h(e["EVIDSERIALNUMBER"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Location:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDLOCROOM"]}
+                    {h(e["EVIDLOCROOM"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Where Found:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDLOCROOMDETAIL"]}
+                    {h(e["EVIDLOCROOMDETAIL"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Located By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDFOUNDBY"]}
+                    {h(e["EVIDFOUNDBY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Witnessed By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDFOUNDBYWITNESS"]}
+                    {h(e["EVIDFOUNDBYWITNESS"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Photographed:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDPICTAKEN"]}
+                    {h(e["EVIDPICTAKEN"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDTRIAGED"]}
+                    {h(e["EVIDTRIAGED"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDTRIAGEDBY"]}
+                    {h(e["EVIDTRIAGEDBY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Notes:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDNOTE"]}
+                    {h(e["EVIDNOTE"])}
                 </td>
             </tr>
             <tr>
@@ -653,7 +805,7 @@ def build_evidence_by_room_report_html(
 
     Groups evidence items under dark-background room headers with item counts.
 
-    Uses the same full detail layout as the full evidence report.
+    Uses the same full detail layout as the AGENT COPY evidence report.
     """
 
     room_tables = ""
@@ -664,89 +816,89 @@ def build_evidence_by_room_report_html(
 
         # Singular vs plural
         if item_count == 1:
-            count_text = f"{room_name}&ensp;:&ensp;({item_count} item)"
+            count_text = f"{h(room_name)}&ensp;:&ensp;({item_count} item)"
         else:
-            count_text = f"{room_name}&ensp;:&ensp;({item_count} items)"
+            count_text = f"{h(room_name)}&ensp;:&ensp;({item_count} items)"
 
         # Filter evidence items for this room
-        room_items = [e for e in evidence if e["evid_loc_room"] == room_name]
+        room_items = [e for e in evidence if e["EVIDLOCROOM"] == room_name]
         evid_rows = "".join([f"""
             <tr>
                 <td class="evidTableDataColOne">Item No.:</td>
                 <td class="evidTableDataColTwo px-6" style="font-weight:bold">
-                    {e["EVIDNUM"]}
+                    {h(e["EVIDNUM"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDQTY"]}
+                    {h(e["EVIDQTY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Description:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDDESC"]}
+                    {h(e["EVIDDESC"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Model #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDMODELNUMBER"]}
+                    {h(e["EVIDMODELNUMBER"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Serial #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDSERIALNUMBER"]}
+                    {h(e["EVIDSERIALNUMBER"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Location:</td>
                 <td class="evidTableDataColTwo px-6">
-                    Room {e["EVIDLOCROOM"]}
+                    Room {h(e["EVIDLOCROOM"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Where Found</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDLOCROOMDETAIL"]}
+                    {h(e["EVIDLOCROOMDETAIL"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Located By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDFOUNDBY"]}
+                    {h(e["EVIDFOUNDBY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Witnessed By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDFOUNDBYWITNESS"]}
+                    {h(e["EVIDFOUNDBYWITNESS"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Photographed:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDPICTAKEN"]}
+                    {h(e["EVIDPICTAKEN"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDTRIAGED"]}
+                    {h(e["EVIDTRIAGED"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Item Triaged By:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDTRIAGEDBY"]}
+                    {h(e["EVIDTRIAGEDBY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Notes:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDNOTE"]}
+                    {h(e["EVIDNOTE"])}
                 </td>
             </tr>
             <tr>
@@ -764,7 +916,7 @@ def build_evidence_by_room_report_html(
                 </thead>
                 <tbody>
                     <tr class="evidTableRoomNameRow">
-                        <th colspan="2">{count_text}</th>
+                        <th colspan="2">{h(count_text)}</th>
                     </tr>
                     {evid_rows}
                 </tbody>
@@ -812,31 +964,31 @@ def build_basic_evidence_report_html(
     evid_rows = "".join([f"""
             <tr class="evidTableItemRow">
                 <td colspan="2" class="evidTableData">
-                    Item #:&ensp;{e["EVIDNUM"]}
+                    Item #:&ensp;{h(e["EVIDNUM"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Quantity:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDQTY"]}
+                    {h(e["EVIDQTY"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Description:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDDESC"]}
+                    {h(e["EVIDDESC"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Model #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDMODELNUMBER"]}
+                    {h(e["EVIDMODELNUMBER"])}
                 </td>
             </tr>
             <tr>
                 <td class="evidTableDataColOne">Serial #:</td>
                 <td class="evidTableDataColTwo px-6">
-                    {e["EVIDSERIALNUMBER"]}
+                    {h(e["EVIDSERIALNUMBER"])}
                 </td>
             </tr>
             <tr>
@@ -881,12 +1033,12 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
     room_rows = "".join([f"""
             <tr>
                 <td class="roomTableData" style="padding-left:25px;">
-                    {r["ROOMLABEL"]}
+                    {h(r["ROOMLABEL"])}
                 </td>
-                <td class="roomTableData font-10">{r["ROOMDESC"]}</td>
-                <td class="roomTableData font-10">{r["ROOMFIRSTAGENT"]}</td>
-                <td class="roomTableData font-10">{r["ROOMSECONDAGENT"]}</td>
-                <td class="roomTableData font-10">{r["ROOMNOTE"]}</td>
+                <td class="roomTableData font-10">{h(r["ROOMDESC"])}</td>
+                <td class="roomTableData font-10">{h(r["ROOMFIRSTAGENT"])}</td>
+                <td class="roomTableData font-10">{h(r["ROOMSECONDAGENT"])}</td>
+                <td class="roomTableData font-10">{h(r["ROOMNOTE"])}</td>
             </tr>"""
             for r in rooms
         ]
@@ -937,11 +1089,11 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 
     person_rows = "".join([f"""
         <tr>
-            <td class="personTableData font-10">{p["PERSONNAME"]}</td>
-            <td class="personTableData font-10">{p["PERSONDOB"]}</td>
-            <td class="personTableData font-10">{p["PERSONADDRESS"]}</td>
-            <td class="personTableData font-10">{p["PERSONPHONE"]}</td>
-            <td class="personTableData font-10">{p["SUSPECTNOTE"]}</td>
+            <td class="personTableData font-10">{h(p["PERSONNAME"])}</td>
+            <td class="personTableData font-10">{h(p["PERSONDOB"])}</td>
+            <td class="personTableData font-10">{h(p["PERSONADDRESS"])}</td>
+            <td class="personTableData font-10">{h(p["PERSONPHONE"])}</td>
+            <td class="personTableData font-10">{h(p["SUSPECTNOTE"])}</td>
         </tr>"""
         for p in persons
         ]
@@ -992,10 +1144,10 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 
     note_rows = "".join([f"""
         <tr>
-            <td class="noteTableData font-10">{n["NOTEDATETIME"]}</td>
-            <td class="noteTableData font-10">{n["NOTEDATETIMEUPDATED"]}</td>
-            <td class="noteTableData font-10">{n["NOTEAUTHOR"]}</td>
-            <td class="noteTableData font-10">{n["NOTETEXT"]}</td>
+            <td class="noteTableData font-10">{h(n["NOTEDATETIME"])}</td>
+            <td class="noteTableData font-10">{h(n["NOTEDATETIMEUPDATED"])}</td>
+            <td class="noteTableData font-10">{h(n["NOTEAUTHOR"])}</td>
+            <td class="noteTableData font-10">{h(n["NOTETEXT"])}</td>
         </tr>
         """
         for n in notes
@@ -1042,7 +1194,7 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 
 # ----- Updated Agents Route -----
 @ui.page("/reports/agents")
-def print_agents_report() -> None:
+def print_agents_report():
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -1074,7 +1226,7 @@ def print_agents_report() -> None:
 
 # ----- Updated Evidence Routes -----
 @ui.page("/reports/evidence")
-def print_evidence_report() -> None:
+def print_evidence_report():
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -1100,7 +1252,7 @@ def print_evidence_report() -> None:
                 "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY,
                 "EVIDNOTE": e.EVIDNOTE,
             }
-            for e in session.query(Evidence).order_by(Evidence.EVIDNUM).all()
+            for e in evidence_in_order(session)
         ]
 
     html = build_evidence_report_html(
@@ -1113,7 +1265,7 @@ def print_evidence_report() -> None:
 
 # ----- Updated Evidence By Room Route -----
 @ui.page("/reports/evidence_by_room")
-def print_evidence_by_room_report() -> None:
+def print_evidence_by_room_report():
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -1122,17 +1274,7 @@ def print_evidence_by_room_report() -> None:
     with get_session() as session:
         active_case = get_case_info()
 
-        unique_rooms = (
-            session.query(
-                Evidence.EVIDLOCROOM,
-                func.count(Evidence.EVIDLOCROOM),
-            )
-            .group_by(Evidence.EVIDLOCROOM)
-            .all()
-        )
-
-        # Convert to list of tuples for the template
-        unique_rooms_list = [(r[0], r[1]) for r in unique_rooms]
+        unique_rooms_list = rooms_with_item_counts(session)
 
         evidence = [
             {
@@ -1150,7 +1292,7 @@ def print_evidence_by_room_report() -> None:
                 "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY,
                 "EVIDNOTE": e.EVIDNOTE,
             }
-            for e in session.query(Evidence).order_by(Evidence.EVIDNUM).all()
+            for e in evidence_in_order(session)
         ]
 
     html = build_evidence_by_room_report_html(
@@ -1164,7 +1306,7 @@ def print_evidence_by_room_report() -> None:
 
 # ----- Updated Basic Evidence Report Route -----
 @ui.page("/reports/evidence_basic")
-def print_basic_evidence_report() -> None:
+def print_basic_evidence_report():
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -1182,7 +1324,7 @@ def print_basic_evidence_report() -> None:
                 "EVIDMODELNUMBER": e.EVIDMODELNUMBER,
                 "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER,
             }
-            for e in session.query(Evidence).order_by(Evidence.EVIDNUM).all()
+            for e in evidence_in_order(session)
         ]
 
     html = build_basic_evidence_report_html(
@@ -1195,7 +1337,7 @@ def print_basic_evidence_report() -> None:
 
 # ----- Updated Rooms Route -----
 @ui.page("/reports/rooms")
-def print_rooms_report() -> None:
+def print_rooms_report():
 
     if not is_authenticated():
         ui.navigate.to("/")
@@ -1211,7 +1353,7 @@ def print_rooms_report() -> None:
                 "ROOMSECONDAGENT": r.ROOMSECONDAGENT,
                 "ROOMNOTE": r.ROOMNOTE,
             }
-            for r in session.query(Rooms).order_by(Rooms.ROOMLABEL).all()
+            for r in rooms_in_order(session)
         ]
 
     html = build_rooms_report_html(
@@ -1224,8 +1366,7 @@ def print_rooms_report() -> None:
 
 # ----- Updated Persons Route -----
 @ui.page("/reports/persons")
-def print_persons_report() -> None:
-
+def print_persons_report():
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -1253,8 +1394,7 @@ def print_persons_report() -> None:
 
 # ----- Updated Notes Route -----
 @ui.page("/reports/notes")
-def print_notes_report() -> None:
-
+def print_notes_report():
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -1268,7 +1408,8 @@ def print_notes_report() -> None:
                 "NOTEAUTHOR": n.NOTEAUTHOR,
                 "NOTETEXT": n.NOTETEXT or "",
             }
-            for n in session.query(Notes).order_by(Notes.NOTEDATETIME).all()
+            # In the order written: see the note on notes_page.SPEC.
+            for n in session.query(Notes).order_by(Notes.Z_PK).all()
         ]
 
     html = build_notes_report_html(
@@ -1279,107 +1420,7 @@ def print_notes_report() -> None:
     render_report_page(html_content=html)
 
 
-# # ----- JSON Output -----
-# @ui.page("/reports/json")
-# def json_output_page() -> None:
-#     if not is_authenticated():
-#         ui.navigate.to("/")
-#         return
-
-#     build_navbar(
-#         is_admin=get_is_admin(),
-#         username=get_current_user_name(),
-#     )
-
-#     ui.label("JSON Data Output").classes("text-2xl font-bold m-4")
-
-#     with get_session() as session:
-
-#         case = session.query(Cases).first()
-
-#         data = {
-#             "case": {
-#                 "CASENUMBER": case.CASENUMBER,
-#                 "LOCATION": case.LOCATION,
-#                 "JURISDICTION": case.JURISDICTION,
-#                 "CASEDATETIMEBEGIN": case.CASEDATETIMEBEGIN,
-#                 "CASEDATETIMEEND": case.CASEDATETIMEEND,
-#             },
-#             "agents": [
-#                 {
-#                     "AGENTNAME": a.AGENTNAME,
-#                     "AGENTPARENTAGENCY": a.AGENTPARENTAGENCY,
-#                     "AGENTPRIMARYROLE": a.AGENTPRIMARYROLE,
-#                     "AGENTROLESECONDARY": a.AGENTROLESECONDARY or "",
-#                     "AGENTPHONE": a.AGENTPHONE,
-#                     "AGENTEMAIL": a.AGENTEMAIL,
-#                     "AGENTNOTE": a.AGENTNOTE or "",
-#                 }
-#                 for a in session.query(Agents).all()
-#             ],
-#             "evidence": [
-#                 {
-#                     "EVIDNUM": e.EVIDNUM,
-#                     "EVIDQTY": e.EVIDQTY,
-#                     "EVIDDESC": e.EVIDDESC,
-#                     "EVIDMODELNUMBER": e.EVIDMODELNUMBER,
-#                     "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER,
-#                     "EVIDLOCROOM": e.EVIDLOCROOM,
-#                     "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
-#                     "EVIDFOUNDBY": e.EVIDFOUNDBY,
-#                     "EVIDFOUNDBYWITNESS": e.EVIDFOUNDBYWITNESS,
-#                     "EVIDPICTAKEN": e.EVIDPICTAKEN,
-#                     "EVIDTRIAGED": e.EVIDTRIAGED,
-#                     "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY,
-#                     "EVIDISCONTRABAND": e.EVIDISCONTRABAND,
-#                     "EVIDNOTE": e.EVIDNOTE,
-#                 }
-#                 for e in session.query(Evidence).all()
-#             ],
-#             "rooms": [
-#                 {
-#                     "ROOMLABEL": r.ROOMLABEL,
-#                     "ROOMDESC": r.ROOMDESC,
-#                     "ROOMFIRSTAGENT": r.ROOMFIRSTAGENT,
-#                     "ROOMSECONDAGENT": r.ROOMSECONDAGENT,
-#                 }
-#                 for r in session.query(Rooms).all()
-#             ],
-#             "persons": [
-#                 {
-#                     "PERSONNAME": p.PERSONNAME,
-#                     "PERSONDOB": p.PERSONDOB or "",
-#                     "PERSONADDRESS": p.PERSONADDRESS or "",
-#                     "PERSONPHONE": p.PERSONPHONE or "",
-#                     "SUSPECTNOTE": p.SUSPECTNOTE or "",
-#                 }
-#                 for p in session.query(Persons).all()
-#             ],
-#             "notes": [
-#                 {
-#                     "NOTEDATETIME": n.NOTEDATETIME,
-#                     "NOTEDATETIMEUPDATED": n.NOTEDATETIMEUPDATED or "",
-#                     "NOTEAUTHOR": n.NOTEAUTHOR,
-#                     "NOTETEXT": n.NOTETEXT,
-#                 }
-#                 for n in session.query(Notes).all()
-#             ],
-#         }
-
-#     json_str = json.dumps(data, indent=4)
-
-#     with ui.column().classes("w-full max-w-4xl mx-auto p-4"):
-#         ui.button(
-#             "Copy JSON",
-#             on_click=lambda: ui.run_javascript(
-#                 f"navigator.clipboard.writeText('{json_str}')"
-#             ),
-#         ).props("outline icon=content_copy").classes("mb-4")
-
-#         ui.code(json_str, language="json").classes("w-full")
-
-
-def open_report_window() -> None:
+def open_report_window():
     """Extracts the report innerHTML and opens it in a clean new tab.
 
     The report can be printed after validation has occured.
@@ -1396,7 +1437,7 @@ def open_report_window() -> None:
     ui.run_javascript(f"""
         const reportContent = document.getElementById('report-container');
         if (!reportContent) {{
-            alert('No report content found to print...');
+            alert('No report content found to print.');
             return;
         }}
 
