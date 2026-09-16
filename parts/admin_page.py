@@ -108,6 +108,8 @@ def build_admin_page():
                     f"One-time password:  {one_time}\n\n"
                     "This is shown once and cannot be recovered. They "
                     "will be asked to change it at first sign-in.",
+                    multi_line=True,
+                    classes="multi-line-notification",
                     timeout=0,
                     position="center",
                     close_button="OK",

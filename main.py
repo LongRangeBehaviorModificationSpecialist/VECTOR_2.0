@@ -252,6 +252,10 @@ textarea.q-field__native {
     font-weight: normal;
 }
 
+.multi-line-notification {
+    white-space: pre-line;
+}
+
 /* Print styles */
 @media print {
     .no-print {

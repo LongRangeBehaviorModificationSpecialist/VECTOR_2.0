@@ -161,7 +161,10 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
     with ui.header().classes("items-center bg-dark no-print"):
 
         # ----- Logo + Brand -----
-        unit_logo("novadc_icac.ico", "w-[32px] h-[32px]")
+        # unit_logo("/static/novadc_icac.ico", "w-[32px] h-[32px]")
+        ui.image(
+            "/static/novadc_icac.ico",
+        ).classes("w-[32px] h-[32px]")
 
         ui.link(
             "V·E·C·T·O·R",
@@ -176,13 +179,12 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
         with ui.row().classes("nav-wide items-center gap-0 no-wrap"):
             for label, route in NAV_PAGES:
                 ui.button(label, on_click=_go(route)).props(
-                    "flat dense color=white"
-                ).classes("q-px-sm")
+                    "flat color=white"
+                ).classes("px-5")
             _nav_dropdown(
                 "Help",
                 [(label, _go(route)) for label, route in HELP_PAGES],
-                classes="q-px-sm",
-                props="dense",
+                classes="px-5"
             )
 
         # ----- ...and one menu button on a narrow one -----
