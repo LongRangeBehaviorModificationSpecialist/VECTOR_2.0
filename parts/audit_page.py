@@ -16,7 +16,8 @@ from nicegui import ui
 
 from auth import get_current_user_name, get_is_admin
 import clock
-from models import get_session, verify_audit_chain, AuditLog
+from live import refresh_on_change
+from models import audit_version, get_session, verify_audit_chain, AuditLog
 from navbar import build_navbar
 
 
@@ -304,3 +305,7 @@ def build_audit_page() -> None:
         search_input.on("keydown.enter", search_again)
 
         refresh_audit_table()
+
+        # Follows the trail itself rather than case data: a sign-in on
+        # another device writes an entry and changes nothing else.
+        refresh_on_change(refresh_audit_table, version=audit_version)

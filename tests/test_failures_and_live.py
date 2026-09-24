@@ -301,10 +301,12 @@ def test_editing_and_deleting_move_the_version(populated):
 
 def test_reading_does_not_move_the_version(populated):
     before = models.data_version()
+    trail_before = models.audit_version()
     with get_session() as session:
         session.query(Agents).all()
         session.query(Evidence).count()
     assert models.data_version() == before
+    assert models.audit_version() == trail_before
 
 
 def test_a_failed_save_does_not_move_the_version(populated):
@@ -314,13 +316,33 @@ def test_a_failed_save_does_not_move_the_version(populated):
     assert models.data_version() == before
 
 
-def test_a_sign_in_record_does_not_move_the_version():
-    """Nothing on screen shows audit rows, so no page needs reloading."""
+def test_a_sign_in_record_does_not_move_the_case_version():
+    """No table of case data changes, so those pages must not reload."""
     before = models.data_version()
     with get_session() as session:
         record_audit(session, action="LOGIN", table_name="users",
                      summary="agent", actor="agent")
     assert models.data_version() == before
+
+
+def test_a_sign_in_record_moves_the_trail_version():
+    """The Audit Trail page exists to show exactly that entry, so it
+    watches this signal instead."""
+    before = models.audit_version()
+    with get_session() as session:
+        record_audit(session, action="LOGIN", table_name="users",
+                     summary="agent", actor="agent")
+    assert models.audit_version() > before
+
+
+def test_saving_a_record_moves_both_signals():
+    """A save writes the record and its audit entry in one commit."""
+    case_before = models.data_version()
+    trail_before = models.audit_version()
+    with get_session() as session:
+        session.add(_agent("Both, Signals"))
+    assert models.data_version() > case_before
+    assert models.audit_version() > trail_before
 
 
 def test_a_bulk_wipe_moves_the_version(populated):

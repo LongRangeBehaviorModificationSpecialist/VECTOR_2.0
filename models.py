@@ -817,13 +817,18 @@ def chain_existing_audit_entries() -> int:
 
 
 # ----- Change signal -----
-# Open pages on other devices watch this number and reload what they show
-# when it moves, so an entry made on one tablet appears on the others
-# without anyone pressing reload. It counts commits of case data made by
-# this process, which is the only one writing to app_data.db while VECTOR
-# runs. The audit rows a sign-in writes do not count: nothing on screen
-# shows them.
+# Open pages on other devices watch these numbers and reload what they
+# show when one moves, so an entry made on one tablet appears on the
+# others without anyone pressing reload. They count commits made by this
+# process, which is the only one writing to app_data.db while VECTOR
+# runs.
+#
+# Case data and the audit trail are counted apart. A sign-in writes
+# nothing but an audit entry: no table on screen changes, so the pages
+# showing case data must not reload -- and the Audit Trail page, which
+# exists to show exactly those entries, must.
 _data_version = 0
+_audit_version = 0
 
 
 def data_version() -> int:
@@ -831,12 +836,19 @@ def data_version() -> int:
     return _data_version
 
 
+def audit_version() -> int:
+    """Goes up by one each time audit entries are committed."""
+    return _audit_version
+
+
 @event.listens_for(Session, "before_flush")
 def _note_case_change(session, _flush_context, _instances) -> None:
     for group in (session.new, session.dirty, session.deleted):
-        if any(not isinstance(obj, AuditLog) for obj in group):
-            session.info["vector_changed"] = True
-            return
+        for obj in group:
+            if isinstance(obj, AuditLog):
+                session.info["vector_audited"] = True
+            else:
+                session.info["vector_changed"] = True
 
 
 @event.listens_for(Session, "do_orm_execute")
@@ -849,14 +861,17 @@ def _note_bulk_change(orm_execute_state) -> None:
 
 @event.listens_for(Session, "after_commit")
 def _count_committed_change(session) -> None:
-    global _data_version
+    global _data_version, _audit_version
     if session.info.pop("vector_changed", False):
         _data_version += 1
+    if session.info.pop("vector_audited", False):
+        _audit_version += 1
 
 
 @event.listens_for(Session, "after_rollback")
 def _forget_rolled_back_change(session) -> None:
     session.info.pop("vector_changed", None)
+    session.info.pop("vector_audited", None)
 
 
 def generate_one_time_password() -> str:

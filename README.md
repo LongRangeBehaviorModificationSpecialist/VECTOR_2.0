@@ -100,7 +100,7 @@ Everything the original does, plus:
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 378 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 380 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -332,8 +332,9 @@ Any device that reaches the port gets the login page, so several agents
 can work the same case from tablets or laptops at once. The database is
 in WAL mode, so simultaneous entries do not collide, and open pages
 refresh on their own within a couple of seconds when another device
-saves. A page waits while you have a dialog open, so an edit in progress
-is never swept away. On a phone or a small tablet the page buttons fold
+saves -- the Audit Trail page included, which follows the trail itself
+so a sign-in on another device shows up. A page waits while you have a
+dialog open, so an edit in progress is never swept away. On a phone or a small tablet the page buttons fold
 into one menu button at the top left, so the bar stays on a single line.
 
 > **Before you use `--lan`, understand what it means.**
@@ -387,7 +388,9 @@ Work top to bottom; each step feeds the next.
    list never skips
 5. **People** — suspects and others present
 6. **Notes** — timestamped narrative entries
-7. **Files** — photographs and documents, stored in the case database
+7. **Files** — photographs and documents, stored in the case database.
+   On a phone or tablet a **Take a photograph** button opens the camera
+   straight into the case
 8. **Reports** — seven printable layouts, including the basic
    inventory used as the return copy. If the case has no end time yet,
    the page offers to fill it in from this machine's clock
@@ -711,7 +714,7 @@ Every push and every pull request runs the same suite on GitHub Actions
 — Ubuntu on the oldest and the newest Python VECTOR supports, and
 Windows — from [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
 
-378 tests, about twelve seconds. They run against a temporary database
+380 tests, about fifteen seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -731,7 +734,7 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
 | `test_json_export.py` | 22 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected; older and upstream layouts import |
 | `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
-| `test_failures_and_live.py` | 20 | Failures are explained without the SQL; a failed import leaves the case unchanged, and an import clears attachments the new case lacks; exports stop rather than leave attachments out; edit dialogs open for values no longer on a list; saves, wipes and imports move the change signal, while reads and sign-ins do not |
+| `test_failures_and_live.py` | 22 | Failures are explained without the SQL; a failed import leaves the case unchanged, and an import clears attachments the new case lacks; exports stop rather than leave attachments out; edit dialogs open for values no longer on a list; saves, wipes and imports move the change signal, while reads do not, and a sign-in moves the trail's signal alone |
 | `test_numbering.py` | 17 | Evidence numbering past item 9; room labels past Z |
 | `test_validators.py` | 16 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time |
 | `test_export_import.py` | 15 | CSV round trip preserves rows, bytes and provenance, including attachments sharing a name; encrypted archives; tampering detected; older and upstream archives import; download staging is cleared |

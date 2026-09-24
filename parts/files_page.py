@@ -184,6 +184,21 @@ def build_uploads_page() -> None:
                     ".zip, .7z, .tar, .tgz, .gz, .tar.gz, .rar, .bz2, .xz"
             ).classes("w-full")
 
+            # On a phone or tablet this opens the camera itself, instead
+            # of the file picker with the camera one more tap behind it.
+            # A desktop browser ignores "capture" and would show the
+            # picker again, so the button appears only where the pointer
+            # is a finger -- see .touch-only in main.py.
+            ui.upload(
+                on_upload=handle_upload,
+                auto_upload=True,
+                label="Take a photograph",
+                multiple=False,
+                max_file_size=Config.MAX_UPLOAD_BYTES,
+            ).props(
+                'accept="image/*,video/*" capture="environment"'
+            ).classes("w-full touch-only mt-2")
+
         # ----- Existing Files Table -----
         ui.separator().classes("my-6")
 

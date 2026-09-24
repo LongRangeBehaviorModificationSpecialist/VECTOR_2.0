@@ -256,6 +256,18 @@ textarea.q-field__native {
     white-space: pre-line;
 }
 
+/* Shown only where the pointer is a finger: the camera button, which a
+   desktop browser would answer with another file picker. */
+.touch-only {
+    display: none !important;
+}
+
+@media (pointer: coarse) {
+    .touch-only {
+        display: block !important;
+    }
+}
+
 /* Print styles */
 @media print {
     .no-print {
