@@ -336,7 +336,7 @@ def confirm_delete_all(action: str, callback):
     """Shows a confirmation dialog before executing a destructive action."""
     with ui.dialog() as dialog, ui.card().classes("max-w-sm p-6"):
 
-        ui.label(f"Warning!").classes("text-lg font-bold mb-2 text-[#1C69A8]")
+        ui.label("Warning!").classes("text-lg font-bold mb-2 text-[#1C69A8]")
 
         ui.label(
             f"This will permanently delete ALL {action} from the database. "

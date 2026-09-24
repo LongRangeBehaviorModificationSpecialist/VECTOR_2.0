@@ -286,7 +286,6 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
     with get_session() as session:
 
         case = session.query(Cases).first()
-        evidence = session.query(Evidence).all()
 
         if not case:
             errors.append(

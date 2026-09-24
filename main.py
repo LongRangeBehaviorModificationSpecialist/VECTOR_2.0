@@ -307,7 +307,7 @@ textarea.q-field__native {
 # report sub-routes were not registered until somebody first visited
 # /reports -- so a bookmark or a page refresh returned 404. auth.py
 # removed the cycle, so the imports can sit where they belong.
-import home_page
+import home_page  # noqa: F401  (imported for its @ui.page routes)
 
 from parts.admin_page import build_admin_page
 from parts.agents_page import build_agents_page

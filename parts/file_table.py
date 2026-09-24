@@ -211,7 +211,7 @@ def files_table() -> Callable[[], None]:
                     )
 
                     ui.label(
-                        f"The following file will be removed from the "
+                        "The following file will be removed from the "
                         "case file :"
                     ).classes("mb-3 text-sm text-[var(--vsp-gray)]")
 

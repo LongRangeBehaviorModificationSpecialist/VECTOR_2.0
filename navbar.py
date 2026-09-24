@@ -37,7 +37,7 @@ def _nav_dropdown(
     with ui.button(label, icon=icon).props(
         f"flat color=white {props}"
     ).classes(classes):
-        with ui.menu() as menu:
+        with ui.menu():
             for item_label, callback in items:
                 if item_label == "---":
                     ui.separator()

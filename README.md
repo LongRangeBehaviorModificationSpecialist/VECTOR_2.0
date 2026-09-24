@@ -100,7 +100,7 @@ Everything the original does, plus:
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 412 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 414 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -714,7 +714,14 @@ Every push and every pull request runs the same suite on GitHub Actions
 — Ubuntu on the oldest and the newest Python VECTOR supports, and
 Windows — from [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
 
-412 tests, about fifteen seconds. They run against a temporary database
+That workflow also runs `ruff check`, configured in
+[`ruff.toml`](ruff.toml) to look for errors rather than style: a name
+that does not exist, an import left behind by code that moved, a value
+assigned and never read. Style is left alone deliberately — this
+codebase has its own conventions and a linter arguing about them would
+be noise.
+
+414 tests, about fifteen seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -727,7 +734,7 @@ export is round-tripped and compared row for row and byte for byte.
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `test_modules_import.py` | 32 | Every module imports: a page builder moved into a new file cannot break the application without failing here |
+| `test_modules_import.py` | 34 | Every module imports: a page builder moved into a new file cannot break the application without failing here |
 | `test_page_specs.py` | 53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written |
 | `test_order_dates_and_files.py` | 29 | Reports and tables list items and rooms in order; renaming a room moves its evidence; impossible or half-typed dates are refused; attachment contents load only when read, and downloads keep their names |
 | `test_times_and_numbers.py` | 25 | Stamps carry this machine's time zone and offset, and UTC stamps already saved are rewritten once; both case times offer the fill button, and the end-time reminder never fills in a time before the start; typed text in a dropdown is kept; removing an item moves the later numbers down, audited |
@@ -775,31 +782,33 @@ case data.
 ## How the code is laid out
 
 ```
-Start VECTOR.bat     double-click launcher for Windows
+Start VECTOR.bat        double-click launcher for Windows
 Start VECTOR.command double-click launcher for macOS, runs the .sh
-Start VECTOR.sh      the macOS launcher itself
-main.py              startup, route table, first-run bootstrap
-auth.py              session state, sign-in throttling, route guards
-models.py            tables, the audit listener, schema upgrades
-clock.py             the machine's clock and time zone, for every stamp
-crypto.py            SQLCipher detection and key handling
-failures.py          plain-language reasons for failures, and the log
-idle.py              signs out a device nobody has touched
-live.py              refreshes open pages when another device saves
-utils.py             validators, the active-case guard, shared helpers
-import_export.py     CSV and JSON export and import
-navbar.py            top navigation and the case badge
-home_page.py         login, main menu, the buttons on it
+Start VECTOR.sh         the macOS launcher itself
+main.py                 startup, route table, first-run bootstrap
+auth.py                 session state, sign-in throttling, route guards
+models.py               tables, the audit listener, schema upgrades
+clock.py                the machine's clock and time zone, for every stamp
+crypto.py               SQLCipher detection and key handling
+failures.py             plain-language reasons for failures, and the log
+idle.py                 signs out a device nobody has touched
+live.py                 refreshes open pages when another device saves
+utils.py                validators, the active-case guard, shared helpers
+import_export.py        CSV and JSON export and import
+navbar.py               top navigation and the case badge
+home_page.py            login, main menu, the buttons on it
 parts/case_transfer.py  export, import and Delete All Data
 parts/admin_users.py    the Admin Panel's card, table and sessions
 parts/file_upload.py    the upload card, the checks, the SHA-256
 parts/file_table.py     the attachments list, downloads, deletes
-parts/crud.py        the table-driven builder every entity page uses
-parts/*_page.py      one file per screen
-program/config.py    paths, network and upload settings
-program/inc/         Virginia jurisdictions, agencies, agent roles
-tools/               demo case, database encryption and decryption
-tests/               the test suite
+parts/crud.py           the table-driven builder every entity page uses
+parts/crud_widgets.py   the Field description and the widgets
+parts/crud_dialogs.py   edit, delete and delete-all
+parts/*_page.py         one file per screen
+program/config.py       paths, network and upload settings
+program/inc/            Virginia jurisdictions, agencies, agent roles
+tools/                  demo case, database encryption and decryption
+tests/                  the test suite
 ```
 
 ### Adding a field to an entity

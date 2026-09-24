@@ -574,8 +574,6 @@ def confirm_new_case_handler() -> None:
 @ui.page("/logout")
 def logout_page():
     """Logs out the current user."""
-    from nicegui import app
-
     sign_out()
 
     ui.notify(

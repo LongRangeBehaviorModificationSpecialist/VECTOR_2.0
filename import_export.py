@@ -518,7 +518,7 @@ def export_vector_to_csv(
 
     # Also show in terminal
     print(f"\n{'='*60}")
-    print(f"  EXPORT COMPLETE")
+    print("  EXPORT COMPLETE")
     print(f"  Location: {zip_path}")
     print(f"  Tables: {exported_tables}")
     print(f"  Total records: {total_records}")
@@ -832,7 +832,7 @@ def import_vector_from_csv(
     )
 
     print(f"\n{'='*60}")
-    print(f"  IMPORT COMPLETE")
+    print("  IMPORT COMPLETE")
     print(f"  Tables: {imported_tables}")
     print(f"  Total records: {total_records}")
     print(f"  Files imported: {files_imported}")
