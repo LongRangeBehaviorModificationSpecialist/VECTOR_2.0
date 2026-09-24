@@ -100,7 +100,7 @@ Everything the original does, plus:
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 380 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 410 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -714,7 +714,7 @@ Every push and every pull request runs the same suite on GitHub Actions
 — Ubuntu on the oldest and the newest Python VECTOR supports, and
 Windows — from [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
 
-380 tests, about fifteen seconds. They run against a temporary database
+410 tests, about fifteen seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -727,6 +727,7 @@ export is round-tripped and compared row for row and byte for byte.
 
 | File | Tests | Covers |
 |------|------:|--------|
+| `test_modules_import.py` | 30 | Every module imports: a page builder moved into a new file cannot break the application without failing here |
 | `test_page_specs.py` | 53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written |
 | `test_order_dates_and_files.py` | 29 | Reports and tables list items and rooms in order; renaming a room moves its evidence; impossible or half-typed dates are refused; attachment contents load only when read, and downloads keep their names |
 | `test_times_and_numbers.py` | 25 | Stamps carry this machine's time zone and offset, and UTC stamps already saved are rewritten once; both case times offer the fill button, and the end-time reminder never fills in a time before the start; typed text in a dropdown is kept; removing an item moves the later numbers down, audited |
@@ -788,7 +789,9 @@ live.py              refreshes open pages when another device saves
 utils.py             validators, the active-case guard, shared helpers
 import_export.py     CSV and JSON export and import
 navbar.py            top navigation and the case badge
-home_page.py         login, main menu, data management
+home_page.py         login, main menu, the buttons on it
+parts/case_transfer.py  export, import and Delete All Data
+parts/admin_users.py    the Admin Panel's card, table and sessions
 parts/crud.py        the table-driven builder every entity page uses
 parts/*_page.py      one file per screen
 program/config.py    paths, network and upload settings
