@@ -78,7 +78,9 @@ def build_authenticated_home():
 
         # ----- Page Title and Header -----
 
-        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-2")
+        ui.image(
+            "/static/novadc_icac.png",
+        ).classes("w-[150px] h-[150px] mb-2")
 
         ui.label(
             "V·E·C·T·O·R Home"
@@ -579,7 +581,9 @@ def build_login_home():
 
     with ui.column().classes("items-center w-full mt-12"):
 
-        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-4")
+        ui.image(
+            "/static/novadc_icac.png",
+        ).classes("w-[150px] h-[150px] mb-2")
 
         ui.label(
             "-- V·E·C·T·O·R --"
@@ -754,7 +758,7 @@ def about_page():
         with ui.card().classes("p-6"):
 
             ui.label(f"Version  :  {Config.version}").classes("mb-2")
-            ui.label(f"Author  :  {Config.author}").classes("mb-2")
+            ui.label(f"Authors  :  {Config.authors}").classes("mb-2")
             ui.label(f"Department  :  {Config.dept}").classes("mb-2")
             ui.label(f"URL : {Config.url}").classes("mb-2")
             ui.label(f"Last Updated  :  {Config.updated}").classes("mb-2")

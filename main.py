@@ -46,6 +46,7 @@ from program.config import (
 
 DEBUG_MODE = "--dev" in sys.argv
 
+
 # ----- Network exposure -----
 # Loopback unless explicitly opted in, so an install is never reachable
 # from the network by accident. See README "Access from another device".
@@ -58,7 +59,6 @@ def get_storage_secret() -> str:
 
     Generates a new secret and saves it if the file doesn't exist.
     """
-
     if SECRET_FILE.exists():
         secret = SECRET_FILE.read_text(encoding="utf-8").strip()
         if secret:
@@ -250,6 +250,10 @@ textarea.q-field__native {
     color: #F5B027;
     font-size: 10pt;
     font-weight: normal;
+}
+
+.multi-line-notification {
+    white-space: pre-line;
 }
 
 /* Print styles */

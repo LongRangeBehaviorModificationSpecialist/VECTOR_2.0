@@ -13,10 +13,9 @@ when the number has moved.
 """
 
 from typing import Callable
-
 from nicegui import ui
-
 from models import data_version
+
 
 CHECK_EVERY_SECONDS = 2.0
 

@@ -126,6 +126,7 @@ event.listen(engine, "connect", _enable_wal)
 
 Session = sessionmaker(bind=engine)
 
+
 # ----- Users database -----
 USERS_DATABASE_URL = _sqlite_url(USERS_DB_PATH)
 
@@ -141,8 +142,8 @@ Base = declarative_base()
 # Users model -> users.db
 UsersBase = declarative_base()
 
-# ----- MODELS -----
 
+# ----- MODELS -----
 
 class Cases(Base):
     """Cases table — stores case details."""
@@ -212,6 +213,7 @@ class AgentsSchema(Schema):
     AGENTNOTE = fields.Str()
     ENTEREDDATETIME = fields.Str()
 
+
 agents_schema = AgentsSchema(many=True)
 
 
@@ -278,6 +280,7 @@ class Evidence(Base):
     def __str__(self):
         return f"Item {self.Z_PK}: {self.EVIDDESC}"
 
+
 class EvidenceSchema(Schema):
     """Evidence schema."""
 
@@ -296,6 +299,7 @@ class EvidenceSchema(Schema):
     EVIDISCONTRABAND = fields.Str()
     EVIDNOTE = fields.Str()
     ENTEREDDATETIME = fields.Str()
+
 
 evid_schema = EvidenceSchema(many=True)
 
@@ -351,6 +355,7 @@ class Notes(Base):
     def __str__(self):
         return f"Note {self.Z_PK}: {self.NOTETEXT}"
 
+
 class NotesSchema(Schema):
     """Notes schema."""
 
@@ -358,6 +363,7 @@ class NotesSchema(Schema):
     NOTEDATETIMEUPDATED = fields.Str()
     NOTEAUTHOR = fields.Str()
     NOTETEXT = fields.Str()
+
 
 note_schema = NotesSchema(many=True)
 
@@ -405,6 +411,7 @@ class FileSchema(Schema):
     FILENOTE = fields.Str()
     FILESHA256 = fields.Str()
     FILEHASHEDAT = fields.Str()
+
 
 file_schema = FileSchema(many=True)
 

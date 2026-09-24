@@ -18,6 +18,7 @@ Routes:
 
 
 Workflow for report creation:
+
     (1) `print_<type>_report() function is called from the navbar button ->
     (2) That function calls `get_case_info()` ->
     (3) `build_<type>_report_html(active_case=active_case,

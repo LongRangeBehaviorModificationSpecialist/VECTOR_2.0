@@ -699,14 +699,14 @@ def build_crud_page(spec: CrudSpec) -> None:
                 )
                 ui.label(
                     f"Delete {spec.entity} {label}?"
-                ).classes("mb-2")
+                ).classes("mb-2 text-base")
                 note = spec.delete_note(row) if spec.delete_note else ""
                 if note:
-                    ui.label(note).classes("mb-2 text-sm text-[#F5B027]")
+                    ui.label(note).classes("mb-2 text-base text-[#F5B027]")
                 ui.label(
                     "The record is removed, but the deletion and its "
                     "contents are kept in the audit trail."
-                ).classes("mb-4 text-xs text-gray-400")
+                ).classes("mb-4 text-sm text-white")
 
                 with ui.row().classes("w-full justify-end gap-2"):
                     ui.button(
