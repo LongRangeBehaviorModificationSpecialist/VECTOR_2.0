@@ -10,6 +10,8 @@ Dependencies:
 import bcrypt
 import clock
 from contextlib import contextmanager
+import hashlib
+import itertools
 import secrets
 from datetime import datetime, timezone
 import json
@@ -477,6 +479,9 @@ class AuditLog(Base):
     summary = Column(String())                     # human-readable label
     before = Column(Text())                        # JSON, changed fields only
     after = Column(Text())
+    # A fingerprint of this entry and of the one before it, which makes
+    # the trail a chain. See audit_fingerprint().
+    chain = Column(String(64))
 
     def __repr__(self):
         return f"Audit {self.id}: {self.action} {self.table_name}"
@@ -503,6 +508,50 @@ _AUDITED_TABLES = {
 def audit_timestamp() -> str:
     """UTC, ISO-8601, explicitly marked. Never local time."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# ----- Tamper-evidence -----
+# Each entry carries a SHA-256 of its own contents and of the entry
+# before it, so the entries form a chain. Change one in a database
+# browser, or take one out, and every entry after it stops matching --
+# which is the difference between an alteration somebody notices and one
+# nobody does.
+#
+# This is evidence of tampering, not protection from it: anyone who can
+# write to the database could recompute the whole chain. An export taken
+# while the trail was whole is the outside copy to check against.
+AUDIT_CHAIN_START = "0" * 64
+
+# The order entries were written in. Their ids are not assigned until the
+# flush, and the chain has to follow the order they happened in.
+_audit_sequence = itertools.count()
+
+
+def audit_fingerprint(previous: str, entry) -> str:
+    """The fingerprint of one entry, given the one before it."""
+    fields = [
+        previous or AUDIT_CHAIN_START,
+        entry.ts_utc or "",
+        entry.actor or "",
+        entry.action or "",
+        entry.table_name or "",
+        "" if entry.row_pk is None else str(entry.row_pk),
+        entry.summary or "",
+        entry.before or "",
+        entry.after or "",
+    ]
+    # A unit separator between the fields, so no value can fake a field
+    # boundary: JSON escapes control characters, and it is not a
+    # character a username or a table name can hold.
+    joined = "\x1f".join(fields)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
+def _new_audit_entry(**fields):
+    """An audit entry, stamped with its place in the order written."""
+    entry = AuditLog(**fields)
+    entry._sequence = next(_audit_sequence)
+    return entry
 
 
 def current_actor() -> str:
@@ -575,7 +624,7 @@ def record_audit(
     entirely.
     """
     session.add(
-        AuditLog(
+        _new_audit_entry(
             ts_utc=audit_timestamp(),
             actor=actor or current_actor(),
             action=action,
@@ -629,7 +678,7 @@ def _audit_before_flush(session, _flush_context, _instances) -> None:
     for action, obj, before, after in entries:
         label_column = _AUDITED_TABLES[obj.__tablename__]
         session.add(
-            AuditLog(
+            _new_audit_entry(
                 ts_utc=audit_timestamp(),
                 actor=actor,
                 action=action,
@@ -640,6 +689,131 @@ def _audit_before_flush(session, _flush_context, _instances) -> None:
                 after=json.dumps(after, default=str) if after else None,
             )
         )
+
+
+@event.listens_for(Session, "before_flush")
+def _chain_audit_entries(session, _flush_context, _instances) -> None:
+    """Fingerprints each new entry onto the one before it.
+
+    Registered after the listener above, so the entries it has just
+    added are chained in the same flush -- and before anything reaches
+    the database, so a rolled-back transaction leaves no gap.
+    """
+    pending = sorted(
+        (obj for obj in session.new if isinstance(obj, AuditLog)),
+        key=lambda entry: getattr(entry, "_sequence", 0),
+    )
+    if not pending:
+        return
+
+    with session.no_autoflush:
+        previous = (
+            session.query(AuditLog.chain)
+            .order_by(AuditLog.id.desc())
+            .limit(1)
+            .scalar()
+        )
+
+    for entry in pending:
+        if entry.chain:
+            continue
+        entry.chain = audit_fingerprint(previous, entry)
+        previous = entry.chain
+
+
+def verify_audit_chain() -> tuple[bool, str]:
+    """Walks the trail, checking each entry against its fingerprint.
+
+    Returns whether everything matches, and a sentence saying what was
+    found -- the first entry that does not match, if any, because every
+    entry after it is chained onto a value that has changed.
+    """
+    previous = AUDIT_CHAIN_START
+    checked = unchained = 0
+
+    with get_session() as session:
+        entries = (
+            session.query(AuditLog).order_by(AuditLog.id).yield_per(500)
+        )
+        for entry in entries:
+            checked += 1
+            if not entry.chain:
+                # Written before fingerprints existed, and not yet
+                # filled in. The next entry was chained onto nothing.
+                unchained += 1
+                previous = AUDIT_CHAIN_START
+                continue
+            if entry.chain != audit_fingerprint(previous, entry):
+                return (
+                    False,
+                    f"Entry {entry.id} does not match its fingerprint: a "
+                    f"{entry.action} on {entry.table_name}, recorded at "
+                    f"{clock.show_utc(entry.ts_utc)} by "
+                    f"{entry.actor or 'someone unrecorded'}. It was "
+                    "changed or the entry before it was removed. "
+                    f"The {checked - 1} entries before it match.",
+                )
+            previous = entry.chain
+
+    if not checked:
+        return (True, "The trail has no entries yet.")
+
+    message = f"All {checked} entries match their fingerprints."
+    if unchained:
+        message += (
+            f" {unchained} of them could not be checked: they were "
+            "written before fingerprints were added."
+        )
+    return (True, message)
+
+
+def chain_existing_audit_entries() -> int:
+    """Fingerprints entries written before the chain existed.
+
+    They are chained in the order they were written, which says nothing
+    about what happened to them before this ran -- only that nothing has
+    changed since. Returns how many were filled in.
+
+    Raw SQL rather than the ORM: this runs during the schema upgrade,
+    and updating the trail is not itself an event worth recording.
+    """
+    from sqlalchemy import text
+
+    with engine.connect() as connection:
+        if _stored_table_name(connection, "AUDIT") is None:
+            return 0
+        rows = connection.execute(
+            text(
+                'SELECT id, ts_utc, actor, action, table_name, row_pk, '
+                'summary, "before", "after", chain FROM "AUDIT" ORDER BY id'
+            )
+        ).all()
+
+    previous = AUDIT_CHAIN_START
+    filled = []
+    for row in rows:
+        if row.chain:
+            previous = row.chain
+            continue
+        fingerprint = audit_fingerprint(previous, row)
+        filled.append((row.id, fingerprint))
+        previous = fingerprint
+
+    if not filled:
+        return 0
+
+    with engine.begin() as connection:
+        for row_id, fingerprint in filled:
+            connection.execute(
+                text('UPDATE "AUDIT" SET chain = :chain WHERE id = :id'),
+                {"chain": fingerprint, "id": row_id},
+            )
+
+    print(
+        f"Schema migration: fingerprinted {len(filled)} existing audit "
+        "entries"
+    )
+    return len(filled)
 
 
 # ----- Change signal -----
@@ -905,6 +1079,9 @@ def _add_missing_columns() -> None:
             ("FILESHA256", "VARCHAR(64)"),
             ("FILEHASHEDAT", "VARCHAR"),
         ],
+        "AUDIT": [
+            ("chain", "VARCHAR(64)"),
+        ],
     }
 
     with engine.begin() as connection:
@@ -1075,13 +1252,15 @@ def upgrade_database() -> None:
 
     Order matters: names first, so the later steps see today's columns;
     then columns added since; then the table rebuilds, which copy rows by
-    the current column list; and last the stored dates, which need the
-    current columns to exist.
+    the current column list; then the stored dates, which need the
+    current columns to exist; and last the audit fingerprints, which
+    cover the entries as they now stand.
     """
     _rename_legacy_schema()
     _add_missing_columns()
     migrate_schema()
     normalise_legacy_dates()
+    chain_existing_audit_entries()
 
 
 # ----- Table Creation -----

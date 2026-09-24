@@ -1,0 +1,50 @@
+name: tests
+
+# Every push and every pull request. The suite runs against a temporary
+# database and never touches db/, so it is safe to run anywhere.
+#
+# This exists because a change that bypassed the logo fallback sat on
+# main with a failing test and nothing said so.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: ${{ matrix.os }} · Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest and the newest Python VECTOR supports, plus Windows,
+        # which is what most of the unit runs. macOS is left out on
+        # purpose: its minutes cost ten times as much on a private
+        # repository, and nothing in the suite is macOS-specific -- the
+        # launcher tests read those files as text.
+        include:
+          - os: ubuntu-latest
+            python-version: "3.10"
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.13"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run the tests
+        run: python -m pytest -q

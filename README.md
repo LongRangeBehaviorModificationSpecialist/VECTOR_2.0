@@ -91,7 +91,7 @@ Everything the original does, plus:
 |------|--------|
 | **Access control** | The admin panel and shutdown require an admin account. Network access is off by default; `--lan` opts in |
 | **Passwords** | A one-time password per account instead of a shared default; throttling and lockout on failed sign-ins; sessions an admin can end |
-| **Audit trail** | Every create, edit, delete, wipe, import and sign-in, with field-level before and after |
+| **Audit trail** | Every create, edit, delete, wipe, import and sign-in, with field-level before and after; each entry fingerprinted onto the one before it, so a later edit or deletion shows up |
 | **Evidence integrity** | A SHA-256 taken when each file is uploaded, verified again at export and at import |
 | **Encryption** | Optional SQLCipher encryption of both databases, with tools to convert either way |
 | **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked"; imports that are all or nothing; failures explained in plain words; reports in item-number order; dates checked before they are saved; evidence numbers that close up when an item is removed |
@@ -100,7 +100,7 @@ Everything the original does, plus:
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 349 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 360 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -277,6 +277,10 @@ runs once:
 - **Times.** Note and entry times that earlier versions stamped in UTC
   are rewritten in this machine's time zone, with the offset. Each change
   is recorded in the audit trail.
+- **Audit fingerprints.** The trail gains a `chain` column, and entries
+  written before it existed are fingerprinted once, in order. They are
+  chained retrospectively, so the chain says nothing about what happened
+  to them before the upgrade — only that nothing has changed since.
 
 A database from before the renames prints:
 
@@ -466,10 +470,18 @@ zone), who, what action, which record, and the
 field-level before and after. Deletions keep the complete row, so a
 mis-click is recoverable from the trail even though the record is gone.
 
-Three properties worth knowing:
+Four properties worth knowing:
 
 - **It is append-only.** Nothing in the application can edit or remove
   an entry, including an administrator.
+- **Each entry is fingerprinted.** An entry carries a SHA-256 of itself
+  and of the entry before it, so the entries form a chain: change one in
+  a database browser, or take one out, and every entry after it stops
+  matching. **Check the trail** on the Audit Trail page walks the chain
+  and says what it found. This is evidence of tampering rather than
+  protection from it — anyone who can write to the database could
+  recompute the whole chain — so keep exports, which carry the trail as
+  it stood when they were made.
 - **It survives "Delete All Data".** A wipe is exactly the event the
   trail exists to record, so it is never cleared.
 - **It travels with the case.** Exports include `AUDIT.csv`. An import
@@ -677,7 +689,11 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-349 tests, about twelve seconds. They run against a temporary database
+Every push and every pull request runs the same suite on GitHub Actions
+— Ubuntu on the oldest and the newest Python VECTOR supports, and
+Windows — from [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
+
+360 tests, about twelve seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -707,6 +723,7 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_logo_and_help.py` | 14 | A missing logo is left out rather than shown broken, whether it is named by file name or by its /static address; every button the Help page names exists |
 | `test_launchers.py` | 5 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned |
 | `test_migration.py` | 11 | Old-schema databases — old names, old constraints — upgrade without losing a row; backups include the write-ahead log |
+| `test_audit_chain.py` | 11 | Every entry is fingerprinted as it is written; an entry changed or removed afterwards is found and named; entries from before the chain are fingerprinted once by the upgrade, and the check says which could not be checked |
 | `test_audit.py` | 9 | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
 | `test_constraints.py` | 8 | The constraints that were removed, and the four that must stay |
 
