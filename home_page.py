@@ -11,7 +11,6 @@ Handles:
     /shutdown        →   Stop the app (admins only)
 """
 
-from datetime import datetime
 from nicegui import ui
 import shutil
 import time
@@ -78,9 +77,7 @@ def build_authenticated_home():
 
         # ----- Page Title and Header -----
 
-        ui.image(
-            "/static/novadc_icac.png",
-        ).classes("w-[150px] h-[150px] mb-2")
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-2")
 
         ui.label(
             "V·E·C·T·O·R Home"
@@ -581,9 +578,7 @@ def build_login_home():
 
     with ui.column().classes("items-center w-full mt-12"):
 
-        ui.image(
-            "/static/novadc_icac.png",
-        ).classes("w-[150px] h-[150px] mb-2")
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-2")
 
         ui.label(
             "-- V·E·C·T·O·R --"

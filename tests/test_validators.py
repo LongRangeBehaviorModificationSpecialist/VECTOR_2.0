@@ -6,9 +6,7 @@ inside "if" guards and then read unconditionally -- so an untouched
 dropdown crashed the save rather than reporting a missing field.
 """
 
-import pytest
-
-from models import Agents, Cases, Evidence, Persons, Rooms, get_session
+from models import Cases, get_session
 import utils
 
 

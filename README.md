@@ -100,7 +100,7 @@ Everything the original does, plus:
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 342 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 349 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -118,7 +118,7 @@ With [Python 3.10 or newer](#requirements) installed, double-click the
 launcher in the project folder:
 
 - **Windows** — `Start VECTOR.bat`
-- **macOS** — `Start VECTOR.command`
+- **macOS** — `Start VECTOR.command`, which runs `Start VECTOR.sh`
 
 The first start sets up a `.venv` folder and installs what VECTOR needs,
 which takes a few minutes and an internet connection; after that it
@@ -615,6 +615,11 @@ double-click the launcher again.
 this happens when the project came as a downloaded ZIP rather than a
 `git clone`. Choose **Run**, or **More info** then **Run anyway**.
 
+**macOS opens `Start VECTOR.sh` in an editor, or not at all** —
+double-click `Start VECTOR.command` instead. Finder only opens a
+`.command` file in Terminal; the `.command` file runs `Start VECTOR.sh`,
+so both stay in step.
+
 **macOS will not open `Start VECTOR.command`** — right-click it and
 choose **Open**; on recent macOS versions, allow it under **System
 Settings → Privacy & Security** instead. If Terminal says permission is
@@ -672,7 +677,7 @@ files alone.
 .venv/bin/python -m pytest
 ```
 
-342 tests, about twelve seconds. They run against a temporary database
+349 tests, about twelve seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -699,7 +704,8 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_active_case.py` | 13 | Pages refuse to record without an open case; the Cases page still works; async handlers stay async |
 | `test_menu_rooms_and_passwords.py` | 13 | The page buttons and the menu share one list, and only administrators are offered Shutdown; a room without agents can be edited and survives a CSV round trip; a dropdown saved blank opens blank; an import knows when a file needs a password |
 | `test_dates.py` | 12 | Old-format case times, birth dates and note times are rewritten once and audited; nothing else is touched |
-| `test_logo_and_help.py` | 12 | A missing logo is left out rather than shown broken; every button the Help page names exists |
+| `test_logo_and_help.py` | 14 | A missing logo is left out rather than shown broken, whether it is named by file name or by its /static address; every button the Help page names exists |
+| `test_launchers.py` | 5 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned |
 | `test_migration.py` | 11 | Old-schema databases — old names, old constraints — upgrade without losing a row; backups include the write-ahead log |
 | `test_audit.py` | 9 | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
 | `test_constraints.py` | 8 | The constraints that were removed, and the four that must stay |
@@ -730,7 +736,8 @@ case data.
 
 ```
 Start VECTOR.bat     double-click launcher for Windows
-Start VECTOR.command double-click launcher for macOS
+Start VECTOR.command double-click launcher for macOS, runs the .sh
+Start VECTOR.sh      the macOS launcher itself
 main.py              startup, route table, first-run bootstrap
 auth.py              session state, sign-in throttling, route guards
 models.py            tables, the audit listener, schema upgrades

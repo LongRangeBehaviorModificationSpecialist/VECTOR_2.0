@@ -11,7 +11,8 @@ Usage:
     Opens a browser at http://localhost:8080
 
     Or double-click "Start VECTOR.bat" (Windows) or "Start VECTOR.command"
-    (macOS), which set up .venv on first use.
+    (macOS, which hands over to "Start VECTOR.sh"). Either sets up .venv
+    on first use.
 """
 
 import ast
@@ -30,7 +31,6 @@ logging.basicConfig(
 
 from auth import (
     get_current_user_name,
-    get_is_admin,
     is_authenticated,
     require_admin,
     require_login,

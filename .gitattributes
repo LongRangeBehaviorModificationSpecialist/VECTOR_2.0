@@ -3,3 +3,4 @@
 # fails on a .command file with CRLF endings ($'\r': command not found).
 *.bat     text eol=crlf
 *.command text eol=lf
+*.sh      text eol=lf

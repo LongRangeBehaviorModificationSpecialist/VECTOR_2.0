@@ -35,6 +35,28 @@ def test_a_folder_is_not_taken_for_a_logo(tmp_path, monkeypatch):
     assert navbar.static_url("novadc_icac.png") is None
 
 
+def test_a_logo_named_by_its_static_address_is_found(tmp_path, monkeypatch):
+    """/static/x.png is what a page would write by hand, so unit_logo()
+    takes that as well as the bare file name. Taking it literally is how
+    a logo that is present gets dropped."""
+    (tmp_path / "novadc_icac.png").write_bytes(b"pretend this is a png")
+    monkeypatch.setattr(navbar, "STATIC_DIR", tmp_path)
+
+    for named in ("novadc_icac.png",
+                  "static/novadc_icac.png",
+                  "/static/novadc_icac.png"):
+        assert navbar.static_url(named) == "/static/novadc_icac.png", named
+
+
+def test_a_missing_logo_is_still_left_out_whichever_way_it_is_named(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(navbar, "STATIC_DIR", tmp_path)
+
+    for named in ("novadc_icac.png", "/static/novadc_icac.png"):
+        assert navbar.static_url(named) is None, named
+
+
 def test_no_page_points_at_a_static_image_directly():
     """Every logo goes through unit_logo(), which checks the file is there."""
     pages = [ROOT / "home_page.py", ROOT / "navbar.py",
