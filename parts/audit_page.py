@@ -29,6 +29,7 @@ ACTION_CHOICES = [
     "IMPORT",
     "LOGIN",
     "LOGIN_FAILED",
+    "LOGOUT_IDLE",
 ]
 
 # A long case runs to thousands of entries, and all of them at once is a

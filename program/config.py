@@ -84,6 +84,14 @@ class Config:
     # attachment, since an export carries every attachment in the case.
     MAX_IMPORT_BYTES = _env_int("VECTOR_MAX_IMPORT_MB", 2048) * 1024 * 1024
 
+    # ----- Sessions -----
+    # A tablet left on a kitchen counter at a scene stays signed in to
+    # the case until somebody closes the browser. A device nobody has
+    # touched for this many minutes signs out, after a warning. Set
+    # VECTOR_SESSION_IDLE_MINUTES=0 for a unit whose devices never leave
+    # a hand and whose scenes run long.
+    SESSION_IDLE_MINUTES = _env_int("VECTOR_SESSION_IDLE_MINUTES", 60)
+
     # ----- Paths (re-exported for convenience) -----
     PROJECT_ROOT = PROJECT_ROOT
     DB_DIR = DB_DIR

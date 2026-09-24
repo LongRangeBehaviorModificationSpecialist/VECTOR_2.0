@@ -189,6 +189,12 @@ def build_uploads_page() -> None:
 
         ui.label("Files List").classes("text-xl font-bold mb-1")
 
+        # A scene's photographs run to hundreds; the name of the one
+        # being asked about should not need scrolling for.
+        search_box = ui.input(
+            placeholder="Search the files below",
+        ).props("dense outlined clearable").classes("w-full max-w-md mb-2")
+
         table_container = ui.column().classes(
             "w-full max-w-5xl mx-auto items-center gap-2")
 
@@ -314,6 +320,10 @@ def build_uploads_page() -> None:
 
                 table.props("dense flat")
                 shown["table"] = table
+
+                table.bind_filter_from(
+                    search_box, "value", backward=lambda typed: typed or ""
+                )
 
                 table.add_slot(
                     "body-cell-actions",

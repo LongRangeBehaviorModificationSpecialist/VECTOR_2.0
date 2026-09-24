@@ -89,7 +89,7 @@ Everything the original does, plus:
 
 | Area | Change |
 |------|--------|
-| **Access control** | The admin panel and shutdown require an admin account. Network access is off by default; `--lan` opts in |
+| **Access control** | The admin panel and shutdown require an admin account. Network access is off by default; `--lan` opts in; a device nobody is using signs itself out |
 | **Passwords** | A one-time password per account instead of a shared default; throttling and lockout on failed sign-ins; sessions an admin can end |
 | **Audit trail** | Every create, edit, delete, wipe, import and sign-in, with field-level before and after; each entry fingerprinted onto the one before it, so a later edit or deletion shows up |
 | **Evidence integrity** | A SHA-256 taken when each file is uploaded, verified again at export and at import |
@@ -100,7 +100,7 @@ Everything the original does, plus:
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 360 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 378 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -365,6 +365,7 @@ All optional, read from the environment:
 | `VECTOR_DB_KEY_FILE`    | unset       | File holding the passphrase              |
 | `VECTOR_NO_PROMPT`      | unset       | Set to `1` to never prompt for it        |
 | `VECTOR_REQUIRE_ENCRYPTION` | unset   | Set to `1` to refuse a plaintext database |
+| `VECTOR_SESSION_IDLE_MINUTES` | `60`  | Minutes untouched before a device signs out; `0` turns it off |
 
 ---
 
@@ -393,6 +394,11 @@ Work top to bottom; each step feeds the next.
 
 The open case's number is shown in the top bar on every page. Until a
 case is open, the other pages refuse new entries and say why.
+
+Every table has a search box above it, which narrows the rows as you
+type — an item number, part of a description, a room, an agent's name.
+It filters the rows already on screen, so the order you sorted them into
+is kept.
 
 A one-page version of this, with export and Delete All Data, is under
 **Help → Help** in the top bar.
@@ -448,6 +454,18 @@ at 3am on a scene must not be shut out of evidence logging.
 A locked account shows **LOCKED** in the Admin Panel's Sign-in column,
 and an admin clears it with the padlock button without changing the
 password.
+
+**A device left alone signs itself out.** After an hour with no typing,
+tapping or scrolling, VECTOR warns and then ends the session, so a
+tablet on a kitchen counter is not a case file anyone passing can
+read. Only real use counts — the pages refresh themselves every couple
+of seconds, and that deliberately does not keep a session alive — and
+every tab of the same browser counts as one device. Records already saved are kept — a sign-out changes no
+case data — but a form filled in and not yet saved goes with the page,
+which is what the warning is for. The sign-out itself is recorded in the
+audit trail.
+Change the wait with `VECTOR_SESSION_IDLE_MINUTES`, or set it to `0` to
+turn it off.
 
 **Signing everyone out.** Admin Panel → Sessions → *Sign Everyone Out*
 ends every session on every device at once. Use it when a device goes
@@ -693,7 +711,7 @@ Every push and every pull request runs the same suite on GitHub Actions
 — Ubuntu on the oldest and the newest Python VECTOR supports, and
 Windows — from [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
 
-360 tests, about twelve seconds. They run against a temporary database
+378 tests, about twelve seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -721,6 +739,7 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_menu_rooms_and_passwords.py` | 13 | The page buttons and the menu share one list, and only administrators are offered Shutdown; a room without agents can be edited and survives a CSV round trip; a dropdown saved blank opens blank; an import knows when a file needs a password |
 | `test_dates.py` | 12 | Old-format case times, birth dates and note times are rewritten once and audited; nothing else is touched |
 | `test_logo_and_help.py` | 14 | A missing logo is left out rather than shown broken, whether it is named by file name or by its /static address; every button the Help page names exists |
+| `test_session_and_search.py` | 18 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for; every table that grows offers a search box and the one-case page does not |
 | `test_launchers.py` | 5 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned |
 | `test_migration.py` | 11 | Old-schema databases — old names, old constraints — upgrade without losing a row; backups include the write-ahead log |
 | `test_audit_chain.py` | 11 | Every entry is fingerprinted as it is written; an entry changed or removed afterwards is found and named; entries from before the chain are fingerprinted once by the upgrade, and the check says which could not be checked |
@@ -761,6 +780,7 @@ models.py            tables, the audit listener, schema upgrades
 clock.py             the machine's clock and time zone, for every stamp
 crypto.py            SQLCipher detection and key handling
 failures.py          plain-language reasons for failures, and the log
+idle.py              signs out a device nobody has touched
 live.py              refreshes open pages when another device saves
 utils.py             validators, the active-case guard, shared helpers
 import_export.py     CSV and JSON export and import

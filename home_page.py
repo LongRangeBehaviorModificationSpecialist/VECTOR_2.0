@@ -793,6 +793,10 @@ the menu button (three lines) at the top left.
 Until a case is open, the top bar shows **No Active Case** and the other
 pages will not save.
 
+Every table has a search box above it. Type part of a name, a room, an
+item number or a description and the list narrows to the rows that hold
+it; clear the box to see them all again.
+
 Times follow this machine's clock and time zone. The times VECTOR records
 itself — notes, entries, uploads — carry their offset from UTC, such as
 `UTC-04:00`.
@@ -820,6 +824,11 @@ itself — notes, entries, uploads — carry their offset from UTC, such as
   {LOCKOUT_MINUTES} minutes. An administrator can clear the lock sooner.
 - Passwords an administrator issues are shown once. Write them down before
   closing the message.
+- A device nobody has touched for {Config.SESSION_IDLE_MINUTES} minutes
+  signs out on its own, so a tablet left at a scene does not stay open on
+  the case. A warning appears first, with **Stay signed in** on it.
+  Records already saved are kept; a form filled in but not yet saved is
+  lost with the page, so save before walking away.
 
 #### Other pages
 

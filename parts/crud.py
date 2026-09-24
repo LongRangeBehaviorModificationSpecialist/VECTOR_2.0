@@ -128,6 +128,8 @@ class CrudSpec:
     live_defaults:  add-form fields whose default is worked out again when
                     another device changes the case, such as the next item
                     number
+    searchable:     whether a search box appears above the table. On for
+                    every table that grows; off for the one-row case
     """
 
     model: type
@@ -159,6 +161,7 @@ class CrudSpec:
     on_delete: Optional[Callable] = None
     delete_note: Optional[Callable[[dict], str]] = None
     live_defaults: tuple = ()
+    searchable: bool = True
 
     def __post_init__(self):
         self.entity_plural = self.entity_plural or f"{self.entity}s"
@@ -475,6 +478,17 @@ def build_crud_page(spec: CrudSpec) -> None:
         ui.separator().classes("my-6")
         ui.label(spec.table_title).classes("text-xl font-bold mb-1")
 
+        # Finding item 47 among 120 by scrolling is how a detail gets
+        # missed. Quasar filters the rows the table already holds, so
+        # this costs no database work and keeps the sort order.
+        search_box = None
+        if spec.searchable:
+            search_box = ui.input(
+                placeholder=f"Search the {spec.entity_plural} below",
+            ).props("dense outlined clearable").classes(
+                "w-full max-w-md mb-2"
+            )
+
         table_container = ui.column().classes(
             "w-full max-w-6xl mx-auto items-center gap-2"
         )
@@ -568,6 +582,13 @@ def build_crud_page(spec: CrudSpec) -> None:
                 )
                 table.props("dense flat")
                 shown["table"] = table
+
+                if search_box is not None:
+                    table.bind_filter_from(
+                        search_box,
+                        "value",
+                        backward=lambda typed: typed or "",
+                    )
 
                 # Defined once here, not pasted into six page modules.
                 delete_button = (

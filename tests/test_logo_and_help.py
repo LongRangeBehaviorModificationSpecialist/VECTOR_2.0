@@ -73,7 +73,8 @@ def test_no_page_points_at_a_static_image_directly():
 # ----- Help -----
 def _on_screen_text() -> str:
     """Source of everything that labels a button or menu, minus the help."""
-    sources = [(ROOT / "navbar.py").read_text(encoding="utf-8")]
+    sources = [(ROOT / "navbar.py").read_text(encoding="utf-8"),
+               (ROOT / "idle.py").read_text(encoding="utf-8")]
     sources += [path.read_text(encoding="utf-8")
                 for path in sorted((ROOT / "parts").glob("*.py"))]
     home_source = (ROOT / "home_page.py").read_text(encoding="utf-8")
