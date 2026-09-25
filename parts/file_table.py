@@ -42,7 +42,7 @@ def files_table() -> Callable[[], None]:
     ).props("dense outlined clearable").classes("w-full max-w-md mb-2")
 
     table_container = ui.column().classes(
-        "w-full max-w-5xl mx-auto items-center gap-2")
+        "w-full max-w-[1536px] px-2 mx-auto items-center gap-2")
 
     shown = {"table": None}
 
@@ -165,6 +165,7 @@ def files_table() -> Callable[[], None]:
             )
 
             table.props("dense flat")
+            table.classes("w-full")
             shown["table"] = table
 
             table.bind_filter_from(

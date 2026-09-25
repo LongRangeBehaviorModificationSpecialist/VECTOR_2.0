@@ -273,8 +273,11 @@ def build_crud_page(spec: CrudSpec) -> None:
                 "w-full max-w-md mb-2"
             )
 
+        # Wide enough for a long evidence row, and never wider than
+        # the window: the table scrolls inside itself instead of taking
+        # the page with it.
         table_container = ui.column().classes(
-            "w-full max-w-6xl mx-auto items-center gap-2"
+            "w-full max-w-[1536px] px-2 mx-auto items-center gap-2"
         )
 
         def _row_dict(record) -> dict:
@@ -365,6 +368,10 @@ def build_crud_page(spec: CrudSpec) -> None:
                     row_key=spec.row_key,
                 )
                 table.props("dense flat")
+                # Fills its column rather than growing to fit the widest
+                # row, which is what leaves Quasar's own scrolling to do
+                # the work.
+                table.classes("w-full")
                 shown["table"] = table
 
                 if search_box is not None:

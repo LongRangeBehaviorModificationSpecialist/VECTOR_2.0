@@ -137,7 +137,7 @@ def build_audit_page() -> None:
             ).props("flat").classes("text-[var(--vsp-blue)]")
 
         table_container = ui.column().classes(
-            "w-full max-w-6xl mx-auto items-center gap-2"
+            "w-full max-w-[1536px] px-2 mx-auto items-center gap-2"
         )
 
         shown = {"limit": PAGE_SIZE}
