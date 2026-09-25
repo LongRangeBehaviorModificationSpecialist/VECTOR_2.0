@@ -100,7 +100,7 @@ Everything the original does, plus:
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 431 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 429 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names and the
@@ -120,10 +120,6 @@ launcher in the project folder:
 - **Windows** — `Start VECTOR.bat`
 - **macOS** — `Start VECTOR.command`, which runs `Start VECTOR.sh`
 
-To let a tablet or a second laptop reach it, double-click
-**`Start VECTOR on the network`** instead — the same launcher with
-`--lan` already on it. See
-[Access from another device](#access-from-another-device).
 
 The first start sets up a `.venv` folder and installs what VECTOR needs,
 which takes a few minutes and an internet connection; after that it
@@ -336,10 +332,8 @@ rather than pretending otherwise.
 **Help → Connect a Device** then shows the exact address to type on the
 other device, and says plainly when VECTOR is not on the network at all.
 
-For a single run without changing what the machine does from then on,
-`--lan` still works, and so does double-clicking
-**`Start VECTOR on the network`** — the `.bat` on Windows, the
-`.command` on macOS.
+For a single run, without changing what the machine does from then on,
+`--lan` still works and takes precedence over the setting.
 
 The launchers pass arguments on, so `"Start VECTOR.bat" --lan` or
 `"./Start VECTOR.command" --lan` from a terminal does the same.
@@ -746,7 +740,7 @@ assigned and never read. Style is left alone deliberately — this
 codebase has its own conventions and a linter arguing about them would
 be noise.
 
-431 tests, about fifteen seconds. They run against a temporary database
+429 tests, about fifteen seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -777,7 +771,7 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_logo_and_help.py` | 14 | A missing logo is left out rather than shown broken, whether it is named by file name or by its /static address; every button the Help page names exists |
 | `test_session_and_search.py` | 18 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for; every table that grows offers a search box and the one-case page does not |
 | `test_network_setting.py` | 13 | Network access is off until somebody turns it on and a damaged settings file reads as off; the flag opens it for one run and the setting from then on; the address given out is one another device could use; and the change is recorded with who made it |
-| `test_launchers.py` | 7 | Every launcher is present, the double-clickable one hands over to the script, arguments pass through, the line endings each system needs are pinned, and the network launchers ask for `--lan` rather than copying the set-up |
+| `test_launchers.py` | 5 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned |
 | `test_migration.py` | 11 | Old-schema databases — old names, old constraints — upgrade without losing a row; backups include the write-ahead log |
 | `test_audit_chain.py` | 11 | Every entry is fingerprinted as it is written; an entry changed or removed afterwards is found and named; entries from before the chain are fingerprinted once by the upgrade, and the check says which could not be checked |
 | `test_audit.py` | 9 | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
@@ -808,36 +802,35 @@ case data.
 ## How the code is laid out
 
 ```
-Start VECTOR.bat                          double-click launcher for Windows
+Start VECTOR.bat        double-click launcher for Windows
 Start VECTOR.command double-click launcher for macOS, runs the .sh
-Start VECTOR.sh                           the macOS launcher itself
-Start VECTOR on the network.bat/.command  the same, with --lan
-main.py                                   startup, route table, first-run bootstrap
-auth.py                                   session state, sign-in throttling, route guards
-models.py                                 tables, the audit listener, schema upgrades
-clock.py                                  the machine's clock and time zone, for every stamp
-crypto.py                                 SQLCipher detection and key handling
-failures.py                               plain-language reasons for failures, and the log
-idle.py                                   signs out a device nobody has touched
-live.py                                   refreshes open pages when another device saves
-utils.py                                  validators, the active-case guard, shared helpers
-import_export.py                          CSV and JSON export and import
-navbar.py                                 top navigation and the case badge
-settings.py                               what this machine does: network access, for now
-home_page.py                              login, main menu, the buttons on it
-parts/case_transfer.py                    export, import and Delete All Data
-parts/admin_users.py                      the Admin Panel's card, table and sessions
-parts/file_upload.py                      the upload card, the checks, the SHA-256
-parts/file_table.py                       the attachments list, downloads, deletes
-parts/connect_page.py                     the address another device should open
-parts/crud.py                             the table-driven builder every entity page uses
-parts/crud_widgets.py                     the Field description and the widgets
-parts/crud_dialogs.py                     edit, delete and delete-all
-parts/*_page.py                           one file per screen
-program/config.py                         paths, network and upload settings
-program/inc/                              Virginia jurisdictions, agencies, agent roles
-tools/                                    demo case, database encryption and decryption
-tests/                                    the test suite
+Start VECTOR.sh         the macOS launcher itself
+main.py                 startup, route table, first-run bootstrap
+auth.py                 session state, sign-in throttling, route guards
+models.py               tables, the audit listener, schema upgrades
+clock.py                the machine's clock and time zone, for every stamp
+crypto.py               SQLCipher detection and key handling
+failures.py             plain-language reasons for failures, and the log
+idle.py                 signs out a device nobody has touched
+live.py                 refreshes open pages when another device saves
+utils.py                validators, the active-case guard, shared helpers
+import_export.py        CSV and JSON export and import
+navbar.py               top navigation and the case badge
+settings.py             what this machine does: network access, for now
+home_page.py            login, main menu, the buttons on it
+parts/case_transfer.py  export, import and Delete All Data
+parts/admin_users.py    the Admin Panel's card, table and sessions
+parts/file_upload.py    the upload card, the checks, the SHA-256
+parts/file_table.py     the attachments list, downloads, deletes
+parts/connect_page.py   the address another device should open
+parts/crud.py           the table-driven builder every entity page uses
+parts/crud_widgets.py   the Field description and the widgets
+parts/crud_dialogs.py   edit, delete and delete-all
+parts/*_page.py         one file per screen
+program/config.py       paths, network and upload settings
+program/inc/            Virginia jurisdictions, agencies, agent roles
+tools/                  demo case, database encryption and decryption
+tests/                  the test suite
 ```
 
 ### Adding a field to an entity

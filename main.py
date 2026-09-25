@@ -14,8 +14,8 @@ Usage:
     (macOS, which hands over to "Start VECTOR.sh"). Either sets up .venv
     on first use.
 
-    "Start VECTOR on the network" does the same with --lan, for when a
-    tablet or a second laptop has to reach it.
+    Whether other devices may reach it is a setting an administrator
+    turns on in the Admin Panel; --lan opens it for one run.
 """
 
 import ast
