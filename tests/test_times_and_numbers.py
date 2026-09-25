@@ -1,4 +1,7 @@
-"""Times in the machine's time zone, fill-in buttons for case times, the
+"""
+test_time_and_numbers.py
+
+Times in the machine's time zone, fill-in buttons for case times, the
 end-time reminder, dropdowns that keep what was typed, and evidence
 numbers that never skip.
 
@@ -38,8 +41,10 @@ def _local(*parts) -> str:
 
 # ----- The machine's time zone -----
 def test_stamps_are_local_with_their_offset():
-    for stamped in (utils.get_current_timestamp(),
-                    utils.get_current_timestamp(format="entry")):
+    for stamped in (
+        utils.get_current_timestamp(),
+        utils.get_current_timestamp(format="entry")
+    ):
         assert STAMP.match(stamped), stamped
         assert stamped.endswith(clock.zone_label())
 
@@ -55,10 +60,14 @@ def test_the_offset_is_this_machines():
 
 
 def test_offsets_are_written_the_same_way_everywhere():
-    eastern = datetime(2026, 9, 15, 8, 45, 12,
-                       tzinfo=timezone(timedelta(hours=-4)))
-    india = datetime(2026, 9, 15, 8, 45, tzinfo=timezone(
-        timedelta(hours=5, minutes=30)))
+    eastern = datetime(
+        2026, 9, 15, 8, 45, 12,
+        tzinfo=timezone(timedelta(hours=-4))
+    )
+    india = datetime(
+        2026, 9, 15, 8, 45,
+        tzinfo=timezone(timedelta(hours=5, minutes=30))
+    )
 
     assert clock.stamp(eastern) == "09-15-2026 08:45:12 UTC-04:00"
     assert clock.zone_label(india) == "UTC+05:30"
@@ -75,27 +84,35 @@ def test_stored_utc_times_are_shown_in_local_time():
 def test_the_fill_in_time_is_now_as_a_case_time():
     filled = clock.case_time_now()
     parsed = utils.parse_entered_date(filled, utils.CASE_TIME_FORMAT)
-
     assert parsed is not None
+
     now = datetime.now().replace(second=0, microsecond=0)
     assert abs(parsed - now) <= timedelta(minutes=1)
 
 
 def test_utc_stamps_already_saved_are_rewritten_once(populated):
     with get_session() as session:
-        session.add(Notes(NOTEDATETIME="09-01-2026 11:32:00",
-                          NOTEDATETIMEUPDATED="", NOTEAUTHOR="Doe, John",
-                          NOTETEXT="Written before the change"))
+        session.add(
+            Notes(
+                NOTEDATETIME="09-01-2026 11:32:00",
+                NOTEDATETIMEUPDATED="",
+                NOTEAUTHOR="Doe, John",
+                NOTETEXT="Written before the change"
+            )
+        )
         session.query(models.Agents).filter_by(
-            AGENTNAME="Doe, John").one().ENTEREDDATETIME = "2026-09-01 11:35:00"
+            AGENTNAME="Doe, John"
+        ).one().ENTEREDDATETIME = "2026-09-01 11:35:00"
 
     models.normalise_legacy_dates()
 
     with get_session() as session:
         note = session.query(Notes).filter_by(
-            NOTETEXT="Written before the change").one()
+            NOTETEXT="Written before the change"
+        ).one()
         agent = session.query(models.Agents).filter_by(
-            AGENTNAME="Doe, John").one()
+            AGENTNAME="Doe, John"
+        ).one()
         assert note.NOTEDATETIME == _local(2026, 9, 1, 11, 32)
         assert agent.ENTEREDDATETIME == _local(2026, 9, 1, 11, 35)
 
@@ -104,32 +121,53 @@ def test_utc_stamps_already_saved_are_rewritten_once(populated):
 
 def test_a_local_stamp_is_left_alone(case):
     with get_session() as session:
-        session.add(Notes(NOTEDATETIME=clock.stamp(), NOTEAUTHOR="Doe, John",
-                          NOTETEXT="Written after the change"))
+        session.add(
+            Notes(
+                NOTEDATETIME=clock.stamp(),
+                NOTEAUTHOR="Doe, John",
+                NOTETEXT="Written after the change"
+            )
+        )
     assert models.normalise_legacy_dates() == 0
 
 
 def test_no_page_labels_its_times_utc():
-    for spec in (agents_page.SPEC, cases_page.SPEC, evidence_page.SPEC,
-                 notes_page.SPEC, persons_page.SPEC, rooms_page.SPEC):
+    for spec in (
+        agents_page.SPEC,
+        cases_page.SPEC,
+        evidence_page.SPEC,
+        notes_page.SPEC,
+        persons_page.SPEC,
+        rooms_page.SPEC
+    ):
         for field in spec.fields:
             assert "UTC" not in field.label, (spec.title, field.label)
             assert "UTC" not in (field.table_label or ""), field.table_label
     for page in ("files_page.py", "audit_page.py"):
-        assert "(UTC)" not in (ROOT / "parts" / page).read_text(encoding="utf-8")
+        assert "(UTC)" not in (
+            ROOT / "parts" / page
+        ).read_text(encoding="utf-8")
 
 
 # ----- Filling in a case time -----
 def test_both_case_times_offer_the_fill_button():
     for name in ("CASEDATETIMEBEGIN", "CASEDATETIMEEND"):
-        assert next(f for f in cases_page.SPEC.fields if f.name == name).now_button
+        assert next(
+            f for f in cases_page.SPEC.fields if f.name == name
+        ).now_button
 
 
 def _case_without_an_end(begin="09-15-2026 07:30"):
     with get_session() as session:
-        session.add(Cases(CASENUMBER="26-2", LOCATION="1 Test Road",
-                          JURISDICTION="Fairfax County",
-                          CASEDATETIMEBEGIN=begin, CASEDATETIMEEND=""))
+        session.add(
+            Cases(
+                CASENUMBER="26-2",
+                LOCATION="1 Test Road",
+                JURISDICTION="Fairfax County",
+                CASEDATETIMEBEGIN=begin,
+                CASEDATETIMEEND=""
+            )
+        )
 
 
 def _stored_end():
@@ -159,24 +197,40 @@ def test_an_end_time_already_entered_is_kept(case):
 
 # ----- Dropdowns keep what was typed -----
 def test_a_new_name_typed_and_left_is_kept():
-    assert typed_choice("Brand, New", ["Doe, John"], None, allow_new=True) \
-        == "Brand, New"
+    assert typed_choice(
+        "Brand, New",
+        ["Doe, John"],
+        None,
+        allow_new=True,
+    ) == "Brand, New"
 
 
 def test_typed_text_matching_an_option_selects_it():
-    assert typed_choice("doe, john", ["Doe, John"], None, allow_new=False) \
-        == "Doe, John"
+    assert typed_choice(
+        "doe, john",
+        ["Doe, John"],
+        None,
+        allow_new=False,
+    ) == "Doe, John"
 
 
 def test_new_text_is_ignored_where_new_values_are_not_allowed():
-    assert typed_choice("Somebody Else", ["Doe, John"], None,
-                        allow_new=False) is None
+    assert typed_choice(
+        "Somebody Else",
+        ["Doe, John"],
+        None,
+        allow_new=False,
+    ) is None
 
 
 @pytest.mark.parametrize("text", ["", "   ", "Doe, John", "doe, john"])
 def test_blank_or_unchanged_text_changes_nothing(text):
-    assert typed_choice(text, ["Doe, John"], "Doe, John", allow_new=True) \
-        is None
+    assert typed_choice(
+        text,
+        ["Doe, John"],
+        "Doe, John",
+        allow_new=True
+    ) is None
 
 
 # ----- Item numbers that never skip -----
@@ -191,8 +245,10 @@ def _delete_item(number) -> str:
 
 def _numbers():
     with get_session() as session:
-        return sorted((item.EVIDNUM for item in session.query(Evidence)),
-                      key=utils.evidence_number_key)
+        return sorted(
+            (item.EVIDNUM for item in session.query(Evidence)),
+            key=utils.evidence_number_key
+        )
 
 
 def _count(action):
@@ -221,10 +277,15 @@ def test_removing_the_last_item_moves_nothing(populated):
 
 def test_a_hand_entered_number_is_left_as_it_is(populated):
     with get_session() as session:
-        session.add(Evidence(EVIDNUM="12A", EVIDQTY="1", EVIDDESC="extra",
-                             EVIDLOCROOM="Room A (Bedroom)",
-                             EVIDLOCROOMDETAIL="shelf", EVIDFOUNDBY="Doe, John",
-                             EVIDFOUNDBYWITNESS="Roe, Jane"))
+        session.add(Evidence(
+            EVIDNUM="12A",
+            EVIDQTY="1",
+            EVIDDESC="extra",
+            EVIDLOCROOM="Room A (Bedroom)",
+            EVIDLOCROOMDETAIL="shelf",
+            EVIDFOUNDBY="Doe, John",
+            EVIDFOUNDBYWITNESS="Roe, Jane"),
+        )
     _delete_item("3")
     assert _numbers() == [str(n) for n in range(1, 12)] + ["12A"]
 

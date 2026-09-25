@@ -1,4 +1,7 @@
-"""Report order, room renames, real dates, and attachments that stay in the
+"""
+test_order_dates_and_files.py
+
+Report order, room renames, real dates, and attachments that stay in the
 database until they are needed.
 
 The return copy listed items 1, 10, 11, 12, 2, because item numbers sorted
@@ -69,7 +72,9 @@ def test_the_evidence_reports_list_items_in_number_order(case):
 def test_rooms_follow_label_order_on_every_list(case):
     with get_session() as session:
         session.add_all([
-            _room("B", "Kitchen"), _room("AA", "Attic"), _room("A", "Hall"),
+            _room("B", "Kitchen"),
+            _room("AA", "Attic"),
+            _room("A", "Hall"),
         ])
         session.add_all([
             _evidence("1", "Room AA (Attic)"),
@@ -79,10 +84,13 @@ def test_rooms_follow_label_order_on_every_list(case):
         ])
 
     with get_session() as session:
-        assert [room.ROOMLABEL for room in reports.rooms_in_order(session)] \
-            == ["A", "B", "AA"]
+        assert [
+            room.ROOMLABEL for room in reports.rooms_in_order(session)
+        ] == ["A", "B", "AA"]
         assert reports.rooms_with_item_counts(session) == [
-            ("Room A (Hall)", 2), ("Room B (Kitchen)", 1), ("Room AA (Attic)", 1),
+            ("Room A (Hall)", 2),
+            ("Room B (Kitchen)", 1),
+            ("Room AA (Attic)", 1),
         ]
     assert utils.load_room_labels() == [
         "Room A (Hall)", "Room B (Kitchen)", "Room AA (Attic)",
@@ -93,12 +101,17 @@ def test_the_on_screen_tables_use_the_same_order():
     from parts.evidence_page import SPEC as evidence_spec
     from parts.rooms_page import SPEC as rooms_spec
 
-    assert sorted([{"EVIDNUM": "10"}, {"EVIDNUM": "2"}],
-                  key=evidence_spec.sort_key) == [
-        {"EVIDNUM": "2"}, {"EVIDNUM": "10"}
+    assert sorted(
+        [{"EVIDNUM": "10"}, {"EVIDNUM": "2"}],
+        key=evidence_spec.sort_key
+    ) == [
+        {"EVIDNUM": "2"},
+        {"EVIDNUM": "10"},
     ]
-    assert sorted([{"ROOMLABEL": "AA"}, {"ROOMLABEL": "B"}],
-                  key=rooms_spec.sort_key) == [
+    assert sorted(
+        [{"ROOMLABEL": "AA"}, {"ROOMLABEL": "B"}],
+        key=rooms_spec.sort_key
+    ) == [
         {"ROOMLABEL": "B"}, {"ROOMLABEL": "AA"}
     ]
 
@@ -197,18 +210,27 @@ def test_a_real_start_with_a_blank_or_later_end_is_accepted(end):
 def test_the_message_says_how_to_enter_the_time(monkeypatch):
     notices = []
     monkeypatch.setattr(
-        utils.ui, "notify", lambda message, **_kw: notices.append(str(message))
+        utils.ui,
+        "notify",
+        lambda message,
+        **_kw: notices.append(str(message))
     )
-    utils.validate_case_entry(CASEDATETIMEBEGIN="19-45-2026 25:99", **CASE)
+    utils.validate_case_entry(
+        CASEDATETIMEBEGIN="19-45-2026 25:99",
+        **CASE
+    )
     assert any("MM-DD-YYYY HH:MM" in notice for notice in notices), notices
 
 
-@pytest.mark.parametrize("dob", ["02-30-1984", "13-01-1984", "03-02", "01-01-2999"])
+@pytest.mark.parametrize(
+    "dob",
+    ["02-30-1984", "13-01-1984", "03-02", "01-01-2999"]
+)
 def test_a_date_of_birth_that_is_not_real_or_not_yet_passed_is_refused(dob):
     assert utils.validate_person_data(
         stage="initial",
         PERSONNAME="Doe, John",
-        SUSPECTNOTE="Present at entry",
+        PERSONNOTE="Present at entry",
         PERSONDOB=dob,
     ) is True
 
@@ -218,7 +240,7 @@ def test_a_blank_or_real_date_of_birth_is_accepted(dob):
     assert utils.validate_person_data(
         stage="initial",
         PERSONNAME="Doe, John",
-        SUSPECTNOTE="Present at entry",
+        PERSONNOTE="Present at entry",
         PERSONDOB=dob,
     ) is False
 

@@ -27,6 +27,7 @@ ACTION_CHOICES = [
     "DELETE",
     "DELETE_ALL",
     "IMPORT",
+    "EXPORT",
     "LOGIN",
     "LOGIN_FAILED",
 ]
@@ -94,7 +95,7 @@ def build_audit_page() -> None:
                 "Search",
                 on_click=lambda: refresh_audit_table(),
                 color="var(--vsp-blue)",
-            ).props("push").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("hover-border-white")
 
         table_container = ui.column().classes(
             "w-full max-w-6xl mx-auto items-center gap-2"
@@ -177,7 +178,7 @@ def build_audit_page() -> None:
                     },
                     {
                         "name": "table_name",
-                        "label": "Record type",
+                        "label": "Record Type",
                         "field": "table_name",
                         "sortable": True,
                         "align": "left",
@@ -216,7 +217,7 @@ def build_audit_page() -> None:
                                 : props.row.action === 'CREATE'
                                 ? 'text-green-500'
                                 : 'text-blue-400'"
-                              style="font-weight:600">
+                            style="font-weight:600">
                             {{ props.row.action }}
                         </span>
                     </q-td>

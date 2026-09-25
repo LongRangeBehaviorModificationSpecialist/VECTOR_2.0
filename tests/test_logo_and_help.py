@@ -1,4 +1,7 @@
-"""The logo fallback and the Help page.
+"""
+test_logo_and_help.py
+
+The logo fallback and the Help page.
 
 Both used to go stale without anyone noticing: the logo files are unit
 branding that a checkout does not include, so every page showed a
@@ -26,7 +29,9 @@ def test_a_missing_logo_has_no_address(tmp_path, monkeypatch):
 def test_a_present_logo_is_served_from_static(tmp_path, monkeypatch):
     (tmp_path / "novadc_icac.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     monkeypatch.setattr(navbar, "STATIC_DIR", tmp_path)
-    assert navbar.static_url("novadc_icac.png") == "/static/novadc_icac.png"
+    assert (
+        navbar.static_url("novadc_icac.png") == "/static/novadc_icac.png"
+    )
 
 
 def test_a_folder_is_not_taken_for_a_logo(tmp_path, monkeypatch):
@@ -37,13 +42,18 @@ def test_a_folder_is_not_taken_for_a_logo(tmp_path, monkeypatch):
 
 def test_no_page_points_at_a_static_image_directly():
     """Every logo goes through unit_logo(), which checks the file is there."""
-    pages = [ROOT / "home_page.py", ROOT / "navbar.py",
-             *sorted((ROOT / "parts").glob("*.py"))]
+    pages = [
+        ROOT / "home_page.py",
+        ROOT / "navbar.py",
+        *sorted((ROOT / "parts").glob("*.py"))
+    ]
     offenders = [
         str(path.relative_to(ROOT))
         for path in pages
-        if re.search(r"ui\.image\(\s*[\"']/static/",
-                     path.read_text(encoding="utf-8"))
+        if re.search(
+            r"ui\.image\(\s*[\"']/static/",
+            path.read_text(encoding="utf-8")
+        )
     ]
     assert not offenders, offenders
 
@@ -52,8 +62,10 @@ def test_no_page_points_at_a_static_image_directly():
 def _on_screen_text() -> str:
     """Source of everything that labels a button or menu, minus the help."""
     sources = [(ROOT / "navbar.py").read_text(encoding="utf-8")]
-    sources += [path.read_text(encoding="utf-8")
-                for path in sorted((ROOT / "parts").glob("*.py"))]
+    sources += [
+        path.read_text(encoding="utf-8")
+        for path in sorted((ROOT / "parts").glob("*.py"))
+    ]
     home_source = (ROOT / "home_page.py").read_text(encoding="utf-8")
     sources.append(home_source.split("HELP_TEXT = ")[0])
     return "\n".join(sources).lower()
@@ -63,9 +75,13 @@ def test_every_button_the_help_names_exists():
     named = re.findall(r"\*\*(.+?)\*\*", home_page.HELP_TEXT)
     assert len(named) > 10, named
     on_screen = _on_screen_text()
-    missing = sorted({name for name in named
-                      if name.lower() not in on_screen})
-    assert not missing, f"the Help page names buttons that do not exist: {missing}"
+    missing = sorted(
+        {name for name in named if name.lower() not in on_screen}
+    )
+    assert (
+        not missing,
+        f"the Help page names buttons that do not exist: {missing}"
+    )
 
 
 def test_the_help_does_not_use_old_names():

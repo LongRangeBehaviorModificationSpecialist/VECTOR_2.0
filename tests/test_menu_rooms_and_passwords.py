@@ -1,4 +1,7 @@
-"""The top bar, rooms without agents, and imports that know whether a file
+"""
+test_menu_rooms_and_passwords.py
+
+The top bar, rooms without agents, and imports that know whether a file
 needs a password.
 
 The row of page buttons filled a fifth of a phone's screen and appeared on
@@ -32,8 +35,18 @@ def out_dir(tmp_path, monkeypatch):
 # ----- The top bar -----
 def test_the_row_and_the_menu_share_one_list_of_pages():
     routes = [route for _label, route in navbar.NAV_PAGES]
-    for page in ["/", "/cases", "/agents", "/rooms", "/evidence",
-                 "/persons", "/notes", "/uploads", "/links", "/reports"]:
+    for page in [
+        "/",
+        "/cases",
+        "/agents",
+        "/rooms",
+        "/evidence",
+        "/persons",
+        "/notes",
+        "/uploads",
+        "/links",
+        "/reports"
+    ]:
         assert page in routes
 
 
@@ -65,7 +78,8 @@ def test_a_room_without_agents_can_be_edited():
 def test_a_dropdown_saved_blank_opens_blank():
     """A blank dropdown is saved as "", which is never an option. NiceGUI
     refused it, so the edit dialog of a room without agents -- or of an
-    item nobody triaged -- would not open."""
+    item nobody triaged -- would not open.
+    """
     from parts.crud import select_value
 
     assert select_value("") is None
@@ -108,12 +122,19 @@ def test_json_exports_are_recognised_either_way(populated, out_dir):
 def test_a_room_without_agents_survives_a_csv_round_trip(case, out_dir):
     """A room saved without agents holds "" in its required agent columns.
     The CSV import turned "" into None, so importing the case failed --
-    found while checking the password prompt with such a room in the case."""
+    found while checking the password prompt with such a room in the case.
+    """
     from models import Rooms, get_session
 
     with get_session() as session:
-        session.add(Rooms(ROOMLABEL="A", ROOMDESC="Garden shed",
-                          ROOMFIRSTAGENT="", ROOMSECONDAGENT=""))
+        session.add(
+            Rooms(
+                ROOMLABEL="A",
+                ROOMDESC="Garden shed",
+                ROOMFIRSTAGENT="",
+                ROOMSECONDAGENT="",
+            )
+        )
     archive = import_export.export_vector_to_csv(destination=out_dir)
 
     # Changed after the export, so a failed import cannot pass unnoticed:
@@ -125,8 +146,11 @@ def test_a_room_without_agents_survives_a_csv_round_trip(case, out_dir):
 
     with get_session() as session:
         room = session.query(Rooms).one()
-        assert (room.ROOMDESC, room.ROOMFIRSTAGENT, room.ROOMSECONDAGENT) \
-            == ("Garden shed", "", "")
+        assert (
+            room.ROOMDESC,
+            room.ROOMFIRSTAGENT,
+            room.ROOMSECONDAGENT
+        ) == ("Garden shed", "", "")
 
 
 def test_a_damaged_file_is_left_for_the_importer_to_explain(tmp_path):

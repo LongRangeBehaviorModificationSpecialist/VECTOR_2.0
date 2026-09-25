@@ -9,15 +9,16 @@ Flask templates. Uses window.print() for native browser printing.
 
 Routes:
     /reports/agents            →  Agent list report
-    /reports/evidence_basic    →  Basic evidence inventory (return copy)
-    /reports/rooms             →  Room list (pending template)
-    /reports/evidence          →  Detailed evidence (pending template)
-    /reports/evidence_by_room  →  Evidence by room (pending template)
-    /reports/persons           →  Person list (pending template)
-    /reports/notes             →  Notes list (pending template)
+    /reports/rooms             →  Room report
+    /reports/evidence          →  Detailed evidence report
+    /reports/evidence_by_room  →  Evidence listed by room report
+    /reports/evidence_basic    →  Basic evidence inventory (return copy) report
+    /reports/persons           →  Person report
+    /reports/notes             →  Notes report
+    /reports/files             →  Files report
 
 
-Workflow for report creation:
+WORKFLOW FOR REPORT CREATION:
 
     (1) `print_<type>_report() function is called from the navbar button ->
     (2) That function calls `get_case_info()` ->
@@ -35,11 +36,22 @@ from sqlalchemy import func
 
 import clock
 from failures import explain, log
-from models import get_session, Agents, Cases, Evidence, Notes, Persons, Rooms
+from models import (
+    get_session,
+    Agents,
+    Cases,
+    Evidence,
+    Notes,
+    Persons,
+    Rooms,
+    UploadedFiles,
+)
 from navbar import build_navbar, unit_logo
 from auth import is_authenticated, get_current_user_name, get_is_admin
 from utils import (
     CASE_TIME_FORMAT,
+    CONFIRM_TIMEOUT,
+    WARN_TIMEOUT,
     evidence_number_key,
     get_case_info,
     get_print_date_time,
@@ -47,6 +59,47 @@ from utils import (
     room_display_key,
     room_label_key,
 )
+
+style = {
+    "color": "#1C69A8",
+    "props": "push",
+    "classes": "w-full py-4 my-0 hover-border-white"
+}
+
+report_buttons = {
+    "0": {
+        "text": "Print Agent List",
+        "page_url": "/reports/agents",
+    },
+    "1": {
+        "text": "Print Room List",
+        "page_url": "/reports/rooms",
+    },
+    "2": {
+        "text": "Print Evidence List (Full)",
+        "page_url": "/reports/evidence",
+    },
+    "3": {
+        "text": "Print Evidence List (By Room)",
+        "page_url": "/reports/evidence_by_room",
+    },
+    "4": {
+        "text": "Print Evidence List (Basic)",
+        "page_url": "/reports/evidence_basic",
+    },
+    "5": {
+        "text": "Print Persons List",
+        "page_url": "/reports/persons",
+    },
+    "6": {
+        "text": "Print Notes List",
+        "page_url": "/reports/notes",
+    },
+    "7": {
+        "text": "Print File List",
+        "page_url": "/reports/files",
+    },
+}
 
 
 # ----- HTML Escaping -----
@@ -59,6 +112,36 @@ def h(value) -> str:
     """
     return escape("" if value is None else str(value))
 
+
+def build_reports_page() -> None:
+    """Report Page wrapper."""
+
+    # ----- Header / Navbar -----
+    build_navbar(
+        is_admin=get_is_admin(),
+        username=get_current_user_name(),
+    )
+
+    with ui.column().classes("items-center w-full mt-4 mb-4"):
+
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-4")
+
+        with ui.row().classes("text-2xl font-normal text-center"):
+            ui.label("V·E·C·T·O·R")
+            ui.label("|").classes("font-bold text-[var(--vsp-blue)]")
+            ui.label("Reports Page")
+
+    _remind_about_end_time()
+
+    with ui.column().classes("w-full items-center gap-4"):
+        with ui.column().classes("w-full max-w-xs"):
+
+            for k, v in report_buttons.items():
+                ui.button(
+                    v['text'],
+                    on_click=lambda url=v['page_url']: ui.navigate.to(url),
+                    color=style['color'],
+                ).props(style['props']).classes(style['classes'])
 
 
 # ----- Order -----
@@ -94,7 +177,6 @@ def rooms_with_item_counts(session) -> list[tuple[str, int]]:
     )
 
 
-# ----- The case's end time -----
 def fill_case_end_time(now_text: str | None = None) -> tuple[bool, str]:
     """Sets the open case's end time to now, unless that would be wrong.
 
@@ -112,13 +194,17 @@ def fill_case_end_time(now_text: str | None = None) -> tuple[bool, str]:
                 f"The case already has an end date/time: "
                 f"{case.CASEDATETIMEEND}."
             )
-        started = parse_entered_date(case.CASEDATETIMEBEGIN, CASE_TIME_FORMAT)
+        started = parse_entered_date(
+            case.CASEDATETIMEBEGIN,
+            CASE_TIME_FORMAT
+        )
         ended = parse_entered_date(now_text, CASE_TIME_FORMAT)
         if started is not None and ended is not None and ended < started:
             return False, (
-                f"The case starts at {case.CASEDATETIMEBEGIN}, which is later "
-                f"than the time now on this machine ({now_text}), so the end "
-                "time was not filled in. Check the start time on the Case page."
+                f"The case starts at {case.CASEDATETIMEBEGIN}, which "
+                f"is later than the time now on this machine ({now_text}), "
+                "so the end time was not filled in. Check the start time "
+                "on the Case page."
             )
         case.CASEDATETIMEEND = now_text
     return True, f"The case's end date/time is now {now_text}."
@@ -152,7 +238,7 @@ def _remind_about_end_time() -> None:
                 "Continue without it",
                 on_click=reminder.close,
                 color="transparent",
-            ).props("flat").classes("text-[var(--vsp-blue)]")
+            ).props("flat").classes("hover-border-blue")
 
             def fill_in_now() -> None:
                 try:
@@ -162,8 +248,8 @@ def _remind_about_end_time() -> None:
                     ui.notify(
                         f"Could not save the end time.\n\n{explain(err)}",
                         multi_line=True,
-                        type="negative",
-                        timeout=0,
+                        type="warning",
+                        timeout=WARN_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -172,8 +258,8 @@ def _remind_about_end_time() -> None:
                 ui.notify(
                     message,
                     multi_line=True,
-                    type="positive" if saved else "warning",
-                    timeout=4000 if saved else 0,
+                    type="" if saved else "warning",
+                    timeout=CONFIRM_TIMEOUT if saved else 0,
                     position="bottom" if saved else "center",
                     close_button="OK",
                 )
@@ -183,74 +269,9 @@ def _remind_about_end_time() -> None:
                 icon="schedule",
                 on_click=fill_in_now,
                 color="var(--vsp-blue)",
-            ).props("push").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("hover-border-white")
 
     reminder.open()
-
-
-# ----- Report Page Wrapper -----
-def build_reports_page() -> None:
-
-    # ----- Header / Navbar -----
-    build_navbar(
-        is_admin=get_is_admin(),
-        username=get_current_user_name(),
-    )
-
-    with ui.column().classes("items-center w-full mt-4 mb-4"):
-
-        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-4")
-
-        ui.label(
-            "V·E·C·T·O·R Reports Page"
-        ).classes("text-2xl font-normal text-center")
-
-    _remind_about_end_time()
-
-    with ui.column().classes("w-full items-center gap-4"):
-        with ui.column().classes("w-full max-w-xs"):
-
-            ui.button(
-                "Print Agent List",
-                on_click=lambda: ui.navigate.to("/reports/agents"),
-                color="#1C69A8",
-            ).props("push").classes("w-full py-3")
-
-            ui.button(
-                "Print Room List",
-                on_click=lambda: ui.navigate.to("/reports/rooms"),
-                color="#1C69A8",
-            ).props("push").classes("w-full py-3")
-
-            ui.button(
-                "Print Evidence List (Full)",
-                on_click=lambda: ui.navigate.to("/reports/evidence"),
-                color="#1C69A8",
-            ).props("push").classes("w-full py-3")
-
-            ui.button(
-                "Print Evidence List (By Room)",
-                on_click=lambda: ui.navigate.to("/reports/evidence_by_room"),
-                color="#1C69A8",
-            ).props("push").classes("w-full py-3")
-
-            ui.button(
-                "Print Evidence List (Basic)",
-                on_click=lambda: ui.navigate.to("/reports/evidence_basic"),
-                color="#1C69A8",
-            ).props("push").classes("w-full py-3")
-
-            ui.button(
-                "Print Persons List",
-                on_click=lambda: ui.navigate.to("/reports/persons"),
-                color="#1C69A8",
-            ).props("push").classes("w-full py-3")
-
-            ui.button(
-                "Print Notes List",
-                on_click=lambda: ui.navigate.to("/reports/notes"),
-                color="#1C69A8",
-            ).props("push").classes("w-full py-3")
 
 
 def render_report_page(html_content: str) -> None:
@@ -267,8 +288,8 @@ def render_report_page(html_content: str) -> None:
             ui.button(
                 "Print Report",
                 on_click=open_report_window,
-                color="#1C69A8",
-            ).props("push icon=print").classes("mb-4 no-print")
+                color="#1C69A8").props("push icon=print"
+            ).classes("mb-4 no-print hover-border-white")
 
             ui.html(html_content)
 
@@ -318,8 +339,8 @@ def show_validation_errors(errors: list[str]) -> None:
     if len(errors) == 1:
         ui.notify(
             errors[0],
-            type="negative",
-            timeout=0,
+            type="warning",
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -327,8 +348,8 @@ def show_validation_errors(errors: list[str]) -> None:
         error_text = "\n".join(f"• {err}" for err in errors)
         ui.notify(
             f"Cannot generate report — missing information:\n\n{error_text}.",
-            type="negative",
-            timeout=0,
+            type="warning",
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -336,6 +357,26 @@ def show_validation_errors(errors: list[str]) -> None:
 
 # ----- Common Print Styles -----
 COMMON_STYLES = """
+@page {
+    margin-bottom: 0.75in;
+    margin-top: 0.25in;
+
+    @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        font-family: "Arial", sans-serif;
+        font-size:10pt;
+        font-weight: bold;
+        color: #000;
+    }
+    @bottom-left {
+        content: "Confidential";
+        font-size: 9pt;
+        font-style: italic;
+        font-weight: bold;
+        color: #FF0000;
+    }
+}
+
 @media print {
     .no-print {
         display: none !important;
@@ -344,59 +385,78 @@ COMMON_STYLES = """
         background: white !important;
         color: black !important;
     }
-    .top-table .agentTable thead tr th.agentTableHeader,
-    .top-table .noteTable thead tr th.noteTableHeader,
-    .top-table .personTable thead tr th.personTableHeader,
-    .top-table .roomTable thead tr th.roomTableHeader,
-    .top-table .evidTableItemRow {
+    .top-table .agent-table thead tr th.agent-table-header,
+    .top-table .note-table thead tr th.note-table-header,
+    .top-table .person-table thead tr th.person-table-header,
+    .top-table .room-table thead tr th.room-table-header {
         border-collapse: collapse;
-        font-weight: lighter;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .top-table .agent-table thead tr th.agent-table-header,
+    .top-table .note-table thead tr th.note-table-header,
+    .top-table .person-table thead tr th.person-table-header,
+    .top-table .room-table thead tr th.room-table-header {
         padding: 0pt 0pt 3pt 5pt;
     }
-    .headerTable tr td.data,
-    .evidTableRoomNameRow,
-    .top-table .evidTable tr td.evidTableData {
+
+    .header-table tr td.header-data-value,
+    .evid-table-room-row-label,
+    .top-table .evid-table tr td.evid-table-item-label {
         font-family: "Times New Roman", Times, serif;
         font-size: 11pt;
     }
 
-    .evidTableRoomNameRow,
-    .top-table .evidTable tr td.evidTableData {
-        font-weight: bold;
-    }
-
-
-    .headerTable tr td.header,
-    .headerTable tr td.data {
+    .header-table tr td.header-data-label,
+    .header-table tr td.header-data-value {
         vertical-align: "bottom";
     }
-    .top-table .agentTable tbody tr td.agentTableData,
-    .top-table .evidTable tr td.evidTableDataColTwo,
-    .top-table .noteTable tbody tr td.noteTableData,
-    .top-table .personTable tbody tr td.personTableData,
-    .top-table .roomTable tbody tr td.roomTableData {
+
+    .agent-table thead,
+    .note-table thead,
+    .room-table thead,
+    .person-table thead {
+        display: table-header-group; /* repeads <thead> on each printed page */
+    }
+
+    .top-table .agent-table tbody tr td.agent-table-data,
+    .top-table .evid-table tr td.evid-data-value,
+    .top-table .file-table tr td.file-data-value,
+    .top-table .note-table tbody tr td.note-table-data,
+    .top-table .person-table tbody tr td.person-table-data,
+    .top-table .room-table tbody tr td.room-table-data {
         font-family: "Times New Roman", Times, serif;
         font-size: 11pt;
         padding: 5px 5px 3px 5px;
-        vertical-align: "bottom";
+        vertical-align: "center";
     }
-    .top-table .evidTable tr td.evidTableDataColOne,
-    .top-table .evidTable tr td.evidTableDataColTwo {
+
+    .top-table .evid-table tr,
+    .top-table .file-table tr {
         height: 1.45rem;
     }
-    .top-table .evidTable tr td.evidTableDataColOne {
+
+    .top-table .header-table tr td.header-data-label,
+    .report-title p.fs-5,
+    .top-table .evid-table tr td.evid-data-label,
+    .top-table .file-table tr td.file-data-label {
         font-size: 10pt;
     }
-    .top-table .evidTable tr td.evidTableDataColTwo {
+
+    .top-table .evid-table tr td.evid-data-value,
+    .top-table .evid-table tr td.file-data-value {
         font-size: 12pt;
         padding: 0pt 6pt;
     }
-    .top-table .headerTable tr td.header {
-        font-size: 10pt;
+
+    .bold {
+        font-weight: bold;
     }
-    .reportTitle p.fs-5 {
-        font-size: 10pt;
-    }
+}
+
+:root {
+    --gray: #D1D5DC;
 }
 
 body {
@@ -407,10 +467,17 @@ body {
     padding: 1em;
 }
 
-.reportTitle {
+.bold { font-weight: bold; }
+
+.top-row {
+    background-color: var(--gray);
+}
+
+.report-title {
     text-align: center;
     margin-bottom: 1em;
 }
+
 .font-08 { font-size: 8pt; }
 .font-09 { font-size: 9pt; }
 .font-10 { font-size: 10pt; }
@@ -431,7 +498,7 @@ body {
 }
 
 td.px-6 {
-    padding: 0pt 6pt;
+    padding: 0px 8px;
 }
 
 .top-table {
@@ -439,106 +506,118 @@ td.px-6 {
     padding-right: 5%;
 }
 
-.evidTable {
-    border-collapse: collapse;
-    margin-left: auto;
-    margin-right: auto;
-    margin-bottom: 2em;
-    width: 100%;
-}
-.headerTable {
+.header-table {
     border-collapse: collapse;
     margin-bottom: 2em;
-    width: 100%;
-    margin-left: auto;
     margin-right: auto;
+    margin-left: auto;
+    table-layout: fixed;
+    width: 100%;
 }
 
-td.header {
+td.header-data-label {
     font-size: 11pt;
     padding: 5px 10px;
-    width: 35%;
+    width: 30%;
 }
 
-td.data {
-    font-family: "Courier New", Courier, monospace;
+td.header-data-value {
+    border-bottom: 1px dotted green;
+    font-family: "Times New Roman", Times, serif;
     padding: 0px 10px;
-    border-bottom: 1px dashed black;
-    width: 65%;
     vertical-align: bottom;
+    width: 70%;
 }
 
 /* Shared table styles */
-.agentTable,
-.noteTable,
-.roomTable,
-.personTable {
+.agent-table,
+.note-table,
+.room-table,
+.person-table {
     border-collapse: collapse;
     width: 100%;
 }
 
-.agentTableHeader,
-.noteTableHeader,
-.roomTableHeader,
-.personTableHeader {
+.agent-table-header,
+.note-table-header,
+.room-table-header,
+.person-table-header {
     border-collapse: collapse;
     font-weight: 650;
     padding: 0pt 5pt;
     text-align: left;
 }
 
-.agentTable thead tr,
-.noteTable thead tr,
-.roomTable thead tr,
-.personTable thead tr {
+.agent-table thead tr,
+.note-table thead tr,
+.room-table thead tr,
+.person-table thead tr {
     border-top: 0px solid black;
-    border-bottom: 1px dashed black;
+    border-bottom: 1px solid black;
 }
 
-.agentTableData,
-.noteTableData,
-.roomTableData,
-.personTableData {
-    border-bottom: 1px dashed black;
+.agent-table-data,
+.note-table-data,
+.room-table-data,
+.person-table-data {
+    border-bottom: 1px dotted black;
     height: 1.85em;
     padding: 0pt 5pt;
-    vertical-align: bottom;
+    vertical-align: center;
 }
 
-/* Evidence table styles */
-.evidTableItemRow {
-    text-align: center;
-    font-weight: 700;
+.evid-table-top,
+.evid-table,
+.file-table {
+    border-collapse: collapse;
+    margin-left: auto;
+    margin-right: auto;
+    table-layout: fixed;
+    width: 100%;
 }
 
-td.evidTableData {
-    border-bottom: 0px solid black;
-    height: 1.75em;
-    font-size: 11pt;
-    padding: 2px 5px;
+.evid-table,
+.file-table {
+    margin-bottom: 1.5em;
 }
 
-td.evidTableDataColOne {
-    height: 1.85em;
-    padding: 0px 5px;
-    font-weight: normal;
-    width: 20%;
-    vertical-align: bottom;
+.evid-table-top td,
+.evid-table td,
+.file-table td {
+    border: 1px solid black;
 }
 
-td.evidTableDataColTwo {
-    border-bottom: 1px dashed black;
-    height: 1.85em;
-    width: 80%;
-    vertical-align: bottom;
+.evid-table-top td {
+    background-color: #D6EEEE;
 }
 
-.evidTableRoomNameRow {
-    border-bottom: 0px dashed black;
+.evid-table td,
+.file-table td {
     height: 1.5em;
-    text-align: center;
-    font-size: 11 pt;
-    padding: 2px 5px;
+}
+
+.evid-table-item-row {
+    font-size: 10pt;
+    font-weight: bold;
+    height: 1.65em;
+    padding: 2px 10px;
+    text-align: left;
+}
+
+
+td.evid-data-label,
+td.file-data-label {
+    font-weight: normal;
+    padding: 0px 10px;
+    width: 30%;
+}
+
+td.evid-data-value,
+td.file-data-value {
+    font-family: "Times New Roman", Times, serif;
+    padding: 0px 10px;
+    width: 70%;
+    word-wrap: break-word;
 }
 
 .end {
@@ -549,7 +628,6 @@ td.evidTableDataColTwo {
 """
 
 
-# ----- Case Header Builder -----
 def build_case_header_html(
         active_case: dict | None,
         page_title: str,
@@ -563,11 +641,11 @@ def build_case_header_html(
         ui.notify(
             "No active case — please create a case first.",
             type="warning",
-            timeout=0,
+            timeout=WARN_TIMEOUT,
             close_button="OK",
             position="center",
         )
-        # Redirect to case creation page
+        # Redirect to case creation page if no active case
         ui.navigate.to("/cases")
         # Stop here: without this the header below subscripts None and
         # the whole report route returns a 500 instead of redirecting.
@@ -577,36 +655,40 @@ def build_case_header_html(
 
     report_header_table = f"""
     <div class="top-table">
-        <table class="headerTable">
+        <table class="header-table">
             <tr>
-                <td class="header font-11">Investigation Number:</td>
-                <td class="data font-11">{h(active_case["CASENUMBER"])}</td>
+                <td class="header-data-label font-11">Investigation Number:</td>
+                <td class="header-data-value font-11">{h(active_case["CASENUMBER"])}</td>
             </tr>
             <tr>
-                <td class="header font-11">Site Address:</td>
-                <td class="data font-11">{h(active_case["LOCATION"])}</td>
+                <td class="header-data-label font-11">Site Address:</td>
+                <td class="header-data-value font-11">{h(active_case["LOCATION"])}</td>
             </tr>
             <tr>
-                <td class="header font-11">Jurisdiction:</td>
-                <td class="data font-11">{h(active_case["JURISDICTION"])}</td>
+                <td class="header-data-label font-11">Jurisdiction:</td>
+                <td class="header-data-value font-11">{h(active_case["JURISDICTION"])}</td>
             </tr>
             <tr>
-                <td class="header font-11">Starting Date and Time:</td>
-                <td class="data font-11">{h(active_case["CASEDATETIMEBEGIN"])}</td>
+                <td class="header-data-label font-11">Starting Date and Time:</td>
+                <td class="header-data-value font-11">
+                    {h(active_case["CASEDATETIMEBEGIN"])}
+                </td>
             </tr>
             <tr>
-                <td class="header font-11">Ending Date and Time:</td>
-                <td class="data font-11">{h(active_case["CASEDATETIMEEND"])}</td>
+                <td class="header-data-label font-11">Ending Date and Time:</td>
+                <td class="header-data-value font-11">
+                    {h(active_case["CASEDATETIMEEND"])}
+                </td>
             </tr>
             <tr>
-                <td class="header font-11">Report Printed Date:</td>
-                <td class="data font-11">{print_date_time}</td>
+                <td class="header-data-label font-11">Report Printed Date:</td>
+                <td class="header-data-value font-11">{print_date_time}</td>
             </tr>
         </table>
     </div>"""
 
     return f"""
-    <div class="reportTitle">
+    <div class="report-title">
         <p class="fs-3 font-11">{page_title}</p>
         <p class="fs-5 font-8">{sub_title}</p>
     </div>
@@ -624,17 +706,16 @@ def build_report_footer_html() -> str:
     """
 
 
-# ----- Agent List Report HTML Template -----
 def build_agents_report_html(active_case: dict, agents: list) -> str:
     """Generates the complete HTML for the Agent List report."""
 
     agent_rows = "".join([f"""
         <tr>
-            <td class="agentTableData font-10">{h(a["AGENTNAME"])}</td>
-            <td class="agentTableData font-10">{h(a["AGENTPARENTAGENCY"])}</td>
-            <td class="agentTableData font-10">{h(a["AGENTPRIMARYROLE"])}</td>
-            <td class="agentTableData font-10">{h(a["AGENTPHONE"])}</td>
-            <td class="agentTableData font-10">{h(a["AGENTEMAIL"])}</td>
+            <td class="agent-table-data font-10">{h(a["AGENTNAME"])}</td>
+            <td class="agent-table-data font-10">{h(a["AGENTPARENTAGENCY"])}</td>
+            <td class="agent-table-data font-10">{h(a["AGENTPRIMARYROLE"])}</td>
+            <td class="agent-table-data font-10">{h(a["AGENTPHONE"])}</td>
+            <td class="agent-table-data font-10">{h(a["AGENTEMAIL"])}</td>
         </tr>"""
         for a in agents]
     )
@@ -658,14 +739,14 @@ def build_agents_report_html(active_case: dict, agents: list) -> str:
 <body>
     {header}
     <div class="top-table">
-        <table class="agentTable">
+        <table class="agent-table">
             <thead>
                 <tr>
-                    <th class="agentTableHeader font-10">Agent Name</th>
-                    <th class="agentTableHeader font-10">Agency</th>
-                    <th class="agentTableHeader font-10">Primary Role</th>
-                    <th class="agentTableHeader font-10">Phone Number</th>
-                    <th class="agentTableHeader font-10">Email</th>
+                    <th class="agent-table-header font-10">Agent Name</th>
+                    <th class="agent-table-header font-10">Agency</th>
+                    <th class="agent-table-header font-10">Primary Role</th>
+                    <th class="agent-table-header font-10">Phone Number</th>
+                    <th class="agent-table-header font-10">Email</th>
                 </tr>
             </thead>
             <tbody>
@@ -678,7 +759,6 @@ def build_agents_report_html(active_case: dict, agents: list) -> str:
 </html>"""
 
 
-# ----- Detailed Evidence Report HTML Template (AGENT COPY) -----
 def build_evidence_report_html(active_case: list, evidence: list) -> str:
     """Generates the complete HTML for the detailed Evidence report.
 
@@ -688,82 +768,83 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
     """
 
     evid_rows = "".join([f"""
-            <tr class="evidTableItemRow">
-                <td colspan="2" class="evidTableData">
+        <table class="evid-table-top">
+            <tr>
+                <td class="evid-table-item-row">
                     Item #:&ensp;{h(e["EVIDNUM"])}
                 </td>
             </tr>
+        </table>
+        <table class="evid-table">
             <tr>
-                <td class="evidTableDataColOne">Quantity:</td>
-                <td class="evidTableDataColTwo px-6">{h(e["EVIDQTY"])}</td>
+                <td class="evid-data-label">Quantity:</td>
+                <td class="evid-data-value px-6">{h(e["EVIDQTY"])}</td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Description:</td>
-                <td class="evidTableDataColTwo px-6">{h(e["EVIDDESC"])}</td>
+                <td class="evid-data-label">Description:</td>
+                <td class="evid-data-value px-6">{h(e["EVIDDESC"])}</td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Model #:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Model #:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDMODELNUMBER"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Serial #:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Serial #:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDSERIALNUMBER"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Location:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Location:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDLOCROOM"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Where Found:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Where Found:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDLOCROOMDETAIL"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Located By:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Located By:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDFOUNDBY"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Witnessed By:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Witnessed By:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDFOUNDBYWITNESS"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Photographed:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Photographed:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDPICTAKEN"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Item Triaged:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Item Triaged:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDTRIAGED"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Item Triaged By:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Item Triaged By:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDTRIAGEDBY"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Notes:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Notes:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDNOTE"])}
                 </td>
             </tr>
-            <tr>
-                <td colspan="2" style="height: 1.25em;"></td>
-            </tr>"""
+        </table>"""
             for e in evidence
         ]
     )
@@ -787,16 +868,13 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
 <body>
     {header}
     <div class="top-table">
-        <table class="evidTable">
-            {evid_rows}
-        </table>
+        {evid_rows}
     </div>
     {footer}
 </body>
 </html>"""
 
 
-# ----- Evidence By Room Report HTML Template -----
 def build_evidence_by_room_report_html(
         active_case: list,
         evidence: list,
@@ -809,6 +887,9 @@ def build_evidence_by_room_report_html(
     Uses the same full detail layout as the AGENT COPY evidence report.
     """
 
+    space = " "
+    double_space = "  "
+
     room_tables = ""
 
     for room in unique_rooms:
@@ -816,94 +897,91 @@ def build_evidence_by_room_report_html(
         item_count = room[1]
 
         # Singular vs plural
-        if item_count == 1:
-            count_text = f"{h(room_name)}&ensp;:&ensp;({item_count} item)"
-        else:
-            count_text = f"{h(room_name)}&ensp;:&ensp;({item_count} items)"
+        label = (
+            f"{h(room_name)}{space}:{double_space}({item_count} "
+            f"{'item' if item_count == 1 else 'items'})"
+        )
 
         # Filter evidence items for this room
         room_items = [e for e in evidence if e["EVIDLOCROOM"] == room_name]
         evid_rows = "".join([f"""
-            <tr>
-                <td class="evidTableDataColOne">Item No.:</td>
-                <td class="evidTableDataColTwo px-6" style="font-weight:bold">
+            <tr class="top-row">
+                <td class="evid-data-label bold">Item No.:</td>
+                <td class="evid-data-value px-6 bold">
                     {h(e["EVIDNUM"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Quantity:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Quantity:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDQTY"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Description:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Description:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDDESC"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Model #:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Model #:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDMODELNUMBER"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Serial #:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Serial #:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDSERIALNUMBER"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Location:</td>
-                <td class="evidTableDataColTwo px-6">
-                    Room {h(e["EVIDLOCROOM"])}
+                <td class="evid-data-label">Location:</td>
+                <td class="evid-data-value px-6">
+                    {h(e["EVIDLOCROOM"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Where Found</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Where Found</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDLOCROOMDETAIL"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Located By:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Located By:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDFOUNDBY"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Witnessed By:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Witnessed By:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDFOUNDBYWITNESS"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Photographed:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Photographed:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDPICTAKEN"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Item Triaged:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Item Triaged:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDTRIAGED"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Item Triaged By:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Item Triaged By:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDTRIAGEDBY"])}
                 </td>
             </tr>
             <tr>
-                <td class="evidTableDataColOne">Notes:</td>
-                <td class="evidTableDataColTwo px-6">
+                <td class="evid-data-label">Notes:</td>
+                <td class="evid-data-value px-6">
                     {h(e["EVIDNOTE"])}
                 </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="height: 1.25em;"></td>
             </tr>
             """
             for e in room_items
@@ -912,15 +990,15 @@ def build_evidence_by_room_report_html(
 
         room_tables += f"""
         <div class="top-table">
-            <table class="evidTable">
-                <thead>
-                </thead>
-                <tbody>
-                    <tr class="evidTableRoomNameRow">
-                        <th colspan="2">{h(count_text)}</th>
-                    </tr>
-                    {evid_rows}
-                </tbody>
+            <table class="evid-table-top">
+                <tr>
+                    <td class="evid-table-item-row">
+                        {h(label)}
+                    </td>
+                </tr>
+            </table>
+            <table class="evid-table">
+                {evid_rows}
             </table>
         </div>
         </br />"""
@@ -950,7 +1028,6 @@ def build_evidence_by_room_report_html(
 </html>"""
 
 
-# ----- Basic Evidence Report HTML Template (RETURN COPY) -----
 def build_basic_evidence_report_html(
         active_case: list,
         evidence: list
@@ -963,38 +1040,39 @@ def build_basic_evidence_report_html(
     """
 
     evid_rows = "".join([f"""
-            <tr class="evidTableItemRow">
-                <td colspan="2" class="evidTableData">
-                    Item #:&ensp;{h(e["EVIDNUM"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evidTableDataColOne">Quantity:</td>
-                <td class="evidTableDataColTwo px-6">
-                    {h(e["EVIDQTY"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evidTableDataColOne">Description:</td>
-                <td class="evidTableDataColTwo px-6">
-                    {h(e["EVIDDESC"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evidTableDataColOne">Model #:</td>
-                <td class="evidTableDataColTwo px-6">
-                    {h(e["EVIDMODELNUMBER"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evidTableDataColOne">Serial #:</td>
-                <td class="evidTableDataColTwo px-6">
-                    {h(e["EVIDSERIALNUMBER"])}
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="height: 1.25em;"></td>
-            </tr>"""
+            <table class="evid-table-top">
+                <tr>
+                    <td class="evid-table-item-row">
+                        Item #:&ensp;{h(e["EVIDNUM"])}
+                    </td>
+                </tr>
+            </table>
+            <table class="evid-table">
+                <tr>
+                    <td class="evid-data-label">Quantity:</td>
+                    <td class="evid-data-value px-6">
+                        {h(e["EVIDQTY"])}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="evid-data-label">Description:</td>
+                    <td class="evid-data-value px-6">
+                        {h(e["EVIDDESC"])}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="evid-data-label">Model #:</td>
+                    <td class="evid-data-value px-6">
+                        {h(e["EVIDMODELNUMBER"])}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="evid-data-label">Serial #:</td>
+                    <td class="evid-data-value px-6">
+                        {h(e["EVIDSERIALNUMBER"])}
+                    </td>
+                </tr>
+            </table>"""
             for e in evidence
         ]
     )
@@ -1018,28 +1096,25 @@ def build_basic_evidence_report_html(
 <body>
     {header}
     <div class="top-table">
-        <table class="evidTable">
-            {evid_rows}
-        </table>
+        {evid_rows}
     </div>
     {footer}
 </body>
 </html>"""
 
 
-# ----- Room List Report HTML Template -----
 def build_rooms_report_html(active_case: list, rooms: list) -> str:
     """Generates the complete HTML for the Room List report."""
 
     room_rows = "".join([f"""
             <tr>
-                <td class="roomTableData" style="padding-left:25px;">
+                <td class="room-table-data">
                     {h(r["ROOMLABEL"])}
                 </td>
-                <td class="roomTableData font-10">{h(r["ROOMDESC"])}</td>
-                <td class="roomTableData font-10">{h(r["ROOMFIRSTAGENT"])}</td>
-                <td class="roomTableData font-10">{h(r["ROOMSECONDAGENT"])}</td>
-                <td class="roomTableData font-10">{h(r["ROOMNOTE"])}</td>
+                <td class="room-table-data font-10">{h(r["ROOMDESC"])}</td>
+                <td class="room-table-data font-10">{h(r["ROOMFIRSTAGENT"])}</td>
+                <td class="room-table-data font-10">{h(r["ROOMSECONDAGENT"])}</td>
+                <td class="room-table-data font-10">{h(r["ROOMNOTE"])}</td>
             </tr>"""
             for r in rooms
         ]
@@ -1064,14 +1139,14 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
 <body>
     {header}
     <div class="top-table">
-        <table class="roomTable">
+        <table class="room-table">
             <thead>
                 <tr>
-                    <th class="roomTableHeader font-10">Room ID</th>
-                    <th class="roomTableHeader font-10">Room Name</th>
-                    <th class="roomTableHeader font-10">Searched By (1)</th>
-                    <th class="roomTableHeader font-10">Searched By (2)</th>
-                    <th class="roomTableHeader font-10">Notes</th>
+                    <th class="room-table-header font-10">Room ID</th>
+                    <th class="room-table-header font-10">Room Name</th>
+                    <th class="room-table-header font-10">Searched By (1)</th>
+                    <th class="room-table-header font-10">Searched By (2)</th>
+                    <th class="room-table-header font-10">Notes</th>
                 </tr>
             </thead>
             <tbody>
@@ -1084,17 +1159,16 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
 </html>"""
 
 
-# ----- Person List Report HTML Template -----
 def build_persons_report_html(active_case: list, persons: list) -> str:
     """Generates the complete HTML for the Person List report."""
 
     person_rows = "".join([f"""
         <tr>
-            <td class="personTableData font-10">{h(p["PERSONNAME"])}</td>
-            <td class="personTableData font-10">{h(p["PERSONDOB"])}</td>
-            <td class="personTableData font-10">{h(p["PERSONADDRESS"])}</td>
-            <td class="personTableData font-10">{h(p["PERSONPHONE"])}</td>
-            <td class="personTableData font-10">{h(p["SUSPECTNOTE"])}</td>
+            <td class="person-table-data font-10">{h(p["PERSONNAME"])}</td>
+            <td class="person-table-data font-10">{h(p["PERSONDOB"])}</td>
+            <td class="person-table-data font-10">{h(p["PERSONADDRESS"])}</td>
+            <td class="person-table-data font-10">{h(p["PERSONPHONE"])}</td>
+            <td class="person-table-data font-10">{h(p["PERSONNOTE"])}</td>
         </tr>"""
         for p in persons
         ]
@@ -1119,14 +1193,14 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 <body>
     {header}
     <div class="top-table">
-        <table class="personTable">
+        <table class="person-table">
             <thead>
                 <tr>
-                    <th class="personTableHeader font-10">Person Name</th>
-                    <th class="personTableHeader font-10">DOB</th>
-                    <th class="personTableHeader font-10">Address</th>
-                    <th class="personTableHeader font-10">Phone #</th>
-                    <th class="personTableHeader font-10">Notes</th>
+                    <th class="person-table-header font-10">Person Name</th>
+                    <th class="person-table-header font-10">DOB</th>
+                    <th class="person-table-header font-10">Address</th>
+                    <th class="person-table-header font-10">Phone #</th>
+                    <th class="person-table-header font-10">Notes</th>
                 </tr>
             </thead>
             <tbody>
@@ -1139,16 +1213,15 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 </html>"""
 
 
-# ----- Notes Report HTML Template -----
 def build_notes_report_html(active_case: list, notes: list) -> str:
     """Generates the complete HTML for the Notes report."""
 
     note_rows = "".join([f"""
         <tr>
-            <td class="noteTableData font-10">{h(n["NOTEDATETIME"])}</td>
-            <td class="noteTableData font-10">{h(n["NOTEDATETIMEUPDATED"])}</td>
-            <td class="noteTableData font-10">{h(n["NOTEAUTHOR"])}</td>
-            <td class="noteTableData font-10">{h(n["NOTETEXT"])}</td>
+            <td class="note-table-data font-10">{h(n["NOTEDATETIME"])}</td>
+            <td class="note-table-data font-10">{h(n["NOTEDATETIMEUPDATED"])}</td>
+            <td class="note-table-data font-10">{h(n["NOTEAUTHOR"])}</td>
+            <td class="note-table-data font-10">{h(n["NOTETEXT"])}</td>
         </tr>
         """
         for n in notes
@@ -1174,13 +1247,13 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 <body>
     {header}
     <div class="top-table">
-        <table class="noteTable">
+        <table class="note-table">
             <thead>
                 <tr>
-                    <th class="noteTableHeader font-10">Date/Time Added</th>
-                    <th class="noteTableHeader font-10">Date/Time Updated</th>
-                    <th class="noteTableHeader font-10">Author</th>
-                    <th class="noteTableHeader font-10">Text</th>
+                    <th class="note-table-header font-10">Date/Time Added</th>
+                    <th class="note-table-header font-10">Date/Time Updated</th>
+                    <th class="note-table-header font-10">Author</th>
+                    <th class="note-table-header font-10">Text</th>
                 </tr>
             </thead>
             <tbody>
@@ -1193,7 +1266,82 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 </html>"""
 
 
-# ----- Updated Agents Route -----
+def build_files_report_html(active_case: list, files: list) -> str:
+    """Generates the complete HTML for the File List report.
+
+    Each item shows only FILENAME, FILEMIMETYPE, FILEUPLOADDATE,
+    FILEUPLOADEDBY, and FILESHA256.
+    """
+
+    file_rows = "".join([f"""
+        <table class="file-table">
+            <tr class="top-row">
+                <td class="file-data-label bold">File No.:</td>
+                <td class="file-data-value px-6 bold">
+                    {h(f["Z_PK"])}
+                </td>
+            </tr>
+            <tr>
+                <td class="file-data-label">File Name:</td>
+                <td class="file-data-value px-6">
+                    {h(f["FILENAME"])}
+                </td>
+            </tr>
+            <tr>
+                <td class="file-data-label">File Type:</td>
+                <td class="file-data-value px-6">
+                    {h(f["FILEMIMETYPE"])}
+                </td>
+            </tr>
+            <tr>
+                <td class="file-data-label">Uploaded Date/Time:</td>
+                <td class="file-data-value px-6">
+                    {h(f["FILEUPLOADDATE"])}
+                </td>
+            </tr>
+            <tr>
+                <td class="file-data-label">Uploaded By:</td>
+                <td class="file-data-value px-6">
+                    {h(f["FILEUPLOADEDBY"])}
+                </td>
+            </tr>
+            <tr>
+                <td class="file-data-label">File Hash (SHA256):</td>
+                <td class="file-data-value px-6">
+                    {h(f["FILESHA256"])}
+                </td>
+            </tr>
+        </table>"""
+            for f in files
+        ]
+    )
+
+    header = build_case_header_html(
+        active_case,
+        page_title="ATTACHED FILES LIST",
+        sub_title="(Agent Copy)",
+    )
+    footer = build_report_footer_html()
+
+    return f"""<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8" />
+    <title>V·E·C·T·O·R | Attached Files List</title>
+    <style>
+        {COMMON_STYLES}
+    </style>
+</head>
+<body>
+    {header}
+    <div class="top-table">
+        {file_rows}
+    </div>
+    {footer}
+</body>
+</html>"""
+
+
 @ui.page("/reports/agents")
 def print_agents_report():
 
@@ -1225,7 +1373,6 @@ def print_agents_report():
     render_report_page(html_content=html)
 
 
-# ----- Updated Evidence Routes -----
 @ui.page("/reports/evidence")
 def print_evidence_report():
 
@@ -1242,16 +1389,16 @@ def print_evidence_report():
                 "EVIDNUM": e.EVIDNUM,
                 "EVIDQTY": e.EVIDQTY,
                 "EVIDDESC": e.EVIDDESC,
-                "EVIDMODELNUMBER": e.EVIDMODELNUMBER,
-                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER,
+                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "N/A",
+                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "N/A",
                 "EVIDLOCROOM": e.EVIDLOCROOM,
                 "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
                 "EVIDFOUNDBY": e.EVIDFOUNDBY,
                 "EVIDFOUNDBYWITNESS": e.EVIDFOUNDBYWITNESS,
                 "EVIDPICTAKEN": e.EVIDPICTAKEN,
                 "EVIDTRIAGED": e.EVIDTRIAGED,
-                "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY,
-                "EVIDNOTE": e.EVIDNOTE,
+                "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY or "N/A",
+                "EVIDNOTE": e.EVIDNOTE or "N/A",
             }
             for e in evidence_in_order(session)
         ]
@@ -1264,7 +1411,6 @@ def print_evidence_report():
     render_report_page(html_content=html)
 
 
-# ----- Updated Evidence By Room Route -----
 @ui.page("/reports/evidence_by_room")
 def print_evidence_by_room_report():
 
@@ -1282,16 +1428,16 @@ def print_evidence_by_room_report():
                 "EVIDNUM": e.EVIDNUM,
                 "EVIDQTY": e.EVIDQTY,
                 "EVIDDESC": e.EVIDDESC,
-                "EVIDMODELNUMBER": e.EVIDMODELNUMBER,
-                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER,
+                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "N/A",
+                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "N/A",
                 "EVIDLOCROOM": e.EVIDLOCROOM,
                 "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
                 "EVIDFOUNDBY": e.EVIDFOUNDBY,
                 "EVIDFOUNDBYWITNESS": e.EVIDFOUNDBYWITNESS,
                 "EVIDPICTAKEN": e.EVIDPICTAKEN,
                 "EVIDTRIAGED": e.EVIDTRIAGED,
-                "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY,
-                "EVIDNOTE": e.EVIDNOTE,
+                "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY or "N/A",
+                "EVIDNOTE": e.EVIDNOTE or "N/A",
             }
             for e in evidence_in_order(session)
         ]
@@ -1305,7 +1451,6 @@ def print_evidence_by_room_report():
     render_report_page(html_content=html)
 
 
-# ----- Updated Basic Evidence Report Route -----
 @ui.page("/reports/evidence_basic")
 def print_basic_evidence_report():
 
@@ -1322,8 +1467,8 @@ def print_basic_evidence_report():
                 "EVIDNUM": e.EVIDNUM,
                 "EVIDQTY": e.EVIDQTY,
                 "EVIDDESC": e.EVIDDESC,
-                "EVIDMODELNUMBER": e.EVIDMODELNUMBER,
-                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER,
+                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "N/A",
+                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "N/A",
             }
             for e in evidence_in_order(session)
         ]
@@ -1336,7 +1481,6 @@ def print_basic_evidence_report():
     render_report_page(html_content=html)
 
 
-# ----- Updated Rooms Route -----
 @ui.page("/reports/rooms")
 def print_rooms_report():
 
@@ -1352,10 +1496,15 @@ def print_rooms_report():
                 "ROOMDESC": r.ROOMDESC,
                 "ROOMFIRSTAGENT": r.ROOMFIRSTAGENT,
                 "ROOMSECONDAGENT": r.ROOMSECONDAGENT,
-                "ROOMNOTE": r.ROOMNOTE,
+                "ROOMNOTE": r.ROOMNOTE or "N/A",
             }
             for r in rooms_in_order(session)
         ]
+
+    ui.add_head_html(
+        "<title>V·E·C·T·O·R | Room List Report</title>",
+        shared=True,
+    )
 
     html = build_rooms_report_html(
         active_case=active_case,
@@ -1365,7 +1514,6 @@ def print_rooms_report():
     render_report_page(html_content=html)
 
 
-# ----- Updated Persons Route -----
 @ui.page("/reports/persons")
 def print_persons_report():
     if not is_authenticated():
@@ -1377,10 +1525,10 @@ def print_persons_report():
         persons = [
             {
                 "PERSONNAME": p.PERSONNAME,
-                "PERSONDOB": p.PERSONDOB or "",
-                "PERSONADDRESS": p.PERSONADDRESS or "",
-                "PERSONPHONE": p.PERSONPHONE or "",
-                "SUSPECTNOTE": p.SUSPECTNOTE or "",
+                "PERSONDOB": p.PERSONDOB or "N/A",
+                "PERSONADDRESS": p.PERSONADDRESS or "N/A",
+                "PERSONPHONE": p.PERSONPHONE or "N/A",
+                "PERSONNOTE": p.PERSONNOTE or "",
             }
             for p in session.query(Persons).order_by(Persons.PERSONNAME).all()
         ]
@@ -1393,7 +1541,6 @@ def print_persons_report():
     render_report_page(html_content=html)
 
 
-# ----- Updated Notes Route -----
 @ui.page("/reports/notes")
 def print_notes_report():
     if not is_authenticated():
@@ -1405,7 +1552,7 @@ def print_notes_report():
         notes = [
             {
                 "NOTEDATETIME": n.NOTEDATETIME,
-                "NOTEDATETIMEUPDATED": n.NOTEDATETIMEUPDATED or "",
+                "NOTEDATETIMEUPDATED": n.NOTEDATETIMEUPDATED or "N/A",
                 "NOTEAUTHOR": n.NOTEAUTHOR,
                 "NOTETEXT": n.NOTETEXT or "",
             }
@@ -1417,6 +1564,34 @@ def print_notes_report():
         active_case=active_case,
         notes=notes
     )
+
+    render_report_page(html_content=html)
+
+
+@ui.page("/reports/files")
+def print_files_report():
+    if not is_authenticated():
+        ui.navigate.to("/")
+        return
+
+    with get_session() as session:
+        active_case = get_case_info()
+        files = [
+            {
+                "Z_PK": f.Z_PK,
+                "FILENAME": f.FILENAME,
+                "FILEMIMETYPE": f.FILEMIMETYPE or "",
+                "FILEUPLOADDATE": f.FILEUPLOADDATE or "",
+                "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
+                "FILESHA256": f.FILESHA256 or "",
+            }
+            for f in session.query(UploadedFiles).order_by(UploadedFiles.Z_PK).all()
+        ]
+
+        html = build_files_report_html(
+            active_case=active_case,
+            files=files,
+        )
 
     render_report_page(html_content=html)
 

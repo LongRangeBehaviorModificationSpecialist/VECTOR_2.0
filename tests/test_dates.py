@@ -1,4 +1,7 @@
-"""Date format.
+"""
+test_dates.py
+
+Date format.
 
 Case times and dates of birth are entered as MM-DD-YYYY. A value stored
 earlier as YYYY-MM-DD would be scrambled by the input mask the first time
@@ -46,7 +49,10 @@ def test_case_times_are_entered_month_first():
 def test_old_case_times_are_rewritten():
     _add_case("2026-09-10 08:00", "2026-09-10 16:30")
     assert models.normalise_legacy_dates() == 2
-    assert _stored_case_times() == ("09-10-2026 08:00", "09-10-2026 16:30")
+    assert _stored_case_times() == (
+        "09-10-2026 08:00",
+        "09-10-2026 16:30"
+    )
 
 
 def test_old_birth_dates_are_rewritten():

@@ -1,4 +1,7 @@
-"""Report rendering.
+"""
+test_reports.py
+
+Report rendering.
 
 Every report shares one case header, so a single stale key took all
 seven down with KeyError: 'case_number'. These tests exist to make that
@@ -16,7 +19,7 @@ def _rows(model):
     with get_session() as session:
         return [
             {column.name: getattr(row, column.name)
-             for column in model.__table__.columns}
+            for column in model.__table__.columns}
             for row in session.query(model).all()
         ]
 
