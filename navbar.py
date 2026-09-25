@@ -94,6 +94,7 @@ NAV_PAGES = [
 ]
 
 HELP_PAGES = [
+    ("Connect a Device", "/connect"),
     ("About App", "/about"),
     ("Help", "/help"),
 ]

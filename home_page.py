@@ -456,7 +456,8 @@ itself — notes, entries, uploads — carry their offset from UTC, such as
 
 - Sign out from the **Welcome** menu at the top right, with **Logout**.
 - Administrators also see **Admin Panel** there, to add accounts, reset
-  passwords and clear a sign-in lock; **Audit Trail**, a record of every
+  passwords, clear a sign-in lock and decide whether other devices may
+  reach this machine; **Audit Trail**, a record of every
   change; and **Shutdown**, which stops VECTOR for everyone.
 - After {LOCK_AFTER_FAILURES} wrong passwords an account is locked for
   {LOCKOUT_MINUTES} minutes. An administrator can clear the lock sooner.
@@ -470,6 +471,8 @@ itself — notes, entries, uploads — carry their offset from UTC, such as
 
 #### Other pages
 
+- **Connect a Device** under **Help** — the address to type on a tablet
+  or a second laptop, and whether VECTOR is reachable from them at all.
 - **Tools** (or **Useful Links** on the Home page) — links to forensic
   software, DFIR and OSINT resources.
 - **Help** → **About App** — the version, and who wrote VECTOR.

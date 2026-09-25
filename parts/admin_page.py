@@ -13,7 +13,12 @@ from nicegui import ui
 
 from auth import get_current_user_name, get_is_admin
 from navbar import build_navbar
-from parts.admin_users import add_user_card, session_controls, users_table
+from parts.admin_users import (
+    add_user_card,
+    network_access_card,
+    session_controls,
+    users_table,
+)
 
 # ----- PAGE BUILDER -----
 def build_admin_page():
@@ -47,6 +52,7 @@ def build_admin_page():
         add_user_card(lambda: refresh["users"]())
         refresh["users"] = users_table()
         session_controls()
+        network_access_card()
 
     # Initial render
     refresh["users"]()

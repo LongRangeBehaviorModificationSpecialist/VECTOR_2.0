@@ -6,6 +6,7 @@ utils.py
 File containing various functions used throughout the application.
 """
 import clock
+import settings
 from datetime import datetime
 from functools import wraps
 from inspect import iscoroutinefunction
@@ -548,6 +549,31 @@ def delete_all_data() -> None:
             table_name="(all case tables)",
             summary=f"{sum(counts.values())} rows deleted",
             before=counts,
+        )
+
+
+def set_network_access(allowed: bool, actor: str = "") -> None:
+    """Turns network access on or off, and records who did it.
+
+    The address a server listens on is fixed when the socket opens, so
+    this takes effect at the next start; the page offering it says so.
+    """
+    was = settings.network_access()
+    settings.set_network_access(allowed)
+
+    state = "on" if allowed else "off"
+    with get_session() as session:
+        record_audit(
+            session,
+            action="SETTING_CHANGED",
+            table_name="(settings)",
+            summary=(
+                f"network access turned {state}; "
+                "takes effect at the next start"
+            ),
+            before={"network_access": was},
+            after={"network_access": bool(allowed)},
+            actor=actor or None,
         )
 
 

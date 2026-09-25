@@ -39,6 +39,7 @@ from auth import (
     require_login,
 )
 from models import get_users_session
+import settings
 from program.config import (
     Config,
     DB_DIR,
@@ -51,10 +52,14 @@ DEBUG_MODE = "--dev" in sys.argv
 
 
 # ----- Network exposure -----
-# Loopback unless explicitly opted in, so an install is never reachable
-# from the network by accident. See README "Access from another device".
+# Loopback unless somebody opts in, so an install is never reachable from
+# the network by accident. Two ways to opt in: the setting an admin turns
+# on in the Admin Panel, which is what this machine does from then on,
+# and --lan, which opens it for this run only. See README "Access from
+# another device".
 LAN_MODE = "--lan" in sys.argv
-HOST = "0.0.0.0" if LAN_MODE else Config.HOST
+HOST = settings.host_to_bind(LAN_MODE)
+settings.note_running_host(HOST)
 
 
 def get_storage_secret() -> str:
@@ -315,6 +320,7 @@ import home_page  # noqa: F401  (imported for its @ui.page routes)
 from parts.admin_page import build_admin_page
 from parts.agents_page import build_agents_page
 from parts.audit_page import build_audit_page
+from parts.connect_page import build_connect_page
 from parts.cases_page import build_cases_page
 from parts.evidence_page import build_evidence_page
 from parts.files_page import build_uploads_page
@@ -341,6 +347,7 @@ PAGES = [
     ("/reports", build_reports_page, False),
     ("/admin", build_admin_page, True),
     ("/audit", build_audit_page, True),
+    ("/connect", build_connect_page, False),
 ]
 
 for _route, _builder, _admin_only in PAGES:
@@ -449,12 +456,14 @@ if __name__ in {"__main__", "__mp_main__"}:
             shared=True,
         )
 
-    if LAN_MODE:
+    if HOST == "0.0.0.0":
+        how = "--lan" if LAN_MODE else "the setting in the Admin Panel"
         print(
-            "\n  ** LAN MODE ** VECTOR is reachable from other devices on "
-            "this network.\n"
+            "\n  ** ON THE NETWORK ** VECTOR is reachable from other "
+            f"devices on this network ({how}).\n"
             "  Traffic is unencrypted HTTP. Use only on a network you "
             "control.\n"
+            "  The address to type is on the Connect a Device page.\n"
         )
 
     ui.run(

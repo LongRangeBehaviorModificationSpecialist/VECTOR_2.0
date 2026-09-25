@@ -21,12 +21,15 @@ from nicegui import ui
 
 from auth import (
     clear_login_failures,
+    get_current_user_name,
     get_is_admin,
     invalidate_all_sessions,
     invalidate_user_sessions,
     lockout_seconds_remaining,
 )
 from models import get_users_session, Users, generate_one_time_password
+import settings
+from utils import set_network_access
 
 
 # ----- Add an account -----
@@ -566,3 +569,65 @@ def session_controls() -> None:
             on_click=open_sign_out_all_dialog,
             color="#ef4444",
         ).props("push")
+
+
+# ----- Network access -----
+def network_access_card() -> None:
+    """The switch that decides whether other devices can reach this
+    machine, with a plain statement of what is true right now.
+
+    It cannot take effect until VECTOR restarts, so it says so rather
+    than implying the switch did something immediately.
+    """
+    with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
+
+        ui.label("Network access").classes("text-lg font-semibold mb-2")
+
+        if settings.reachable_now():
+            ui.label(
+                "Right now: other devices on this network can reach "
+                "VECTOR. The address to give them is on the Connect a "
+                "Device page."
+            ).classes("text-sm text-[#F5B027] mb-3")
+        else:
+            ui.label(
+                "Right now: VECTOR is answering on this machine only."
+            ).classes("text-sm text-[var(--vsp-gray)] mb-3")
+
+        switch = ui.switch(
+            "Let other devices on this network reach VECTOR",
+            value=settings.network_access(),
+        ).classes("text-sm")
+
+        ui.label(
+            "Takes effect the next time VECTOR starts. Nothing changes "
+            "until then -- a listening port cannot be moved."
+        ).classes("text-xs text-gray-400 mt-2")
+
+        ui.label(
+            "Traffic is unencrypted HTTP, so turn this on only for a "
+            "network you control. With it off the port is not on the "
+            "network at all: the connection is refused before VECTOR "
+            "sees it."
+        ).classes("text-xs text-gray-400 mt-1")
+
+        def on_change(event) -> None:
+            if not get_is_admin():
+                ui.navigate.to("/")
+                return
+
+            allowed = bool(event.value)
+            set_network_access(allowed, get_current_user_name())
+
+            ui.notify(
+                ("Other devices will be able to reach VECTOR "
+                 if allowed else
+                 "VECTOR will answer on this machine only ")
+                + "the next time it starts.",
+                type="info",
+                timeout=0,
+                position="center",
+                close_button="OK",
+            )
+
+        switch.on_value_change(on_change)
