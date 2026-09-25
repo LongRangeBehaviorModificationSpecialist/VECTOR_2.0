@@ -13,6 +13,9 @@ Usage:
     Or double-click "Start VECTOR.bat" (Windows) or "Start VECTOR.command"
     (macOS, which hands over to "Start VECTOR.sh"). Either sets up .venv
     on first use.
+
+    "Start VECTOR on the network" does the same with --lan, for when a
+    tablet or a second laptop has to reach it.
 """
 
 import ast
