@@ -49,7 +49,9 @@ def _scene_time(text: str) -> str:
     import clock
     from datetime import datetime
 
-    return clock.stamp(datetime.strptime(text, "%m-%d-%Y %H:%M:%S").astimezone())
+    return clock.stamp(
+        datetime.strptime(text, "%m-%d-%Y %H:%M:%S").astimezone()
+    )
 
 
 DEMO_CASE = {
@@ -61,87 +63,314 @@ DEMO_CASE = {
 }
 
 DEMO_AGENTS = [
-    ("Demo, Alex", "Virginia State Police", "Case Agent (Primary)",
-     "", "555-0101", "alex.demo@example.invalid"),
-    ("Sample, Bailey", "Virginia State Police", "Search",
-     "Photographer", "555-0102", "bailey.sample@example.invalid"),
-    ("Placeholder, Casey", "Fairfax County Police", "Evidence Triage",
-     "", "555-0103", "casey.placeholder@example.invalid"),
-    ("Testcase, Devon", "Town of Herndon Police", "Photographer",
-     "", "555-0104", ""),
-    ("Fixture, Ellis", "Loudon County Sheriff's Office", "Search",
-     "", "555-0105", ""),
+    (
+        "Demo, Alex",
+        "Virginia State Police",
+        "Case Agent (Primary)",
+        "", "555-0101",
+        "alex.demo@example.invalid"
+    ),
+    (
+        "Sample, Bailey",
+        "Virginia State Police",
+        "Search",
+        "Photographer",
+        "555-0102",
+        "bailey.sample@example.invalid"
+    ),
+    (
+        "Placeholder, Casey",
+        "Fairfax County Police",
+        "Evidence Triage",
+        "",
+        "555-0103",
+        "casey.placeholder@example.invalid"
+    ),
+    (
+        "Testcase, Devon",
+        "Town of Herndon Police",
+        "Photographer",
+        "",
+        "555-0104",
+        ""
+    ),
+    (
+        "Fixture, Ellis",
+        "Loudon County Sheriff's Office",
+        "Search",
+        "",
+        "555-0105",
+        ""
+    ),
 ]
 
 DEMO_ROOMS = [
-    ("A", "Living Room", "Demo, Alex", "Sample, Bailey"),
-    ("B", "Kitchen", "Placeholder, Casey", "Testcase, Devon"),
-    ("C", "Main Bedroom", "Demo, Alex", "Fixture, Ellis"),
-    ("D", "Second Bedroom", "Sample, Bailey", "Placeholder, Casey"),
-    ("E", "Detached Garage", "Testcase, Devon", "Fixture, Ellis"),
+    (
+        "A",
+        "Living Room",
+        "Demo, Alex",
+        "Sample, Bailey"
+    ),
+    (
+        "B",
+        "Kitchen",
+        "Placeholder, Casey",
+        "Testcase, Devon"
+    ),
+    (
+        "C",
+        "Main Bedroom",
+        "Demo, Alex",
+        "Fixture, Ellis"
+    ),
+    (
+        "D",
+        "Second Bedroom",
+        "Sample, Bailey",
+        "Placeholder, Casey"
+    ),
+    (
+        "E",
+        "Detached Garage",
+        "Testcase, Devon",
+        "Fixture, Ellis"
+    ),
 ]
 
 DEMO_EVIDENCE = [
-    ("1", "1", "Laptop computer, silver", "XPS-13", "SN-0000001",
-     "Room A (Living Room)", "On coffee table", "Demo, Alex",
-     "Sample, Bailey", "Yes", "Yes", "Placeholder, Casey", "Unknown",
-     "Powered off at seizure"),
-    ("2", "1", "Mobile telephone, black, cracked screen", "Model-9",
-     "SN-0000002", "Room C (Main Bedroom)", "Nightstand drawer",
-     "Demo, Alex", "Fixture, Ellis", "Yes", "Yes", "Placeholder, Casey",
-     "Yes", "Airplane mode enabled at seizure"),
-    ("3", "4", "USB flash drives, assorted", "", "",
-     "Room C (Main Bedroom)", "Desk drawer, left", "Fixture, Ellis",
-     "Demo, Alex", "Yes", "No", "", "Unknown", "Bagged together"),
-    ("4", "1", "External hard drive, 2TB", "Portable-2T", "SN-0000004",
-     "Room E (Detached Garage)", "Shelf above workbench",
-     "Testcase, Devon", "Fixture, Ellis", "Yes", "No", "", "Unknown", ""),
-    ("5", "1", "Tablet computer, 10 inch", "Tab-10", "SN-0000005",
-     "Room D (Second Bedroom)", "Under mattress", "Sample, Bailey",
-     "Placeholder, Casey", "Yes", "Yes", "Placeholder, Casey", "No", ""),
-    ("6", "1", "Desktop tower, black", "Tower-500", "SN-0000006",
-     "Room A (Living Room)", "Beneath television stand", "Demo, Alex",
-     "Sample, Bailey", "Yes", "No", "", "Unknown", "Left in place, imaged"),
-    ("7", "2", "Memory cards, microSD", "", "", "Room B (Kitchen)",
-     "Kitchen drawer, second from top", "Placeholder, Casey",
-     "Testcase, Devon", "Yes", "No", "", "Unknown", ""),
-    ("8", "1", "Router, consumer grade", "Net-AC1200", "SN-0000008",
-     "Room A (Living Room)", "Hall cupboard", "Sample, Bailey",
-     "Demo, Alex", "Yes", "No", "", "N/A", "Configuration photographed"),
-    ("9", "1", "Notebook, spiral bound, handwritten", "", "",
-     "Room C (Main Bedroom)", "Bedside table", "Fixture, Ellis",
-     "Demo, Alex", "Yes", "No", "", "Unknown", "Contains handwritten notes"),
-    ("10", "1", "Games console", "Console-X", "SN-0000010",
-     "Room D (Second Bedroom)", "Beside television", "Testcase, Devon",
-     "Sample, Bailey", "Yes", "No", "", "Unknown", ""),
-    ("11", "3", "Optical discs, unlabelled", "", "",
-     "Room E (Detached Garage)", "Cardboard box on floor",
-     "Fixture, Ellis", "Testcase, Devon", "Yes", "No", "", "Unknown", ""),
-    ("12", "1", "Digital camera", "Cam-200", "SN-0000012",
-     "Room C (Main Bedroom)", "Wardrobe, top shelf", "Demo, Alex",
-     "Placeholder, Casey", "Yes", "Yes", "Placeholder, Casey", "Unknown",
-     "Memory card seized as item 7"),
+    (
+        "1",
+        "1",
+        "Laptop computer, silver",
+        "XPS-13",
+        "SN-0000001",
+        "Room A (Living Room)",
+        "On coffee table",
+        "Demo, Alex",
+        "Sample, Bailey",
+        "Yes",
+        "Yes",
+        "Placeholder, Casey",
+        "Unknown",
+        "Powered off at seizure"
+    ),
+    (
+        "2",
+        "1",
+        "Mobile telephone, black, cracked screen",
+        "Model-9",
+        "SN-0000002",
+        "Room C (Main Bedroom)",
+        "Nightstand drawer",
+        "Demo, Alex",
+        "Fixture, Ellis",
+        "Yes",
+        "Yes",
+        "Placeholder, Casey",
+        "Yes",
+        "Airplane mode enabled at seizure"
+    ),
+    (
+        "3",
+        "4",
+        "USB flash drives, assorted",
+        "",
+        "",
+        "Room C (Main Bedroom)",
+        "Desk drawer, left",
+        "Fixture, Ellis",
+        "Demo, Alex",
+        "Yes",
+        "No",
+        "", "Unknown",
+        "Bagged together"
+    ),
+    (
+        "4",
+        "1",
+        "External hard drive, 2TB",
+        "Portable-2T",
+        "SN-0000004",
+        "Room E (Detached Garage)",
+        "Shelf above workbench",
+        "Testcase, Devon",
+        "Fixture, Ellis",
+        "Yes",
+        "No",
+        "",
+        "Unknown",
+        ""
+    ),
+    (
+        "5",
+        "1",
+        "Tablet computer, 10 inch",
+        "Tab-10",
+        "SN-0000005",
+        "Room D (Second Bedroom)",
+        "Under mattress",
+        "Sample, Bailey",
+        "Placeholder, Casey",
+        "Yes",
+        "Yes",
+        "Placeholder, Casey",
+        "No",
+        ""
+    ),
+    (
+        "6",
+        "1",
+        "Desktop tower, black",
+        "Tower-500",
+        "SN-0000006",
+        "Room A (Living Room)",
+        "Beneath television stand",
+        "Demo, Alex",
+        "Sample, Bailey",
+        "Yes",
+        "No",
+        "",
+        "Unknown",
+        "Left in place, imaged"
+    ),
+    (
+        "7",
+        "2",
+        "Memory cards, microSD",
+        "",
+        "",
+        "Room B (Kitchen)",
+        "Kitchen drawer, second from top",
+        "Placeholder, Casey",
+        "Testcase, Devon",
+        "Yes",
+        "No",
+        "",
+        "Unknown",
+        ""
+    ),
+    (
+        "8",
+        "1",
+        "Router, consumer grade",
+        "Net-AC1200",
+        "SN-0000008",
+        "Room A (Living Room)",
+        "Hall cupboard",
+        "Sample, Bailey",
+        "Demo, Alex",
+        "Yes",
+        "No",
+        "",
+        "N/A",
+        "Configuration photographed"
+    ),
+    (
+        "9",
+        "1",
+        "Notebook, spiral bound, handwritten",
+        "",
+        "",
+        "Room C (Main Bedroom)",
+        "Bedside table",
+        "Fixture, Ellis",
+        "Demo, Alex",
+        "Yes",
+        "No",
+        "",
+        "Unknown",
+        "Contains handwritten notes"
+    ),
+    (
+        "10",
+        "1",
+        "Games console",
+        "Console-X",
+        "SN-0000010",
+        "Room D (Second Bedroom)",
+        "Beside television",
+        "Testcase, Devon",
+        "Sample, Bailey",
+        "Yes",
+        "No",
+        "",
+        "Unknown",
+        ""
+    ),
+    (
+        "11",
+        "3",
+        "Optical discs, unlabelled",
+        "",
+        "",
+        "Room E (Detached Garage)",
+        "Cardboard box on floor",
+        "Fixture, Ellis",
+        "Testcase, Devon",
+        "Yes",
+        "No",
+        "",
+        "Unknown",
+        ""
+    ),
+    (
+        "12",
+        "1",
+        "Digital camera",
+        "Cam-200",
+        "SN-0000012",
+        "Room C (Main Bedroom)",
+        "Wardrobe, top shelf",
+        "Demo, Alex",
+        "Placeholder, Casey",
+        "Yes",
+        "Yes",
+        "Placeholder, Casey",
+        "Unknown",
+        "Memory card seized as item 7"
+    ),
 ]
 
 DEMO_PERSONS = [
-    ("Fictional, Jordan", "04-17-1985", "1 Example Way, Springfield",
-     "555-0110", "Named on the warrant. Present at entry."),
-    ("Invented, Morgan", "11-02-1991", "1 Example Way, Springfield",
-     "555-0111", "Resident. Cooperative throughout."),
+    (
+        "Fictional, Jordan",
+        "04-17-1985",
+        "1 Example Way, Springfield",
+        "555-0110",
+        "Named on the warrant. Present at entry."
+    ),
+    (
+        "Invented, Morgan",
+        "11-02-1991",
+        "1 Example Way, Springfield",
+        "555-0111",
+        "Resident. Cooperative throughout."
+    ),
 ]
 
 DEMO_NOTES = [
-    ("09-01-2026 07:32:00", "Demo, Alex",
-     "Entry made at 0730. Premises secured. Two occupants present and "
-     "identified."),
-    ("09-01-2026 08:15:00", "Sample, Bailey",
-     "Photographs taken of all rooms prior to search commencing."),
-    ("09-01-2026 11:40:00", "Placeholder, Casey",
-     "Triage completed on items 1, 2, 5 and 12. No further action on "
-     "item 5."),
-    ("09-01-2026 15:40:00", "Demo, Alex",
-     "Search concluded. Property receipt provided to occupant. "
-     "Twelve items seized."),
+    (
+        "09-01-2026 07:32:00",
+        "Demo, Alex",
+        "Entry made at 0730. Premises secured. Two occupants present and "
+        "identified."
+    ),
+    (
+        "09-01-2026 08:15:00",
+        "Sample, Bailey",
+        "Photographs taken of all rooms prior to search commencing."
+    ),
+    (
+        "09-01-2026 11:40:00", "Placeholder, Casey",
+        "Triage completed on items 1, 2, 5 and 12. No further action on "
+        "item 5."
+    ),
+    (
+        "09-01-2026 15:40:00",
+        "Demo, Alex",
+        "Search concluded. Property receipt provided to occupant. "
+        "Twelve items seized."
+    ),
 ]
 
 
@@ -149,7 +378,13 @@ def rebuild_case() -> None:
     """Clears the case tables and writes the demo case."""
     with get_session() as session:
         for model in (
-            Evidence, Notes, Persons, Rooms, Agents, Cases, UploadedFiles,
+            Cases,
+            Agents,
+            Rooms,
+            Evidence,
+            Persons,
+            Notes,
+            UploadedFiles,
         ):
             session.query(model).delete()
 
@@ -181,9 +416,22 @@ def rebuild_case() -> None:
             )
 
         for item in DEMO_EVIDENCE:
-            (num, qty, desc, model_no, serial, room, where, found_by,
-             witness, photographed, triaged, triaged_by, contraband,
-             note) = item
+            (
+                num,
+                qty,
+                desc,
+                model_no,
+                serial,
+                room,
+                where,
+                found_by,
+                witness,
+                photographed,
+                triaged,
+                triaged_by,
+                contraband,
+                note
+            ) = item
             session.add(
                 Evidence(
                     EVIDNUM=num,
@@ -211,7 +459,7 @@ def rebuild_case() -> None:
                     PERSONDOB=dob,
                     PERSONADDRESS=address,
                     PERSONPHONE=phone,
-                    SUSPECTNOTE=note,
+                    PERSONNOTE=note,
                     ENTEREDDATETIME=_scene_time("09-01-2026 08:05:00"),
                 )
             )
@@ -274,13 +522,13 @@ def main() -> None:
 
     if "--users" in sys.argv:
         issued = reset_users()
-        print("\n" + "=" * 62)
+        print("\n" + "  " + "=" * 62)
         print("  Accounts reset. These passwords are shown once.")
-        print("=" * 62)
+        print("  " + "=" * 62)
         for name, password, is_admin in issued:
             role = "admin" if is_admin else "standard"
             print(f"    {name:<8} ({role:<8})  {password}")
-        print("=" * 62)
+        print("  " + "=" * 62)
         print("  Each account must change its password at first sign-in.\n")
 
 

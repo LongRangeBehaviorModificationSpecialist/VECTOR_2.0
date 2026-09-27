@@ -1,4 +1,7 @@
-"""Schema migration.
+"""
+test_migration.py
+
+Schema migration.
 
 An existing database has to reach the current schema without losing a
 row: old column names renamed in place, columns added since, and the
@@ -42,7 +45,7 @@ CREATE TABLE "PERSONS" (
     "SUSPECTDOB" VARCHAR,
     "SUSPECTADDRESS" VARCHAR,
     "SUSPECTPHONE" VARCHAR,
-    "SUSPECTNOTE" TEXT,
+    "PERSONNOTE" TEXT,
     "ENTEREDDATETIME" VARCHAR
 );
 CREATE TABLE "files" (
@@ -190,11 +193,17 @@ def test_person_columns_are_renamed(legacy_database):
     models.upgrade_database()
 
     columns = _columns(legacy_database, "PERSONS")
-    assert {"PERSONNAME", "PERSONDOB", "PERSONADDRESS",
-            "PERSONPHONE"} <= columns
-    assert not {c for c in columns if c.startswith("SUSPECT")} - {
-        "SUSPECTNOTE"
-    }
+    assert {
+        "PERSONNAME",
+        "PERSONDOB",
+        "PERSONADDRESS",
+        "PERSONPHONE",
+        "PERSONNOTE"
+    } <= columns
+    assert not {
+        c for c in columns
+        if c.startswith("SUSPECT")
+    } - {"SUSPECTNOTE"}
 
     connection = sqlite3.connect(legacy_database)
     row = connection.execute(
@@ -212,8 +221,14 @@ def test_the_files_table_and_its_columns_are_renamed(legacy_database):
     assert "files" not in tables
 
     columns = _columns(legacy_database, "FILES")
-    assert {"Z_PK", "FILENAME", "FILESIZE", "FILEMIMETYPE",
-            "FILEUPLOADDATE", "FILEUPLOADEDBY", "FILEDATA"} <= columns
+    assert {"Z_PK",
+            "FILENAME",
+            "FILESIZE",
+            "FILEMIMETYPE",
+            "FILEUPLOADDATE",
+            "FILEUPLOADEDBY",
+            "FILEDATA"
+        } <= columns
     assert "file_name" not in columns
 
 
@@ -222,8 +237,14 @@ def test_user_columns_are_renamed_and_passwords_still_work(legacy_database):
 
     users_path = models.USERS_DB_PATH
     columns = _columns(users_path, "users")
-    assert {"Z_PK", "USERNAME", "PASSWORDHASH", "ISADMIN", "ISACTIVE",
-            "MUSTCHANGEPASSWORD", "ENTEREDDATETIME"} <= columns
+    assert {"Z_PK",
+            "USERNAME",
+            "PASSWORDHASH",
+            "ISADMIN",
+            "ISACTIVE",
+            "MUSTCHANGEPASSWORD",
+            "ENTEREDDATETIME"
+        } <= columns
 
     with OrmSession(models.users_engine) as session:
         user = session.query(models.Users).one()
@@ -235,7 +256,7 @@ def test_user_columns_are_renamed_and_passwords_still_work(legacy_database):
 def test_new_columns_are_added_to_an_old_files_table(legacy_database):
     models.upgrade_database()
     columns = _columns(legacy_database, "FILES")
-    assert {"FILESHA256", "FILEHASHEDAT", "FILENOTE"} <= columns
+    assert {"FILESHA256", "FILEHASHEDDATETIME", "FILENOTE"} <= columns
 
 
 # ----- Constraint rebuilds -----
@@ -326,7 +347,8 @@ def test_a_current_database_is_left_alone(tmp_path, monkeypatch):
 
 def test_the_backup_includes_writes_still_in_the_wal(tmp_path, monkeypatch):
     """In WAL mode recent writes sit in the -wal file. A backup that
-    copied only the .db would silently leave them out."""
+    copied only the .db would silently leave them out.
+    """
     path = tmp_path / "wal.db"
     writer = sqlite3.connect(path)
     writer.execute("PRAGMA journal_mode=WAL")

@@ -1,4 +1,7 @@
-"""The audit trail.
+"""
+test_audit.py
+
+The audit trail.
 
 Hooked into the session flush rather than each page's save handler, so
 a new page or a forgotten call site cannot skip it.

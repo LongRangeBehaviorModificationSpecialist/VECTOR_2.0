@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 
 """
-import_export.py — Database export and import functionality.
+import_export.py
+
+Database export and import functionality.
 
 Import: Restores tables from CSV files and file BLOBs from disk.
 Export: Saves all tables to CSV files and file BLOBs to disk.
 """
 
 import csv
+from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import json
@@ -22,18 +25,33 @@ from failures import explain, log
 from models import (
     LEGACY_COLUMN_NAMES,
     LEGACY_TABLE_NAMES,
+    Cases,
     get_session,
     normalise_legacy_dates,
     record_audit,
 )
+from utils import CONFIRM_TIMEOUT, WARN_TIMEOUT, ZERO_TIMEOUT
+
+
+@dataclass
+class ExportResult:
+    zip_path: Path
+    message: str
 
 
 # ----- MODEL REGISTRY -----
-# [Add or remove tables here as your app grows]
+# [Add or remove tables here as the app grows]
 def get_exportable_models() -> list:
     """Returns a list of (model_class, model_name) tuples for CSV export."""
     from models import (
-        Cases, Agents, Rooms, Evidence, Persons, Notes, AuditLog,
+        Cases,
+        Agents,
+        Rooms,
+        Evidence,
+        Persons,
+        Notes,
+        # UploadedFiles,  # MAS added 09-21-26
+        AuditLog,
     )
 
     return [
@@ -43,6 +61,7 @@ def get_exportable_models() -> list:
         (Evidence, "EVIDENCE"),
         (Persons, "PERSONS"),
         (Notes, "NOTES"),
+        # (UploadedFiles, "FILES"),  # MAS added 09-21-26
         # The audit trail travels with the case: an export that drops it
         # cannot answer what changed after collection.
         (AuditLog, "AUDIT"),
@@ -51,7 +70,15 @@ def get_exportable_models() -> list:
 
 def get_all_models() -> dict:
     """Returns ALL models including UploadedFiles for import."""
-    from models import Cases, Agents, Rooms, Evidence, Persons, Notes, UploadedFiles
+    from models import (
+        Cases,
+        Agents,
+        Rooms,
+        Evidence,
+        Persons,
+        Notes,
+        UploadedFiles,
+    )
 
     return {
         "CASES": Cases,
@@ -62,6 +89,7 @@ def get_all_models() -> dict:
         "NOTES": Notes,
         "FILES": UploadedFiles,
     }
+
 
 
 # ----- Names used by older exports -----
@@ -81,11 +109,19 @@ _FILE_ENTRY_ALIASES = {
     "mime_type": "FILEMIMETYPE",
     "uploaded_by": "FILEUPLOADEDBY",
     "hash_at_ingest": "FILESHA256",
-    "hashed_at": "FILEHASHEDAT",
+    "hashed_at": "FILEHASHEDDATETIME",
     "file_hash": "FILEHASH",
     "matches_ingest_hash": "FILEHASHMATCHES",
     "data_base64": "FILEDATA_b64",
 }
+
+def hash_file(path: Path, chunk_size: int = 65536) -> str:
+    """Streamed SHA-256 of a file's contents."""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest().upper()
 
 
 def canonical_table_name(name: str) -> str:
@@ -114,8 +150,9 @@ def _report_failure(message: str, err: BaseException) -> None:
     ui.notify(
         f"{message}\n\n{explain(err)}",
         multi_line=True,
-        type="negative",
-        timeout=0,
+        classes="multi-line-notification",
+        type="warning",
+        timeout=WARN_TIMEOUT,
         position="center",
         close_button="OK",
     )
@@ -135,10 +172,11 @@ def _clear_case_tables(session) -> None:
 # ----- Staging -----
 # Exports are built in the system temp folder and handed to the browser as
 # a download, so the file reaches whichever device asked for it -- a tablet
-# on --lan included -- and no copy is left on the host's Desktop. Imports
+# on `--lan` included -- and no copy is left on the host's Desktop. Imports
 # arrive the same way, as an upload. Neither is needed once the download or
 # the import has happened, so anything left for over an hour is removed.
 STAGING_PREFIXES = ("vector_export_", "vector_import_upload_")
+# Set value to 1 hour (3,600 seconds)
 STAGING_MAX_AGE_SECONDS = 60 * 60
 
 
@@ -201,8 +239,8 @@ def get_case_info_for_folder_name() -> str:
         if not case:
             ui.notify(
                 "No case found. Cannot export data.",
-                type="negative",
-                timeout=0,
+                type="warning",
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -290,13 +328,12 @@ def deserialize_value(value: str, column) -> str:
         return value
 
 
-# ----- EXPORT FUNCTION -----
-
+# ----- CSV EXPORT FUNCTION -----
 
 def export_vector_to_csv(
         password: Optional[str] = None,
         destination: Optional[Path] = None,
-) -> Optional[Path]:
+) -> Optional[ExportResult]:
     """Exports every table to CSV, with every attachment, as one ZIP.
 
     Returns the finished archive's path, or None if the export failed.
@@ -317,7 +354,7 @@ def export_vector_to_csv(
     destination = (
         Path(destination) if destination else new_staging_dir("vector_export_")
     )
-    work_dir = new_staging_dir("vector_export_")
+    work_dir = new_staging_dir(prefix="vector_export_")
 
     # ----- Assemble the archive's contents before zipping -----
     export_dir = work_dir / folder_name
@@ -328,7 +365,10 @@ def export_vector_to_csv(
         export_dir.mkdir(parents=True, exist_ok=True)
         files_dir.mkdir(parents=True, exist_ok=True)
     except OSError as err:
-        _report_failure("Could not start the export. Nothing was downloaded.", err)
+        _report_failure(
+            "Could not start the export. Nothing was downloaded.",
+            err
+        )
         shutil.rmtree(work_dir, ignore_errors=True)
         return None
 
@@ -346,8 +386,7 @@ def export_vector_to_csv(
                 records = session.query(model_class).all()
                 with open(csv_path, "w", newline="", encoding="utf-8") as f:
                     writer = csv.writer(f)
-                    writer.writerow(columns)  # Header row
-
+                    writer.writerow(columns)  # Write the header row
                     for record in records:
                         row = (
                             [
@@ -356,6 +395,7 @@ def export_vector_to_csv(
                             ]
                         )
                         writer.writerow(row)
+
                 count = len(records)
                 total_records += count
                 exported_tables[table_name] = count
@@ -389,7 +429,9 @@ def export_vector_to_csv(
                     with open(file_path, "wb") as f:
                         f.write(uf.FILEDATA)
 
-                    sha256_hash = hashlib.sha256(uf.FILEDATA).hexdigest()
+                    sha256_hash = (
+                        hashlib.sha256(uf.FILEDATA).hexdigest().upper()
+                    )
 
                     # The hash taken when the file was collected is the
                     # one that matters. Recomputing here only certifies
@@ -412,7 +454,7 @@ def export_vector_to_csv(
                             "FILESIZE": uf.FILESIZE or len(uf.FILEDATA),
                             "FILEHASH": sha256_hash,
                             "FILESHA256": recorded or None,
-                            "FILEHASHEDAT": uf.FILEHASHEDAT or None,
+                            "FILEHASHEDDATETIME": uf.FILEHASHEDDATETIME or None,
                             "FILEMIMETYPE": uf.FILEMIMETYPE or "",
                             "FILEUPLOADEDBY": uf.FILEUPLOADEDBY or "",
                             "FILEHASHMATCHES": verified,
@@ -437,7 +479,11 @@ def export_vector_to_csv(
         "export_date": datetime.now().isoformat(),
         "case_file": zip_path.name,
         "tables": [
-            {"name": table_name, "records": count}
+            {
+                "name": table_name,
+                "records": count,
+                "sha256": hash_file(export_dir / f"{table_name}.csv"),
+            }
             for table_name, count in exported_tables.items()
         ],
         "total_records": total_records,
@@ -449,13 +495,15 @@ def export_vector_to_csv(
 
     if integrity_failures:
         ui.notify(
-            "WARNING: these attachments no longer match the SHA-256 "
-            "recorded when they were collected:\n"
+            "WARNING -- these attachments no longer match the SHA-256 "
+            "recorded when they were collected:\n\n"
             + "\n".join(integrity_failures)
-            + "\nThe export still completed. Investigate before relying "
+            + "\n\nThe export still completed. Investigate before relying "
             "on these files.",
-            type="negative",
-            timeout=0,
+            multi_line=True,
+            classes="multi-line-notification",
+            type="warning",
+            timeout=ZERO_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -467,69 +515,97 @@ def export_vector_to_csv(
 
     # ----- Create the ZIP file -----
     try:
-        if password:
-            with pyzipper.AESZipFile(
-                zip_path,
-                "w",
-                compression=pyzipper.ZIP_DEFLATED,
-                encryption=pyzipper.WZ_AES
-            ) as zf:
+        with get_session() as session:
+            if password:
+                with pyzipper.AESZipFile(
+                    zip_path,
+                    "w",
+                    compression=pyzipper.ZIP_DEFLATED,
+                    encryption=pyzipper.WZ_AES
+                ) as zf:
 
-                zf.setpassword(password.encode("utf-8"))
-                zf.setencryption(pyzipper.WZ_AES, nbits=256)
+                    zf.setpassword(password.encode("utf-8"))
+                    zf.setencryption(pyzipper.WZ_AES, nbits=256)
 
-                # Walk the export directory and add all files
-                for file_path in export_dir.rglob("*"):
-                    if file_path.is_file():
-                        arcname = file_path.relative_to(export_dir)
-                        zf.write(file_path, arcname)
-        else:
-            # ----- Unencrypted ZIP -----
-            with pyzipper.AESZipFile(
-                zip_path,
-                "w",
-                compression=pyzipper.ZIP_DEFLATED
-            ) as zf:
-                for file_path in export_dir.rglob("*"):
-                    if file_path.is_file():
-                        arcname = file_path.relative_to(export_dir)
-                        zf.write(file_path, arcname)
+                    # Walk the export directory and add all files
+                    for file_path in export_dir.rglob("*"):
+                        if file_path.is_file():
+                            arcname = file_path.relative_to(export_dir)
+                            zf.write(file_path, arcname)
+            else:
+                # ----- Unencrypted ZIP -----
+                with pyzipper.AESZipFile(
+                    zip_path,
+                    "w",
+                    compression=pyzipper.ZIP_DEFLATED
+                ) as zf:
+                    for file_path in export_dir.rglob("*"):
+                        if file_path.is_file():
+                            arcname = file_path.relative_to(export_dir)
+                            zf.write(file_path, arcname)
 
     except Exception as err:
-        _report_failure("Could not create the ZIP file. Nothing was downloaded.", err)
+        _report_failure(
+            "Could not create the ZIP file. Nothing was exported.",
+            err,
+        )
         shutil.rmtree(work_dir, ignore_errors=True)
         return None
 
-    # ----- Delete the staging directory -----
+    try:
+        with get_session() as session:
+            case = session.query(Cases).order_by(Cases.Z_PK).first()
+
+            stage = "the audit record"
+            record_audit(
+                session,
+                action="EXPORT",
+                table_name="(all case tables)",
+                summary=f"Exported CSV data for Case No. {case.CASENUMBER}",
+                after={
+                    "destination": str(zip_path.name),
+                    "date/time": manifest.get("export_date", "unknown"),
+                    "records": total_records,
+                    "files": num_files,
+                    "integrity_failures": integrity_failures,
+                    "encrypted": password is not None and len(password) > 0,
+                }
+            )
+    except Exception as err:
+        ui.notify(
+            f"Failed to record action in {stage} → {err}.",
+            multi_line=True,
+            classes="multi-line-notification",
+            type="warning",
+            timeout=WARN_TIMEOUT,
+            position="center",
+            close_button="OK",
+        )
+        print(f"{err}")
+        return None
+
+    # Delete the staging directory
     shutil.rmtree(work_dir, ignore_errors=True)
+
+    def entry_word(count: int) -> str:
+        return "entry" if count == 1 else "entries"
 
     enc_text = " (AES-256 encrypted)" if password else ""
 
-    # ----- Success notification -----
-    ui.notify(
-        f"Export complete!{enc_text}\n"
-        f"Tables: {', '.join(f'{n} ({c})' for n, c in exported_tables.items())}\n"
-        f"Files: {num_files}\n"
-        f"Downloading {zip_path.name}",
-        timeout=0,
-        position="bottom",
-        close_button="OK",
+    table_lines = "\n".join(
+        f"{n} ({c} {entry_word(c)})" for n, c in exported_tables.items()
     )
 
-    # Also show in terminal
-    print(f"\n{'='*60}")
-    print(f"  EXPORT COMPLETE")
-    print(f"  Location: {zip_path}")
-    print(f"  Tables: {exported_tables}")
-    print(f"  Total records: {total_records}")
-    print(f"  Files exported: {num_files}")
-    print(f"{'='*60}\n")
+    message = (
+        f"Exporting data to CSV{enc_text}...\n\n"
+        f"Tables :\n\n{table_lines}\n\n"
+        f"Output will be named :  {zip_path.name}"
+    )
 
-    return zip_path
+    return ExportResult(zip_path=zip_path, message=message)
 
 
-# ----- IMPORT FUNCTION -----
-
+# ----- CSV IMPORT FUNCTION -----
 
 def import_vector_from_csv(
         zip_path: str,
@@ -547,8 +623,8 @@ def import_vector_from_csv(
     if not zip_file.exists():
         ui.notify(
             "ZIP file not found.",
-            type="negative",
-            timeout=0,
+            type="warning",
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -558,7 +634,7 @@ def import_vector_from_csv(
         ui.notify(
             "Please select a .zip file.",
             type="warning",
-            timeout=0,
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -578,8 +654,8 @@ def import_vector_from_csv(
                 ui.notify(
                     f"Failed to decrypt ZIP file → {err}.\n"
                     "Check your password and try again.",
-                    type="negative",
-                    timeout=0,
+                    type="warning",
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -596,7 +672,7 @@ def import_vector_from_csv(
                 ui.notify(
                     "This ZIP file is encrypted. Please provide a password.",
                     type="warning",
-                    timeout=0,
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -653,8 +729,8 @@ def import_vector_from_csv(
     if not found_tables:
         ui.notify(
             "No CSV files found in the selected ZIP archive.",
-            type="negative",
-            timeout=0,
+            type="warning",
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -738,7 +814,7 @@ def import_vector_from_csv(
                     with open(file_path, "rb") as f:
                         file_data = f.read()
 
-                    actual_hash = hashlib.sha256(file_data).hexdigest()
+                    actual_hash = hashlib.sha256(file_data).hexdigest().upper()
                     entry = manifest_files.get(file_path.name)
 
                     if entry is None:
@@ -761,7 +837,7 @@ def import_vector_from_csv(
                             details.get("FILEUPLOADEDBY") or "import"
                         ),
                         FILESHA256=details.get("FILESHA256") or actual_hash,
-                        FILEHASHEDAT=details.get("FILEHASHEDAT"),
+                        FILEHASHEDDATETIME=details.get("FILEHASHEDDATETIME"),
                     )
                     session.add(new_file)
                     files_imported += 1
@@ -783,7 +859,7 @@ def import_vector_from_csv(
 
     except Exception as err:
         _report_failure(
-            "Nothing was imported, and the case is unchanged. The problem "
+            "Nothing was imported and the case is unchanged. The problem "
             f"was in {stage}.",
             err,
         )
@@ -807,8 +883,8 @@ def import_vector_from_csv(
             + "\n\n".join(problems)
             + "\n\nThe import completed and has been recorded in the "
             "audit trail. Treat these files as unverified.",
-            type="negative",
-            timeout=0,
+            type="warning",
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -820,23 +896,20 @@ def import_vector_from_csv(
     # ----- Clean up temporary directory -----
     shutil.rmtree(temp_dir, ignore_errors=True)
 
+    table_lines = " | ".join(imported_tables)
+
     # ----- Success notification -----
     ui.notify(
-        f"Import complete!\n"
-        f"Tables: {', '.join(imported_tables)}\n"
-        f"Files: {files_imported}\n"
-        f"Total records: {total_records}",
-        timeout=0,
+        f"Data import complete!\n\n"
+        f"Tables :  {table_lines}\n\n"
+        f"Total records :  {total_records}\n\n"
+        f"Files :  {files_imported}",
+        multi_line=True,
+        classes="multi-line-notification",
+        timeout=CONFIRM_TIMEOUT,
         position="bottom",
         close_button="OK",
     )
-
-    print(f"\n{'='*60}")
-    print(f"  IMPORT COMPLETE")
-    print(f"  Tables: {imported_tables}")
-    print(f"  Total records: {total_records}")
-    print(f"  Files imported: {files_imported}")
-    print(f"{'='*60}\n")
 
 
 # ----- JSON EXPORT / IMPORT -----
@@ -844,8 +917,7 @@ def import_vector_from_csv(
 # folder, with attachments embedded, so a case can be handed to another
 # tool or another system as a single artifact.
 #
-# Ported from the upstream project and rebuilt to match this branch. The
-# SHA-256 recorded at collection travels with each attachment and is
+# The SHA-256 recorded at collection travels with each attachment and is
 # checked on the way back in, the audit trail is included in the export
 # and an import is itself recorded, and the file is staged in a temp
 # directory rather than written to the Desktop in the clear and then
@@ -855,7 +927,7 @@ def import_vector_from_csv(
 # under files.records with the bytes in FILEDATA_b64 -- and the importer
 # still reads this branch's earlier 1.0 layout.
 
-JSON_FORMAT_VERSION = "1.1"
+JSON_FORMAT_VERSION = "1.2"
 
 
 def _row_to_json(record, columns: list) -> dict:
@@ -908,10 +980,12 @@ def _json_to_value(value, column):
     return value
 
 
+# ----- JSON EXPORT FUNCTION -----
+
 def export_vector_to_json(
         password: Optional[str] = None,
         destination: Optional[Path] = None,
-) -> Optional[Path]:
+) -> Optional[ExportResult]:
     """Exports the whole case to a single JSON file.
 
     Attachments are embedded as base64 alongside the SHA-256 recorded
@@ -937,7 +1011,10 @@ def export_vector_to_json(
             "application": "VECTOR",
         },
         "tables": {},
-        "files": {"record_count": 0, "records": []},
+        "files": {
+            "record_count": 0,
+            "records": []
+        },
     }
 
     total_records = 0
@@ -974,7 +1051,9 @@ def export_vector_to_json(
                 if not uploaded.FILEDATA:
                     continue
 
-                current_hash = hashlib.sha256(uploaded.FILEDATA).hexdigest()
+                current_hash = (
+                    hashlib.sha256(uploaded.FILEDATA).hexdigest().upper()
+                )
                 recorded = uploaded.FILESHA256 or ""
                 matches = (not recorded) or recorded == current_hash
                 if not matches:
@@ -989,7 +1068,7 @@ def export_vector_to_json(
                         "FILEMIMETYPE": uploaded.FILEMIMETYPE,
                         "FILEUPLOADEDBY": uploaded.FILEUPLOADEDBY,
                         "FILESHA256": recorded or None,
-                        "FILEHASHEDAT": uploaded.FILEHASHEDAT,
+                        "FILEHASHEDDATETIME": uploaded.FILEHASHEDDATETIME,
                         "FILEHASH": current_hash,
                         "FILEHASHMATCHES": matches,
                         "FILEDATA_b64": base64.b64encode(
@@ -1020,8 +1099,8 @@ def export_vector_to_json(
             + "\n".join(integrity_failures)
             + "\nThe export still completed. Investigate before relying "
             "on these files.",
-            type="negative",
-            timeout=0,
+            type="warning",
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -1037,7 +1116,11 @@ def export_vector_to_json(
     try:
         with open(staged_json, "w", encoding="utf-8") as handle:
             json.dump(
-                payload, handle, indent=4, ensure_ascii=False, default=str
+                payload,
+                handle,
+                indent=4,
+                ensure_ascii=False,
+                default=str
             )
 
         if password:
@@ -1056,30 +1139,65 @@ def export_vector_to_json(
             shutil.copy2(staged_json, final_path)
 
     except Exception as err:
-        _report_failure("Could not write the JSON export. Nothing was downloaded.", err)
+        _report_failure(
+            "Could not write the JSON export. Nothing was downloaded.",
+            err)
         return None
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
 
+    try:
+        with get_session() as session:
+            case = session.query(Cases).order_by(Cases.Z_PK).first()
+
+            stage = "the audit record"
+            record_audit(
+                session,
+                action="EXPORT",
+                table_name="(all case tables)",
+                summary=f"Exported JSON data for Case No. {case.CASENUMBER}",
+                after={
+                    "destination": str(final_path.name),
+                    "date/time": payload.get("export_metadata", {}).get(
+                        "export_date",
+                        "unknown"
+                    ),
+                    "format_version": payload.get("export_metadata", {}).get(
+                        "format_version",
+                        "unknown"
+                    ),
+                    "records": total_records,
+                    "files": len(file_records),
+                    "integrity_failures": integrity_failures,
+                    "encrypted": password is not None and len(password) > 0,
+                }
+            )
+    except Exception as err:
+        ui.notify(
+            f"Failed to record action in {stage} → {err}.",
+            multi_line=True,
+            classes="multi-line-notification",
+            type="warning",
+            timeout=WARN_TIMEOUT,
+            position="center",
+            close_button="OK",
+        )
+        print(f"{err}")
+        return None
+
     encrypted_note = " (AES-256 encrypted)" if password else ""
-    ui.notify(
-        f"JSON export complete{encrypted_note}.\n"
-        f"Records: {total_records}\n"
-        f"Attachments embedded: {len(file_records)}\n"
-        f"Downloading {final_path.name}",
-        timeout=0,
-        position="bottom",
-        close_button="OK",
+
+    message = (
+        f"Exporting data to JSON{encrypted_note}...\n"
+        f"Total records :  {total_records}\n"
+        f"Attachments embedded :  {len(file_records)}\n"
+        f"Output will be named :  {final_path.name}"
     )
 
-    print(f"\n{'=' * 60}")
-    print("  JSON EXPORT COMPLETE")
-    print(f"  Location: {final_path}")
-    print(f"  Records: {total_records}, files: {len(file_records)}")
-    print(f"{'=' * 60}\n")
+    return ExportResult(zip_path=final_path, message=message)
 
-    return final_path
 
+# ----- JSON IMPORT FUNCTION -----
 
 def import_vector_from_json(
         source: str,
@@ -1099,8 +1217,8 @@ def import_vector_from_json(
     if not source_path.exists():
         ui.notify(
             f"{source_path.name} not found.",
-            type="negative",
-            timeout=0,
+            type="warning",
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -1121,8 +1239,8 @@ def import_vector_from_json(
             ui.notify(
                 "Could not open that archive. If it is encrypted, check "
                 "the password.",
-                type="negative",
-                timeout=0,
+                type="warning",
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -1133,8 +1251,8 @@ def import_vector_from_json(
             shutil.rmtree(staging, ignore_errors=True)
             ui.notify(
                 "No .json file inside that archive.",
-                type="negative",
-                timeout=0,
+                type="warning",
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -1148,9 +1266,9 @@ def import_vector_from_json(
         if staging:
             shutil.rmtree(staging, ignore_errors=True)
         ui.notify(
-            f"Could not read that file - {err}",
-            type="negative",
-            timeout=0,
+            f"Could not read that file → {err}.",
+            type="warning",
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -1162,8 +1280,8 @@ def import_vector_from_json(
         ui.notify(
             "That is not a VECTOR JSON export - it has no 'tables' "
             "section.",
-            type="negative",
-            timeout=0,
+            type="warning",
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -1226,7 +1344,7 @@ def import_vector_from_json(
             for raw_entry in file_entries:
                 entry = canonical_file_entry(raw_entry)
                 raw = base64.b64decode(entry.get("FILEDATA_b64", ""))
-                actual_hash = hashlib.sha256(raw).hexdigest()
+                actual_hash = hashlib.sha256(raw).hexdigest().upper()
 
                 expected = entry.get("FILEHASH")
                 if expected and expected != actual_hash:
@@ -1247,7 +1365,7 @@ def import_vector_from_json(
                             entry.get("FILEUPLOADEDBY") or "import"
                         ),
                         FILESHA256=entry.get("FILESHA256") or actual_hash,
-                        FILEHASHEDAT=entry.get("FILEHASHEDAT"),
+                        FILEHASHEDDATETIME=entry.get("FILEHASHEDDATETIME"),
                     )
                 )
                 files_imported += 1
@@ -1262,10 +1380,12 @@ def import_vector_from_json(
                 after={
                     "source": str(source),
                     "exported": payload.get("export_metadata", {}).get(
-                        "export_date", "unknown"
+                        "export_date",
+                        "unknown"
                     ),
                     "format_version": payload.get("export_metadata", {}).get(
-                        "format_version", "unknown"
+                        "format_version",
+                        "unknown"
                     ),
                     "hash_mismatches": hash_mismatches,
                 },
@@ -1275,7 +1395,7 @@ def import_vector_from_json(
         if staging:
             shutil.rmtree(staging, ignore_errors=True)
         _report_failure(
-            "Nothing was imported, and the case is unchanged. The problem "
+            "Nothing was imported (ln 1354), and the case is unchanged. The problem "
             f"was in {stage}.",
             err,
         )
@@ -1288,32 +1408,32 @@ def import_vector_from_json(
 
     if hash_mismatches:
         ui.notify(
-            "WARNING - these attachments do not match the hash recorded "
+            "WARNING -- these attachments do not match the hash recorded "
             "in the file:\n"
             + "\n".join(hash_mismatches)
             + "\n\nThe import completed and has been recorded in the "
             "audit trail. Treat these files as unverified.",
-            type="negative",
-            timeout=0,
+            multi_line=True,
+            classes="multi-line-notification",
+            type="warning",
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
 
+    tables = " | ".join(imported)
+
     ui.notify(
-        f"JSON import complete.\n"
-        f"Tables: {', '.join(imported)}\n"
-        f"Attachments: {files_imported}\n"
-        f"Total records: {total_records}",
-        timeout=0,
+        f"Data import complete.\n\n"
+        f"Tables :  {tables}\n\n"
+        f"Total records :  {total_records}\n\n"
+        f"Files :  {files_imported}",
+        multi_line=True,
+        classes="multi-line-notification",
+        timeout=CONFIRM_TIMEOUT,
         position="bottom",
         close_button="OK",
     )
-
-    print(f"\n{'=' * 60}")
-    print("  JSON IMPORT COMPLETE")
-    print(f"  Tables: {imported}")
-    print(f"  Records: {total_records}, files: {files_imported}")
-    print(f"{'=' * 60}\n")
 
 
 def needs_password(path) -> bool:

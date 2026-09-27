@@ -34,8 +34,9 @@ from sqlalchemy import exists, inspect
 from typing import Optional
 
 
-NOTIFICATION_TIMEOUT = 0
-POSITIVE_NOTIFICATION_TIMEOUT = 2000
+WARN_TIMEOUT = 6000
+CONFIRM_TIMEOUT = 4000
+ZERO_TIMEOUT = 0
 
 AGENTS_JSON_PATH = Path(__file__).parent / "parts/agents.json"
 
@@ -144,7 +145,6 @@ def required_textarea(label: str, **kwargs):
 def get_case_info() -> dict | None:
     """Returns the single active case info (or None if no case exists)."""
     with get_session() as session:
-
         case = session.query(Cases).first()
 
         if not case:
@@ -155,10 +155,12 @@ def get_case_info() -> dict | None:
             "LOCATION": case.LOCATION or "",
             "JURISDICTION": case.JURISDICTION or "",
             "CASEDATETIMEBEGIN": (
-                str(case.CASEDATETIMEBEGIN) if case.CASEDATETIMEBEGIN else ""
+                str(case.CASEDATETIMEBEGIN)
+                if case.CASEDATETIMEBEGIN else ""
             ),
             "CASEDATETIMEEND": (
-                str(case.CASEDATETIMEEND) if case.CASEDATETIMEEND else ""
+                str(case.CASEDATETIMEEND)
+                if case.CASEDATETIMEEND else ""
             ),
         }
 
@@ -191,8 +193,12 @@ def load_agents_from_json() -> list[dict]:
 
 def save_agent_to_json(agents: list) -> None:
     """Saves the agents list to agents.json with proper formatting."""
-    with open(AGENTS_JSON_PATH, "w", encoding="utf-8") as f:
-        json.dump(agents, f, indent=4, ensure_ascii=False)
+    with open(AGENTS_JSON_PATH, "w", encoding="utf-8") as file:
+        json.dump(
+            agents,
+            file,
+            indent=4,
+            ensure_ascii=False)
 
 
 def get_agent_dict() -> list[dict]:
@@ -296,13 +302,15 @@ def _case_is_open() -> bool:
     """True when a case is open; otherwise says so and returns False."""
     if has_active_case():
         return True
+
     ui.notify(
         "No active case!  Start a case before proceeding.",
         type="warning",
-        timeout=0,
+        timeout=WARN_TIMEOUT,
         position="center",
         close_button="OK",
     )
+
     return False
 
 
@@ -344,7 +352,10 @@ def confirm_delete_all(action: str, callback):
         ).classes("mb-4 text-base text-[#D4D4D8]")
 
         with ui.row().classes("w-full justify-end gap-2"):
-            ui.button("Cancel", on_click=dialog.close).props("flat")
+            ui.button(
+                "Cancel",
+                on_click=dialog.close
+            ).props("flat").classes("hover-border-blue")
 
             def on_confirm():
                 callback()
@@ -354,7 +365,7 @@ def confirm_delete_all(action: str, callback):
                 "Delete All",
                 on_click=on_confirm,
                 color="#ef4444",
-            ).props("push")
+            ).props("push").classes("hover-border-white")
 
     dialog.open()
 
@@ -427,7 +438,9 @@ def get_next_evid_num() -> str:
         "1" if no numeric evidence numbers exist yet.
     """
     with get_session() as session:
-        raw_numbers = [row[0] for row in session.query(Evidence.EVIDNUM).all()]
+        raw_numbers = [
+            row[0] for row in session.query(Evidence.EVIDNUM).all()
+        ]
 
     highest = 0
     for value in raw_numbers:
@@ -550,15 +563,23 @@ def delete_all_data() -> None:
             before=counts,
         )
 
+    ui.notify(
+        "All case data has been deleted.",
+        type="warning",
+        timeout=WARN_TIMEOUT,
+        position="center",
+        close_button="OK",
+    )
+
 
 def value_in_use(session, model, column_name, value, exclude_pk=None) -> bool:
     """Return True if `value` already exists in `model.column_name`.
 
     Args:
-        model:         the mapped class, e.g. Agents
-        column_name:   name of the attribute to check, e.g. "agent_name"
-        value:         the proposed value
-        exclude_pk:    primary key of the row being updated (None on insert)
+        model:       the mapped class, e.g. Agents
+        column_name: name of the attribute to check, e.g. "agent_name"
+        value:       the proposed value
+        exclude_pk:  primary key of the row being updated (None on insert)
 
     Returns:
         [bool] True if the value exists in the database, else returns False
@@ -596,7 +617,7 @@ def _refuse(message: str) -> bool:
     ui.notify(
         message,
         type="warning",
-        timeout=0,
+        timeout=WARN_TIMEOUT,
         position="center",
         close_button="OK",
     )
@@ -624,7 +645,7 @@ def validate_case_entry(
                 "a different case, use Start New Case on the home page — "
                 "it clears the current case after a warning.",
                 type="warning",
-                timeout=0,
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -644,7 +665,10 @@ def validate_case_entry(
         if not value:
             ui.notify(
                 f"The '{field_label}' field is required.",
-                type="warning", timeout=0, position="center", close_button="OK",
+                type="warning",
+                timeout=WARN_TIMEOUT,
+                position="center",
+                close_button="OK",
             )
             return True
 
@@ -652,7 +676,7 @@ def validate_case_entry(
     if started is None:
         return _refuse(
             "'Date/Time Started' is not a real date and time. Enter it as "
-            "MM-DD-YYYY HH:MM, for example 09-15-2026 07:30."
+            "MM-DD-YYYY HH:MM, for example '09-15-2026 07:30'."
         )
 
     end = (CASEDATETIMEEND or "").strip()
@@ -683,7 +707,7 @@ def validate_case_entry(
                 f"Case '{number}' already exists. Please use a unique case "
                 "number.",
                 type="warning",
-                timeout=0,
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -715,7 +739,7 @@ def validate_agent_entry(
             ui.notify(
                 f"The '{field_label}' field is required.",
                 type="warning",
-                timeout=0,
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -726,7 +750,7 @@ def validate_agent_entry(
                 f"The 'Primary Role' field and the 'Secondary Role' "
                 f"field for {name} cannot be the same.",
                 type="warning",
-                timeout=0,
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -747,7 +771,7 @@ def validate_agent_entry(
                 f"'{name}' is already in the case database. Please "
                 "check the name and try again.",
                 type="warning",
-                timeout=0,
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -797,7 +821,7 @@ def validate_evid_entry(
             ui.notify(
                 f"The '{field_label}' field is required.",
                 type="warning",
-                timeout=0,
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -808,7 +832,7 @@ def validate_evid_entry(
             "The same agent cannot be listed in the 'Found By' and the "
             "'Witnessed By' fields.",
             type="warning",
-            timeout=0,
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -819,7 +843,7 @@ def validate_evid_entry(
             "The 'Triaged By' field is required if the 'Item Triaged?' "
             "field is set to 'Yes'.",
             type="warning",
-            timeout=0,
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -839,7 +863,7 @@ def validate_evid_entry(
             ui.notify(
                 f"Evidence Item Number '{item_num}' is already in use.",
                 type="warning",
-                timeout=0,
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -877,7 +901,10 @@ def validate_room_entry(
         if not value:
             ui.notify(
                 f"The '{field_label}' field is required.",
-                type="warning", timeout=0, position="center", close_button="OK",
+                type="warning",
+                timeout=WARN_TIMEOUT,
+                position="center",
+                close_button="OK",
             )
             return True
 
@@ -887,10 +914,10 @@ def validate_room_entry(
     # so much as its description corrected.
     if bool(first) != bool(second):
         ui.notify(
-            "Agents must be entered as a pair: fill both 'First Agent "
-            "Name' and 'Second Agent Name', or leave both blank.",
+            "Agents must be entered as a pair -- fill both 'First Agent "
+            "Name' and 'Second Agent Name' or leave both blank.",
             type="warning",
-            timeout=0,
+            timeout=WARN_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -901,7 +928,10 @@ def validate_room_entry(
         ui.notify(
             "The same agent cannot be listed in both the 'First Agent Name' "
             "and 'Second Agent Name' fields.",
-            type="warning", timeout=0, position="center", close_button="OK",
+            type="warning",
+            timeout=WARN_TIMEOUT,
+            position="center",
+            close_button="OK",
         )
         return True
 
@@ -918,7 +948,10 @@ def validate_room_entry(
         ):
             ui.notify(
                 "That label is currently assigned to another room.",
-                type="warning", timeout=0, position="center", close_button="OK",
+                type="warning",
+                timeout=WARN_TIMEOUT,
+                position="center",
+                close_button="OK",
             )
             return True
 
@@ -928,13 +961,13 @@ def validate_room_entry(
 def validate_person_data(
         stage: str,
         PERSONNAME: str = "",
-        SUSPECTNOTE: str = "",
+        PERSONNOTE: str = "",
         row: Optional[dict] = None,
         PERSONDOB: str = "",
 ) -> bool:
 
     suspect = (PERSONNAME or "").strip()
-    note = (SUSPECTNOTE or "").strip()
+    note = (PERSONNOTE or "").strip()
 
     for field_label, value in [
         ("Name", suspect),
@@ -943,7 +976,10 @@ def validate_person_data(
         if not value:
             ui.notify(
                 f"The '{field_label}' field is required.",
-                type="warning", timeout=0, position="center", close_button="OK",
+                type="warning",
+                timeout=WARN_TIMEOUT,
+                position="center",
+                close_button="OK",
             )
             return True
 
@@ -970,7 +1006,10 @@ def validate_person_data(
             ui.notify(
                 f"'{suspect}' is already in the database. Person names "
                 "must be unique.",
-                type="warning", timeout=0, position="center", close_button="OK",
+                type="warning",
+                timeout=WARN_TIMEOUT,
+                position="center",
+                close_button="OK",
             )
             return True
 
@@ -993,7 +1032,7 @@ def validate_note_data(
             ui.notify(
                 f"The '{field_label}' field is required.",
                 type="warning",
-                timeout=0,
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )

@@ -1,4 +1,7 @@
-"""Page specifications.
+"""
+test_page_specs.py
+
+Page specifications.
 
 Each entity page is now a CrudSpec rather than 500 lines of hand-written
 scaffold. That makes the pages checkable without a browser: every field
@@ -97,7 +100,8 @@ def test_select_options_are_callable_and_return_lists(name, spec):
 @pytest.mark.parametrize("name,spec", ALL_SPECS)
 def test_validator_accepts_an_empty_submission(name, spec):
     """The builder always passes (stage, values, row); an empty form
-    must be reported as invalid rather than raising."""
+    must be reported as invalid rather than raising.
+    """
     values = {f.name: "" for f in spec.fields}
     assert spec.validate(stage="initial", values=values, row=None) is True
 
@@ -139,20 +143,23 @@ def test_evidence_number_is_not_user_editable():
 
 def test_cases_page_has_no_delete_all():
     """Clearing the case goes through Start New Case, which wipes
-    attachments too."""
+    attachments too.
+    """
     assert cases_page.SPEC.show_delete_all is False
 
 
 def test_cases_page_holds_one_case():
     """The add form closes while a case is open; Start New Case is the
-    way to begin another."""
+    way to begin another.
+    """
     assert cases_page.SPEC.max_records == 1
     assert "Start New Case" in cases_page.SPEC.limit_message
 
 
 def test_the_case_row_has_no_delete_button():
     """Deleting the case alone left its agents, rooms, evidence and notes
-    behind for the next case. Start New Case clears all of it."""
+    behind for the next case. Start New Case clears all of it.
+    """
     assert cases_page.SPEC.allow_delete is False
 
 
@@ -164,7 +171,8 @@ def test_other_pages_keep_their_delete_buttons():
 
 def test_notes_are_listed_in_the_order_written():
     """NOTEDATETIME is text in two formats on an upgraded database, so
-    sorting on it put new notes above old ones."""
+    sorting on it put new notes above old ones.
+    """
     assert notes_page.SPEC.order_by == "Z_PK"
 
 

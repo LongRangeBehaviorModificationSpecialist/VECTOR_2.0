@@ -21,6 +21,7 @@ from auth import (
     clear_login_failures,
     lockout_seconds_remaining,
 )
+from utils import CONFIRM_TIMEOUT, WARN_TIMEOUT, ZERO_TIMEOUT
 
 # ----- PAGE BUILDER -----
 def build_admin_page():
@@ -73,7 +74,7 @@ def build_admin_page():
                     ui.notify(
                         "A username is required.",
                         type="warning",
-                        timeout=0,
+                        timeout=WARN_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -85,8 +86,8 @@ def build_admin_page():
 
                         ui.notify(
                             "That username already exists.",
-                            type="negative",
-                            timeout=0,
+                            type="warning",
+                            timeout=WARN_TIMEOUT,
                             position="center",
                             close_button="OK",
                         )
@@ -110,7 +111,7 @@ def build_admin_page():
                     "will be asked to change it at first sign-in.",
                     multi_line=True,
                     classes="multi-line-notification",
-                    timeout=0,
+                    timeout=ZERO_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -124,7 +125,7 @@ def build_admin_page():
                 "Create User",
                 on_click=create_user,
                 color="var(--vsp-blue)",
-            ).props("push").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("hover-border-white")
 
         # ----- Existing Users Table -----
         ui.separator().classes("my-6")
@@ -304,7 +305,7 @@ def build_admin_page():
                                         on_click=reset_dialog.close,
                                         color="transparent",
                                         ).props("flat").classes(
-                                        "text-[var(--vsp-blue)]"
+                                        "hover-border-blue"
                                     )
 
                                     def on_confirm_reset():
@@ -353,7 +354,7 @@ def build_admin_page():
                                             ),
                                             multi_line=True,
                                             type="warning",
-                                            timeout=0,
+                                            timeout=WARN_TIMEOUT,
                                             position="center",
                                             close_button="OK",
                                         )
@@ -366,7 +367,7 @@ def build_admin_page():
                                         on_click=on_confirm_reset,
                                         color="var(--vsp-blue)",
                                         ).props("push").classes(
-                                        "text-[var(--vsp-white)]"
+                                        "hover-border-white"
                                     )
 
                             reset_dialog.open()
@@ -380,8 +381,8 @@ def build_admin_page():
 
                                 ui.notify(
                                     "Cannot delete the admin account.",
-                                    type="negative",
-                                    timeout=0,
+                                    type="warning",
+                                    timeout=WARN_TIMEOUT,
                                     position="center",
                                     close_button="OK",
                                 )
@@ -411,7 +412,7 @@ def build_admin_page():
                                         on_click=delete_dialog.close,
                                         color="transparent",
                                         ).props("flat"
-                                    ).classes("text-[var(--vsp-blue)]")
+                                    ).classes("hover-border-blue")
 
                                     def on_confirm_delete():
 
@@ -435,8 +436,8 @@ def build_admin_page():
                                                 ui.notify(
                                                     "Cannot delete an admin "
                                                     "account.",
-                                                    type="negative",
-                                                    timeout=0,
+                                                    type="warning",
+                                                    timeout=WARN_TIMEOUT,
                                                     position="center",
                                                     close_button="OK",
                                                 )
@@ -459,11 +460,14 @@ def build_admin_page():
                                             "deleted."
                                             + (
                                                 "" if ended else
-                                                " Their open sessions could "
+                                                "Their open sessions could "
                                                 "NOT be ended; use Sign "
                                                 "Everyone Out below."
                                             ),
-                                            timeout=4000 if ended else 0,
+                                            timeout=(
+                                                CONFIRM_TIMEOUT
+                                                if ended else 0
+                                            ),
                                             position="bottom",
                                             close_button="OK",
                                         )
@@ -476,7 +480,7 @@ def build_admin_page():
                                         on_click=on_confirm_delete,
                                         color="#ef4444",
                                         ).props("push").classes(
-                                        "text-[var(--vsp-white)]"
+                                        "hover-border-white"
                                     )
 
                             delete_dialog.open()
@@ -492,7 +496,7 @@ def build_admin_page():
                             ui.notify(
                                 f"Sign-in lock cleared for "
                                 f"'{row['USERNAME']}'.",
-                                timeout=4000,
+                                timeout=CONFIRM_TIMEOUT,
                                 position="bottom",
                                 close_button="OK",
                             )
@@ -530,7 +534,7 @@ def build_admin_page():
                             "Cancel",
                             on_click=dialog.close,
                             color="transparent",
-                        ).props("flat").classes("text-[var(--vsp-blue)]")
+                        ).props("flat").classes("hover-border-blue")
 
                         def confirm_sign_out_all() -> None:
                             if not get_is_admin():
@@ -541,8 +545,8 @@ def build_admin_page():
                                     "The sessions could NOT be ended. The "
                                     "details are in the VECTOR console "
                                     "window.",
-                                    type="negative",
-                                    timeout=0,
+                                    type="warning",
+                                    timeout=WARN_TIMEOUT,
                                     position="center",
                                     close_button="OK",
                                 )
@@ -556,7 +560,7 @@ def build_admin_page():
                             on_click=confirm_sign_out_all,
                             color="#ef4444",
                         ).props("push").classes(
-                            "text-[var(--vsp-white)]"
+                            "hover-border-white"
                         )
 
                 dialog.open()
@@ -565,7 +569,7 @@ def build_admin_page():
                 "Sign Everyone Out",
                 on_click=open_sign_out_all_dialog,
                 color="#ef4444",
-            ).props("push")
+            ).props("push").classes("hover-border-white")
 
     # Initial render
     refresh_users_table()

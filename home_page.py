@@ -19,6 +19,7 @@ from pathlib import Path
 
 from failures import explain, log
 from import_export import (
+    ExportResult,
     export_vector_to_csv,
     export_vector_to_json,
     import_vector_from_csv,
@@ -48,7 +49,54 @@ from models import (
 )
 from navbar import build_navbar, unit_logo
 from program.config import Config
-from utils import delete_all_data
+from utils import delete_all_data, CONFIRM_TIMEOUT, WARN_TIMEOUT
+
+
+style = {
+    "color": "var(--vsp-blue)",
+    "props": "push",
+    "classes": "flex-shrink-0 min-w-56 py-3 hover-border-white"
+}
+
+home_page_buttons = {
+    "0": {
+        "text": "Start New Case",
+        "action": "confirm_new_case_handler()",
+    },
+    "1": {
+        "text": "Add Agent",
+        "page_url": "/agents",
+    },
+    "2": {
+        "text": "Add Room",
+        "page_url": "/rooms",
+        },
+    "3": {
+        "text": "Add Evidence",
+        "page_url": "/evidence",
+        },
+    "4": {
+        "text": "Add Person",
+        "page_url": "/persons",
+        },
+    "5": {
+        "text": "Add Note",
+        "page_url": "/notes",
+        },
+    "6": {
+        "text": "Add File",
+        "page_url": "/uploads",
+        },
+    "7": {
+        "text": "Useful Links",
+        "page_url": "/links",
+        },
+    "8": {
+        "text": "Reports",
+        "page_url": "/reports",
+        },
+
+}
 
 
 # ----- Home Page Registration -----
@@ -105,89 +153,47 @@ def build_authenticated_home():
 
         ui.button(
             "Start New Case",
-            on_click=confirm_new_case_handler,
+            on_click=lambda: confirm_new_case_handler(),
             color="var(--vsp-blue)",
         ).props("push").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
+            "flex-shrink-0 min-w-56 py-3 hover-border-white"
         )
 
-        ui.button(
-            "Add Agent",
-            on_click=lambda: ui.navigate.to("/agents"),
-            color="var(--vsp-blue)",
-        ).props("push").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+        for k, v in list(home_page_buttons.items())[1:3]:
+            ui.button(
+                v["text"],
+                on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                color=style["color"],
+            ).props(style["props"]).classes(style["classes"])
 
-        ui.button(
-            "Add Room",
-            on_click=lambda: ui.navigate.to("/rooms"),
-            color="var(--vsp-blue)",
-        ).props("push").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
 
     # ----- Action Buttons ROW 2: Add Evidence | Add Person | Add Note -----
 
     with ui.row().classes(
         "flex justify-center items-center gap-6 py-1 w-full"):
 
-        ui.button(
-            "Add Evidence",
-            on_click=lambda: ui.navigate.to("/evidence"),
-            color="var(--vsp-blue)",
-        ).props("push").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+        for k, v in list(home_page_buttons.items())[3:6]:
+            ui.button(
+                v["text"],
+                on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                color=style["color"],
+            ).props(style["props"]).classes(style["classes"])
 
-        ui.button(
-            "Add Person",
-            on_click=lambda: ui.navigate.to("/persons"),
-            color="var(--vsp-blue)",
-        ).props("push").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
-
-        ui.button(
-            "Add Note",
-            on_click=lambda: ui.navigate.to("/notes"),
-            color="var(--vsp-blue)",
-        ).props("push").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
 
     # ----- Action Buttons ROW 3: Add File | Useful Links -----
 
     with ui.row().classes(
         "flex justify-center items-center gap-6 py-1 w-full"):
 
-        ui.button(
-            "Add File",
-            on_click=lambda: ui.navigate.to("/uploads"),
-            color="var(--vsp-blue)",
-        ).props("push").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
+        for k, v in list(home_page_buttons.items())[6:]:
+            ui.button(
+                v["text"],
+                on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                color=style["color"],
+            ).props(style["props"]).classes(style["classes"])
 
-        ui.button(
-            "Useful Links",
-            on_click=lambda: ui.navigate.to("/links"),
-            color="var(--vsp-blue)",
-        ).props("push").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
-
-        ui.button(
-            "Reports",
-            on_click=lambda: ui.navigate.to("/reports"),
-            color="var(--vsp-blue)",
-        ).props("push").classes(
-            "flex-shrink-0 min-w-56 py-3 text-[var(--vsp-white)]"
-        )
 
     # ----- Import / Export ROW -----
-
-    # ui.separator().classes("my-2")
 
     with ui.column().classes("items-center w-full py-2"):
 
@@ -271,7 +277,7 @@ def build_authenticated_home():
                                 "Please enter a password or uncheck "
                                 "encryption.",
                                 type="warning",
-                                timeout=0,
+                                timeout=WARN_TIMEOUT,
                                 position="center",
                                 close_button="OK",
                             )
@@ -280,22 +286,33 @@ def build_authenticated_home():
                         dialog.close()
 
                         # ----- Run the selected exports -----
-                        # Each finished file goes to the browser, so it
+                        # Each results file goes to the browser, so it
                         # arrives on the device the export was asked from.
-                        finished = []
+                        results = []
                         if format_radio.value in ("csv", "both"):
-                            finished.append(
-                                export_vector_to_csv(password=pwd)
-                            )
+                            result = export_vector_to_csv(password=pwd)
+                            if result is not None:
+                                results.append(result)
 
                         if format_radio.value in ("json", "both"):
-                            finished.append(
-                                export_vector_to_json(password=pwd)
-                            )
+                            result = export_vector_to_json(password=pwd)
+                            if result is not None:
+                                results.append(result)
 
-                        for path in finished:
-                            if path is not None:
-                                ui.download.file(path)
+                        # Pass each file path to the browser to it can be
+                        # downloaded to a location choosen by the user.
+                        for result in results:
+                            ui.download.file(result.zip_path)
+
+                        for result in results:
+                            ui.notify(
+                                result.message,
+                                multi_line=True,
+                                classes="multi-line-notification",
+                                timeout=CONFIRM_TIMEOUT,
+                                position="bottom",
+                                close_button="OK",
+                            )
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -303,15 +320,13 @@ def build_authenticated_home():
                             "Cancel",
                             on_click=dialog.close,
                             color="transparent",
-                        ).props("flat").classes("text-[var(--vsp-blue)]")
+                        ).props("flat").classes("hover-border-blue")
 
                         ui.button(
                             "Export Now",
                             on_click=do_export,
                             color="var(--vsp-blue)",
-                        ).props("push").classes(
-                            "text-[var(--vsp-white)]"
-                        )
+                        ).props("push").classes("hover-border-white")
 
                 dialog.open()
 
@@ -338,7 +353,7 @@ def build_authenticated_home():
                     ).classes("text-sm font-bold text-[#EF4444]")
 
                     ui.label("This will REPLACE ALL existing data!").classes(
-                        "text-sm text-[var(--vsp-gray)]"
+                        "text-base text-[var(--vsp-gray)]"
                     )
 
                     picked = {"path": None, "folder": None, "locked": False}
@@ -400,7 +415,7 @@ def build_authenticated_home():
                             ui.notify(
                                 "Choose the exported file first.",
                                 type="warning",
-                                timeout=0,
+                                timeout=WARN_TIMEOUT,
                                 position="center",
                                 close_button="OK",
                             )
@@ -413,7 +428,7 @@ def build_authenticated_home():
                                 "This file is protected with a password. "
                                 "Enter it to import the file.",
                                 type="warning",
-                                timeout=0,
+                                timeout=WARN_TIMEOUT,
                                 position="center",
                                 close_button="OK",
                             )
@@ -447,13 +462,14 @@ def build_authenticated_home():
                             "Cancel",
                             on_click=cancel_import,
                             color="transparent",
-                        ).props("flat").classes("text-[var(--vsp-blue)]")
+                        ).props("flat").classes("hover-border-blue")
 
                         import_button = ui.button(
                             "Import Now",
                             on_click=do_import,
                             color="var(--vsp-blue)",
-                        ).props("push").classes("text-[var(--vsp-white)]")
+                        ).props("push").classes("hover-border-white")
+
                         import_button.disable()
 
                 dialog.open()
@@ -476,7 +492,6 @@ def build_authenticated_home():
                     )
 
                     # ----- User verification of destructive activity -----
-
                     affirm_checkbox = ui.checkbox(
                         "I understand the current data cannot be recovered.",
                         value=False,
@@ -501,7 +516,7 @@ def build_authenticated_home():
                                 "Tick the box to confirm you understand "
                                 "the data cannot be recovered.",
                                 type="warning",
-                                timeout=0,
+                                timeout=WARN_TIMEOUT,
                                 position="center",
                                 close_button="OK",
                             )
@@ -511,35 +526,29 @@ def build_authenticated_home():
                             ui.notify(
                                 "Type DELETE, in capital letters, to confirm.",
                                 type="warning",
-                                timeout=0,
+                                timeout=WARN_TIMEOUT,
                                 position="center",
                                 close_button="OK",
                             )
                             return
 
                         dialog.close()
+
                         try:
                             delete_all_data()
                         except Exception as err:
-                            log.exception("Delete All Data failed")
+                            log.exception("Data deletion failed")
                             ui.notify(
-                                "Nothing was deleted, and the case is "
+                                "No data was deleted, and the case is "
                                 f"unchanged.\n\n{explain(err)}",
                                 multi_line=True,
-                                type="negative",
-                                timeout=0,
+                                classes="multi-line-notification",
+                                type="warning",
+                                timeout=WARN_TIMEOUT,
                                 position="center",
                                 close_button="OK",
                             )
                             return
-
-                        ui.notify(
-                            "All case data has been deleted.",
-                            timeout=4000,
-                            position="bottom",
-                            close_button="OK",
-                        )
-                        ui.navigate.to("/")
 
                     with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -547,13 +556,13 @@ def build_authenticated_home():
                             "Cancel",
                             on_click=dialog.close,
                             color="transparent",
-                        ).props("flat").classes("text-[var(--vsp-blue)]")
+                        ).props("flat").classes("hover-border-blue")
 
                         ui.button(
                             "Delete all data",
                             on_click=do_delete,
                             color="#EF4444",
-                        ).props("push").classes("text-[var(--vsp-white)]")
+                        ).props("push").classes("hover-border-white")
 
                 dialog.open()
 
@@ -561,19 +570,19 @@ def build_authenticated_home():
                 "📤 EXPORT CASE DATA",
                 on_click=open_export_dialog,
                 color="#379161",
-            ).props("push").classes("w-56 py-3 text-[var(--vsp-white)]")
+            ).props("push").classes("w-56 py-3 hover-border-white")
 
             ui.button(
                 "📥 IMPORT CASE DATA",
                 on_click=open_import_dialog,
                 color="#379161",
-            ).props("push").classes("w-56 py-3 text-[var(--vsp-white)]")
+            ).props("push").classes("w-56 py-3 hover-border-white")
 
             ui.button(
                 "DELETE ALL DATA",
                 on_click=open_delete_all_dialog,
                 color="#EF4444",
-            ).props("push").classes("w-56 py-3 text-[var(--vsp-white)]")
+            ).props("push").classes("w-56 py-3 hover-border-white")
 
 
 def build_login_home():
@@ -598,9 +607,7 @@ def build_login_home():
             "Please log in below"
         ).classes("text-lg mb-6")
 
-        username_input = ui.input(
-            label="Username"
-        ).classes("w-full max-w-xs")
+        username_input = ui.input(label="Username").classes("w-full max-w-xs")
 
         username_input.props("autofocus")
 
@@ -621,7 +628,7 @@ def build_login_home():
                 ui.notify(
                     "Both a username and password are required.",
                     type="warning",
-                    timeout=0,
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -635,12 +642,12 @@ def build_login_home():
                 minutes = max(1, round(locked_for / 60))
                 ui.notify(
                     f"Too many failed attempts. This account is locked "
-                    f"for about {minutes} more minute"
+                    f"for {minutes} more minute"
                     f"{'s' if minutes != 1 else ''}.\n"
                     "An administrator can clear the lock from the Admin "
                     "Panel.",
                     type="negative",
-                    timeout=0,
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -676,7 +683,7 @@ def build_login_home():
                     else:
                         ui.notify(
                             f"Welcome, {user.USERNAME}!",
-                            timeout=4000,
+                            timeout=CONFIRM_TIMEOUT,
                             position="bottom",
                             close_button="OK",
                         )
@@ -722,7 +729,7 @@ def build_login_home():
                     ui.notify(
                         message,
                         type="warning",
-                        timeout=0,
+                        timeout=WARN_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -846,13 +853,8 @@ def help_page():
     )
 
     with ui.column().classes("w-full items-center"):
-
         with ui.column().classes("items-center w-full mt-8 max-w-3xl"):
-
-            ui.label(
-                "Help"
-            ).classes("text-2xl font-bold mb-6")
-
+            ui.label("Help").classes("text-2xl font-bold mb-6")
             with ui.card().classes("p-6 w-full"):
                 ui.markdown(HELP_TEXT).classes("text-sm")
 
@@ -888,7 +890,10 @@ def confirm_new_case_handler() -> None:
 
         with ui.row().classes("w-full justify-end gap-2"):
 
-            ui.button("Cancel", on_click=warn_dialog.close).props("flat")
+            ui.button(
+                "Cancel",
+                on_click=warn_dialog.close
+            ).props("flat").classes("hover-border-blue")
 
             def on_proceed() -> None:
                 # Through delete_all_data() rather than a table list of its
@@ -904,8 +909,8 @@ def confirm_new_case_handler() -> None:
                         "Nothing was deleted, and the case is unchanged."
                         f"\n\n{explain(err)}",
                         multi_line=True,
-                        type="negative",
-                        timeout=0,
+                        type="warning",
+                        timeout=WARN_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -913,8 +918,7 @@ def confirm_new_case_handler() -> None:
 
                 ui.notify(
                     "Old case data cleared",
-                    type="positive",
-                    timeout=4000,
+                    timeout=CONFIRM_TIMEOUT,
                     position="bottom",
                     close_button="OK",
                 )
@@ -924,7 +928,7 @@ def confirm_new_case_handler() -> None:
                 "Proceed (Delete All Data)",
                 on_click=on_proceed,
                 color="#EF4444",
-            ).props("push").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("hover-border-white")
 
     warn_dialog.open()
 
@@ -938,7 +942,7 @@ def logout_page():
 
     ui.notify(
         "You have been logged out successfully.",
-        timeout=4000,
+        timeout=CONFIRM_TIMEOUT,
         position="bottom",
         close_button="OK",
     )
@@ -961,6 +965,11 @@ def shutdown_page():
 
     sign_out()
 
-    ui.notify("Shutting down...", type="positive", timeout=2000)
+    ui.notify(
+        "Shutting down...",
+        type="positive",
+        timeout=CONFIRM_TIMEOUT,
+        position="center",
+    )
 
     app.shutdown()

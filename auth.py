@@ -15,6 +15,7 @@ until someone happened to visit /reports.
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 import logging
+from utils import CONFIRM_TIMEOUT, WARN_TIMEOUT
 
 from nicegui import app, ui
 
@@ -281,8 +282,8 @@ def require_admin(page_builder):
         if not get_is_admin():
             ui.notify(
                 "Admin access is required to access this page.",
-                type="negative",
-                timeout=0,
+                type="warning",
+                timeout=WARN_TIMEOUT,
                 position="center",
                 close_button="OK",
             )

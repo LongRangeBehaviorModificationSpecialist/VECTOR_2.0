@@ -35,6 +35,9 @@ from utils import (
     required_input,
     required_select,
     required_textarea,
+    CONFIRM_TIMEOUT,
+    WARN_TIMEOUT,
+    ZERO_TIMEOUT
 )
 
 
@@ -176,8 +179,8 @@ def notify_problem(message: str) -> None:
     """A problem the user has to acknowledge."""
     ui.notify(
         message,
-        type="negative",
-        timeout=0,
+        type="warning",
+        timeout=WARN_TIMEOUT,
         position="center",
         close_button="OK",
     )
@@ -187,7 +190,7 @@ def notify_done(message: str) -> None:
     """A confirmation that can fade."""
     ui.notify(
         message,
-        timeout=4000,
+        timeout=CONFIRM_TIMEOUT,
         position="bottom",
         close_button="OK",
     )
@@ -343,7 +346,7 @@ def _make_widget(spec_field: Field, value=None):
             icon="schedule",
             on_click=lambda: widget.set_value(clock.case_time_now()),
         ).props("flat dense no-caps").classes(
-            "self-end text-[var(--vsp-blue)]"
+            "self-end hover-border-blue"
         )
     return widget
 
@@ -411,14 +414,14 @@ def build_crud_page(spec: CrudSpec) -> None:
                 ui.button(
                     "Clear",
                     on_click=lambda: _clear_form(),
-                    color="transparent",
-                ).props("flat").classes("text-[var(--vsp-blue)]")
+                    color="transparent").props("flat"
+                ).classes("hover-border-blue")
 
                 submit_button = ui.button(
                     spec.submit_label,
                     on_click=lambda: _submit(),
-                    color="var(--vsp-blue)",
-                ).props("push").classes("text-[var(--vsp-white)]")
+                    color="var(--vsp-blue)").props("push"
+                ).classes("hover-border-white")
 
         def _clear_form() -> None:
             for spec_field in spec.fields:
@@ -618,7 +621,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                         "Cancel",
                         on_click=edit_dialog.close,
                         color="transparent",
-                    ).props("flat").classes("text-[var(--vsp-blue)]")
+                    ).props("flat").classes("hover-border-blue")
 
                     def on_save_update() -> None:
                         values = _values_from(edit_widgets)
@@ -676,7 +679,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                         "Update",
                         on_click=on_save_update,
                         color="var(--vsp-blue)",
-                    ).props("push").classes("text-[var(--vsp-white)]")
+                    ).props("push").classes("hover-border-white")
 
             edit_dialog.open()
 
@@ -700,9 +703,12 @@ def build_crud_page(spec: CrudSpec) -> None:
                 ui.label(
                     f"Delete {spec.entity} {label}?"
                 ).classes("mb-2 text-base")
+
                 note = spec.delete_note(row) if spec.delete_note else ""
+                
                 if note:
                     ui.label(note).classes("mb-2 text-base text-[#F5B027]")
+
                 ui.label(
                     "The record is removed, but the deletion and its "
                     "contents are kept in the audit trail."
@@ -713,7 +719,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                         "Cancel",
                         on_click=delete_dialog.close,
                         color="transparent",
-                    ).props("flat").classes("text-[var(--vsp-blue)]")
+                    ).props("flat").classes("hover-border-blue")
 
                     def on_confirm_delete() -> None:
                         try:
@@ -759,7 +765,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                         "Delete",
                         on_click=on_confirm_delete,
                         color="#ef4444",
-                    ).props("push").classes("text-[var(--vsp-white)]")
+                    ).props("push").classes("hover-border-white")
 
             delete_dialog.open()
 
@@ -788,9 +794,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                                 "Cancel",
                                 on_click=dialog.close,
                                 color="transparent",
-                            ).props("flat").classes(
-                                "text-[var(--vsp-blue)]"
-                            )
+                            ).props("flat").classes("hover-border-blue")
 
                             def on_confirm_delete_all() -> None:
                                 try:
@@ -825,9 +829,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                                 "Delete All",
                                 on_click=on_confirm_delete_all,
                                 color="#ef4444",
-                            ).props("push").classes(
-                                "text-[var(--vsp-white)]"
-                            )
+                            ).props("push").classes("hover-border-white")
 
                     dialog.open()
 
@@ -837,7 +839,8 @@ def build_crud_page(spec: CrudSpec) -> None:
                     f"Delete All {spec.entity_plural.title()}",
                     on_click=_open_delete_all_dialog,
                     color="#ef4444",
-                ).props("push")
+                ).props("push").classes("hover-border-white")
+
                 if spec.requires_case:
                     delete_all_button.set_enabled(has_active_case())
 

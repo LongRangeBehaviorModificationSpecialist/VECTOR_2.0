@@ -15,13 +15,13 @@ before you run this.
 
 What it does, in order:
 
-  1. refuses to run while VECTOR is open, or on an already-encrypted
-     database
-  2. takes the passphrase twice and checks it is not trivially weak
-  3. copies each database to a timestamped .plaintext-backup
-  4. writes an encrypted copy with SQLCipher's sqlcipher_export()
-  5. verifies the encrypted copy opens and holds the same row counts
-  6. only then replaces the original
+    1. refuses to run while VECTOR is open, or on an already-encrypted
+        database
+    2. takes the passphrase twice and checks it is not trivially weak
+    3. copies each database to a timestamped .plaintext-backup
+    4. writes an encrypted copy with SQLCipher's sqlcipher_export()
+    5. verifies the encrypted copy opens and holds the same row counts
+    6. only then replaces the original
 
 If any step fails, nothing is replaced and the backup is left in place.
 The backups are unencrypted copies of the case -- delete them once you
@@ -39,7 +39,13 @@ import crypto  # noqa: E402
 from program.config import APP_DB_PATH, USERS_DB_PATH  # noqa: E402
 
 TABLES_TO_COUNT = [
-    "CASES", "AGENTS", "ROOMS", "EVIDENCE", "PERSONS", "NOTES", "FILES",
+    "CASES",
+    "AGENTS",
+    "ROOMS",
+    "EVIDENCE",
+    "PERSONS",
+    "NOTES",
+    "FILES",
     "AUDIT",
 ]
 
@@ -100,7 +106,9 @@ def encrypt_one(path: Path, passphrase: str, stamp: str) -> bool:
     # rejects an empty key rather than treating it as "none".
     source = sqlcipher3.connect(str(path))
     escaped = passphrase.replace("'", "''")
-    source.execute(f"ATTACH DATABASE '{encrypted}' AS encrypted KEY '{escaped}'")
+    source.execute(
+        f"ATTACH DATABASE '{encrypted}' AS encrypted KEY '{escaped}'"
+    )
     source.execute("SELECT sqlcipher_export('encrypted')")
     source.execute("DETACH DATABASE encrypted")
     source.close()
@@ -158,15 +166,15 @@ def main() -> None:
                 )
                 sys.exit(1)
 
-    print("=" * 68)
+    print("  " + "=" * 68)
     print("  ENCRYPT THE CASE DATABASE")
-    print("=" * 68)
+    print("  " + "=" * 68)
     print("  There is no way to recover a lost passphrase. No reset, no")
     print("  backdoor, no key escrow. If it is lost, so is the case.")
     print()
     print("  Record it somewhere your unit already trusts with")
     print("  credentials BEFORE continuing.")
-    print("=" * 68)
+    print("  " + "=" * 68)
     print()
 
     if input("  Type ENCRYPT to continue: ").strip() != "ENCRYPT":
@@ -202,9 +210,9 @@ def main() -> None:
         print("  The .plaintext-backup files are beside them.")
         sys.exit(1)
 
-    print("=" * 68)
+    print("  " + "=" * 68)
     print("  Done. The case databases are encrypted.")
-    print("=" * 68)
+    print("  " + "=" * 68)
     print("  VECTOR will now ask for the passphrase at every start.")
     print("  Supply it with VECTOR_DB_KEY, VECTOR_DB_KEY_FILE, or by")
     print("  starting from a terminal.")
@@ -212,7 +220,7 @@ def main() -> None:
     print("  Start VECTOR and confirm the case looks right, then delete")
     print(f"  db/*.plaintext-backup-{stamp} -- those are unencrypted")
     print("  copies of the case.")
-    print("=" * 68)
+    print("  " + "=" * 68)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,7 @@
-"""Shared test fixtures.
+"""
+conftest.py
+
+Shared test fixtures.
 
 VECTOR_DB_DIR is set before anything imports program.config, so the whole
 suite works against a temporary database and never touches db/.

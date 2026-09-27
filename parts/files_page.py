@@ -30,6 +30,8 @@ from utils import (
     format_file_size,
     confirm_delete_all,
     require_active_case,
+    CONFIRM_TIMEOUT,
+    WARN_TIMEOUT,
 )
 
 
@@ -124,7 +126,7 @@ def build_uploads_page() -> None:
                             f"Only images, videos, documents, and archives "
                             "are permitted.",
                             type="warning",
-                            timeout=0,
+                            timeout=WARN_TIMEOUT,
                             position="center",
                             close_button="OK",
                         )
@@ -135,7 +137,7 @@ def build_uploads_page() -> None:
                     # Hashed on arrival, not at export time: the stored
                     # digest then certifies the file as collected rather
                     # than whatever the database holds later.
-                    digest = hashlib.sha256(file_data).hexdigest()
+                    digest = hashlib.sha256(file_data).hexdigest().upper()
                     hashed_at = audit_timestamp()
 
                     with get_session() as session:
@@ -146,7 +148,7 @@ def build_uploads_page() -> None:
                             FILEMIMETYPE=file_mime_type,
                             FILEUPLOADEDBY=uploader,
                             FILESHA256=digest,
-                            FILEHASHEDAT=hashed_at,
+                            FILEHASHEDDATETIME=hashed_at,
                         )
                         session.add(new_file)
 
@@ -154,7 +156,7 @@ def build_uploads_page() -> None:
                         f"'{file_name}' uploaded ({file_size:,} bytes, "
                         f"{file_mime_type}).\n"
                         f"SHA-256: {digest}",
-                        timeout=0,
+                        timeout=WARN_TIMEOUT,
                         position="bottom",
                         close_button="OK",
                     )
@@ -167,8 +169,8 @@ def build_uploads_page() -> None:
                     ui.notify(
                         f"Could not upload {name}.\n\n{explain(err)}",
                         multi_line=True,
-                        type="negative",
-                        timeout=0,
+                        type="warning",
+                        timeout=WARN_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -375,7 +377,7 @@ def build_uploads_page() -> None:
                                 "Cancel",
                                 on_click=delete_dialog.close,
                                 color="transparent",
-                            ).props("flat").classes("text-[var(--vsp-blue)]")
+                            ).props("flat").classes("hover-border-blue")
 
                             def on_confirm_delete() -> None:
                                 try:
@@ -395,8 +397,8 @@ def build_uploads_page() -> None:
                                         f"Could not delete {row['FILENAME']}."
                                         f"\n\n{explain(err)}",
                                         multi_line=True,
-                                        type="negative",
-                                        timeout=0,
+                                        type="warning",
+                                        timeout=WARN_TIMEOUT,
                                         position="center",
                                         close_button="OK",
                                     )
@@ -406,7 +408,7 @@ def build_uploads_page() -> None:
                                 ui.notify(
                                     f"File: {row['FILENAME']} has been "
                                     "deleted.",
-                                    timeout=4000,
+                                    timeout=CONFIRM_TIMEOUT,
                                     position="bottom",
                                     close_button="OK",
                                 )
@@ -418,9 +420,7 @@ def build_uploads_page() -> None:
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                            ).props("push").classes(
-                                "text-[var(--vsp-white)]"
-                            )
+                            ).props("push").classes("hover-border-white")
 
                     delete_dialog.open()
 
@@ -442,8 +442,8 @@ def build_uploads_page() -> None:
                     ui.notify(
                         f"Nothing was deleted.\n\n{explain(err)}",
                         multi_line=True,
-                        type="negative",
-                        timeout=0,
+                        type="warning",
+                        timeout=WARN_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -451,7 +451,7 @@ def build_uploads_page() -> None:
 
                 ui.notify(
                     "All files have been deleted.",
-                    timeout=4000,
+                    timeout=CONFIRM_TIMEOUT,
                     position="bottom",
                     close_button="OK",
                 )
@@ -465,7 +465,7 @@ def build_uploads_page() -> None:
                     delete_all_files,
                 ),
                 color="#ef4444",
-            ).props("push").classes("mb-2 items-center")
+            ).props("push").classes("mb-2 items-center hover-border-white")
             delete_all_button.set_enabled(has_active_case())
 
     # ----- Initial render -----
