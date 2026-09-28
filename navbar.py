@@ -181,11 +181,11 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
             for label, route in NAV_PAGES:
                 ui.button(label, on_click=_go(route)).props(
                     "flat color=white"
-                ).classes("px-5 hover-border-blue")
+                ).classes("py-3 px-5 hover-border-blue")
             _nav_dropdown(
                 "Help",
                 [(label, _go(route)) for label, route in HELP_PAGES],
-                classes="px-5 hover-border-blue"
+                classes="p-3 hover-border-blue"
             )
 
         # ----- ...and one menu button on a narrow one -----
@@ -195,7 +195,7 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
             + [("---", None)]
             + [(label, _go(route)) for label, route in HELP_PAGES],
             icon="menu",
-            classes="nav-narrow hover-border-blue",
+            classes="p-3 nav-narrow hover-border-blue",
             props='round dense aria-label="Menu"',
         )
 
@@ -214,17 +214,17 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
                 ui.badge(
                     f"Case No.: {number}",
                     color="positive",
-                ).classes("case-badge nav-not-phone py-3 px-5")
+                ).classes("p-3 case-badge nav-not-phone")
                 # Just the number on a phone, so the bar keeps to one line.
                 ui.badge(
                     number,
                     color="positive"
-                ).classes("case-badge nav-phone")
+                ).classes("p-3 case-badge nav-phone")
             else:
                 ui.badge(
                     "No Active Case",
                     color="#ef4444",
-                ).classes("case-badge py-3 px-5")
+                ).classes("p-3 case-badge")
 
         case_badge()
         # Follows a case opened or cleared on another device.
@@ -242,13 +242,13 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
             f"Welcome, {username}",
             account_items,
             icon="account_circle",
-            classes="account-menu nav-not-phone hover-border-blue",
+            classes="p-3 account-menu nav-not-phone hover-border-blue",
         )
         spoken_name = (username or "").replace('"', "")
         _nav_dropdown(
             "",
             account_items,
             icon="account_circle",
-            classes="account-menu nav-phone hover-border-blue",
             props=f'round dense aria-label="Account menu for {spoken_name}"',
+            classes="p-3 account-menu nav-phone hover-border-blue",
         )
