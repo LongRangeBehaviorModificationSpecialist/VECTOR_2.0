@@ -415,13 +415,13 @@ def build_crud_page(spec: CrudSpec) -> None:
                     "Clear",
                     on_click=lambda: _clear_form(),
                     color="transparent").props("flat"
-                ).classes("hover-border-blue")
+                ).classes("p-3 hover-border-blue")
 
                 submit_button = ui.button(
                     spec.submit_label,
                     on_click=lambda: _submit(),
                     color="var(--vsp-blue)").props("push"
-                ).classes("hover-border-white")
+                ).classes("p-3 hover-border-white")
 
         def _clear_form() -> None:
             for spec_field in spec.fields:
@@ -621,7 +621,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                         "Cancel",
                         on_click=edit_dialog.close,
                         color="transparent",
-                    ).props("flat").classes("hover-border-blue")
+                    ).props("flat").classes("p-3 hover-border-blue")
 
                     def on_save_update() -> None:
                         values = _values_from(edit_widgets)
@@ -676,10 +676,10 @@ def build_crud_page(spec: CrudSpec) -> None:
                         refresh_table()
 
                     ui.button(
-                        "Update",
+                        f"Update {spec.entity}",
                         on_click=on_save_update,
                         color="var(--vsp-blue)",
-                    ).props("push").classes("hover-border-white")
+                    ).props("push").classes("p-3 hover-border-white")
 
             edit_dialog.open()
 
@@ -705,7 +705,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                 ).classes("mb-2 text-base")
 
                 note = spec.delete_note(row) if spec.delete_note else ""
-                
+
                 if note:
                     ui.label(note).classes("mb-2 text-base text-[#F5B027]")
 
@@ -719,7 +719,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                         "Cancel",
                         on_click=delete_dialog.close,
                         color="transparent",
-                    ).props("flat").classes("hover-border-blue")
+                    ).props("flat").classes("p-3 hover-border-blue")
 
                     def on_confirm_delete() -> None:
                         try:
@@ -762,10 +762,10 @@ def build_crud_page(spec: CrudSpec) -> None:
                         refresh_table()
 
                     ui.button(
-                        "Delete",
+                        f"Delete {spec.entity}",
                         on_click=on_confirm_delete,
                         color="#ef4444",
-                    ).props("push").classes("hover-border-white")
+                    ).props("push").classes("p-3 hover-border-white")
 
             delete_dialog.open()
 
@@ -794,7 +794,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                                 "Cancel",
                                 on_click=dialog.close,
                                 color="transparent",
-                            ).props("flat").classes("hover-border-blue")
+                            ).props("flat").classes("p-3 hover-border-blue")
 
                             def on_confirm_delete_all() -> None:
                                 try:
@@ -829,7 +829,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                                 "Delete All",
                                 on_click=on_confirm_delete_all,
                                 color="#ef4444",
-                            ).props("push").classes("hover-border-white")
+                            ).props("push").classes("p-3 hover-border-white")
 
                     dialog.open()
 
@@ -839,7 +839,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                     f"Delete All {spec.entity_plural.title()}",
                     on_click=_open_delete_all_dialog,
                     color="#ef4444",
-                ).props("push").classes("hover-border-white")
+                ).props("push").classes("p-3 hover-border-white")
 
                 if spec.requires_case:
                     delete_all_button.set_enabled(has_active_case())

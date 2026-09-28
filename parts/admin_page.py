@@ -125,7 +125,7 @@ def build_admin_page():
                 "Create User",
                 on_click=create_user,
                 color="var(--vsp-blue)",
-            ).props("push").classes("hover-border-white")
+            ).props("push").classes("p-3 hover-border-white")
 
         # ----- Existing Users Table -----
         ui.separator().classes("my-6")
@@ -305,7 +305,7 @@ def build_admin_page():
                                         on_click=reset_dialog.close,
                                         color="transparent",
                                         ).props("flat").classes(
-                                        "hover-border-blue"
+                                        "p-3 hover-border-blue"
                                     )
 
                                     def on_confirm_reset():
@@ -367,7 +367,7 @@ def build_admin_page():
                                         on_click=on_confirm_reset,
                                         color="var(--vsp-blue)",
                                         ).props("push").classes(
-                                        "hover-border-white"
+                                        "p-3 hover-border-white"
                                     )
 
                             reset_dialog.open()
@@ -412,7 +412,7 @@ def build_admin_page():
                                         on_click=delete_dialog.close,
                                         color="transparent",
                                         ).props("flat"
-                                    ).classes("hover-border-blue")
+                                    ).classes("p-3 hover-border-blue")
 
                                     def on_confirm_delete():
 
@@ -480,7 +480,7 @@ def build_admin_page():
                                         on_click=on_confirm_delete,
                                         color="#ef4444",
                                         ).props("push").classes(
-                                        "hover-border-white"
+                                        "p-3 hover-border-white"
                                     )
 
                             delete_dialog.open()
@@ -534,7 +534,7 @@ def build_admin_page():
                             "Cancel",
                             on_click=dialog.close,
                             color="transparent",
-                        ).props("flat").classes("hover-border-blue")
+                        ).props("flat").classes("p-3 hover-border-blue")
 
                         def confirm_sign_out_all() -> None:
                             if not get_is_admin():
@@ -559,8 +559,8 @@ def build_admin_page():
                             "Sign Everyone Out",
                             on_click=confirm_sign_out_all,
                             color="#ef4444",
-                        ).props("push").classes(
-                            "hover-border-white"
+                            ).props("push").classes(
+                            "p-3 hover-border-white"
                         )
 
                 dialog.open()
@@ -569,7 +569,7 @@ def build_admin_page():
                 "Sign Everyone Out",
                 on_click=open_sign_out_all_dialog,
                 color="#ef4444",
-            ).props("push").classes("hover-border-white")
+            ).props("push").classes("p-3 hover-border-white")
 
     # Initial render
     refresh_users_table()

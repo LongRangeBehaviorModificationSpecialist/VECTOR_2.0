@@ -377,7 +377,7 @@ def build_uploads_page() -> None:
                                 "Cancel",
                                 on_click=delete_dialog.close,
                                 color="transparent",
-                            ).props("flat").classes("hover-border-blue")
+                            ).props("flat").classes("p-3 hover-border-blue")
 
                             def on_confirm_delete() -> None:
                                 try:
@@ -420,7 +420,7 @@ def build_uploads_page() -> None:
                                 "Delete",
                                 on_click=on_confirm_delete,
                                 color="#ef4444",
-                            ).props("push").classes("hover-border-white")
+                            ).props("push").classes("p-3 hover-border-white")
 
                     delete_dialog.open()
 
@@ -465,7 +465,7 @@ def build_uploads_page() -> None:
                     delete_all_files,
                 ),
                 color="#ef4444",
-            ).props("push").classes("mb-2 items-center hover-border-white")
+            ).props("push").classes("p-3 mb-2 items-center hover-border-white")
             delete_all_button.set_enabled(has_active_case())
 
     # ----- Initial render -----

@@ -95,7 +95,7 @@ def build_audit_page() -> None:
                 "Search",
                 on_click=lambda: refresh_audit_table(),
                 color="var(--vsp-blue)",
-            ).props("push").classes("hover-border-white")
+            ).props("push").classes("p-3 hover-border-white")
 
         table_container = ui.column().classes(
             "w-full max-w-6xl mx-auto items-center gap-2"

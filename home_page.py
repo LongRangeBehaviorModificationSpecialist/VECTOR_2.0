@@ -55,47 +55,42 @@ from utils import delete_all_data, CONFIRM_TIMEOUT, WARN_TIMEOUT
 style = {
     "color": "var(--vsp-blue)",
     "props": "push",
-    "classes": "flex-shrink-0 min-w-56 py-3 hover-border-white"
+    "classes": "w-75 p-6 hover-border-white",
 }
 
 home_page_buttons = {
     "0": {
-        "text": "Start New Case",
-        "action": "confirm_new_case_handler()",
-    },
-    "1": {
         "text": "Add Agent",
         "page_url": "/agents",
     },
-    "2": {
+    "1": {
         "text": "Add Room",
         "page_url": "/rooms",
         },
-    "3": {
+    "2": {
         "text": "Add Evidence",
         "page_url": "/evidence",
         },
-    "4": {
+    "3": {
         "text": "Add Person",
         "page_url": "/persons",
         },
-    "5": {
+    "4": {
         "text": "Add Note",
         "page_url": "/notes",
         },
-    "6": {
+    "5": {
         "text": "Add File",
         "page_url": "/uploads",
         },
-    "7": {
+    "6": {
         "text": "Useful Links",
         "page_url": "/links",
         },
-    "8": {
+    "7": {
         "text": "Reports",
         "page_url": "/reports",
         },
-
 }
 
 
@@ -149,17 +144,15 @@ def build_authenticated_home():
     # ----- Action Buttons ROW 1: Start New Case | Add Agent | Add Room -----
 
     with ui.row().classes(
-        "flex justify-center items-center gap-6 py-1 w-full"):
+        "flex justify-center items-center gap-8 py-1 w-full"):
 
         ui.button(
             "Start New Case",
-            on_click=lambda: confirm_new_case_handler(),
-            color="var(--vsp-blue)",
-        ).props("push").classes(
-            "flex-shrink-0 min-w-56 py-3 hover-border-white"
-        )
+            on_click=confirm_new_case_handler,
+            color=style["color"],
+        ).props(style["props"]).classes(style["classes"])
 
-        for k, v in list(home_page_buttons.items())[1:3]:
+        for k, v in list(home_page_buttons.items())[0:2]:
             ui.button(
                 v["text"],
                 on_click=lambda url=v["page_url"]: ui.navigate.to(url),
@@ -170,9 +163,9 @@ def build_authenticated_home():
     # ----- Action Buttons ROW 2: Add Evidence | Add Person | Add Note -----
 
     with ui.row().classes(
-        "flex justify-center items-center gap-6 py-1 w-full"):
+        "flex justify-center items-center gap-8 py-1 w-full"):
 
-        for k, v in list(home_page_buttons.items())[3:6]:
+        for k, v in list(home_page_buttons.items())[2:5]:
             ui.button(
                 v["text"],
                 on_click=lambda url=v["page_url"]: ui.navigate.to(url),
@@ -183,9 +176,9 @@ def build_authenticated_home():
     # ----- Action Buttons ROW 3: Add File | Useful Links -----
 
     with ui.row().classes(
-        "flex justify-center items-center gap-6 py-1 w-full"):
+        "flex justify-center items-center gap-8 py-1 w-full"):
 
-        for k, v in list(home_page_buttons.items())[6:]:
+        for k, v in list(home_page_buttons.items())[5:]:
             ui.button(
                 v["text"],
                 on_click=lambda url=v["page_url"]: ui.navigate.to(url),
@@ -205,7 +198,8 @@ def build_authenticated_home():
             ).classes("text-lg font-bold py-1")
 
         # ----- Row to hold the Data Management buttons -----
-        with ui.row().classes("flex justify-center items-center gap-6 w-full"):
+        with ui.row().classes(
+            "flex justify-center items-center gap-8 py-1 w-full"):
 
             # ----- EXPORT Button -----
             def open_export_dialog():
@@ -320,13 +314,13 @@ def build_authenticated_home():
                             "Cancel",
                             on_click=dialog.close,
                             color="transparent",
-                        ).props("flat").classes("hover-border-blue")
+                        ).props("flat").classes("p-3 hover-border-blue")
 
                         ui.button(
                             "Export Now",
                             on_click=do_export,
                             color="var(--vsp-blue)",
-                        ).props("push").classes("hover-border-white")
+                        ).props("push").classes("p-3 hover-border-white")
 
                 dialog.open()
 
@@ -462,13 +456,13 @@ def build_authenticated_home():
                             "Cancel",
                             on_click=cancel_import,
                             color="transparent",
-                        ).props("flat").classes("hover-border-blue")
+                        ).props("flat").classes("p-3 hover-border-blue")
 
                         import_button = ui.button(
                             "Import Now",
                             on_click=do_import,
                             color="var(--vsp-blue)",
-                        ).props("push").classes("hover-border-white")
+                        ).props("push").classes("p-3 hover-border-white")
 
                         import_button.disable()
 
@@ -556,33 +550,40 @@ def build_authenticated_home():
                             "Cancel",
                             on_click=dialog.close,
                             color="transparent",
-                        ).props("flat").classes("hover-border-blue")
+                        ).props("flat").classes("p-3 hover-border-blue")
 
                         ui.button(
                             "Delete all data",
                             on_click=do_delete,
                             color="#EF4444",
-                        ).props("push").classes("hover-border-white")
+                        ).props("push").classes("p-3 hover-border-white")
 
                 dialog.open()
 
-            ui.button(
-                "📤 EXPORT CASE DATA",
-                on_click=open_export_dialog,
-                color="#379161",
-            ).props("push").classes("w-56 py-3 hover-border-white")
+            action_buttons = {
+                "0": {
+                    "text":"📤 EXPORT CASE DATA",
+                    "color": "#379161",
+                    "command":open_export_dialog,
+                },
+                "1": {
+                    "text":"📥 IMPORT CASE DATA",
+                    "color": "#379161",
+                    "command":open_import_dialog,
+                },
+                "2": {
+                    "text":"DELETE ALL DATA",
+                    "color": "#EF4444",
+                    "command":open_delete_all_dialog,
+                }
+            }
 
-            ui.button(
-                "📥 IMPORT CASE DATA",
-                on_click=open_import_dialog,
-                color="#379161",
-            ).props("push").classes("w-56 py-3 hover-border-white")
-
-            ui.button(
-                "DELETE ALL DATA",
-                on_click=open_delete_all_dialog,
-                color="#EF4444",
-            ).props("push").classes("w-56 py-3 hover-border-white")
+            for _, v in action_buttons.items():
+                ui.button(
+                    v["text"],
+                    on_click=v["command"],
+                    color=v["color"],
+                ).props("push").classes("w-75 p-6 hover-border-white")
 
 
 def build_login_home():
@@ -741,7 +742,7 @@ def build_login_home():
         ui.button(
             "Login",
             on_click=attempt_login,
-        ).props("push").classes("mt-4 px-8 py-3")
+        ).props("push").classes("mt-4 px-8 p-3")
 
 
 # ----- About Page -----
@@ -893,7 +894,7 @@ def confirm_new_case_handler() -> None:
             ui.button(
                 "Cancel",
                 on_click=warn_dialog.close
-            ).props("flat").classes("hover-border-blue")
+            ).props("flat").classes("p-3 hover-border-blue")
 
             def on_proceed() -> None:
                 # Through delete_all_data() rather than a table list of its
@@ -928,7 +929,7 @@ def confirm_new_case_handler() -> None:
                 "Proceed (Delete All Data)",
                 on_click=on_proceed,
                 color="#EF4444",
-            ).props("push").classes("hover-border-white")
+            ).props("push").classes("p-3 hover-border-white")
 
     warn_dialog.open()
 

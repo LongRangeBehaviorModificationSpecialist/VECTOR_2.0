@@ -34,8 +34,8 @@ from sqlalchemy import exists, inspect
 from typing import Optional
 
 
-WARN_TIMEOUT = 6000
-CONFIRM_TIMEOUT = 4000
+WARN_TIMEOUT = 4000
+CONFIRM_TIMEOUT = 3500
 ZERO_TIMEOUT = 0
 
 AGENTS_JSON_PATH = Path(__file__).parent / "parts/agents.json"
@@ -355,7 +355,7 @@ def confirm_delete_all(action: str, callback):
             ui.button(
                 "Cancel",
                 on_click=dialog.close
-            ).props("flat").classes("hover-border-blue")
+            ).props("flat").classes("p-3 hover-border-blue")
 
             def on_confirm():
                 callback()
@@ -365,7 +365,7 @@ def confirm_delete_all(action: str, callback):
                 "Delete All",
                 on_click=on_confirm,
                 color="#ef4444",
-            ).props("push").classes("hover-border-white")
+            ).props("push").classes("p-3 hover-border-white")
 
     dialog.open()
 

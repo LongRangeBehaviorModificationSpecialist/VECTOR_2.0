@@ -63,9 +63,9 @@ from utils import (
 style = {
     "color": "#1C69A8",
     "props": "push",
-    "classes": "w-full py-4 my-0 hover-border-white"
+    "classes": "w-75 p-6 hover-border-white"
 }
-
+# "classes": "w-full p-4 my-0 hover-border-white"
 report_buttons = {
     "0": {
         "text": "Print Agent List",
@@ -133,16 +133,38 @@ def build_reports_page() -> None:
 
     _remind_about_end_time()
 
-    with ui.column().classes("w-full items-center gap-4"):
-        with ui.column().classes("w-full max-w-xs"):
+    # ----- First row of buttons -----
+    with ui.row().classes(
+            "flex justify-center items-center gap-8 my-1 py-1 w-full"):
 
-            for k, v in report_buttons.items():
-                ui.button(
-                    v['text'],
-                    on_click=lambda url=v['page_url']: ui.navigate.to(url),
-                    color=style['color'],
-                ).props(style['props']).classes(style['classes'])
+        for k, v in list(report_buttons.items())[0:3]:
+            ui.button(
+                v['text'],
+                on_click=lambda url=v['page_url']: ui.navigate.to(url),
+                color=style['color'],
+            ).props(style['props']).classes(style['classes'])
 
+    # ----- Second row of buttons -----
+    with ui.row().classes(
+            "flex justify-center items-center gap-8 my-1 py-1 w-full"):
+
+        for k, v in list(report_buttons.items())[3:6]:
+            ui.button(
+                v['text'],
+                on_click=lambda url=v['page_url']: ui.navigate.to(url),
+                color=style['color'],
+            ).props(style['props']).classes(style['classes'])
+
+    # ----- Third row of buttons -----
+    with ui.row().classes(
+                "flex justify-center items-center gap-8 my-1 py-1 w-full"):
+
+        for k, v in list(report_buttons.items())[6:]:
+            ui.button(
+                v['text'],
+                on_click=lambda url=v['page_url']: ui.navigate.to(url),
+                color=style['color'],
+            ).props(style['props']).classes(style['classes'])
 
 # ----- Order -----
 # Item numbers and room labels are text. Ordered by the database, the
@@ -238,7 +260,7 @@ def _remind_about_end_time() -> None:
                 "Continue without it",
                 on_click=reminder.close,
                 color="transparent",
-            ).props("flat").classes("hover-border-blue")
+            ).props("flat").classes("p-3 hover-border-blue")
 
             def fill_in_now() -> None:
                 try:
@@ -269,7 +291,7 @@ def _remind_about_end_time() -> None:
                 icon="schedule",
                 on_click=fill_in_now,
                 color="var(--vsp-blue)",
-            ).props("push").classes("hover-border-white")
+            ).props("push").classes("p-3 hover-border-white")
 
     reminder.open()
 
@@ -289,7 +311,7 @@ def render_report_page(html_content: str) -> None:
                 "Print Report",
                 on_click=open_report_window,
                 color="#1C69A8").props("push icon=print"
-            ).classes("mb-4 no-print hover-border-white")
+            ).classes("p-3 mb-4 no-print hover-border-white")
 
             ui.html(html_content)
 
@@ -358,23 +380,28 @@ def show_validation_errors(errors: list[str]) -> None:
 # ----- Common Print Styles -----
 COMMON_STYLES = """
 @page {
+    margin-top: 0.65in;
+    margin-right: 0.5in;
     margin-bottom: 0.75in;
-    margin-top: 0.25in;
+    margin-left: 0.5in;
 
-    @bottom-right {
+    @bottom-center {
         content: "Page " counter(page) " of " counter(pages);
-        font-family: "Arial", sans-serif;
-        font-size:10pt;
-        font-weight: bold;
         color: #000;
+        font-family: "Arial", sans-serif;
+        font-size: 10pt;
+        font-weight: bold;
+        margin-bottom: 0.5in;
     }
+    /*
     @bottom-left {
         content: "Confidential";
+        font-family: "Arial", sans-serif;
         font-size: 9pt;
-        font-style: italic;
         font-weight: bold;
         color: #FF0000;
     }
+    */
 }
 
 @media print {
@@ -522,7 +549,7 @@ td.header-data-label {
 }
 
 td.header-data-value {
-    border-bottom: 1px dotted green;
+    border-bottom: 1px dotted black;
     font-family: "Times New Roman", Times, serif;
     padding: 0px 10px;
     vertical-align: bottom;

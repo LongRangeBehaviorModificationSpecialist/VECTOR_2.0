@@ -30,7 +30,6 @@ logging.basicConfig(
 
 from auth import (
     get_current_user_name,
-    # get_is_admin,
     is_authenticated,
     require_admin,
     require_login,
@@ -43,6 +42,7 @@ from program.config import (
     STATIC_DIR,
     USERS_SEED_PATH,
 )
+from utils import WARN_TIMEOUT
 
 DEBUG_MODE = "--dev" in sys.argv
 
@@ -443,7 +443,7 @@ def change_password_page():
             ui.button(
                 "Save Password",
                 on_click=save_new_password,
-            ).props("push").classes("w-full mt-4 hover-border-white")
+            ).props("push").classes("w-full mt-4 p-3 hover-border-white")
 
 
 # ----- Run -----
