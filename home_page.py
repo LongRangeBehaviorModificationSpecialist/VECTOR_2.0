@@ -432,7 +432,7 @@ the menu button (three lines) at the top left.
    order they were written.
 7. **Files** — photographs and documents. Each file is fingerprinted
    (SHA-256) when it is added, so a later change to it can be detected.
-8. **Reports** — seven printable lists, including the inventory used as
+8. **Reports** — eight printable lists, including the inventory used as
    the return copy. If the case is missing a detail a report needs, the
    page says which, and if it has no end time yet the page offers to fill
    it in from this machine's clock.

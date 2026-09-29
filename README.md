@@ -9,7 +9,7 @@ scene paperwork and exports the case as an encrypted archive.
 
 VECTOR runs on your own machine. Nothing is sent anywhere.
 
-`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `429 tests`
+`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `445 tests`
 
 > **About this fork.** VECTOR was created by SSA M. Sponheimer of the
 > Virginia State Police NOVA/DC ICAC
@@ -65,8 +65,8 @@ VECTOR runs on your own machine. Nothing is sent anywhere.
 
 **Afterwards**
 
-- **Seven printable reports**, including the basic inventory left as
-  the return copy
+- **Eight printable reports**, including the basic inventory left as
+  the return copy and a list of every attached file with its SHA-256
 - **Export** as a ZIP of CSVs, a single JSON file, or both — optionally
   AES-256 encrypted
 - **Import** either format back, with every attachment checked against
@@ -94,17 +94,20 @@ Everything the original does, plus:
 | **Audit trail** | Every create, edit, delete, wipe, import and sign-in, with field-level before and after; each entry fingerprinted onto the one before it, so a later edit or deletion shows up |
 | **Evidence integrity** | A SHA-256 taken when each file is uploaded, verified again at export and at import |
 | **Encryption** | Optional SQLCipher encryption of both databases, with tools to convert either way |
-| **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked"; imports that are all or nothing; failures explained in plain words; reports in item-number order; dates checked before they are saved; evidence numbers that close up when an item is removed |
+| **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked"; imports that are all or nothing; failures explained in plain words, and kept on screen until acknowledged; reports in item-number order; dates checked before they are saved; evidence numbers that close up when an item is removed |
 | **Times** | Stamped in the machine's own time zone, with the offset from UTC; case times fill in from the clock, and Reports asks about a missing end time |
 | **Several devices** | Open pages refresh on their own when another device saves, and the case badge follows; on a phone or a small tablet the page buttons fold into one menu |
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 429 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 445 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
-the active-case badge and guard, the capitalised column names and the
-refreshed interface — with fixes made while bringing it across.
+the active-case badge and guard, the capitalised column names, the
+refreshed interface, and (28-Sep-2026) the larger buttons with hover
+borders, the Files report, "Page X of Y" on printed reports, exports
+recorded in the audit trail and a hash for every table in the CSV
+manifest — with fixes made while bringing it across.
 
 Every change, with the reasoning behind it, is listed in
 [pull request #2](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/2)
@@ -241,9 +244,9 @@ VECTOR creates its databases and prints a one-time administrator
 password:
 
 ```
-==============================================================
+  ==============================================================
   FIRST RUN - an administrator account has been created.
-==============================================================
+  ==============================================================
     Username:  admin
     Password:  64xhZN0pDYhwPG73
 ```
@@ -266,8 +269,12 @@ runs once:
 
 - **Names.** PERSONS, FILES and users take the upstream project's
   capitalised column names — `SUSPECTNAME` → `PERSONNAME`, `file_name`
-  → `FILENAME`, `user_name` → `USERNAME`, and so on. Columns are renamed
-  in place, so no row is copied and every password keeps working.
+  → `FILENAME`, `user_name` → `USERNAME`, and so on, and since
+  28-Sep-2026 `SUSPECTNOTE` → `PERSONNOTE` and `FILEHASHEDAT` →
+  `FILEHASHEDDATETIME`. Columns are renamed in place, so no row is
+  copied and every password keeps working. A database opened by a
+  version that added `FILEHASHEDDATETIME` empty beside the old column
+  has its hashing times copied across.
 - **Constraints.** A table still carrying a unique constraint that
   blocked ordinary scenes — a second agent with no email address, a
   house with two bedrooms, the same photograph attached twice — is
@@ -281,7 +288,12 @@ runs once:
 - **Audit fingerprints.** The trail gains a `chain` column, and entries
   written before it existed are fingerprinted once, in order. They are
   chained retrospectively, so the chain says nothing about what happened
-  to them before the upgrade — only that nothing has changed since.
+  to them before the upgrade — only that nothing has changed since. This
+  happens before the date and time rewrites above, which write audit
+  entries of their own and have to be chained onto the old ones. (A
+  database upgraded on 24-Sep-2026 had them the other way round, and
+  its trail fails the check at the first rewritten entry. That is a
+  record of the order, not of tampering; a new database is unaffected.)
 
 A database from before the renames prints:
 
@@ -410,12 +422,17 @@ Work top to bottom; each step feeds the next.
 7. **Files** — photographs and documents, stored in the case database.
    On a phone or tablet a **Take a photograph** button opens the camera
    straight into the case
-8. **Reports** — seven printable layouts, including the basic
-   inventory used as the return copy. If the case has no end time yet,
+8. **Reports** — eight printable layouts, including the basic
+   inventory used as the return copy and the list of attached files. If the case has no end time yet,
    the page offers to fill it in from this machine's clock
 
 The open case's number is shown in the top bar on every page. Until a
 case is open, the other pages refuse new entries and say why.
+
+Prompts and confirmations fade after a few seconds. A message saying
+that something did **not** happen — a record that was not saved, an
+import or export that failed, an attachment that no longer matches its
+hash — stays until you press **OK**.
 
 Every table has a search box above it, which narrows the rows as you
 type — an item number, part of a description, a room, an agent's name.
@@ -439,7 +456,14 @@ included, and lands wherever that browser saves downloads:
 
 Both carry the audit trail, and both record the SHA-256 taken when each
 attachment was collected — so a file that has changed since is flagged
-on the way out, and again on the way back in.
+on the way out, and again on the way back in. The CSV manifest also
+records a SHA-256 of each table's CSV, and every export is itself
+recorded in the audit trail; an export whose record cannot be written
+is not handed over.
+
+Digests are shown in capitals. One recorded in lower case, as every
+attachment was before 28-Sep-2026, is the same digest, and is compared
+as one.
 
 **Import** takes either format: choose the file, and VECTOR works out
 which format it is from the file itself — and whether it was exported
@@ -502,7 +526,7 @@ server.
 ## The audit trail
 
 Every change to case data is recorded — creations, edits, deletions,
-bulk wipes, imports, and both successful and failed logins. Admins read
+bulk wipes, imports, exports, and both successful and failed logins. Admins read
 it at **Welcome → Audit Trail**.
 
 Each entry records when (kept in UTC, shown in this machine's time
@@ -740,7 +764,7 @@ assigned and never read. Style is left alone deliberately — this
 codebase has its own conventions and a linter arguing about them would
 be noise.
 
-429 tests, about fifteen seconds. They run against a temporary database
+445 tests, about fifteen seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -757,14 +781,14 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_page_specs.py` | 53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written |
 | `test_order_dates_and_files.py` | 29 | Reports and tables list items and rooms in order; renaming a room moves its evidence; impossible or half-typed dates are refused; attachment contents load only when read, and downloads keep their names |
 | `test_times_and_numbers.py` | 25 | Stamps carry this machine's time zone and offset, and UTC stamps already saved are rewritten once; both case times offer the fill button, and the end-time reminder never fills in a time before the start; typed text in a dropdown is kept; removing an item moves the later numbers down, audited |
-| `test_reports.py` | 25 | All seven reports render, carry the case header, and escape their values |
+| `test_reports.py` | 29 | All eight reports render, carry the case header, and escape their values; the Files report prints upload times in local time |
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
-| `test_json_export.py` | 22 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected; older and upstream layouts import |
+| `test_json_export.py` | 23 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected, a lower-case collection hash not mistaken for tampering; older and upstream layouts import |
 | `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
 | `test_failures_and_live.py` | 22 | Failures are explained without the SQL; a failed import leaves the case unchanged, and an import clears attachments the new case lacks; exports stop rather than leave attachments out; edit dialogs open for values no longer on a list; saves, wipes and imports move the change signal, while reads do not, and a sign-in moves the trail's signal alone |
 | `test_numbering.py` | 17 | Evidence numbering past item 9; room labels past Z |
 | `test_validators.py` | 16 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time |
-| `test_export_import.py` | 15 | CSV round trip preserves rows, bytes and provenance, including attachments sharing a name; encrypted archives; tampering detected; older and upstream archives import; download staging is cleared |
+| `test_export_import.py` | 17 | CSV round trip preserves rows, bytes and provenance, including attachments sharing a name; encrypted archives; tampering detected, and a lower-case hash is the same hash; older and upstream archives import, including those with `SUSPECTNOTE` and `FILEHASHEDAT`; download staging is cleared |
 | `test_active_case.py` | 13 | Pages refuse to record without an open case; the Cases page still works; async handlers stay async |
 | `test_menu_rooms_and_passwords.py` | 13 | The page buttons and the menu share one list, and only administrators are offered Shutdown; a room without agents can be edited and survives a CSV round trip; a dropdown saved blank opens blank; an import knows when a file needs a password |
 | `test_dates.py` | 12 | Old-format case times, birth dates and note times are rewritten once and audited; nothing else is touched |
@@ -772,9 +796,10 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_session_and_search.py` | 18 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for; every table that grows offers a search box and the one-case page does not |
 | `test_network_setting.py` | 13 | Network access is off until somebody turns it on and a damaged settings file reads as off; the flag opens it for one run and the setting from then on; the address given out is one another device could use; and the change is recorded with who made it |
 | `test_launchers.py` | 5 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned |
-| `test_migration.py` | 11 | Old-schema databases — old names, old constraints — upgrade without losing a row; backups include the write-ahead log |
-| `test_audit_chain.py` | 11 | Every entry is fingerprinted as it is written; an entry changed or removed afterwards is found and named; entries from before the chain are fingerprinted once by the upgrade, and the check says which could not be checked |
+| `test_migration.py` | 13 | Old-schema databases — old names, old constraints — upgrade without losing a row, including the September renames of the person notes and hashing time; backups include the write-ahead log |
+| `test_audit_chain.py` | 13 | Every entry is fingerprinted as it is written; an entry changed or removed afterwards is found and named; entries from before the chain are fingerprinted once by the upgrade, before anything else writes to the trail, and the check says which could not be checked |
 | `test_audit.py` | 9 | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
+| `test_messages.py` | 5 | A failed save or import stays on screen until acknowledged, a confirmation fades, the wipe itself shows nothing, and no debugging note reaches a message |
 | `test_constraints.py` | 8 | The constraints that were removed, and the four that must stay |
 
 ---
