@@ -69,9 +69,11 @@ def files_table() -> Callable[[], None]:
                     "file_size_bytes": f.FILESIZE or 0,
                     "FILEMIMETYPE": f.FILEMIMETYPE or "unknown",
                     "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
-                    "FILESHA256": (f.FILESHA256 or "not recorded"),
+                    "FILESHA256": (
+                        (f.FILESHA256 or "").upper() or "not recorded"
+                    ),
                     "sha256_short": (
-                        f"{f.FILESHA256[:12]}…" if f.FILESHA256
+                        f"{f.FILESHA256[:12].upper()}…" if f.FILESHA256
                         else "not recorded"
                     ),
                     # Stored in UTC; shown in this machine's zone.

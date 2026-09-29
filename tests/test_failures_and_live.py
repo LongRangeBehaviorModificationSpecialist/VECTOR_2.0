@@ -196,7 +196,7 @@ def test_a_failed_csv_import_leaves_the_case_unchanged(
         out_dir,
         notices
 ):
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
 
     # EVIDENCE.csv gains a second item 1. The tables before it in the
     # archive -- AGENTS and CASES -- used to be replaced before this failed.
@@ -227,7 +227,7 @@ def test_a_failed_json_import_leaves_the_case_unchanged(
         out_dir,
         notices
 ):
-    exported = import_export.export_vector_to_json(destination=out_dir)
+    exported = import_export.export_vector_to_json(destination=out_dir).zip_path
     payload = json.loads(exported.read_text(encoding="utf-8"))
     records = payload["tables"]["EVIDENCE"]["records"]
     records.append(dict(records[0]))
@@ -255,7 +255,7 @@ def test_importing_a_case_without_attachments_removes_the_old_ones(
     """An archive with no files folder used to leave the previous case's
     attachments in place, and wrote no import record.
     """
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
     _add_attachment("previous_case.jpg")
     with get_session() as session:
         imports_before = session.query(AuditLog).filter_by(
@@ -384,7 +384,7 @@ def test_a_bulk_wipe_moves_the_version(populated):
 
 
 def test_an_import_moves_the_version(populated, out_dir, notices):
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
     before = models.data_version()
     import_export.import_vector_from_csv(str(archive))
     assert models.data_version() > before

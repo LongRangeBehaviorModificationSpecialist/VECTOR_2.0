@@ -101,19 +101,19 @@ def test_agents_are_still_assigned_as_a_pair(stage):
 # ----- Imports that know whether a file needs a password -----
 def test_an_encrypted_csv_export_is_recognised(populated, out_dir):
     archive = import_export.export_vector_to_csv(
-        password="correct horse battery", destination=out_dir)
+        password="correct horse battery", destination=out_dir).zip_path
     assert import_export.needs_password(archive) is True
 
 
 def test_a_plain_csv_export_needs_no_password(populated, out_dir):
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
     assert import_export.needs_password(archive) is False
 
 
 def test_json_exports_are_recognised_either_way(populated, out_dir):
-    plain = import_export.export_vector_to_json(destination=out_dir)
+    plain = import_export.export_vector_to_json(destination=out_dir).zip_path
     sealed = import_export.export_vector_to_json(
-        password="correct horse battery", destination=out_dir)
+        password="correct horse battery", destination=out_dir).zip_path
 
     assert import_export.needs_password(plain) is False
     assert import_export.needs_password(sealed) is True
@@ -135,7 +135,7 @@ def test_a_room_without_agents_survives_a_csv_round_trip(case, out_dir):
                 ROOMSECONDAGENT="",
             )
         )
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
 
     # Changed after the export, so a failed import cannot pass unnoticed:
     # imports are all or nothing, and a failure would leave this in place.

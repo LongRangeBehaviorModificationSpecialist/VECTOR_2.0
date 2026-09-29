@@ -1609,7 +1609,7 @@ def print_files_report():
                 "FILEMIMETYPE": f.FILEMIMETYPE or "",
                 "FILEUPLOADDATE": f.FILEUPLOADDATE or "",
                 "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
-                "FILESHA256": f.FILESHA256 or "",
+                "FILESHA256": (f.FILESHA256 or "").upper(),
             }
             for f in session.query(UploadedFiles).order_by(UploadedFiles.Z_PK).all()
         ]

@@ -94,7 +94,7 @@ def test_export_writes_one_json_file(with_attachment, out_dir):
 
 
 def test_export_leaves_nothing_staged(with_attachment, out_dir):
-    exported = import_export.export_vector_to_json(destination=out_dir)
+    exported = import_export.export_vector_to_json(destination=out_dir).zip_path
     assert [p.name for p in out_dir.iterdir()] == [exported.name]
     assert list(Path(tempfile.gettempdir()).iterdir()) == []
 
@@ -108,7 +108,7 @@ def test_the_file_is_valid_json_with_the_expected_shape(
         next(out_dir.glob("*.json")).read_text(encoding="utf-8")
     )
     assert payload["export_metadata"]["application"] == "VECTOR"
-    assert payload["export_metadata"]["format_version"] == "1.1"
+    assert payload["export_metadata"]["format_version"] == "1.2"
     assert "tables" in payload
     assert payload["tables"]["EVIDENCE"]["record_count"] == 12
     assert payload["files"]["record_count"] == 1
@@ -121,6 +121,18 @@ def test_the_audit_trail_is_included(with_attachment, out_dir):
         next(out_dir.glob("*.json")).read_text(encoding="utf-8")
     )
     assert "AUDIT" in payload["tables"]
+
+
+def test_a_lower_case_collection_hash_is_not_reported_as_altered(
+        with_attachment, out_dir):
+    """The fixture's attachment was recorded in lower case, as every
+    attachment collected before the change to capitals was."""
+    import_export.export_vector_to_json(destination=out_dir)
+    payload = json.loads(next(out_dir.glob("*.json")).read_text(encoding="utf-8"))
+    entry = payload["files"]["records"][0]
+    assert entry["FILESHA256"] == entry["FILESHA256"].lower()
+    assert entry["FILEHASH"] == entry["FILEHASH"].upper()
+    assert entry["FILEHASHMATCHES"] is True
 
 
 def test_attachments_carry_their_collection_hash(with_attachment, out_dir):
@@ -404,7 +416,7 @@ def test_attachments_sharing_a_name_all_survive_json(case, out_dir):
                 )
             )
 
-    exported = import_export.export_vector_to_json(destination=out_dir)
+    exported = import_export.export_vector_to_json(destination=out_dir).zip_path
     delete_all_data()
     import_export.import_vector_from_json(str(exported))
 

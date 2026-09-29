@@ -21,6 +21,7 @@ import pytest
 import import_export
 from models import (
     Agents,
+    AuditLog,
     Cases,
     Evidence,
     Notes,
@@ -88,7 +89,7 @@ def test_export_produces_an_archive(with_attachment, out_dir):
 
 def test_export_cleans_up_its_staging_directory(with_attachment, out_dir):
     """The unzipped case must not be left behind anywhere."""
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
     assert [p.name for p in out_dir.iterdir()] == [archive.name]
     assert list(Path(tempfile.gettempdir()).iterdir()) == []
 
@@ -100,7 +101,7 @@ def test_export_without_a_destination_stages_for_download(
     """What the Export button does: build the file in a private staging
     folder for the browser to download, never on the host's Desktop.
     """
-    archive = import_export.export_vector_to_csv()
+    archive = import_export.export_vector_to_csv().zip_path
     assert archive.exists()
     assert archive.parent.parent == Path(tempfile.gettempdir())
     assert archive.parent.name.startswith("vector_export_")
@@ -116,7 +117,10 @@ def test_manifest_records_the_ingest_hash(with_attachment, out_dir):
     entry = manifest["files"][0]
     assert entry["FILENAME"] == "scene_photo.jpg"
     assert entry["FILESHA256"] == hashlib.sha256(PAYLOAD).hexdigest()
-    assert entry["FILEHASH"] == hashlib.sha256(PAYLOAD).hexdigest()
+    assert entry["FILEHASH"] == hashlib.sha256(PAYLOAD).hexdigest().upper()
+    # Recorded in lower case at collection, recomputed in capitals now:
+    # the same digest, so the file is not reported as altered.
+    assert entry["FILEHASHMATCHES"] is True
     assert entry["FILEHASHMATCHES"] is True
     assert manifest["integrity_failures"] == []
 
@@ -231,7 +235,6 @@ def test_import_is_recorded_in_the_audit_trail(with_attachment, out_dir):
     archive = next(out_dir.glob("*.zip"))
 
     from utils import delete_all_data
-    from models import AuditLog
     delete_all_data()
     import_export.import_vector_from_csv(str(archive))
 
@@ -395,7 +398,26 @@ def test_an_archive_from_upstream_keeps_its_evidence(tmp_path):
         assert session.query(Evidence).one().EVIDDESC == "Laptop"
         restored = session.query(UploadedFiles).one()
         assert restored.FILEDATA == photo
-        assert restored.FILESHA256 == digest
+        # Nothing recorded at collection, so the digest taken on arrival
+        # stands in -- in capitals, as VECTOR now writes them.
+        assert restored.FILESHA256 == digest.upper()
+        # The manifest's lower-case digest is the same one: no mismatch.
+        entry = (
+            session.query(AuditLog)
+            .filter(AuditLog.action == "IMPORT")
+            .one()
+        )
+        assert json.loads(entry.after)["hash_mismatches"] == []
+
+
+def test_a_lower_case_digest_is_the_same_digest():
+    """Hex is not case-sensitive, and attachments collected before the
+    change to capitals carry lower-case digests."""
+    digest = hashlib.sha256(b"photo").hexdigest()
+    assert import_export.same_hash(digest, digest.upper())
+    assert import_export.same_hash(f" {digest}\n", digest.upper())
+    assert not import_export.same_hash(digest, hashlib.sha256(b"x").hexdigest())
+    assert not import_export.same_hash("", digest)
 
 
 # ----- Attachments that share a name -----
@@ -421,7 +443,7 @@ def test_attachments_sharing_a_name_all_survive_the_round_trip(case, out_dir):
                 )
             )
 
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
     with zipfile.ZipFile(archive) as zf:
         stored = [n for n in zf.namelist() if n.startswith("files/")]
     assert len({name.lower() for name in stored}) == 3

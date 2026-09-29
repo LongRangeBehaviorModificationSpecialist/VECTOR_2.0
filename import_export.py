@@ -116,6 +116,16 @@ _FILE_ENTRY_ALIASES = {
     "data_base64": "FILEDATA_b64",
 }
 
+def same_hash(first, second) -> bool:
+    """Whether two SHA-256 digests are the same digest.
+
+    Hex is not case-sensitive: VECTOR now writes digests in capitals,
+    and every attachment collected before that was recorded in lower
+    case. Compared as text, each of those would read as altered.
+    """
+    return (first or "").strip().upper() == (second or "").strip().upper()
+
+
 def hash_file(path: Path, chunk_size: int = 65536) -> str:
     """Streamed SHA-256 of a file's contents."""
     hasher = hashlib.sha256()
@@ -439,7 +449,9 @@ def export_vector_to_csv(
                     # the copy, so compare the two and say so if they
                     # disagree.
                     recorded = uf.FILESHA256 or ""
-                    verified = (not recorded) or recorded == sha256_hash
+                    verified = (not recorded) or same_hash(
+                        recorded, sha256_hash
+                    )
                     if not verified:
                         integrity_failures.append(archive_name)
 
@@ -822,7 +834,7 @@ def import_vector_from_csv(
                         unlisted_files.append(file_path.name)
                     else:
                         expected = entry.get("FILEHASH")
-                        if expected and expected != actual_hash:
+                        if expected and not same_hash(expected, actual_hash):
                             hash_mismatches.append(file_path.name)
 
                     details = entry or {}
@@ -1056,7 +1068,9 @@ def export_vector_to_json(
                     hashlib.sha256(uploaded.FILEDATA).hexdigest().upper()
                 )
                 recorded = uploaded.FILESHA256 or ""
-                matches = (not recorded) or recorded == current_hash
+                matches = (not recorded) or same_hash(
+                    recorded, current_hash
+                )
                 if not matches:
                     integrity_failures.append(
                         uploaded.FILENAME or "(unnamed)"
@@ -1348,7 +1362,7 @@ def import_vector_from_json(
                 actual_hash = hashlib.sha256(raw).hexdigest().upper()
 
                 expected = entry.get("FILEHASH")
-                if expected and expected != actual_hash:
+                if expected and not same_hash(expected, actual_hash):
                     hash_mismatches.append(
                         entry.get("FILENAME") or "(unnamed)"
                     )
