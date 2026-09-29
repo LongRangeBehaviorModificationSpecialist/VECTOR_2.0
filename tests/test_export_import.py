@@ -462,6 +462,50 @@ def test_attachments_sharing_a_name_all_survive_the_round_trip(case, out_dir):
 
 # ----- Staging cleanup -----
 
+@pytest.mark.parametrize(
+    "typed, safe",
+    [
+        ("26-1234", "26-1234"),
+        ("26:1234", "26_1234"),
+        ('ICAC?26 "A"', "ICAC_26_A"),
+        ('"26-1234"', "26-1234"),
+        ("a/b\\c|d*e<f>g", "a_b_c_d_e_f_g"),
+        ("case.", "case"),
+        ("", "UNKNOWN"),
+    ],
+)
+def test_a_case_number_becomes_a_file_name_windows_accepts(typed, safe):
+    assert import_export.safe_file_name(typed) == safe
+
+
+def test_a_case_number_windows_would_refuse_still_exports(case, out_dir):
+    """The case number names the export. With a colon or a question mark
+    in it the export stopped with "Could not start the export"."""
+    with get_session() as session:
+        session.query(Cases).one().CASENUMBER = "26:1234?A"
+
+    result = import_export.export_vector_to_csv(destination=out_dir)
+
+    assert result is not None
+    assert result.zip_path.is_file()
+    assert result.zip_path.name.startswith("26_1234_A_")
+
+
+def test_an_archive_named_in_capitals_imports(with_attachment, out_dir):
+    """A copy that arrives as CASE.ZIP is the same archive."""
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
+    shouted = archive.with_name("CASE.ZIP")
+    archive.rename(shouted)
+    from utils import delete_all_data
+    delete_all_data()
+
+    import_export.import_vector_from_csv(str(shouted))
+
+    with get_session() as session:
+        assert session.query(Cases).count() == 1
+        assert session.query(UploadedFiles).one().FILEDATA == PAYLOAD
+
+
 def test_stale_staging_is_removed_and_recent_staging_kept(out_dir):
     import os
     import time

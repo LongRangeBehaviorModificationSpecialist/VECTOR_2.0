@@ -17,6 +17,7 @@ import json
 from nicegui import ui
 from pathlib import Path
 import pyzipper
+import re
 import shutil
 import tempfile
 from typing import Optional
@@ -257,12 +258,7 @@ def get_case_info_for_folder_name() -> str:
             )
             return ""
 
-        case_number = (
-            (case.CASENUMBER or "UNKNOWN")
-            .replace("/", "_")
-            .replace("\\", "_")
-            .replace(" ", "_")
-        )
+        case_number = safe_file_name(case.CASENUMBER or "UNKNOWN")
 
         begin_dt = case.CASEDATETIMEBEGIN or "UNKNOWN"
 
@@ -271,13 +267,29 @@ def get_case_info_for_folder_name() -> str:
             dt_str = begin_dt.strftime("%Y-%m-%d_%H%M%S")
         else:
             # Sanitize the string
-            dt_str = (
+            dt_str = safe_file_name(
                 str(begin_dt)
                 .replace(":", "")
                 .replace(" ", "_")
                 .replace("/", "")
             )
         return f"{case_number}_{dt_str}_saved_results"
+
+
+_NOT_IN_FILE_NAMES = re.compile(r'[<>:"/\\|?*\x00-\x1f\s]+')
+
+
+def safe_file_name(text: str) -> str:
+    """Text made fit to be part of a file name on Windows as well.
+
+    The case number names the export. One holding a character Windows
+    refuses -- "26:1234", "ICAC?26" -- stopped the export at the end of
+    the day with "Could not start the export". Those characters, and
+    spaces, become underscores, and any left at either end go -- with
+    trailing dots, which Windows also refuses.
+    """
+    cleaned = _NOT_IN_FILE_NAMES.sub("_", str(text)).strip("_. ")
+    return cleaned or "UNKNOWN"
 
 
 def get_column_names(model_class) -> list:
@@ -476,6 +488,12 @@ def export_vector_to_csv(
 
                     num_files += 1
 
+                # Let go of this attachment's bytes before the next is
+                # read. The session keeps what it has loaded, so without
+                # this every photograph in the case was held in memory
+                # at once.
+                session.expire(uf, ["FILEDATA"])
+
     except Exception as err:
         # Carrying on would hand over an export without its attachments,
         # under a message saying it was complete.
@@ -644,7 +662,7 @@ def import_vector_from_csv(
         )
         return
 
-    if not zip_file.suffix == ".zip":
+    if zip_file.suffix.lower() != ".zip":
         ui.notify(
             "Please select a .zip file.",
             type="warning",
@@ -897,6 +915,8 @@ def import_vector_from_csv(
             + "\n\n".join(problems)
             + "\n\nThe import completed and has been recorded in the "
             "audit trail. Treat these files as unverified.",
+            multi_line=True,
+            classes="multi-line-notification",
             type="warning",
             timeout=ZERO_TIMEOUT,
             position="center",
