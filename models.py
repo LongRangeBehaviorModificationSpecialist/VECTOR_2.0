@@ -773,6 +773,13 @@ def chain_existing_audit_entries() -> int:
     about what happened to them before this ran -- only that nothing has
     changed since. Returns how many were filled in.
 
+    Only entries after the last fingerprinted one are filled in. An
+    unfingerprinted entry with a fingerprinted one after it was already
+    passed over when that one was written -- it was chained onto the
+    start -- and filling it in now would break the chain there rather
+    than extend it. It is left as it is, and the check reports it as
+    one that could not be checked, which is the truth.
+
     Raw SQL rather than the ORM: this runs during the schema upgrade,
     and updating the trail is not itself an event worth recording.
     """
@@ -788,12 +795,15 @@ def chain_existing_audit_entries() -> int:
             )
         ).all()
 
-    previous = AUDIT_CHAIN_START
+    last_chained = max(
+        (index for index, row in enumerate(rows) if row.chain),
+        default=-1,
+    )
+    previous = rows[last_chained].chain if last_chained >= 0 else (
+        AUDIT_CHAIN_START
+    )
     filled = []
-    for row in rows:
-        if row.chain:
-            previous = row.chain
-            continue
+    for row in rows[last_chained + 1:]:
         fingerprint = audit_fingerprint(previous, row)
         filled.append((row.id, fingerprint))
         previous = fingerprint
@@ -1298,15 +1308,21 @@ def upgrade_database() -> None:
 
     Order matters: names first, so the later steps see today's columns;
     then columns added since; then the table rebuilds, which copy rows by
-    the current column list; then the stored dates, which need the
-    current columns to exist; and last the audit fingerprints, which
-    cover the entries as they now stand.
+    the current column list; then the audit fingerprints for entries
+    written before there were any; and last the stored dates.
+
+    The fingerprints have to come before anything that writes to the
+    trail. Rewriting a date writes an audit entry, and a new entry is
+    chained onto the one before it -- which, before the old entries are
+    fingerprinted, has none, so the new one was chained onto the start.
+    Fingerprinting the old ones afterwards then left it chained onto the
+    wrong thing, and the trail failed its own check from that entry on.
     """
     _rename_legacy_schema()
     _add_missing_columns()
     migrate_schema()
-    normalise_legacy_dates()
     chain_existing_audit_entries()
+    normalise_legacy_dates()
 
 
 # ----- Table Creation -----

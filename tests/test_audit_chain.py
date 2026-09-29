@@ -132,6 +132,49 @@ def test_entries_from_before_the_chain_are_fingerprinted_once(populated):
     assert "could not be checked" not in message
 
 
+def test_an_upgrade_that_rewrites_dates_leaves_a_trail_that_checks_out(
+        populated):
+    """An upgrade from before fingerprints, of a database with dates in
+    the old format: rewriting the dates writes audit entries, and those
+    have to chain onto the old entries, not onto the start.
+
+    This is what happened to a database upgraded on 24-Sep-2026: the
+    dates were rewritten first, the old entries fingerprinted after,
+    and the check failed from the first rewritten entry on.
+    """
+    with models.engine.begin() as connection:
+        connection.execute(text('UPDATE "AUDIT" SET chain = NULL'))
+        connection.execute(
+            text('UPDATE "PERSONS" SET "PERSONDOB" = \'1984-03-02\'')
+        )
+    before = len(_entries())
+
+    models.upgrade_database()
+
+    assert len(_entries()) > before  # the date rewrite was recorded
+    intact, message = verify_audit_chain()
+    assert intact, message
+
+
+def test_old_entries_passed_over_are_left_unfingerprinted(populated):
+    """Entries with no fingerprint, followed by one that was chained past
+    them, are reported as unchecked rather than filled in -- filling them
+    in would break the chain at the entry after them."""
+    with models.engine.begin() as connection:
+        connection.execute(text('UPDATE "AUDIT" SET chain = NULL'))
+    # Written while the old entries had no fingerprints: chained onto
+    # the start.
+    _add_evidence(number="99", desc="Tablet")
+    entries = _entries()
+    assert entries[-1][2] and not entries[0][2]
+
+    assert chain_existing_audit_entries() == 0
+
+    intact, message = verify_audit_chain()
+    assert intact, message
+    assert "could not be checked" in message
+
+
 def test_a_trail_with_no_entries_checks_out():
     intact, message = verify_audit_chain()
     assert intact
