@@ -128,7 +128,7 @@ def bootstrap_first_admin():
         encoding="utf-8",
     )
 
-    print("  " + "\n" + "=" * 62)
+    print("\n  " + "=" * 62)
     print("  FIRST RUN - an administrator account has been created.")
     print("  " + "=" * 62)
     print("    Username:  admin")
