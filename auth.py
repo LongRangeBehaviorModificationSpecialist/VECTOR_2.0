@@ -15,7 +15,7 @@ until someone happened to visit /reports.
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 import logging
-from utils import CONFIRM_TIMEOUT, WARN_TIMEOUT
+from utils import WARN_TIMEOUT
 
 from nicegui import app, ui
 

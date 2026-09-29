@@ -103,8 +103,7 @@ def test_every_button_the_help_names_exists():
     missing = sorted(
         {name for name in named if name.lower() not in on_screen}
     )
-    assert (
-        not missing,
+    assert not missing, (
         f"the Help page names buttons that do not exist: {missing}"
     )
 

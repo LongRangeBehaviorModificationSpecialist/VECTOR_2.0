@@ -54,7 +54,7 @@ class WrongKey(RuntimeError):
 def sqlcipher_available() -> bool:
     """True when the sqlcipher3 driver can be imported."""
     try:
-        import sqlcipher3
+        import sqlcipher3  # noqa: F401
         return True
     except ImportError:
         return False
