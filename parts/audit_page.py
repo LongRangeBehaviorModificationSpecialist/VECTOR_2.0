@@ -86,7 +86,9 @@ def show_chain_check() -> None:
         ).classes("text-xs text-gray-400 mb-4")
 
         with ui.row().classes("w-full justify-end"):
-            ui.button("Close", on_click=result.close).props("flat")
+            ui.button("Close", on_click=result.close).props("flat").classes(
+                "p-3 hover-border-blue"
+            )
 
     result.open()
 
@@ -136,7 +138,7 @@ def build_audit_page() -> None:
             ui.button(
                 "Check the trail",
                 on_click=lambda: show_chain_check(),
-            ).props("flat").classes("text-[var(--vsp-blue)]")
+            ).props("flat").classes("p-3 hover-border-blue")
 
         table_container = ui.column().classes(
             "w-full max-w-[1536px] px-2 mx-auto items-center gap-2"
@@ -301,7 +303,7 @@ def build_audit_page() -> None:
                         f"Show {min(PAGE_SIZE, remaining)} older "
                         f"{'entry' if remaining == 1 else 'entries'}",
                         on_click=show_older,
-                    ).props("flat").classes("text-[var(--vsp-blue)] mt-2")
+                    ).props("flat").classes("p-3 mt-2 hover-border-blue")
 
         action_filter.on_value_change(lambda _: search_again())
         search_input.on("keydown.enter", search_again)

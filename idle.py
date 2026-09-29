@@ -170,12 +170,16 @@ def sign_out_when_idle(username: str = "") -> ui.timer | None:
             ).classes("text-sm text-[#F5B027] mb-4")
 
             with ui.row().classes("w-full justify-end gap-2"):
-                ui.button("Sign out now", on_click=end_session).props("flat")
+                ui.button(
+                    "Sign out now",
+                    on_click=end_session,
+                    color="transparent",
+                ).props("flat").classes("p-3 hover-border-blue")
                 ui.button(
                     "Stay signed in",
                     on_click=stay_signed_in,
                     color="var(--vsp-blue)",
-                ).props("push").classes("text-[var(--vsp-white)]")
+                ).props("push").classes("p-3 hover-border-white")
 
         dialog.open()
 
