@@ -68,12 +68,25 @@ clean.
   typed into a form but not yet saved is lost.
 - **Photographs**: on a phone or tablet the Files page has **Take a
   photograph**, which opens the camera straight into the case. Each file
-  is hashed (SHA-256) the moment it arrives.
+  is hashed (SHA-256) the moment it arrives. iPhone photographs in HEIC
+  format are accepted.
+- **Deleting an evidence item renumbers the ones after it.** Delete item
+  4 of 7 and items 5–7 become 4–6, so the list never skips; the delete
+  dialog says so first, and every change is in the audit trail. If the
+  bags are already labelled, **edit** a wrong item rather than deleting
+  it, or re-mark the later bags.
 - **Before leaving the scene**:
   1. Reports page → fill in the end time when it offers.
   2. Print what is needed. Printed reports now carry "Page X of Y".
+     **Print Report** opens the report in a new window; if the browser
+     says a pop-up was blocked, allow pop-ups for the VECTOR address
+     (Chrome/Edge: the icon at the right of the address bar; iPad:
+     Settings → Safari → Block Pop-ups off) — or press Ctrl+P on the
+     report page itself, which prints without the menus.
   3. **Export** — CSV, JSON or **Both**, with a password if the file
-     will travel. The file downloads through the browser.
+     will travel. The file downloads through the browser. With a lot of
+     photographs, use **CSV** (the default): the JSON file holds every
+     attachment inside one file and takes far more memory to build.
   4. Check the export is where you expect it and opens. Copy it off the
      laptop.
   5. **Welcome, admin → Audit Trail → Check the trail**: it should say
@@ -172,6 +185,30 @@ on a fresh database.
 8. **Version 0.94, 28-Sep-2026** on the About page, and the first-run
    banner's first rule lined up with the others (eb2364a).
 
+Then a second read of every file, the evening before:
+
+9. **The Evidence by Room report printed apostrophes and ampersands as
+   codes** (467393b). The room heading was escaped twice, so
+   "Kid's Room & Closet" printed as "Kid&#x27;s Room &amp; Closet".
+10. **A trailing space made a second agent** (ae76e5e). Forms saved what
+    was typed, spaces and all, while the duplicate check compared
+    trimmed text — and a tablet keyboard adds a space after every word
+    it completes. "Doe, John " went in beside "Doe, John". Everything
+    typed is now saved trimmed.
+11. **iPhone photographs were refused** (ae76e5e). HEIC, the format
+    iPhones and iPads save in, was not an allowed type.
+12. **A case number with `:` `?` `*` `"` `<` `>` or `|` stopped the
+    export** (a247b5f). The case number names the export file, and
+    Windows refuses those characters in a file name — "Could not start
+    the export", at the end of the day. Reproduced on Windows; they now
+    become underscores.
+13. **The CSV export held every photograph in memory at once**
+    (a247b5f); now one at a time. And an archive named `.ZIP` in
+    capitals imports, and the import's integrity warning keeps its line
+    breaks.
+14. **A roster file that cannot be written** no longer makes a saved
+    agent look unsaved (ae76e5e).
+
 The tests the author's commits broke were updated where the change was
 intended (exports now return the file and a message; JSON is 1.2) and
 put back where the change was not (the "legacy" test fixtures had been
@@ -180,13 +217,15 @@ database).
 
 ## What was checked
 
-- **445 tests pass** (429 before the merge; the 16 new ones cover the
-  fixes). The author's own suite on their commits: 18 failures and 9
+- **465 tests pass** (429 before the merge; the 36 new ones cover the
+  fixes, and were run against the code before each fix to see them
+  fail). The author's own suite on their commits: 18 failures and 9
   errors.
 - **ruff** (the CI lint job): clean.
 - **Six page simulations** — export, import with and without a password,
   Delete All, the Admin Panel, the Files page, record editing and
-  renumbering — all pass, driving the real pages.
+  renumbering — all pass (96 checks), driving the real pages, before and
+  after the second review.
 - **A copy of this machine's database** opens and migrates: notes kept,
   columns renamed, backup made.
 - **Walk-through of the real application on a fresh database**: first
@@ -215,6 +254,9 @@ database).
   except this laptop's audit trail.
 - **Held back:** the "save a copy of the database before Start New
   Case" change (`feature/new-case-db-copy`) is not in this build.
+- **Contraband is not printed.** "Contains Contraband?" is recorded and
+  exported, but no report prints it — the original author left it out
+  of every layout. A question for him, not changed here.
 
 ## Commits in this build since the last one
 
@@ -230,6 +272,10 @@ database).
 | 3b8ee66 | style: this branch's own buttons take upstream's hover borders |
 | 63c0481 | fix: the Files report prints upload times in local time |
 | eb2364a | chore: version 0.94, and the first-run banner lines up |
+| a9d2b13 | docs: these notes, and the README after the merge |
+| 467393b | fix: the Evidence by Room report prints a room's apostrophe and ampersand |
+| ae76e5e | fix: entries are saved without surrounding spaces, and iPhone photos are accepted |
+| a247b5f | fix: an export named after any case number, one photograph in memory at a time |
 
 Each commit message has the full reasoning.
 
