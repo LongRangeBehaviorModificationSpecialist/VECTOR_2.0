@@ -1603,17 +1603,7 @@ def print_files_report():
 
     with get_session() as session:
         active_case = get_case_info()
-        files = [
-            {
-                "Z_PK": f.Z_PK,
-                "FILENAME": f.FILENAME,
-                "FILEMIMETYPE": f.FILEMIMETYPE or "",
-                "FILEUPLOADDATE": f.FILEUPLOADDATE or "",
-                "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
-                "FILESHA256": (f.FILESHA256 or "").upper(),
-            }
-            for f in session.query(UploadedFiles).order_by(UploadedFiles.Z_PK).all()
-        ]
+        files = files_report_rows(session)
 
         html = build_files_report_html(
             active_case=active_case,
@@ -1621,6 +1611,31 @@ def print_files_report():
         )
 
     render_report_page(html_content=html)
+
+
+def files_report_rows(session) -> list[dict]:
+    """The attachments as the Files report lists them.
+
+    The attachment itself is not read: FILEDATA is deferred, and nothing
+    here touches it.
+    """
+    return [
+        {
+            "Z_PK": f.Z_PK,
+            "FILENAME": f.FILENAME,
+            "FILEMIMETYPE": f.FILEMIMETYPE or "",
+            # Stored in UTC. Printed raw it read as a local time four
+            # or five hours out; shown in this machine's zone, with its
+            # offset, as the Files page shows it.
+            "FILEUPLOADDATE": (
+                clock.show_utc(f.FILEUPLOADDATE)
+                if f.FILEUPLOADDATE else ""
+            ),
+            "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
+            "FILESHA256": (f.FILESHA256 or "").upper(),
+        }
+        for f in session.query(UploadedFiles).order_by(UploadedFiles.Z_PK)
+    ]
 
 
 def open_report_window():

@@ -8,9 +8,20 @@ seven down with KeyError: 'case_number'. These tests exist to make that
 class of failure loud.
 """
 
+import hashlib
+from datetime import datetime
+
 import pytest
 
-from models import Agents, Evidence, Notes, Persons, Rooms, get_session
+from models import (
+    Agents,
+    Evidence,
+    Notes,
+    Persons,
+    Rooms,
+    UploadedFiles,
+    get_session,
+)
 from utils import get_case_info
 import parts.reports_page as reports
 
@@ -48,8 +59,15 @@ def _build(name):
             active_case, _rows(Persons)),
         "notes": lambda: reports.build_notes_report_html(
             active_case, _rows(Notes)),
+        "files": lambda: reports.build_files_report_html(
+            active_case, _file_rows()),
     }
     return builders[name]()
+
+
+def _file_rows():
+    with get_session() as session:
+        return reports.files_report_rows(session)
 
 
 REPORT_NAMES = [
@@ -60,6 +78,7 @@ REPORT_NAMES = [
     "rooms",
     "persons",
     "notes",
+    "files",
 ]
 
 
@@ -118,6 +137,30 @@ def test_evidence_by_room_groups_items(populated):
     assert "Room A (Bedroom)" in html
     # All twelve items live in that room, so each number should appear.
     assert "12" in html
+
+
+def test_the_files_report_prints_local_time_and_the_hash(case):
+    """Upload times are stored in UTC. Printed as stored, 03:05 on the
+    29th read as a local time for a file uploaded at 23:05 on the 28th."""
+    photo = b"scene photograph"
+    with get_session() as session:
+        session.add(
+            UploadedFiles(
+                FILENAME="<scene>.jpg",
+                FILEDATA=photo,
+                FILESIZE=len(photo),
+                FILEMIMETYPE="image/jpeg",
+                FILEUPLOADEDBY="Doe, John",
+                FILEUPLOADDATE=datetime(2026, 9, 29, 3, 5, 35),
+                # Recorded in lower case, as attachments before now were.
+                FILESHA256=hashlib.sha256(photo).hexdigest(),
+            )
+        )
+    html = _build("files")
+    assert "2026-09-29 03:05:35" not in html
+    assert "UTC" in html
+    assert hashlib.sha256(photo).hexdigest().upper() in html
+    assert "&lt;scene&gt;.jpg" in html and "<scene>" not in html
 
 
 def test_reports_survive_an_empty_case(case):
