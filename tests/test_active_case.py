@@ -1,4 +1,7 @@
-"""The active case.
+"""
+test_active_case.py
+
+The active case.
 
 Agents, rooms, evidence and the rest belong to a case, so the pages that
 record them refuse to until one has been opened. Ported from upstream,
@@ -24,7 +27,10 @@ import parts.rooms_page as rooms_page
 def notices(monkeypatch):
     captured = []
     monkeypatch.setattr(
-        utils.ui, "notify", lambda message, **kw: captured.append(str(message))
+        utils.ui,
+        "notify",
+        lambda message,
+        **kw: captured.append(str(message))
     )
     return captured
 
@@ -67,7 +73,8 @@ def test_the_guard_lets_an_action_through_with_a_case(case, notices):
 
 def test_an_async_handler_stays_async(case):
     """The file upload handler is async. Wrapping it must not leave a
-    coroutine that nothing awaits."""
+    coroutine that nothing awaits.
+    """
 
     @utils.require_active_case
     async def upload(event):
@@ -88,7 +95,8 @@ def test_an_async_handler_is_stopped_without_a_case(notices):
 
 def test_the_guard_keeps_the_handler_signature():
     """NiceGUI reads a handler's parameters to decide whether to pass the
-    event, so the wrapper has to still look like the original."""
+    event, so the wrapper has to still look like the original.
+    """
 
     @utils.require_active_case
     def on_edit(event):

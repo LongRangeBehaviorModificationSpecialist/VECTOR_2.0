@@ -1,4 +1,7 @@
-"""Export and import.
+"""
+test_export_import.py
+
+Export and import.
 
 The export is the only way a case leaves the machine, so a round trip
 has to preserve every row and every attachment byte-for-byte.
@@ -54,7 +57,7 @@ def with_attachment(populated):
                 FILEUPLOADEDBY="Roe, Jane",
                 FILEDATA=PAYLOAD,
                 FILESHA256=hashlib.sha256(PAYLOAD).hexdigest(),
-                FILEHASHEDAT="2026-09-10T08:10:00Z",
+                FILEHASHEDDATETIME="2026-09-10T08:10:00Z",
             )
         )
     return populated
@@ -64,8 +67,15 @@ def _counts():
     with get_session() as session:
         return {
             model.__name__: session.query(model).count()
-            for model in (Cases, Agents, Rooms, Evidence, Persons, Notes,
-                          UploadedFiles)
+            for model in (
+                Cases,
+                Agents,
+                Rooms,
+                Evidence,
+                Persons,
+                Notes,
+                UploadedFiles,
+            )
         }
 
 
@@ -83,10 +93,13 @@ def test_export_cleans_up_its_staging_directory(with_attachment, out_dir):
     assert list(Path(tempfile.gettempdir()).iterdir()) == []
 
 
-def test_export_without_a_destination_stages_for_download(with_attachment,
-                                                          out_dir):
+def test_export_without_a_destination_stages_for_download(
+        with_attachment,
+        out_dir
+):
     """What the Export button does: build the file in a private staging
-    folder for the browser to download, never on the host's Desktop."""
+    folder for the browser to download, never on the host's Desktop.
+    """
     archive = import_export.export_vector_to_csv()
     assert archive.exists()
     assert archive.parent.parent == Path(tempfile.gettempdir())
@@ -177,8 +190,11 @@ def test_encrypted_round_trip(with_attachment, out_dir):
     assert _counts() == before
 
 
-def test_import_detects_a_tampered_attachment(with_attachment, out_dir,
-                                              tmp_path):
+def test_import_detects_a_tampered_attachment(
+        with_attachment,
+        out_dir,
+        tmp_path
+):
     """A file whose bytes no longer match the manifest must be flagged."""
     import_export.export_vector_to_csv(destination=out_dir)
     archive = next(out_dir.glob("*.zip"))
@@ -244,7 +260,8 @@ def _zip(path, members: dict) -> None:
 
 def test_an_archive_from_before_the_renames_still_imports(tmp_path):
     """Lowercase table names, SUSPECT* columns and the old manifest keys
-    must all land in today's columns, provenance included."""
+    must all land in today's columns, provenance included.
+    """
     photo = b"legacy-photo-bytes"
     digest = hashlib.sha256(photo).hexdigest()
     archive = tmp_path / "legacy.zip"
@@ -263,7 +280,7 @@ def test_an_archive_from_before_the_renames_still_imports(tmp_path):
             "SUSPECTDOB": "03-02-1984",
             "SUSPECTADDRESS": "14 Elm Street",
             "SUSPECTPHONE": "",
-            "SUSPECTNOTE": "Present at entry",
+            "PERSONNOTE": "Present at entry",
             "ENTEREDDATETIME": "",
         }]),
         "export_manifest.json": json.dumps({"files": [{
@@ -288,12 +305,13 @@ def test_an_archive_from_before_the_renames_still_imports(tmp_path):
         assert restored.FILEDATA == photo
         assert restored.FILEMIMETYPE == "image/jpeg"
         assert restored.FILEUPLOADEDBY == "Doe, John"
-        assert restored.FILEHASHEDAT == "2026-09-01T08:10:00Z"
+        assert restored.FILEHASHEDDATETIME == "2026-09-01T08:10:00Z"
 
 
 def test_an_archive_from_upstream_keeps_its_evidence(tmp_path):
     """Upstream writes the evidence table as EVIDENDCE.csv, which its own
-    importer then skips. Read here as the table it meant."""
+    importer then skips. Read here as the table it meant.
+    """
     photo = b"upstream-photo"
     digest = hashlib.sha256(photo).hexdigest()
     archive = tmp_path / "upstream.zip"
@@ -338,7 +356,8 @@ def test_an_archive_from_upstream_keeps_its_evidence(tmp_path):
 def test_attachments_sharing_a_name_all_survive_the_round_trip(case, out_dir):
     """Two files called photo.jpg used to overwrite each other in the
     archive, so one was silently lost. Windows also treats PHOTO.JPG as
-    the same file."""
+    the same file.
+    """
     attachments = [
         ("photo.jpg", b"FRONT"),
         ("photo.jpg", b"BACK"),

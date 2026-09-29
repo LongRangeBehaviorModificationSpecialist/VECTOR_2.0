@@ -226,7 +226,6 @@ class Rooms(Base):
 
     Z_PK = Column(Integer(), primary_key=True, autoincrement=True)
     ROOMLABEL = Column(String(), nullable=False, unique=True)
-    # Not unique: a house with two bedrooms is ordinary.
     ROOMDESC = Column(String(), nullable=False)
     ROOMFIRSTAGENT = Column(String(), nullable=False)
     ROOMSECONDAGENT = Column(String(), nullable=False)
@@ -316,7 +315,7 @@ class Persons(Base):
     PERSONDOB = Column(String())
     PERSONADDRESS = Column(String())
     PERSONPHONE = Column(String())
-    SUSPECTNOTE = Column(Text())
+    PERSONNOTE = Column(Text())
     ENTEREDDATETIME = Column(String())
 
     def __repr__(self):
@@ -333,7 +332,7 @@ class PersonSchema(Schema):
     PERSONDOB = fields.Str()
     PERSONADDRESS = fields.Str()
     PERSONPHONE = fields.Str()
-    SUSPECTNOTE = fields.Str()
+    PERSONNOTE = fields.Str()
     ENTEREDDATETIME = fields.Str()
 
 
@@ -393,7 +392,7 @@ class UploadedFiles(Base):
     # Computed when the file is received, not when it is exported, so
     # the recorded hash certifies the file as collected.
     FILESHA256 = Column(String(64), index=True)
-    FILEHASHEDAT = Column(String())
+    FILEHASHEDDATETIME = Column(String())
 
     def __repr__(self):
         return f"File: {self.FILENAME}, Uploaded at: {self.FILEUPLOADDATE}"
@@ -412,7 +411,7 @@ class FileSchema(Schema):
     FILEUPLOADEDBY = fields.Str()
     FILENOTE = fields.Str()
     FILESHA256 = fields.Str()
-    FILEHASHEDAT = fields.Str()
+    FILEHASHEDDATETIME = fields.Str()
 
 
 file_schema = FileSchema(many=True)
@@ -608,14 +607,14 @@ def _changed_fields(obj) -> tuple[dict, dict]:
 
 
 def record_audit(
-    session,
-    action: str,
-    table_name: str,
-    row_pk=None,
-    summary: str = "",
-    before=None,
-    after=None,
-    actor: str | None = None,
+        session,
+        action: str,
+        table_name: str,
+        row_pk=None,
+        summary: str = "",
+        before=None,
+        after=None,
+        actor: str | None = None,
 ) -> None:
     """Writes one audit row.
 
@@ -924,7 +923,7 @@ LEGACY_COLUMN_NAMES = {
         "file_data": "FILEDATA",
         "file_note": "FILENOTE",
         "sha256": "FILESHA256",
-        "hashed_at": "FILEHASHEDAT",
+        "hashed_at": "FILEHASHEDDATETIME",
     },
     "users": {
         "id": "Z_PK",
@@ -1092,7 +1091,7 @@ def _add_missing_columns() -> None:
         "FILES": [
             ("FILENOTE", "VARCHAR"),
             ("FILESHA256", "VARCHAR(64)"),
-            ("FILEHASHEDAT", "VARCHAR"),
+            ("FILEHASHEDDATETIME", "VARCHAR"),
         ],
         "AUDIT": [
             ("chain", "VARCHAR(64)"),
@@ -1257,8 +1256,10 @@ def normalise_legacy_dates() -> int:
                     changed += 1
 
     if changed:
-        print(f"Schema migration: {changed} date(s) and time(s) brought "
-              "up to date")
+        print(
+            f"Schema migration: {changed} date(s) and time(s) brought "
+            "up to date"
+        )
     return changed
 
 

@@ -1,4 +1,5 @@
-"""Validators.
+"""
+test_validators.py
 
 Each returns True when the entry is INVALID and submission should stop.
 Several used to raise UnboundLocalError instead, because they assigned
@@ -29,7 +30,7 @@ def test_person_missing_note_is_reported_not_raised():
     assert utils.validate_person_data(
         stage="initial",
         PERSONNAME="Doe, John",
-        SUSPECTNOTE=None,
+        PERSONNOTE=None,
     ) is True
 
 
@@ -147,7 +148,8 @@ def test_agent_primary_and_secondary_roles_must_differ():
 
 def test_duplicate_case_number_is_rejected(case):
     """Only reachable on a database that already holds two cases, from
-    before one case at a time was enforced."""
+    before one case at a time was enforced.
+    """
     with get_session() as session:
         second = Cases(
             CASENUMBER="26-000002",
@@ -176,7 +178,10 @@ def test_a_second_case_cannot_be_opened(case, monkeypatch):
     and never printed."""
     notices = []
     monkeypatch.setattr(
-        utils.ui, "notify", lambda message, **kw: notices.append(str(message))
+        utils.ui,
+        "notify",
+        lambda message,
+        **kw: notices.append(str(message))
     )
 
     assert utils.validate_case_entry(

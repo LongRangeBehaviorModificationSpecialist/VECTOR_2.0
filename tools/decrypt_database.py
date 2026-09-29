@@ -124,16 +124,16 @@ def main() -> None:
         print("Neither database is encrypted. Nothing to do.")
         return
 
-    print("=" * 68)
+    print("  " + "=" * 68)
     print("  DECRYPT THE CASE DATABASE")
-    print("=" * 68)
+    print("  " + "=" * 68)
     print("  The result is an ordinary SQLite file. A suspect's name,")
     print("  address and date of birth will be readable by anyone with")
     print("  the file, and photographs can be extracted from it.")
     print()
     print("  Decrypt onto an encrypted volume, or delete the plaintext")
     print("  copy when you are finished with it.")
-    print("=" * 68)
+    print("  " + "=" * 68)
     print()
 
     if input("  Type DECRYPT to continue: ").strip() != "DECRYPT":

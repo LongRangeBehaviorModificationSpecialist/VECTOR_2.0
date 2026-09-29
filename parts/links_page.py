@@ -92,7 +92,7 @@ def build_link_section(title: str, icon: str, links: dict[str, str]) -> None:
                         new_tab=True,
                     ),
                     color="blue-6",
-                ).props("outline no-caps").classes("text-left text-sm")
+                ).props("outline no-caps").classes("p-3 text-left text-base")
 
 
 # ----- Main Page Builder -----

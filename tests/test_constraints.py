@@ -1,4 +1,7 @@
-"""Database constraints.
+"""
+test_constraints.py
+
+Database constraints.
 
 Three unique constraints used to reject situations that occur on most
 warrants. Four others are real identity rules and must stay.
@@ -41,6 +44,7 @@ def _room(label, desc):
 def test_two_agents_can_share_a_blank_email():
     with get_session() as session:
         session.add_all([_agent("Doe, John"), _agent("Roe, Jane")])
+
     with get_session() as session:
         assert session.query(Agents).count() == 2
 
@@ -48,8 +52,10 @@ def test_two_agents_can_share_a_blank_email():
 def test_two_agents_can_share_a_blank_phone():
     with get_session() as session:
         session.add_all(
-            [_agent("Doe, John", email="a@b.gov"),
-             _agent("Roe, Jane", email="c@d.gov")]
+            [
+                _agent("Doe, John", email="a@b.gov"),
+                _agent("Roe, Jane", email="c@d.gov"),
+            ]
         )
     with get_session() as session:
         assert session.query(Agents).count() == 2
@@ -58,6 +64,7 @@ def test_two_agents_can_share_a_blank_phone():
 def test_a_house_can_have_two_bedrooms():
     with get_session() as session:
         session.add_all([_room("A", "Bedroom"), _room("B", "Bedroom")])
+
     with get_session() as session:
         assert session.query(Rooms).count() == 2
 
@@ -84,6 +91,7 @@ def test_the_same_photograph_can_be_attached_twice():
 def test_agent_names_stay_unique():
     with get_session() as session:
         session.add(_agent("Doe, John"))
+
     with pytest.raises(IntegrityError):
         with get_session() as session:
             session.add(_agent("Doe, John", email="other@vsp.gov"))
@@ -92,6 +100,7 @@ def test_agent_names_stay_unique():
 def test_room_labels_stay_unique():
     with get_session() as session:
         session.add(_room("A", "Bedroom"))
+
     with pytest.raises(IntegrityError):
         with get_session() as session:
             session.add(_room("A", "Kitchen"))
@@ -111,6 +120,7 @@ def test_evidence_numbers_stay_unique():
 
     with get_session() as session:
         session.add(item("1", "Laptop"))
+
     with pytest.raises(IntegrityError):
         with get_session() as session:
             session.add(item("1", "Phone"))
@@ -119,6 +129,7 @@ def test_evidence_numbers_stay_unique():
 def test_person_names_stay_unique():
     with get_session() as session:
         session.add(Persons(PERSONNAME="O'Brien, Sean"))
+
     with pytest.raises(IntegrityError):
         with get_session() as session:
             session.add(Persons(PERSONNAME="O'Brien, Sean"))

@@ -18,7 +18,13 @@ from typing import Callable, Optional
 from nicegui import ui
 
 import clock
-from utils import required_input, required_select, required_textarea
+from utils import (
+    CONFIRM_TIMEOUT,
+    WARN_TIMEOUT,
+    required_input,
+    required_select,
+    required_textarea,
+)
 
 
 # ----- Field description -----
@@ -66,8 +72,8 @@ def notify_problem(message: str) -> None:
     """A problem the user has to acknowledge."""
     ui.notify(
         message,
-        type="negative",
-        timeout=0,
+        type="warning",
+        timeout=WARN_TIMEOUT,
         position="center",
         close_button="OK",
     )
@@ -77,7 +83,7 @@ def notify_done(message: str) -> None:
     """A confirmation that can fade."""
     ui.notify(
         message,
-        timeout=4000,
+        timeout=CONFIRM_TIMEOUT,
         position="bottom",
         close_button="OK",
     )
@@ -233,7 +239,7 @@ def _make_widget(spec_field: Field, value=None):
             icon="schedule",
             on_click=lambda: widget.set_value(clock.case_time_now()),
         ).props("flat dense no-caps").classes(
-            "self-end text-[var(--vsp-blue)]"
+            "self-end hover-border-blue"
         )
     return widget
 

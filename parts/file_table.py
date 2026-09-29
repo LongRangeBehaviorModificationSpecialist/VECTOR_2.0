@@ -22,7 +22,13 @@ from nicegui import ui
 
 from failures import explain, log
 from models import get_session, has_active_case, UploadedFiles
-from utils import confirm_delete_all, format_file_size, require_active_case
+from utils import (
+    CONFIRM_TIMEOUT,
+    WARN_TIMEOUT,
+    confirm_delete_all,
+    format_file_size,
+    require_active_case,
+)
 
 
 def files_table() -> Callable[[], None]:
@@ -232,7 +238,7 @@ def files_table() -> Callable[[], None]:
                             "Cancel",
                             on_click=delete_dialog.close,
                             color="transparent",
-                        ).props("flat").classes("text-[var(--vsp-blue)]")
+                        ).props("flat").classes("p-3 hover-border-blue")
 
                         def on_confirm_delete() -> None:
                             try:
@@ -252,8 +258,8 @@ def files_table() -> Callable[[], None]:
                                     f"Could not delete {row['FILENAME']}."
                                     f"\n\n{explain(err)}",
                                     multi_line=True,
-                                    type="negative",
-                                    timeout=0,
+                                    type="warning",
+                                    timeout=WARN_TIMEOUT,
                                     position="center",
                                     close_button="OK",
                                 )
@@ -263,7 +269,7 @@ def files_table() -> Callable[[], None]:
                             ui.notify(
                                 f"File: {row['FILENAME']} has been "
                                 "deleted.",
-                                timeout=4000,
+                                timeout=CONFIRM_TIMEOUT,
                                 position="bottom",
                                 close_button="OK",
                             )
@@ -275,9 +281,7 @@ def files_table() -> Callable[[], None]:
                             "Delete",
                             on_click=on_confirm_delete,
                             color="#ef4444",
-                        ).props("push").classes(
-                            "text-[var(--vsp-white)]"
-                        )
+                        ).props("push").classes("p-3 hover-border-white")
 
                 delete_dialog.open()
 
@@ -299,8 +303,8 @@ def files_table() -> Callable[[], None]:
                 ui.notify(
                     f"Nothing was deleted.\n\n{explain(err)}",
                     multi_line=True,
-                    type="negative",
-                    timeout=0,
+                    type="warning",
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -308,7 +312,7 @@ def files_table() -> Callable[[], None]:
 
             ui.notify(
                 "All files have been deleted.",
-                timeout=4000,
+                timeout=CONFIRM_TIMEOUT,
                 position="bottom",
                 close_button="OK",
             )
@@ -322,7 +326,7 @@ def files_table() -> Callable[[], None]:
                 delete_all_files,
             ),
             color="#ef4444",
-        ).props("push").classes("mb-2 items-center")
+        ).props("push").classes("p-3 mb-2 items-center hover-border-white")
         delete_all_button.set_enabled(has_active_case())
 
     def refresh_everything() -> None:

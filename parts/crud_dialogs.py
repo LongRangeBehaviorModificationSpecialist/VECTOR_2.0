@@ -52,7 +52,7 @@ def open_edit_dialog(spec, row: dict, labels: dict,
                 "Cancel",
                 on_click=edit_dialog.close,
                 color="transparent",
-            ).props("flat").classes("text-[var(--vsp-blue)]")
+            ).props("flat").classes("p-3 hover-border-blue")
 
             def on_save_update() -> None:
                 values = _values_from(edit_widgets)
@@ -107,10 +107,10 @@ def open_edit_dialog(spec, row: dict, labels: dict,
                 refresh()
 
             ui.button(
-                "Update",
+                f"Update {spec.entity}",
                 on_click=on_save_update,
                 color="var(--vsp-blue)",
-            ).props("push").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("p-3 hover-border-white")
 
     edit_dialog.open()
 
@@ -146,7 +146,7 @@ def open_delete_dialog(spec, row: dict, labels: dict,
                 "Cancel",
                 on_click=delete_dialog.close,
                 color="transparent",
-            ).props("flat").classes("text-[var(--vsp-blue)]")
+            ).props("flat").classes("p-3 hover-border-blue")
 
             def on_confirm_delete() -> None:
                 try:
@@ -189,10 +189,10 @@ def open_delete_dialog(spec, row: dict, labels: dict,
                 refresh()
 
             ui.button(
-                "Delete",
+                f"Delete {spec.entity}",
                 on_click=on_confirm_delete,
                 color="#ef4444",
-            ).props("push").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("p-3 hover-border-white")
 
     delete_dialog.open()
 
@@ -226,9 +226,7 @@ def delete_all_section(spec, labels: dict, refresh: Callable[[], None],
                             "Cancel",
                             on_click=dialog.close,
                             color="transparent",
-                        ).props("flat").classes(
-                            "text-[var(--vsp-blue)]"
-                        )
+                        ).props("flat").classes("p-3 hover-border-blue")
 
                         def on_confirm_delete_all() -> None:
                             try:
@@ -263,9 +261,7 @@ def delete_all_section(spec, labels: dict, refresh: Callable[[], None],
                             "Delete All",
                             on_click=on_confirm_delete_all,
                             color="#ef4444",
-                        ).props("push").classes(
-                            "text-[var(--vsp-white)]"
-                        )
+                        ).props("push").classes("p-3 hover-border-white")
 
                 dialog.open()
 
@@ -275,7 +271,8 @@ def delete_all_section(spec, labels: dict, refresh: Callable[[], None],
                 f"Delete All {spec.entity_plural.title()}",
                 on_click=_open_delete_all_dialog,
                 color="#ef4444",
-            ).props("push")
+            ).props("push").classes("p-3 hover-border-white")
+
             if spec.requires_case:
                 delete_all_button.set_enabled(has_active_case())
 

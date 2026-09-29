@@ -1,4 +1,7 @@
-"""Evidence numbering and room labelling.
+"""
+test_numbering.py
+
+Evidence numbering and room labelling.
 
 EVIDNUM is a text column. Ordering by it put "9" after "10", so from
 the tenth item onward the form pre-filled a number already in use --

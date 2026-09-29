@@ -1,4 +1,7 @@
-"""JSON export and import.
+"""
+test_json_export.py
+
+JSON export and import.
 
 A second format alongside the CSV archive: one self-contained file with
 attachments embedded, for handing a case to another tool.
@@ -38,7 +41,8 @@ PAYLOAD = b"\xff\xd8\xff\xe0" + b"scene-photo-bytes" * 128
 @pytest.fixture
 def out_dir(tmp_path, monkeypatch):
     """Where the finished export is written. Staging goes in a private
-    temp folder, so a test never touches the real one."""
+    temp folder, so a test never touches the real one.
+    """
     temp_root = tmp_path / "temp"
     temp_root.mkdir()
     monkeypatch.setattr(tempfile, "tempdir", str(temp_root))
@@ -58,7 +62,7 @@ def with_attachment(populated):
                 FILEUPLOADEDBY="Roe, Jane",
                 FILEDATA=PAYLOAD,
                 FILESHA256=hashlib.sha256(PAYLOAD).hexdigest(),
-                FILEHASHEDAT="2026-09-10T08:10:00Z",
+                FILEHASHEDDATETIME="2026-09-10T08:10:00Z",
             )
         )
     return populated
@@ -68,8 +72,15 @@ def _counts():
     with get_session() as session:
         return {
             model.__name__: session.query(model).count()
-            for model in (Cases, Agents, Rooms, Evidence, Persons, Notes,
-                          UploadedFiles)
+            for model in (
+                Cases,
+                Agents,
+                Rooms,
+                Evidence,
+                Persons,
+                Notes,
+                UploadedFiles,
+            )
         }
 
 
@@ -88,8 +99,10 @@ def test_export_leaves_nothing_staged(with_attachment, out_dir):
     assert list(Path(tempfile.gettempdir()).iterdir()) == []
 
 
-def test_the_file_is_valid_json_with_the_expected_shape(with_attachment,
-                                                        out_dir):
+def test_the_file_is_valid_json_with_the_expected_shape(
+        with_attachment,
+        out_dir
+):
     import_export.export_vector_to_json(destination=out_dir)
     payload = json.loads(
         next(out_dir.glob("*.json")).read_text(encoding="utf-8")
@@ -124,7 +137,9 @@ def test_attachments_carry_their_collection_hash(with_attachment, out_dir):
 
 def test_an_encrypted_export_is_really_encrypted(with_attachment, out_dir):
     import_export.export_vector_to_json(
-        destination=out_dir, password="correct horse battery")
+        destination=out_dir,
+        password="correct horse battery"
+    )
     archive = next(out_dir.glob("*.json.zip"))
     assert not list(out_dir.glob("*.json"))  # no plaintext left beside it
 
@@ -180,7 +195,9 @@ def test_round_trip_preserves_field_values(with_attachment, out_dir):
 def test_encrypted_round_trip(with_attachment, out_dir):
     before = _counts()
     import_export.export_vector_to_json(
-        destination=out_dir, password="correct horse battery")
+        destination=out_dir,
+        password="correct horse battery"
+    )
     archive = next(out_dir.glob("*.json.zip"))
 
     delete_all_data()
@@ -217,7 +234,8 @@ def test_a_tampered_attachment_is_detected(with_attachment, out_dir):
 
 def test_the_local_audit_trail_is_not_overwritten(with_attachment, out_dir):
     """An import appends a record; it does not import someone else's
-    history over the receiving machine's own."""
+    history over the receiving machine's own.
+    """
     import_export.export_vector_to_json(destination=out_dir)
     exported = next(out_dir.glob("*.json"))
 
@@ -259,25 +277,33 @@ def test_a_missing_file_is_refused(tmp_path):
 
 def test_a_1_0_export_still_imports(tmp_path):
     """This branch's first layout: lowercase tables, SUSPECT* columns and
-    a bare list of attachments with lowercase keys."""
+    a bare list of attachments with lowercase keys.
+    """
     photo = b"version-one-photo"
     digest = hashlib.sha256(photo).hexdigest()
     payload = {
-        "export_metadata": {"format_version": "1.0", "application": "VECTOR"},
+        "export_metadata": {
+            "format_version": "1.0",
+            "application": "VECTOR"
+        },
         "tables": {
-            "cases": {"records": [{
-                "Z_PK": 1,
-                "CASENUMBER": "26-V1",
-                "LOCATION": "1 Old Road",
-                "JURISDICTION": "Fairfax County",
-                "CASEDATETIMEBEGIN": "2026-09-01 08:00",
-            }]},
-            "persons": {"records": [{
-                "Z_PK": 1,
-                "SUSPECTNAME": "O'Brien, Sean",
-                "SUSPECTDOB": "03-02-1984",
-                "SUSPECTNOTE": "Present at entry",
-            }]},
+            "cases": {
+                "records": [{
+                    "Z_PK": 1,
+                    "CASENUMBER": "26-V1",
+                    "LOCATION": "1 Old Road",
+                    "JURISDICTION": "Fairfax County",
+                    "CASEDATETIMEBEGIN": "2026-09-01 08:00",
+                }]
+            },
+            "persons": {
+                "records": [{
+                    "Z_PK": 1,
+                    "SUSPECTNAME": "O'Brien, Sean",
+                    "SUSPECTDOB": "03-02-1984",
+                    "PERSONNOTE": "Present at entry",
+                }]
+            },
         },
         "files": [{
             "file_name": "old.jpg",
@@ -310,32 +336,43 @@ def test_an_upstream_export_imports(tmp_path):
     under files.records with the bytes in FILEDATA_b64."""
     photo = b"upstream-photo"
     payload = {
-        "export_metadata": {"format_version": "1.0"},
-        "tables": {
-            "CASES": {"record_count": 1, "records": [{
-                "Z_PK": 1,
-                "CASENUMBER": "26-UPSTREAM",
-                "LOCATION": "2 New Road",
-                "JURISDICTION": "Fairfax County",
-                "CASEDATETIMEBEGIN": "09-01-2026 08:00",
-            }]},
-            "EVIDENDCE": {"record_count": 1, "records": [{
-                "Z_PK": 1,
-                "EVIDNUM": "1",
-                "EVIDQTY": "1",
-                "EVIDDESC": "Laptop",
-                "EVIDLOCROOM": "Room A (Bedroom)",
-                "EVIDLOCROOMDETAIL": "shelf",
-                "EVIDFOUNDBY": "Doe, John",
-                "EVIDFOUNDBYWITNESS": "Roe, Jane",
-            }]},
+        "export_metadata": {
+            "format_version": "1.0"
         },
-        "files": {"record_count": 1, "records": [{
-            "FILENAME": "a.jpg",
-            "FILESIZE": len(photo),
-            "FILEMIMETYPE": "image/jpeg",
-            "FILEDATA_b64": base64.b64encode(photo).decode("ascii"),
-        }]},
+        "tables": {
+            "CASES": {
+                "record_count": 1,
+                "records": [{
+                    "Z_PK": 1,
+                    "CASENUMBER": "26-UPSTREAM",
+                    "LOCATION": "2 New Road",
+                    "JURISDICTION": "Fairfax County",
+                    "CASEDATETIMEBEGIN": "09-01-2026 08:00",
+                }]
+            },
+            "EVIDENDCE": {
+                "record_count": 1,
+                "records": [{
+                    "Z_PK": 1,
+                    "EVIDNUM": "1",
+                    "EVIDQTY": "1",
+                    "EVIDDESC": "Laptop",
+                    "EVIDLOCROOM": "Room A (Bedroom)",
+                    "EVIDLOCROOMDETAIL": "shelf",
+                    "EVIDFOUNDBY": "Doe, John",
+                    "EVIDFOUNDBYWITNESS": "Roe, Jane",
+                }]
+            },
+        },
+        "files": {
+            "record_count": 1,
+            "records": [{
+                "FILENAME": "a.jpg",
+                "FILESIZE": len(photo),
+                "FILEMIMETYPE": "image/jpeg",
+                "FILEDATA_b64": base64.b64encode(photo).decode("ascii"),
+            }]
+        },
     }
     path = tmp_path / "upstream.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -350,7 +387,10 @@ def test_an_upstream_export_imports(tmp_path):
 
 
 def test_attachments_sharing_a_name_all_survive_json(case, out_dir):
-    attachments = [("photo.jpg", b"FRONT"), ("photo.jpg", b"BACK")]
+    attachments = [
+        ("photo.jpg", b"FRONT"),
+        ("photo.jpg", b"BACK")
+    ]
     with get_session() as session:
         for name, payload in attachments:
             session.add(
@@ -384,7 +424,8 @@ def test_a_json_file_is_recognised(tmp_path):
 
 def test_the_csv_archive_is_not_mistaken_for_json(with_attachment, out_dir):
     """The CSV archive also contains export_manifest.json, so the
-    detection has to look at more than 'is there a .json in here'."""
+    detection has to look at more than 'is there a .json in here'.
+    """
     import_export.export_vector_to_csv(destination=out_dir)
     archive = next(out_dir.glob("*.zip"))
     assert import_export.looks_like_json_export(str(archive)) is False

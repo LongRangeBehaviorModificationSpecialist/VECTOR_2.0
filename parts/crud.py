@@ -198,14 +198,14 @@ def build_crud_page(spec: CrudSpec) -> None:
                 ui.button(
                     "Clear",
                     on_click=lambda: _clear_form(),
-                    color="transparent",
-                ).props("flat").classes("text-[var(--vsp-blue)]")
+                    color="transparent").props("flat"
+                ).classes("p-3 hover-border-blue")
 
                 submit_button = ui.button(
                     spec.submit_label,
                     on_click=lambda: _submit(),
-                    color="var(--vsp-blue)",
-                ).props("push").classes("text-[var(--vsp-white)]")
+                    color="var(--vsp-blue)").props("push"
+                ).classes("p-3 hover-border-white")
 
         def _clear_form() -> None:
             for spec_field in spec.fields:

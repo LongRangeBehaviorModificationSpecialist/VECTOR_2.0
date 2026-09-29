@@ -28,6 +28,7 @@ ACTION_CHOICES = [
     "DELETE",
     "DELETE_ALL",
     "IMPORT",
+    "EXPORT",
     "LOGIN",
     "LOGIN_FAILED",
     "LOGOUT_IDLE",
@@ -130,7 +131,7 @@ def build_audit_page() -> None:
                 "Search",
                 on_click=lambda: search_again(),
                 color="var(--vsp-blue)",
-            ).props("push").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("p-3 hover-border-white")
 
             ui.button(
                 "Check the trail",
@@ -236,7 +237,7 @@ def build_audit_page() -> None:
                     },
                     {
                         "name": "table_name",
-                        "label": "Record type",
+                        "label": "Record Type",
                         "field": "table_name",
                         "sortable": True,
                         "align": "left",
@@ -275,7 +276,7 @@ def build_audit_page() -> None:
                                 : props.row.action === 'CREATE'
                                 ? 'text-green-500'
                                 : 'text-blue-400'"
-                              style="font-weight:600">
+                            style="font-weight:600">
                             {{ props.row.action }}
                         </span>
                     </q-td>

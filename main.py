@@ -47,6 +47,7 @@ from program.config import (
     STATIC_DIR,
     USERS_SEED_PATH,
 )
+from utils import WARN_TIMEOUT
 
 DEBUG_MODE = "--dev" in sys.argv
 
@@ -127,14 +128,14 @@ def bootstrap_first_admin():
         encoding="utf-8",
     )
 
-    print("\n" + "=" * 62)
+    print("  " + "\n" + "=" * 62)
     print("  FIRST RUN - an administrator account has been created.")
-    print("=" * 62)
+    print("  " + "=" * 62)
     print("    Username:  admin")
     print(f"    Password:  {password}")
     print("\n  You will be asked to change it at first login.")
     print(f"  Also saved to: {note}")
-    print("=" * 62 + "\n")
+    print("  " + "=" * 62 + "\n")
 
 
 def seed_default_user():
@@ -170,8 +171,14 @@ def seed_default_user():
         if clean_hash.startswith("b'") and clean_hash.endswith("'"):
             clean_hash = clean_hash[2:-1]
 
-    user_name = user_data.get("USERNAME", user_data.get("user_name", ""))
-    is_admin = user_data.get("ISADMIN", user_data.get("is_admin", False))
+    user_name = user_data.get(
+        "USERNAME",
+        user_data.get("user_name", "")
+    )
+    is_admin = user_data.get(
+        "ISADMIN",
+        user_data.get("is_admin", False)
+    )
 
     with get_users_session() as session:
         existing = (
@@ -219,7 +226,6 @@ ui.add_css(
     --q-negative: #ef4444;
     --q-warning: #f59e0b;
     --q-info: #3b82f6;
-    --q-vspblue: #2984D1;
 
     --vsp-blue: #2984D1;
     --vsp-blue-2: #1C69A8;
@@ -253,7 +259,8 @@ textarea.q-field__native {
 }
 
 /* Amber labels on the inputs that need care: passwords, file paths and
-   the DELETE affirmation */
+the DELETE affirmation */
+
 .yellow-label .q-field__label {
     color: #F5B027;
     font-size: 10pt;
@@ -274,6 +281,29 @@ textarea.q-field__native {
     .touch-only {
         display: block !important;
     }
+}
+
+/*
+Added so border would appear when button is hovered. Also underline
+appears under the text and the text increase in size by 5.0%
+*/
+
+.hover-border-white {
+    border: 2px solid transparent;
+    color: var(--vsp-white);
+}
+
+.hover-border-white:hover {
+    border: 2px dashed white;
+}
+
+.hover-border-blue {
+    border: 2px solid transparent;
+    color: var(--vsp-blue);
+}
+
+.hover-border-blue:hover {
+    border: 2px dashed var(--vsp-blue);
 }
 
 /* Print styles */
@@ -368,9 +398,7 @@ def change_password_page():
 
     with ui.column().classes("items-center w-full mt-12"):
 
-        ui.label(
-            "Change Password"
-        ).classes("text-2xl font-bold mb-2")
+        ui.label("Change Password").classes("text-2xl font-bold mb-2")
 
         ui.label(
             "You must set a new password before continuing."
@@ -395,8 +423,8 @@ def change_password_page():
                 if not new_pass.value or len(new_pass.value) < 8:
                     ui.notify(
                         "Password must be at least 8 characters.",
-                        type="negative",
-                        timeout=0,
+                        type="warning",
+                        timeout=WARN_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -404,9 +432,9 @@ def change_password_page():
 
                 if new_pass.value != confirm_pass.value:
                     ui.notify(
-                        "Passwords do not match.",
-                        type="negative",
-                        timeout=0,
+                        "Passwords do not match. Please try again.",
+                        type="warning",
+                        timeout=WARN_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -424,9 +452,10 @@ def change_password_page():
                     if user:
                         user.set_password(new_pass.value)
                         user.MUSTCHANGEPASSWORD = False
+
                 ui.notify(
                     "Password changed.",
-                    timeout=4000,
+                    timeout=WARN_TIMEOUT,
                     position="bottom",
                     close_button="OK",
                 )
@@ -437,7 +466,7 @@ def change_password_page():
             ui.button(
                 "Save Password",
                 on_click=save_new_password,
-            ).props("push").classes("w-full mt-4")
+            ).props("push").classes("w-full mt-4 p-3 hover-border-white")
 
 
 # ----- Run -----
@@ -447,7 +476,7 @@ if __name__ in {"__main__", "__mp_main__"}:
     # Without one the browser shows NiceGUI's default icon.
     _favicon = next(
         (name for name in ("favicon.ico", "novadc_icac.ico")
-         if (STATIC_DIR / name).is_file()),
+        if (STATIC_DIR / name).is_file()),
         None,
     )
     if _favicon:

@@ -27,7 +27,12 @@ from models import (
 )
 from program.config import Config
 from auth import get_current_user_name
-from utils import get_mime_type, is_allowed_file, require_active_case
+from utils import (
+    WARN_TIMEOUT,
+    get_mime_type,
+    is_allowed_file,
+    require_active_case,
+)
 
 
 def upload_card(refresh_files: Callable[[], None]) -> None:
@@ -71,7 +76,7 @@ def upload_card(refresh_files: Callable[[], None]) -> None:
                         f"Only images, videos, documents, and archives "
                         "are permitted.",
                         type="warning",
-                        timeout=0,
+                        timeout=WARN_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -82,7 +87,7 @@ def upload_card(refresh_files: Callable[[], None]) -> None:
                 # Hashed on arrival, not at export time: the stored
                 # digest then certifies the file as collected rather
                 # than whatever the database holds later.
-                digest = hashlib.sha256(file_data).hexdigest()
+                digest = hashlib.sha256(file_data).hexdigest().upper()
                 hashed_at = audit_timestamp()
 
                 with get_session() as session:
@@ -93,7 +98,7 @@ def upload_card(refresh_files: Callable[[], None]) -> None:
                         FILEMIMETYPE=file_mime_type,
                         FILEUPLOADEDBY=uploader,
                         FILESHA256=digest,
-                        FILEHASHEDAT=hashed_at,
+                        FILEHASHEDDATETIME=hashed_at,
                     )
                     session.add(new_file)
 
@@ -101,7 +106,7 @@ def upload_card(refresh_files: Callable[[], None]) -> None:
                     f"'{file_name}' uploaded ({file_size:,} bytes, "
                     f"{file_mime_type}).\n"
                     f"SHA-256: {digest}",
-                    timeout=0,
+                    timeout=WARN_TIMEOUT,
                     position="bottom",
                     close_button="OK",
                 )
@@ -114,8 +119,8 @@ def upload_card(refresh_files: Callable[[], None]) -> None:
                 ui.notify(
                     f"Could not upload {name}.\n\n{explain(err)}",
                     multi_line=True,
-                    type="negative",
-                    timeout=0,
+                    type="warning",
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )

@@ -54,7 +54,7 @@ class WrongKey(RuntimeError):
 def sqlcipher_available() -> bool:
     """True when the sqlcipher3 driver can be imported."""
     try:
-        import sqlcipher3  # noqa: F401
+        import sqlcipher3
         return True
     except ImportError:
         return False
@@ -151,7 +151,10 @@ def can_prompt() -> bool:
     VECTOR_DB_KEY or VECTOR_DB_KEY_FILE.
     """
     if os.environ.get("VECTOR_NO_PROMPT", "").strip().lower() in (
-        "1", "true", "yes", "on"
+        "1",
+        "true",
+        "yes",
+        "on"
     ):
         return False
 

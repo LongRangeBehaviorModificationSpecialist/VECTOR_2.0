@@ -1,4 +1,7 @@
-"""Failures that explain themselves, imports that cannot half-happen, and
+"""
+test_failures_and_live.py
+
+Failures that explain themselves, imports that cannot half-happen, and
 the change signal that keeps other devices' pages current.
 
 A failed save used to show the SQL statement with the reason buried in
@@ -130,15 +133,15 @@ def test_a_missing_required_value_names_the_field():
     with pytest.raises(IntegrityError) as caught:
         with get_session() as session:
             session.add(Agents(AGENTNAME="No, Agency"))
-
     message = explain(caught.value, {"AGENTPARENTAGENCY": "Parent Agency"})
-
     assert message == "Parent Agency cannot be left empty."
 
 
 def test_a_locked_database_is_explained_as_busy():
     err = OperationalError(
-        "INSERT ...", {}, sqlite3.OperationalError("database is locked")
+        "INSERT ...",
+        {},
+        sqlite3.OperationalError("database is locked")
     )
     assert "busy" in explain(err)
 
@@ -165,9 +168,10 @@ def test_an_unexpected_failure_still_says_what_it_was():
 def test_a_stored_value_missing_from_the_options_is_offered():
     from parts.crud import options_including
 
-    assert options_including(["Doe, John"], "Demo, Alex") == [
-        "Doe, John", "Demo, Alex"
-    ]
+    assert options_including(
+        ["Doe, John"],
+        "Demo, Alex",
+    ) == ["Doe, John", "Demo, Alex"]
 
 
 def test_options_are_left_alone_when_the_value_is_listed_or_blank():
@@ -187,8 +191,11 @@ def test_labelled_options_gain_the_value_too():
 
 
 # ----- Imports are all or nothing -----
-def test_a_failed_csv_import_leaves_the_case_unchanged(populated, out_dir,
-                                                       notices):
+def test_a_failed_csv_import_leaves_the_case_unchanged(
+        populated,
+        out_dir,
+        notices
+):
     archive = import_export.export_vector_to_csv(destination=out_dir)
 
     # EVIDENCE.csv gains a second item 1. The tables before it in the
@@ -207,13 +214,19 @@ def test_a_failed_csv_import_leaves_the_case_unchanged(populated, out_dir,
     import_export.import_vector_from_csv(str(archive))
 
     assert _snapshot() == before
-    assert any("Nothing was imported" in n and "EVIDENCE" in n
-               for n in notices), notices
+    assert any(
+        "Nothing was imported"
+        in n and "EVIDENCE" in n
+        for n in notices
+    ), notices
     assert not any("[SQL" in n for n in notices)
 
 
-def test_a_failed_json_import_leaves_the_case_unchanged(populated, out_dir,
-                                                        notices):
+def test_a_failed_json_import_leaves_the_case_unchanged(
+        populated,
+        out_dir,
+        notices
+):
     exported = import_export.export_vector_to_json(destination=out_dir)
     payload = json.loads(exported.read_text(encoding="utf-8"))
     records = payload["tables"]["EVIDENCE"]["records"]
@@ -227,14 +240,21 @@ def test_a_failed_json_import_leaves_the_case_unchanged(populated, out_dir,
     import_export.import_vector_from_json(str(exported))
 
     assert _snapshot() == before
-    assert any("Nothing was imported" in n and "EVIDENCE" in n
-               for n in notices), notices
+    assert any(
+        "Nothing was imported"
+        in n and "EVIDENCE" in n
+        for n in notices
+    ), notices
 
 
 def test_importing_a_case_without_attachments_removes_the_old_ones(
-        populated, out_dir, notices):
+        populated,
+        out_dir,
+        notices
+):
     """An archive with no files folder used to leave the previous case's
-    attachments in place, and wrote no import record."""
+    attachments in place, and wrote no import record.
+    """
     archive = import_export.export_vector_to_csv(destination=out_dir)
     _add_attachment("previous_case.jpg")
     with get_session() as session:
@@ -250,8 +270,12 @@ def test_importing_a_case_without_attachments_removes_the_old_ones(
 
 
 # ----- Exports stop rather than leave things out -----
-def test_a_csv_export_that_cannot_copy_attachments_stops(populated, out_dir,
-                                                         notices, monkeypatch):
+def test_a_csv_export_that_cannot_copy_attachments_stops(
+        populated,
+        out_dir,
+        notices,
+        monkeypatch
+):
     _add_attachment()
 
     def unreadable(*_args, **_kwargs):
@@ -264,9 +288,12 @@ def test_a_csv_export_that_cannot_copy_attachments_stops(populated, out_dir,
     assert any("Nothing was downloaded" in n for n in notices), notices
 
 
-def test_a_json_export_that_cannot_embed_attachments_stops(populated, out_dir,
-                                                           notices,
-                                                           monkeypatch):
+def test_a_json_export_that_cannot_embed_attachments_stops(
+        populated,
+        out_dir,
+        notices,
+        monkeypatch
+):
     _add_attachment()
 
     def broken(*_args, **_kwargs):
@@ -320,8 +347,13 @@ def test_a_sign_in_record_does_not_move_the_case_version():
     """No table of case data changes, so those pages must not reload."""
     before = models.data_version()
     with get_session() as session:
-        record_audit(session, action="LOGIN", table_name="users",
-                     summary="agent", actor="agent")
+        record_audit(
+            session,
+            action="LOGIN",
+            table_name="users",
+            summary="agent",
+            actor="agent",
+        )
     assert models.data_version() == before
 
 

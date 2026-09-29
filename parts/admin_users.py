@@ -29,7 +29,12 @@ from auth import (
 )
 from models import get_users_session, Users, generate_one_time_password
 import settings
-from utils import set_network_access
+from utils import (
+    CONFIRM_TIMEOUT,
+    WARN_TIMEOUT,
+    ZERO_TIMEOUT,
+    set_network_access,
+)
 
 
 # ----- Add an account -----
@@ -64,7 +69,7 @@ def add_user_card(refresh_users: Callable[[], None]) -> None:
                 ui.notify(
                     "A username is required.",
                     type="warning",
-                    timeout=0,
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -76,8 +81,8 @@ def add_user_card(refresh_users: Callable[[], None]) -> None:
 
                     ui.notify(
                         "That username already exists.",
-                        type="negative",
-                        timeout=0,
+                        type="warning",
+                        timeout=WARN_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -101,7 +106,7 @@ def add_user_card(refresh_users: Callable[[], None]) -> None:
                 "will be asked to change it at first sign-in.",
                 multi_line=True,
                 classes="multi-line-notification",
-                timeout=0,
+                timeout=ZERO_TIMEOUT,
                 position="center",
                 close_button="OK",
             )
@@ -115,7 +120,7 @@ def add_user_card(refresh_users: Callable[[], None]) -> None:
             "Create User",
             on_click=create_user,
             color="var(--vsp-blue)",
-        ).props("push").classes("text-[var(--vsp-white)]")
+        ).props("push").classes("p-3 hover-border-white")
 
 
 # ----- The accounts -----
@@ -302,7 +307,7 @@ def users_table() -> Callable[[], None]:
                                     on_click=reset_dialog.close,
                                     color="transparent",
                                     ).props("flat").classes(
-                                    "text-[var(--vsp-blue)]"
+                                    "p-3 hover-border-blue"
                                 )
 
                                 def on_confirm_reset():
@@ -351,7 +356,7 @@ def users_table() -> Callable[[], None]:
                                         ),
                                         multi_line=True,
                                         type="warning",
-                                        timeout=0,
+                                        timeout=WARN_TIMEOUT,
                                         position="center",
                                         close_button="OK",
                                     )
@@ -364,7 +369,7 @@ def users_table() -> Callable[[], None]:
                                     on_click=on_confirm_reset,
                                     color="var(--vsp-blue)",
                                     ).props("push").classes(
-                                    "text-[var(--vsp-white)]"
+                                    "p-3 hover-border-white"
                                 )
 
                         reset_dialog.open()
@@ -378,8 +383,8 @@ def users_table() -> Callable[[], None]:
 
                             ui.notify(
                                 "Cannot delete the admin account.",
-                                type="negative",
-                                timeout=0,
+                                type="warning",
+                                timeout=WARN_TIMEOUT,
                                 position="center",
                                 close_button="OK",
                             )
@@ -409,7 +414,7 @@ def users_table() -> Callable[[], None]:
                                     on_click=delete_dialog.close,
                                     color="transparent",
                                     ).props("flat"
-                                ).classes("text-[var(--vsp-blue)]")
+                                ).classes("p-3 hover-border-blue")
 
                                 def on_confirm_delete():
 
@@ -433,8 +438,8 @@ def users_table() -> Callable[[], None]:
                                             ui.notify(
                                                 "Cannot delete an admin "
                                                 "account.",
-                                                type="negative",
-                                                timeout=0,
+                                                type="warning",
+                                                timeout=WARN_TIMEOUT,
                                                 position="center",
                                                 close_button="OK",
                                             )
@@ -457,11 +462,14 @@ def users_table() -> Callable[[], None]:
                                         "deleted."
                                         + (
                                             "" if ended else
-                                            " Their open sessions could "
+                                            "Their open sessions could "
                                             "NOT be ended; use Sign "
                                             "Everyone Out below."
                                         ),
-                                        timeout=4000 if ended else 0,
+                                        timeout=(
+                                            CONFIRM_TIMEOUT
+                                            if ended else 0
+                                        ),
                                         position="bottom",
                                         close_button="OK",
                                     )
@@ -474,7 +482,7 @@ def users_table() -> Callable[[], None]:
                                     on_click=on_confirm_delete,
                                     color="#ef4444",
                                     ).props("push").classes(
-                                    "text-[var(--vsp-white)]"
+                                    "p-3 hover-border-white"
                                 )
 
                         delete_dialog.open()
@@ -490,7 +498,7 @@ def users_table() -> Callable[[], None]:
                         ui.notify(
                             f"Sign-in lock cleared for "
                             f"'{row['USERNAME']}'.",
-                            timeout=4000,
+                            timeout=CONFIRM_TIMEOUT,
                             position="bottom",
                             close_button="OK",
                         )
@@ -533,7 +541,7 @@ def session_controls() -> None:
                         "Cancel",
                         on_click=dialog.close,
                         color="transparent",
-                    ).props("flat").classes("text-[var(--vsp-blue)]")
+                    ).props("flat").classes("p-3 hover-border-blue")
 
                     def confirm_sign_out_all() -> None:
                         if not get_is_admin():
@@ -544,8 +552,8 @@ def session_controls() -> None:
                                 "The sessions could NOT be ended. The "
                                 "details are in the VECTOR console "
                                 "window.",
-                                type="negative",
-                                timeout=0,
+                                type="warning",
+                                timeout=WARN_TIMEOUT,
                                 position="center",
                                 close_button="OK",
                             )
@@ -559,7 +567,7 @@ def session_controls() -> None:
                         on_click=confirm_sign_out_all,
                         color="#ef4444",
                     ).props("push").classes(
-                        "text-[var(--vsp-white)]"
+                        "p-3 hover-border-white"
                     )
 
             dialog.open()
@@ -568,7 +576,7 @@ def session_controls() -> None:
             "Sign Everyone Out",
             on_click=open_sign_out_all_dialog,
             color="#ef4444",
-        ).props("push")
+        ).props("push").classes("p-3 hover-border-white")
 
 
 # ----- Network access -----
@@ -625,7 +633,7 @@ def network_access_card() -> None:
                  "VECTOR will answer on this machine only ")
                 + "the next time it starts.",
                 type="info",
-                timeout=0,
+                timeout=ZERO_TIMEOUT,
                 position="center",
                 close_button="OK",
             )

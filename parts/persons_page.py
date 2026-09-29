@@ -18,7 +18,7 @@ def _validate(stage: str, values: dict, row: dict | None) -> bool:
         stage=stage,
         PERSONNAME=values.get("PERSONNAME", ""),
         PERSONDOB=values.get("PERSONDOB", ""),
-        SUSPECTNOTE=values.get("SUSPECTNOTE", ""),
+        PERSONNOTE=values.get("PERSONNOTE", ""),
         row=row,
     )
 
@@ -50,7 +50,7 @@ SPEC = CrudSpec(
             placeholder="(###) ###-####",
             props='mask="(###) ###-####"',
         ),
-        Field("SUSPECTNOTE", "Notes", required=True),
+        Field("PERSONNOTE", "Notes", required=True),
         Field(
             "ENTEREDDATETIME",
             "Entered",

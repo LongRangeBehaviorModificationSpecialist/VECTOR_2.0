@@ -40,10 +40,14 @@ def explain(err: BaseException, labels: dict | None = None) -> str:
         return labels.get(column, column)
 
     unique = re.search(
-        r"unique constraint failed: ([\w.]+(?:, [\w.]+)*)", text, re.IGNORECASE
+        r"unique constraint failed: ([\w.]+(?:, [\w.]+)*)",
+        text,
+        re.IGNORECASE
     )
     if unique:
-        columns = [part.split(".")[-1] for part in unique.group(1).split(", ")]
+        columns = [
+            part.split(".")[-1] for part in unique.group(1).split(", ")
+        ]
         fields = " and ".join(name(column) for column in columns)
         return (
             f"Another record already has that {fields}, and it has to be "
@@ -51,7 +55,9 @@ def explain(err: BaseException, labels: dict | None = None) -> str:
         )
 
     not_null = re.search(
-        r"not null constraint failed: \w+\.(\w+)", text, re.IGNORECASE
+        r"not null constraint failed: \w+\.(\w+)",
+        text,
+        re.IGNORECASE
     )
     if not_null:
         return f"{name(not_null.group(1))} cannot be left empty."
@@ -65,7 +71,11 @@ def explain(err: BaseException, labels: dict | None = None) -> str:
             "db folder is not read-only."
         )
 
-    if "disk is full" in lowered or getattr(original, "errno", None) == errno.ENOSPC:
+    if "disk is full" in lowered or getattr(
+        original,
+        "errno",
+        None
+    ) == errno.ENOSPC:
         return "The disk is full. Free some space and try again."
 
     if isinstance(original, PermissionError):
@@ -89,4 +99,7 @@ def explain(err: BaseException, labels: dict | None = None) -> str:
             "or not a VECTOR export."
         )
 
-    return f"{type(original).__name__}: {text}" if text else type(original).__name__
+    return (
+        f"{type(original).__name__}: {text}"
+        if text else type(original).__name__
+    )

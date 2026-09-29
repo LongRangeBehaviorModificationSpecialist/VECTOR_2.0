@@ -31,7 +31,7 @@ from import_export import (
     new_staging_dir,
 )
 from program.config import Config
-from utils import delete_all_data
+from utils import delete_all_data, CONFIRM_TIMEOUT, WARN_TIMEOUT
 
 
 # ----- Export -----
@@ -105,7 +105,7 @@ def open_export_dialog() -> None:
                     "Please enter a password or uncheck "
                     "encryption.",
                     type="warning",
-                    timeout=0,
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -114,22 +114,33 @@ def open_export_dialog() -> None:
             dialog.close()
 
             # ----- Run the selected exports -----
-            # Each finished file goes to the browser, so it
+            # Each results file goes to the browser, so it
             # arrives on the device the export was asked from.
-            finished = []
+            results = []
             if format_radio.value in ("csv", "both"):
-                finished.append(
-                    export_vector_to_csv(password=pwd)
-                )
+                result = export_vector_to_csv(password=pwd)
+                if result is not None:
+                    results.append(result)
 
             if format_radio.value in ("json", "both"):
-                finished.append(
-                    export_vector_to_json(password=pwd)
-                )
+                result = export_vector_to_json(password=pwd)
+                if result is not None:
+                    results.append(result)
 
-            for path in finished:
-                if path is not None:
-                    ui.download.file(path)
+            # Pass each file path to the browser to it can be
+            # downloaded to a location choosen by the user.
+            for result in results:
+                ui.download.file(result.zip_path)
+
+            for result in results:
+                ui.notify(
+                    result.message,
+                    multi_line=True,
+                    classes="multi-line-notification",
+                    timeout=CONFIRM_TIMEOUT,
+                    position="bottom",
+                    close_button="OK",
+                )
 
         with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -137,15 +148,13 @@ def open_export_dialog() -> None:
                 "Cancel",
                 on_click=dialog.close,
                 color="transparent",
-            ).props("flat").classes("text-[var(--vsp-blue)]")
+            ).props("flat").classes("p-3 hover-border-blue")
 
             ui.button(
                 "Export Now",
                 on_click=do_export,
                 color="var(--vsp-blue)",
-            ).props("push").classes(
-                "text-[var(--vsp-white)]"
-            )
+            ).props("push").classes("p-3 hover-border-white")
 
     dialog.open()
 
@@ -176,7 +185,7 @@ def open_import_dialog() -> None:
         ).classes("text-sm font-bold text-[#EF4444]")
 
         ui.label("This will REPLACE ALL existing data!").classes(
-            "text-sm text-[var(--vsp-gray)]"
+            "text-base text-[var(--vsp-gray)]"
         )
 
         picked = {"path": None, "folder": None, "locked": False}
@@ -238,7 +247,7 @@ def open_import_dialog() -> None:
                 ui.notify(
                     "Choose the exported file first.",
                     type="warning",
-                    timeout=0,
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -251,7 +260,7 @@ def open_import_dialog() -> None:
                     "This file is protected with a password. "
                     "Enter it to import the file.",
                     type="warning",
-                    timeout=0,
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -285,13 +294,14 @@ def open_import_dialog() -> None:
                 "Cancel",
                 on_click=cancel_import,
                 color="transparent",
-            ).props("flat").classes("text-[var(--vsp-blue)]")
+            ).props("flat").classes("p-3 hover-border-blue")
 
             import_button = ui.button(
                 "Import Now",
                 on_click=do_import,
                 color="var(--vsp-blue)",
-            ).props("push").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("p-3 hover-border-white")
+
             import_button.disable()
 
     dialog.open()
@@ -317,7 +327,6 @@ def open_delete_all_dialog() -> None:
         )
 
         # ----- User verification of destructive activity -----
-
         affirm_checkbox = ui.checkbox(
             "I understand the current data cannot be recovered.",
             value=False,
@@ -342,7 +351,7 @@ def open_delete_all_dialog() -> None:
                     "Tick the box to confirm you understand "
                     "the data cannot be recovered.",
                     type="warning",
-                    timeout=0,
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
@@ -352,35 +361,29 @@ def open_delete_all_dialog() -> None:
                 ui.notify(
                     "Type DELETE, in capital letters, to confirm.",
                     type="warning",
-                    timeout=0,
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
                 return
 
             dialog.close()
+
             try:
                 delete_all_data()
             except Exception as err:
-                log.exception("Delete All Data failed")
+                log.exception("Data deletion failed")
                 ui.notify(
-                    "Nothing was deleted, and the case is "
+                    "No data was deleted, and the case is "
                     f"unchanged.\n\n{explain(err)}",
                     multi_line=True,
-                    type="negative",
-                    timeout=0,
+                    classes="multi-line-notification",
+                    type="warning",
+                    timeout=WARN_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
                 return
-
-            ui.notify(
-                "All case data has been deleted.",
-                timeout=4000,
-                position="bottom",
-                close_button="OK",
-            )
-            ui.navigate.to("/")
 
         with ui.row().classes("w-full justify-end gap-2 mt-4"):
 
@@ -388,12 +391,12 @@ def open_delete_all_dialog() -> None:
                 "Cancel",
                 on_click=dialog.close,
                 color="transparent",
-            ).props("flat").classes("text-[var(--vsp-blue)]")
+            ).props("flat").classes("p-3 hover-border-blue")
 
             ui.button(
                 "Delete all data",
                 on_click=do_delete,
                 color="#EF4444",
-            ).props("push").classes("text-[var(--vsp-white)]")
+            ).props("push").classes("p-3 hover-border-white")
 
     dialog.open()

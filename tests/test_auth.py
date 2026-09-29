@@ -1,4 +1,7 @@
-"""Authentication: one-time passwords, throttling and session control.
+"""
+test_auth.py
+
+Authentication: one-time passwords, throttling and session control.
 
 These three closed the last of the security findings. The storage
 helpers fall back safely outside a browser session, so the pure logic --
@@ -30,7 +33,6 @@ def test_generated_passwords_are_long_enough():
 def test_no_shared_default_password_remains():
     """The published constant must not come back."""
     import models
-
     assert not hasattr(models, "DEFAULT_USER_PASSWORD")
 
 
@@ -52,7 +54,9 @@ def failures(monkeypatch):
     store = {}
     monkeypatch.setattr(auth, "_failures", lambda: dict(store))
     monkeypatch.setattr(
-        auth, "_save_failures", lambda data: store.clear() or store.update(data)
+        auth,
+        "_save_failures",
+        lambda data: store.clear() or store.update(data)
     )
     return store
 
@@ -151,7 +155,9 @@ def generations(monkeypatch):
     """An in-memory stand-in for the generation counters."""
     store = {"session_generation": 0, "user_generations": {}}
     monkeypatch.setattr(
-        auth, "global_generation", lambda: store["session_generation"]
+        auth,
+        "global_generation",
+        lambda: store["session_generation"]
     )
     monkeypatch.setattr(
         auth,
@@ -159,10 +165,12 @@ def generations(monkeypatch):
         lambda name: store["user_generations"].get(name, 0),
     )
 
+
     def bump_user(name):
         store["user_generations"][name] = (
             store["user_generations"].get(name, 0) + 1
         )
+
 
     def bump_all():
         store["session_generation"] += 1

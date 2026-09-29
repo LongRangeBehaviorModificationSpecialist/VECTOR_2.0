@@ -1,4 +1,7 @@
-"""At-rest encryption.
+"""
+test_crypto.py
+
+At-rest encryption.
 
 The tests that need SQLCipher skip themselves when the driver is not
 installed, so the suite still runs on a machine without it -- which is
@@ -68,7 +71,8 @@ def test_an_encrypted_database_is_detected(tmp_path):
 @requires_sqlcipher
 def test_awkward_passphrases_round_trip(tmp_path, passphrase):
     """PRAGMA takes no bound parameters, so the escaping is ours to get
-    right. A passphrase must never need to avoid a character."""
+    right. A passphrase must never need to avoid a character.
+    """
     import sqlcipher3
 
     path = tmp_path / "sealed.db"
@@ -120,7 +124,8 @@ def test_wrong_passphrase_raises_wrongkey(tmp_path):
 @requires_sqlcipher
 def test_case_data_is_not_readable_in_the_raw_file(tmp_path):
     """The whole point: a suspect's details must not be sitting in the
-    file in the clear."""
+    file in the clear.
+    """
     import sqlcipher3
 
     path = tmp_path / "case.db"
@@ -207,7 +212,8 @@ def test_an_empty_key_file_says_so(tmp_path, monkeypatch):
 def test_prompting_can_be_disabled(monkeypatch):
     """A shortcut or scheduled task has no console; getpass on Windows
     reads the console directly, so it would hang with nothing on
-    screen."""
+    screen.
+    """
     monkeypatch.delenv("VECTOR_DB_KEY", raising=False)
     monkeypatch.delenv("VECTOR_DB_KEY_FILE", raising=False)
     monkeypatch.setenv("VECTOR_NO_PROMPT", "1")
