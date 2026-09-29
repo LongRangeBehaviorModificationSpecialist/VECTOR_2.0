@@ -24,7 +24,7 @@ from failures import explain, log
 from models import get_session, has_active_case, UploadedFiles
 from utils import (
     CONFIRM_TIMEOUT,
-    WARN_TIMEOUT,
+    ZERO_TIMEOUT,
     confirm_delete_all,
     format_file_size,
     require_active_case,
@@ -261,7 +261,7 @@ def files_table() -> Callable[[], None]:
                                     f"\n\n{explain(err)}",
                                     multi_line=True,
                                     type="warning",
-                                    timeout=WARN_TIMEOUT,
+                                    timeout=ZERO_TIMEOUT,
                                     position="center",
                                     close_button="OK",
                                 )
@@ -306,7 +306,7 @@ def files_table() -> Callable[[], None]:
                     f"Nothing was deleted.\n\n{explain(err)}",
                     multi_line=True,
                     type="warning",
-                    timeout=WARN_TIMEOUT,
+                    timeout=ZERO_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )

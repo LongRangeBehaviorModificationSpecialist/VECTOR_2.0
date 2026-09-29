@@ -564,14 +564,6 @@ def delete_all_data() -> None:
             before=counts,
         )
 
-    ui.notify(
-        "All case data has been deleted.",
-        type="warning",
-        timeout=WARN_TIMEOUT,
-        position="center",
-        close_button="OK",
-    )
-
 
 def set_network_access(allowed: bool, actor: str = "") -> None:
     """Turns network access on or off, and records who did it.

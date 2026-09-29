@@ -52,6 +52,7 @@ from utils import (
     CASE_TIME_FORMAT,
     CONFIRM_TIMEOUT,
     WARN_TIMEOUT,
+    ZERO_TIMEOUT,
     evidence_number_key,
     get_case_info,
     get_print_date_time,
@@ -271,7 +272,7 @@ def _remind_about_end_time() -> None:
                         f"Could not save the end time.\n\n{explain(err)}",
                         multi_line=True,
                         type="warning",
-                        timeout=WARN_TIMEOUT,
+                        timeout=ZERO_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )

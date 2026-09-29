@@ -31,7 +31,12 @@ from import_export import (
     new_staging_dir,
 )
 from program.config import Config
-from utils import delete_all_data, CONFIRM_TIMEOUT, WARN_TIMEOUT
+from utils import (
+    CONFIRM_TIMEOUT,
+    WARN_TIMEOUT,
+    ZERO_TIMEOUT,
+    delete_all_data,
+)
 
 
 # ----- Export -----
@@ -379,11 +384,21 @@ def open_delete_all_dialog() -> None:
                     multi_line=True,
                     classes="multi-line-notification",
                     type="warning",
-                    timeout=WARN_TIMEOUT,
+                    timeout=ZERO_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )
                 return
+
+            # Said here rather than inside delete_all_data(), which Start
+            # New Case also uses and follows with its own message.
+            ui.notify(
+                "All case data has been deleted.",
+                type="warning",
+                timeout=WARN_TIMEOUT,
+                position="center",
+                close_button="OK",
+            )
 
         with ui.row().classes("w-full justify-end gap-2 mt-4"):
 

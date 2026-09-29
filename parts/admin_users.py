@@ -462,7 +462,7 @@ def users_table() -> Callable[[], None]:
                                         "deleted."
                                         + (
                                             "" if ended else
-                                            "Their open sessions could "
+                                            " Their open sessions could "
                                             "NOT be ended; use Sign "
                                             "Everyone Out below."
                                         ),
@@ -553,7 +553,7 @@ def session_controls() -> None:
                                 "details are in the VECTOR console "
                                 "window.",
                                 type="warning",
-                                timeout=WARN_TIMEOUT,
+                                timeout=ZERO_TIMEOUT,
                                 position="center",
                                 close_button="OK",
                             )

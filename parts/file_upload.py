@@ -29,6 +29,7 @@ from program.config import Config
 from auth import get_current_user_name
 from utils import (
     WARN_TIMEOUT,
+    ZERO_TIMEOUT,
     get_mime_type,
     is_allowed_file,
     require_active_case,
@@ -119,8 +120,9 @@ def upload_card(refresh_files: Callable[[], None]) -> None:
                 ui.notify(
                     f"Could not upload {name}.\n\n{explain(err)}",
                     multi_line=True,
+                    classes="multi-line-notification",
                     type="warning",
-                    timeout=WARN_TIMEOUT,
+                    timeout=ZERO_TIMEOUT,
                     position="center",
                     close_button="OK",
                 )

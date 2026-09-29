@@ -20,7 +20,7 @@ from nicegui import ui
 import clock
 from utils import (
     CONFIRM_TIMEOUT,
-    WARN_TIMEOUT,
+    ZERO_TIMEOUT,
     required_input,
     required_select,
     required_textarea,
@@ -69,11 +69,14 @@ class Field:
 
 # ----- Notification helpers -----
 def notify_problem(message: str) -> None:
-    """A problem the user has to acknowledge."""
+    """A problem the user has to acknowledge -- so it stays until they
+    do. Every caller is a save, change or deletion that did not happen."""
     ui.notify(
         message,
+        multi_line=True,
+        classes="multi-line-notification",
         type="warning",
-        timeout=WARN_TIMEOUT,
+        timeout=ZERO_TIMEOUT,
         position="center",
         close_button="OK",
     )

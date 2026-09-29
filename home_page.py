@@ -41,7 +41,12 @@ from parts.case_transfer import (
     open_import_dialog,
 )
 from program.config import Config
-from utils import delete_all_data, CONFIRM_TIMEOUT, WARN_TIMEOUT
+from utils import (
+    CONFIRM_TIMEOUT,
+    WARN_TIMEOUT,
+    ZERO_TIMEOUT,
+    delete_all_data,
+)
 
 
 style = {
@@ -552,7 +557,7 @@ def confirm_new_case_handler() -> None:
                         f"\n\n{explain(err)}",
                         multi_line=True,
                         type="warning",
-                        timeout=WARN_TIMEOUT,
+                        timeout=ZERO_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )

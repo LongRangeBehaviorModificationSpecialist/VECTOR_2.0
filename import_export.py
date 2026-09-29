@@ -163,7 +163,7 @@ def _report_failure(message: str, err: BaseException) -> None:
         multi_line=True,
         classes="multi-line-notification",
         type="warning",
-        timeout=WARN_TIMEOUT,
+        timeout=ZERO_TIMEOUT,
         position="center",
         close_button="OK",
     )
@@ -590,11 +590,12 @@ def export_vector_to_csv(
             multi_line=True,
             classes="multi-line-notification",
             type="warning",
-            timeout=WARN_TIMEOUT,
+            timeout=ZERO_TIMEOUT,
             position="center",
             close_button="OK",
         )
         print(f"{err}")
+        shutil.rmtree(work_dir, ignore_errors=True)
         return None
 
     # Delete the staging directory
@@ -897,7 +898,7 @@ def import_vector_from_csv(
             + "\n\nThe import completed and has been recorded in the "
             "audit trail. Treat these files as unverified.",
             type="warning",
-            timeout=WARN_TIMEOUT,
+            timeout=ZERO_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -1114,8 +1115,10 @@ def export_vector_to_json(
             + "\n".join(integrity_failures)
             + "\nThe export still completed. Investigate before relying "
             "on these files.",
+            multi_line=True,
+            classes="multi-line-notification",
             type="warning",
-            timeout=WARN_TIMEOUT,
+            timeout=ZERO_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -1193,7 +1196,7 @@ def export_vector_to_json(
             multi_line=True,
             classes="multi-line-notification",
             type="warning",
-            timeout=WARN_TIMEOUT,
+            timeout=ZERO_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -1410,7 +1413,7 @@ def import_vector_from_json(
         if staging:
             shutil.rmtree(staging, ignore_errors=True)
         _report_failure(
-            "Nothing was imported (ln 1354), and the case is unchanged. The problem "
+            "Nothing was imported, and the case is unchanged. The problem "
             f"was in {stage}.",
             err,
         )
@@ -1431,7 +1434,7 @@ def import_vector_from_json(
             multi_line=True,
             classes="multi-line-notification",
             type="warning",
-            timeout=WARN_TIMEOUT,
+            timeout=ZERO_TIMEOUT,
             position="center",
             close_button="OK",
         )
