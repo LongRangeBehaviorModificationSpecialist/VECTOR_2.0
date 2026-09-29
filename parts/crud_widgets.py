@@ -247,9 +247,21 @@ def _make_widget(spec_field: Field, value=None):
     return widget
 
 
+def _clean(value):
+    """A widget's value as it is saved: text without the spaces around it.
+
+    The validators compare trimmed text, but the value saved was the one
+    typed -- and a tablet's keyboard puts a space after every word it
+    completes. "Doe, John " passed as a new agent beside "Doe, John",
+    two names that look the same on every list and report.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return value
+
+
 def _values_from(widgets: dict) -> dict:
-    """Reads the current value of every widget, normalised to str."""
-    return {
-        name: ("" if widget.value is None else widget.value)
-        for name, widget in widgets.items()
-    }
+    """Reads the current value of every widget, as it is to be saved."""
+    return {name: _clean(widget.value) for name, widget in widgets.items()}

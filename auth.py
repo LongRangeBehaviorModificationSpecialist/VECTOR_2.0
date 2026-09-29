@@ -5,11 +5,12 @@ auth.py
 
 Session state and route guards.
 
-Deliberately imports nothing from the rest of the application. Every
-page module previously reached into main.py for these three helpers,
-while main.py imported the pages -- a cycle that forced function-level
-imports throughout the codebase and left report routes unregistered
-until someone happened to visit /reports.
+Imports nothing from the pages, and from the rest of the application
+only the message timeouts in utils. Every page module previously reached
+into main.py for these three helpers, while main.py imported the pages
+-- a cycle that forced function-level imports throughout the codebase
+and left report routes unregistered until someone happened to visit
+/reports.
 """
 
 from datetime import datetime, timedelta, timezone

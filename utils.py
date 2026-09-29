@@ -52,6 +52,11 @@ ALLOWED_MIME_TYPES = {
     "image/webp",
     "image/svg+xml",
     "image/tiff",
+    # iPhones and iPads save photographs as HEIC. A browser uploading one
+    # from the camera usually converts it to JPEG; one copied from a
+    # phone or a Mac arrives as it is, and was refused.
+    "image/heic",
+    "image/heif",
     # Videos
     "video/mp4",
     "video/quicktime",
@@ -92,6 +97,8 @@ mimetypes.add_type("application/gzip", ".tgz")
 mimetypes.add_type("application/vnd.rar", ".rar")
 mimetypes.add_type("application/x-bzip2", ".bz2")
 mimetypes.add_type("application/x-xz", ".xz")
+mimetypes.add_type("image/heic", ".heic")
+mimetypes.add_type("image/heif", ".heif")
 
 
 def get_current_timestamp(format: str = "") -> str:
