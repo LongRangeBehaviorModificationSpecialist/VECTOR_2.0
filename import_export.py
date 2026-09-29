@@ -110,6 +110,7 @@ _FILE_ENTRY_ALIASES = {
     "uploaded_by": "FILEUPLOADEDBY",
     "hash_at_ingest": "FILESHA256",
     "hashed_at": "FILEHASHEDDATETIME",
+    "FILEHASHEDAT": "FILEHASHEDDATETIME",
     "file_hash": "FILEHASH",
     "matches_ingest_hash": "FILEHASHMATCHES",
     "data_base64": "FILEDATA_b64",

@@ -897,10 +897,11 @@ _UNIQUE_DROPPED = {
 }
 
 # Names from before the upstream project brought PERSONS, FILES and users
-# into line with the TABLE+FIELD capitals used everywhere else. Databases
-# and exports made earlier still carry them. The migration and both
-# importers read this one map, so they cannot disagree about what an old
-# name means.
+# into line with the TABLE+FIELD capitals used everywhere else, and from
+# before PERSONS.SUSPECTNOTE became PERSONNOTE and FILES.FILEHASHEDAT
+# became FILEHASHEDDATETIME. Databases and exports made earlier still
+# carry them. The migration and both importers read this one map, so they
+# cannot disagree about what an old name means.
 LEGACY_TABLE_NAMES = {
     "files": "FILES",
     "uploaded_files": "FILES",
@@ -912,6 +913,7 @@ LEGACY_COLUMN_NAMES = {
         "SUSPECTDOB": "PERSONDOB",
         "SUSPECTADDRESS": "PERSONADDRESS",
         "SUSPECTPHONE": "PERSONPHONE",
+        "SUSPECTNOTE": "PERSONNOTE",
     },
     "FILES": {
         "id": "Z_PK",
@@ -924,6 +926,7 @@ LEGACY_COLUMN_NAMES = {
         "file_note": "FILENOTE",
         "sha256": "FILESHA256",
         "hashed_at": "FILEHASHEDDATETIME",
+        "FILEHASHEDAT": "FILEHASHEDDATETIME",
     },
     "users": {
         "id": "Z_PK",
@@ -998,6 +1001,11 @@ def _rename_legacy_schema() -> None:
     ALTER TABLE ... RENAME COLUMN keeps every row, index and constraint,
     so no rebuild is needed. Idempotent: a column is renamed only while
     its old spelling is present and its new one is not.
+
+    Where both spellings are present -- a database opened by a version
+    that added the new column, empty, beside the old one -- the old
+    values are copied into the gaps in the new column instead, and the
+    old column is left where it is.
     """
     from sqlalchemy import text
 
@@ -1021,8 +1029,19 @@ def _rename_legacy_schema() -> None:
                     for old, new in renames.items()
                     if old in present and new not in present
                 ]
-                if columns or stored != table_name:
-                    plan.append((table_name, stored, columns))
+                gaps = [
+                    (old, new)
+                    for old, new in renames.items()
+                    if old in present and new in present
+                    and connection.execute(
+                        text(
+                            f'SELECT COUNT(*) FROM "{stored}" '
+                            f'WHERE "{new}" IS NULL AND "{old}" IS NOT NULL'
+                        )
+                    ).scalar()
+                ]
+                if columns or gaps or stored != table_name:
+                    plan.append((table_name, stored, columns, gaps))
 
         if not plan:
             continue
@@ -1030,13 +1049,24 @@ def _rename_legacy_schema() -> None:
         _backup_database(target_engine, path)
 
         with target_engine.begin() as connection:
-            for table_name, stored, columns in plan:
+            for table_name, stored, columns, gaps in plan:
                 for old, new in columns:
                     connection.execute(
                         text(
                             f'ALTER TABLE "{stored}" '
                             f'RENAME COLUMN "{old}" TO "{new}"'
                         )
+                    )
+                for old, new in gaps:
+                    connection.execute(
+                        text(
+                            f'UPDATE "{stored}" SET "{new}" = "{old}" '
+                            f'WHERE "{new}" IS NULL AND "{old}" IS NOT NULL'
+                        )
+                    )
+                    print(
+                        f"Schema migration: {stored}.{old} copied into "
+                        f"{stored}.{new}"
                     )
                 if stored != table_name:
                     # SQLite refuses a rename that differs only in case,

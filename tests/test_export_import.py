@@ -280,7 +280,7 @@ def test_an_archive_from_before_the_renames_still_imports(tmp_path):
             "SUSPECTDOB": "03-02-1984",
             "SUSPECTADDRESS": "14 Elm Street",
             "SUSPECTPHONE": "",
-            "PERSONNOTE": "Present at entry",
+            "SUSPECTNOTE": "Present at entry",
             "ENTEREDDATETIME": "",
         }]),
         "export_manifest.json": json.dumps({"files": [{
@@ -301,11 +301,58 @@ def test_an_archive_from_before_the_renames_still_imports(tmp_path):
         person = session.query(Persons).one()
         assert person.PERSONNAME == "O'Brien, Sean"
         assert person.PERSONDOB == "03-02-1984"
+        assert person.PERSONNOTE == "Present at entry"
         restored = session.query(UploadedFiles).one()
         assert restored.FILEDATA == photo
         assert restored.FILEMIMETYPE == "image/jpeg"
         assert restored.FILEUPLOADEDBY == "Doe, John"
         assert restored.FILEHASHEDDATETIME == "2026-09-01T08:10:00Z"
+
+
+def test_an_archive_from_before_personnote_still_imports(tmp_path):
+    """Exports made before PERSONS.SUSPECTNOTE became PERSONNOTE and the
+    manifest's FILEHASHEDAT became FILEHASHEDDATETIME -- every export
+    made with the version in use until now."""
+    photo = b"photo-from-the-version-before"
+    archive = tmp_path / "before_personnote.zip"
+    _zip(archive, {
+        "CASES.csv": _csv([{
+            "Z_PK": "1",
+            "CASENUMBER": "26-BEFORE",
+            "LOCATION": "1 Old Road",
+            "JURISDICTION": "Fairfax County",
+            "CASEDATETIMEBEGIN": "09-01-2026 08:00",
+            "CASEDATETIMEEND": "",
+        }]),
+        "PERSONS.csv": _csv([{
+            "Z_PK": "1",
+            "PERSONNAME": "Doe, Jane",
+            "PERSONDOB": "",
+            "PERSONADDRESS": "",
+            "PERSONPHONE": "",
+            "SUSPECTNOTE": "Resident, cooperative",
+            "ENTEREDDATETIME": "",
+        }]),
+        "export_manifest.json": json.dumps({"files": [{
+            "FILENAME": "scene.jpg",
+            "FILEHASH": hashlib.sha256(photo).hexdigest(),
+            "FILESHA256": hashlib.sha256(photo).hexdigest(),
+            "FILEHASHEDAT": "09-01-2026 08:10:00 -0400",
+            "FILEMIMETYPE": "image/jpeg",
+            "FILEUPLOADEDBY": "Doe, John",
+        }]}),
+        "files/scene.jpg": photo,
+    })
+
+    import_export.import_vector_from_csv(str(archive))
+
+    with get_session() as session:
+        assert session.query(Persons).one().PERSONNOTE == (
+            "Resident, cooperative"
+        )
+        restored = session.query(UploadedFiles).one()
+        assert restored.FILEDATA == photo
+        assert restored.FILEHASHEDDATETIME == "09-01-2026 08:10:00 -0400"
 
 
 def test_an_archive_from_upstream_keeps_its_evidence(tmp_path):

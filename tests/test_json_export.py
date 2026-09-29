@@ -301,7 +301,7 @@ def test_a_1_0_export_still_imports(tmp_path):
                     "Z_PK": 1,
                     "SUSPECTNAME": "O'Brien, Sean",
                     "SUSPECTDOB": "03-02-1984",
-                    "PERSONNOTE": "Present at entry",
+                    "SUSPECTNOTE": "Present at entry",
                 }]
             },
         },
@@ -324,7 +324,9 @@ def test_a_1_0_export_still_imports(tmp_path):
         assert case.CASENUMBER == "26-V1"
         # Stored before the date format changed; rewritten on the way in.
         assert case.CASEDATETIMEBEGIN == "09-01-2026 08:00"
-        assert session.query(Persons).one().PERSONNAME == "O'Brien, Sean"
+        person = session.query(Persons).one()
+        assert person.PERSONNAME == "O'Brien, Sean"
+        assert person.PERSONNOTE == "Present at entry"
         restored = session.query(UploadedFiles).one()
         assert restored.FILEDATA == photo
         assert restored.FILEUPLOADEDBY == "Doe, John"
