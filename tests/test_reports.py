@@ -163,6 +163,27 @@ def test_the_files_report_prints_local_time_and_the_hash(case):
     assert "&lt;scene&gt;.jpg" in html and "<scene>" not in html
 
 
+def test_a_room_heading_prints_its_apostrophe_and_ampersand(case):
+    """The Evidence by Room heading escaped the room's name twice, so
+    "Kid's Room & Closet" printed as "Kid&#x27;s Room &amp; Closet"."""
+    room = "Room B (Kid's Room & Closet)"
+    with get_session() as session:
+        session.add(
+            Evidence(
+                EVIDNUM="1",
+                EVIDQTY="1",
+                EVIDDESC="Tablet",
+                EVIDLOCROOM=room,
+                EVIDLOCROOMDETAIL="under the bed",
+                EVIDFOUNDBY="Doe, John",
+                EVIDFOUNDBYWITNESS="Roe, Jane",
+            )
+        )
+    html = _build("evidence_by_room")
+    assert "Kid&#x27;s Room &amp; Closet) :" in html
+    assert "&amp;#x27;" not in html and "&amp;amp;" not in html
+
+
 def test_reports_survive_an_empty_case(case):
     """A case with no agents, rooms or evidence still renders."""
     for report_name in REPORT_NAMES:

@@ -923,9 +923,10 @@ def build_evidence_by_room_report_html(
         room_name = room[0]
         item_count = room[1]
 
-        # Singular vs plural
+        # Singular vs plural. Escaped once, where it is printed: escaped
+        # here as well, "Kid's Room" printed as "Kid&#x27;s Room".
         label = (
-            f"{h(room_name)}{space}:{double_space}({item_count} "
+            f"{room_name}{space}:{double_space}({item_count} "
             f"{'item' if item_count == 1 else 'items'})"
         )
 
@@ -969,7 +970,7 @@ def build_evidence_by_room_report_html(
                 </td>
             </tr>
             <tr>
-                <td class="evid-data-label">Where Found</td>
+                <td class="evid-data-label">Where Found:</td>
                 <td class="evid-data-value px-6">
                     {h(e["EVIDLOCROOMDETAIL"])}
                 </td>
@@ -1028,7 +1029,7 @@ def build_evidence_by_room_report_html(
                 {evid_rows}
             </table>
         </div>
-        </br />"""
+        <br />"""
 
     header = build_case_header_html(
         active_case,
