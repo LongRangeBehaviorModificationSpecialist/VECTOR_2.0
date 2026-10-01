@@ -289,7 +289,19 @@ letters in digests need comparing as digests (0c2fc13).
 
 ## Notes from the day
 
-_(Anything that went wrong or was awkward, to fix before the pull
-request.)_
+The search warrant went fine. Three things to change, all done on
+30-Sep (7b83ad7, a44c286):
 
--
+- **Two "Print Report" buttons in the print window**, one blue and
+  labelled "printPrint Report". The print window copied VECTOR's own
+  Print button along with the report, and with no icon font there the
+  icon's name was printed in front of the label. The button now sits
+  outside what is copied. The window is also opened by the click itself
+  now, so a pop-up blocker no longer stops it.
+- **"Report Printed Date" on every report.** Gone by default; a switch on
+  the Reports page puts it back.
+- **A list of addresses in the console with network access on, only the
+  192.168 one working.** One per network adapter, virtual ones included.
+  VECTOR now names the one on the network the computer is connected to,
+  in the console and on Connect a Device, and keeps the rest out of the
+  way.

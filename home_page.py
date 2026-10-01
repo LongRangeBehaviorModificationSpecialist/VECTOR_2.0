@@ -435,7 +435,8 @@ the menu button (three lines) at the top left.
 8. **Reports** — eight printable lists, including the inventory used as
    the return copy. If the case is missing a detail a report needs, the
    page says which, and if it has no end time yet the page offers to fill
-   it in from this machine's clock.
+   it in from this machine's clock. A switch on the Reports page adds the
+   date and time each report was printed.
 
 Until a case is open, the top bar shows **No Active Case** and the other
 pages will not save.
