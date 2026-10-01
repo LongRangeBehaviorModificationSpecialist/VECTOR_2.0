@@ -23,6 +23,13 @@ Imports nothing from the rest of the application.
 
 import json
 import socket
+from dataclasses import dataclass
+
+try:
+    # Installed with NiceGUI, which uses it to list addresses at start-up.
+    import ifaddr
+except ImportError:  # pragma: no cover - only without NiceGUI's extras
+    ifaddr = None
 
 from program.config import Config, DB_DIR
 
@@ -111,42 +118,158 @@ def reachable_now() -> bool:
     return _running_host == "0.0.0.0"
 
 
-def machine_addresses() -> list:
-    """This machine's addresses on the network, best guess first.
+# ----- The address to type -----
+# A computer has an address for every network adapter it has, and most
+# have more than one: Wi-Fi and a cable, and on a laptop that runs VMware,
+# Hyper-V, WSL, Docker or a VPN, a virtual adapter for each of them --
+# networks that exist only inside this machine. VECTOR listens on all of
+# them, and NiceGUI used to print every one at start-up, so a tablet user
+# was handed half a dozen addresses of which one worked. The adapter
+# names say which are which.
 
-    Loopback and the 169.254 addresses Windows invents when there is no
-    network are left out: neither is any use to a tablet.
+# Names of adapters no other device can reach. Matched without regard to
+# case, anywhere in the adapter's name: on Windows that is the adapter's
+# description ("VMware Virtual Ethernet Adapter for VMnet8"), on macOS
+# and Linux its interface name ("vmnet8", "utun3", "docker0").
+_VIRTUAL_ADAPTERS = (
+    "vmware", "vmnet", "virtualbox", "vboxnet", "hyper-v", "vethernet",
+    "wsl", "docker", "virbr", "veth", "vnic", "parallels", "tailscale",
+    "zerotier", "wireguard", "hamachi", "tap-", "utun", "tun0", "tun1",
+    "vpn", "loopback", "npcap", "bluetooth", "br-",
+    # The VPN clients agencies issue, whose adapters say who made them
+    # rather than that they are VPNs.
+    "anyconnect", "pangp", "globalprotect", "fortinet", "juniper",
+    "pulse secure", "f5 ", "openvpn", "nordlynx", "virtual miniport",
+)
+
+# Tunnels: a VPN can carry the default route, and its address is still no
+# use to a tablet. A hypervisor's adapter can carry it too -- Hyper-V's
+# external switch puts the real network on "vEthernet (...)" -- and then
+# it is the real network, so only tunnels are refused the main place.
+_TUNNEL_ADAPTERS = (
+    "vpn", "utun", "tun0", "tun1", "tap-", "wireguard", "tailscale",
+    "zerotier", "hamachi", "anyconnect", "pangp", "globalprotect",
+    "fortinet", "juniper", "pulse secure", "f5 ", "openvpn", "nordlynx",
+    "virtual miniport",
+)
+
+# This laptop's own hotspot, which tablets join directly: Windows' Mobile
+# Hotspot runs on a "Wi-Fi Direct Virtual Adapter" at 192.168.137.1, and
+# macOS Internet Sharing on bridge100.
+_HOTSPOT_ADAPTERS = ("wi-fi direct", "hosted network", "bridge100")
+WINDOWS_HOTSPOT_ADDRESS = "192.168.137.1"
+
+# The kinds of address, in the order they are offered.
+MAIN, HOTSPOT, OTHER, VIRTUAL = "main", "hotspot", "other", "virtual"
+_ORDER = (MAIN, HOTSPOT, OTHER, VIRTUAL)
+
+
+@dataclass(frozen=True)
+class NetworkAddress:
+    address: str
+    adapter: str
+    kind: str
+
+    @property
+    def url(self) -> str:
+        return f"http://{self.address}:{Config.PORT}"
+
+
+def _adapter_addresses() -> list:
+    """(adapter name, address) for every IPv4 address on this machine."""
+    found = []
+    if ifaddr is not None:
+        try:
+            for adapter in ifaddr.get_adapters():
+                for ip in adapter.ips:
+                    if ip.is_IPv4:
+                        found.append((adapter.nice_name or adapter.name,
+                                      str(ip.ip)))
+        except Exception:
+            found = []
+    if not found:
+        try:
+            for info in socket.getaddrinfo(socket.gethostname(), None,
+                                           socket.AF_INET):
+                found.append(("", info[4][0]))
+        except OSError:
+            pass
+    return found
+
+
+def _route_address() -> str:
+    """The address traffic leaves this machine from, or "" if none.
+
+    That is the adapter carrying the default route -- the network this
+    machine is on, which a tablet on the same network can reach.
+    Connecting a UDP socket sends nothing; 192.0.2.1 is reserved for
+    documentation and never answers.
     """
-    found = set()
-
-    try:
-        for info in socket.getaddrinfo(socket.gethostname(), None,
-                                       socket.AF_INET):
-            found.add(info[4][0])
-    except OSError:
-        pass
-
-    # The address a route off this machine would leave from, which is
-    # the one another device on the same network will reach. Connecting
-    # a UDP socket sends nothing; the address is documentation-only.
     probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         probe.connect(("192.0.2.1", 9))
-        found.add(probe.getsockname()[0])
+        return probe.getsockname()[0]
     except OSError:
-        pass
+        return ""
     finally:
         probe.close()
 
+
+def classify_addresses(found: list, route: str) -> list:
+    """Sorts (adapter, address) pairs into NetworkAddress, best first.
+
+    Loopback and the 169.254 addresses an adapter gives itself when it
+    has no network are left out: neither is any use to a tablet. Kept
+    apart from the lookups so the rule can be tested on any machine.
+    """
+    addresses = {}
+    for adapter, address in found:
+        if address.startswith("127.") or address.startswith("169.254."):
+            continue
+        name = (adapter or "").lower()
+        if address == route and not any(
+            hint in name for hint in _TUNNEL_ADAPTERS
+        ):
+            kind = MAIN
+        elif any(hint in name for hint in _HOTSPOT_ADAPTERS) or (
+            address == WINDOWS_HOTSPOT_ADDRESS
+        ):
+            kind = HOTSPOT
+        elif any(hint in name for hint in _VIRTUAL_ADAPTERS):
+            kind = VIRTUAL
+        else:
+            kind = OTHER
+        # One entry per address, keeping the most useful reading of it.
+        held = addresses.get(address)
+        if held is None or _ORDER.index(kind) < _ORDER.index(held.kind):
+            addresses[address] = NetworkAddress(address, adapter or "", kind)
+    if route and route not in addresses and not route.startswith(
+        ("127.", "169.254.")
+    ):
+        addresses[route] = NetworkAddress(route, "", MAIN)
+
     return sorted(
-        address for address in found
-        if not address.startswith("127.")
-        and not address.startswith("169.254.")
+        addresses.values(),
+        key=lambda item: (_ORDER.index(item.kind), item.address),
     )
 
 
+def network_addresses() -> list:
+    """Every address on this machine, as NetworkAddress, best first."""
+    return classify_addresses(_adapter_addresses(), _route_address())
+
+
+def machine_addresses() -> list:
+    """The addresses another device could use, best first: the network
+    this machine is on, then its own hotspot, then any other real
+    adapter. Virtual adapters are left out."""
+    return [
+        item.address for item in network_addresses() if item.kind != VIRTUAL
+    ]
+
+
 def addresses_for_other_devices() -> list:
-    """The whole address to type on a tablet, one per network address."""
+    """The whole address to type on a tablet, best first."""
     return [
         f"http://{address}:{Config.PORT}"
         for address in machine_addresses()

@@ -592,10 +592,16 @@ def network_access_card() -> None:
         ui.label("Network access").classes("text-lg font-semibold mb-2")
 
         if settings.reachable_now():
+            addresses = settings.addresses_for_other_devices()
+            where = (
+                f"The address to give them is {addresses[0]} -- "
+                "Help -> Connect a Device has more."
+                if addresses else
+                "The address to give them is on the Connect a Device page."
+            )
             ui.label(
                 "Right now: other devices on this network can reach "
-                "VECTOR. The address to give them is on the Connect a "
-                "Device page."
+                f"VECTOR. {where}"
             ).classes("text-sm text-[#F5B027] mb-3")
         else:
             ui.label(

@@ -94,6 +94,122 @@ def test_the_address_is_given_whole():
         assert url.endswith(f":{Config.PORT}")
 
 
+# ----- Which of the machine's addresses to give -----
+# Adapter names as Windows reports them, and as macOS and Linux do.
+WIFI = "Intel(R) Wi-Fi 6 AX201 160MHz"
+CABLE = "Realtek PCIe GbE Family Controller"
+VMNET8 = "VMware Virtual Ethernet Adapter for VMnet8"
+WSL = "vEthernet (WSL (Hyper-V firewall))"
+VPN = "Cisco AnyConnect Secure Mobility Client Virtual Miniport Adapter"
+HOTSPOT = "Microsoft Wi-Fi Direct Virtual Adapter #2"
+
+
+def _kinds(found, route):
+    return [(a.address, a.kind)
+            for a in settings.classify_addresses(found, route)]
+
+
+def test_the_network_this_computer_is_on_comes_first():
+    """A laptop with VMware and WSL has three addresses; one of them is
+    on the network a tablet can join. Sorted as text, WSL's 172.x came
+    first and the page said the first was usually the one."""
+    found = [(VMNET8, "192.168.88.1"), (WSL, "172.20.16.1"),
+             (WIFI, "192.168.1.23")]
+    assert _kinds(found, route="192.168.1.23") == [
+        ("192.168.1.23", "main"),
+        ("172.20.16.1", "virtual"),
+        ("192.168.88.1", "virtual"),
+    ]
+
+
+def test_virtual_adapters_are_not_offered():
+    found = [(VMNET8, "192.168.88.1"), (WIFI, "192.168.1.23")]
+    addresses = [a.address for a in settings.classify_addresses(
+        found, "192.168.1.23") if a.kind != settings.VIRTUAL]
+    assert addresses == ["192.168.1.23"]
+
+
+def test_a_vpn_carrying_the_route_is_not_the_address_to_give():
+    """With a VPN connected, traffic leaves through the tunnel -- but a
+    tablet on the Wi-Fi still reaches the Wi-Fi address."""
+    found = [(VPN, "10.8.0.14"), (WIFI, "192.168.1.23")]
+    assert _kinds(found, route="10.8.0.14") == [
+        ("192.168.1.23", "other"),
+        ("10.8.0.14", "virtual"),
+    ]
+
+
+def test_hyper_v_carrying_the_real_network_is_the_main_address():
+    """Hyper-V's external switch moves the real network onto a vEthernet
+    adapter. It carries the route, so it is the one to give."""
+    found = [("vEthernet (External Switch)", "192.168.1.23")]
+    assert _kinds(found, route="192.168.1.23") == [("192.168.1.23", "main")]
+
+
+@pytest.mark.parametrize("adapter", [
+    "PANGP Virtual Ethernet Adapter",
+    "Fortinet SSL VPN Virtual Ethernet Adapter",
+    "TAP-Windows Adapter V9",
+    "WireGuard Tunnel",
+])
+def test_agency_vpn_clients_are_recognised(adapter):
+    found = [(adapter, "10.8.0.14"), (WIFI, "192.168.1.23")]
+    assert _kinds(found, route="10.8.0.14")[0] == ("192.168.1.23", "other")
+
+
+def test_this_laptops_own_hotspot_is_offered_after_the_main_network():
+    found = [(HOTSPOT, "192.168.137.1"), (WIFI, "192.168.1.23")]
+    assert _kinds(found, route="192.168.1.23") == [
+        ("192.168.1.23", "main"),
+        ("192.168.137.1", "hotspot"),
+    ]
+
+
+def test_a_second_real_adapter_is_offered_after_the_main_one():
+    found = [(CABLE, "10.0.0.5"), (WIFI, "192.168.1.23")]
+    assert _kinds(found, route="192.168.1.23") == [
+        ("192.168.1.23", "main"),
+        ("10.0.0.5", "other"),
+    ]
+
+
+def test_loopback_and_self_assigned_addresses_are_left_out():
+    found = [("Software Loopback Interface 1", "127.0.0.1"),
+             (CABLE, "169.254.10.20"), (WIFI, "192.168.1.23")]
+    assert _kinds(found, route="192.168.1.23") == [("192.168.1.23", "main")]
+
+
+def test_without_a_route_the_real_adapters_still_come_first():
+    """No default route -- a hotspot with no internet, say."""
+    found = [(VMNET8, "192.168.88.1"), (WIFI, "192.168.43.7")]
+    assert _kinds(found, route="") == [
+        ("192.168.43.7", "other"),
+        ("192.168.88.1", "virtual"),
+    ]
+
+
+def test_macos_and_linux_interface_names_are_recognised():
+    found = [("en0", "192.168.1.23"), ("vmnet8", "172.16.5.1"),
+             ("utun3", "10.8.0.2"), ("docker0", "172.17.0.1"),
+             ("bridge100", "192.168.2.1")]
+    assert _kinds(found, route="192.168.1.23") == [
+        ("192.168.1.23", "main"),
+        ("192.168.2.1", "hotspot"),
+        ("10.8.0.2", "virtual"),
+        ("172.16.5.1", "virtual"),
+        ("172.17.0.1", "virtual"),
+    ]
+
+
+def test_the_route_address_is_kept_when_no_adapter_lists_it():
+    assert _kinds([], route="192.168.1.23") == [("192.168.1.23", "main")]
+
+
+def test_an_address_listed_twice_appears_once():
+    found = [("", "192.168.1.23"), (WIFI, "192.168.1.23")]
+    assert _kinds(found, route="192.168.1.23") == [("192.168.1.23", "main")]
+
+
 # ----- The record of the change -----
 
 def test_turning_it_on_is_recorded_with_who_did_it():

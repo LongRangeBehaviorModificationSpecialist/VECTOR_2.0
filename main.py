@@ -492,8 +492,30 @@ if __name__ in {"__main__", "__mp_main__"}:
             f"devices on this network ({how}).\n"
             "  Traffic is unencrypted HTTP. Use only on a network you "
             "control.\n"
-            "  The address to type is on the Connect a Device page.\n"
         )
+
+    @app.on_startup
+    def say_where_vector_is() -> None:
+        """One address for this computer and one for a tablet.
+
+        NiceGUI's own message listed an address for every network adapter
+        -- VMware, Hyper-V, WSL and VPN adapters included, none of which
+        a tablet can reach -- so it is turned off below in favour of
+        this.
+        """
+        lines = [
+            "",
+            "  VECTOR is running.",
+            f"    On this computer:  http://localhost:{Config.PORT}",
+        ]
+        if HOST == "0.0.0.0":
+            others = settings.addresses_for_other_devices()
+            if others:
+                lines.append(f"    On a tablet:       {others[0]}")
+            lines.append(
+                "    (Help -> Connect a Device shows it, and the others.)"
+            )
+        print("\n".join(lines) + "\n", flush=True)
 
     ui.run(
         title="V·E·C·T·O·R",
@@ -503,4 +525,5 @@ if __name__ in {"__main__", "__mp_main__"}:
         show=Config.SHOW_BROWSER,
         dark=True,
         storage_secret=get_storage_secret(),
+        show_welcome_message=False,
     )
