@@ -288,6 +288,25 @@ def test_a_csv_export_that_cannot_copy_attachments_stops(
     assert any("Nothing was downloaded" in n for n in notices), notices
 
 
+@pytest.mark.parametrize("export", ["export_vector_to_csv",
+                                    "export_vector_to_json"])
+def test_an_export_that_cannot_be_recorded_is_not_handed_over(
+        populated,
+        out_dir,
+        notices,
+        monkeypatch,
+        export,
+):
+    """An export the audit trail cannot record is not handed over. A
+    failure before the record was begun raised again in the handler,
+    which named a variable not yet set."""
+    monkeypatch.setattr(import_export, "Cases", object())
+
+    assert getattr(import_export, export)(destination=out_dir) is None
+    assert any("could not be recorded in the audit trail" in n
+               for n in notices), notices
+
+
 def test_a_json_export_that_cannot_embed_attachments_stops(
         populated,
         out_dir,

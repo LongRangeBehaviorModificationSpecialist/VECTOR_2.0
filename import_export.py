@@ -587,7 +587,6 @@ def export_vector_to_csv(
         with get_session() as session:
             case = session.query(Cases).order_by(Cases.Z_PK).first()
 
-            stage = "the audit record"
             record_audit(
                 session,
                 action="EXPORT",
@@ -603,16 +602,15 @@ def export_vector_to_csv(
                 }
             )
     except Exception as err:
-        ui.notify(
-            f"Failed to record action in {stage} → {err}.",
-            multi_line=True,
-            classes="multi-line-notification",
-            type="warning",
-            timeout=ZERO_TIMEOUT,
-            position="center",
-            close_button="OK",
+        # Named the audit record through a "stage" set inside the try, so
+        # a failure before it was set raised again here; and printed the
+        # raw error to the console rather than logging it.
+        _report_failure(
+            "The CSV export was made but could not be recorded in the "
+            "audit trail, so it was not handed over. Nothing was "
+            "downloaded.",
+            err,
         )
-        print(f"{err}")
         shutil.rmtree(work_dir, ignore_errors=True)
         return None
 
@@ -1188,7 +1186,6 @@ def export_vector_to_json(
         with get_session() as session:
             case = session.query(Cases).order_by(Cases.Z_PK).first()
 
-            stage = "the audit record"
             record_audit(
                 session,
                 action="EXPORT",
@@ -1211,16 +1208,15 @@ def export_vector_to_json(
                 }
             )
     except Exception as err:
-        ui.notify(
-            f"Failed to record action in {stage} → {err}.",
-            multi_line=True,
-            classes="multi-line-notification",
-            type="warning",
-            timeout=ZERO_TIMEOUT,
-            position="center",
-            close_button="OK",
+        # Named the audit record through a "stage" set inside the try, so
+        # a failure before it was set raised again here; and printed the
+        # raw error to the console rather than logging it.
+        _report_failure(
+            "The JSON export was made but could not be recorded in the "
+            "audit trail, so it was not handed over. Nothing was "
+            "downloaded.",
+            err,
         )
-        print(f"{err}")
         return None
 
     encrypted_note = " (AES-256 encrypted)" if password else ""
