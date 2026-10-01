@@ -3,8 +3,9 @@
 """
 settings.py
 
-Settings that belong to this machine rather than to the case. At the
-moment there is one: whether VECTOR listens on the network.
+Settings that belong to this machine rather than to the case: whether
+VECTOR listens on the network, and whether reports print the date and
+time they were printed.
 
 They are kept in db/settings.json rather than in the case database,
 because they describe this installation. A database copied to another
@@ -29,7 +30,8 @@ from program.config import Config, DB_DIR
 SETTINGS_PATH = DB_DIR / "settings.json"
 
 NETWORK_ACCESS = "network_access"
-DEFAULTS = {NETWORK_ACCESS: False}
+REPORT_PRINT_DATE = "report_print_date"
+DEFAULTS = {NETWORK_ACCESS: False, REPORT_PRINT_DATE: False}
 
 # Set at startup from what VECTOR actually bound to, so a page can say
 # what is true now rather than what the setting says for next time.
@@ -71,6 +73,19 @@ def set_network_access(allowed: bool) -> None:
     """Turns network access on or off for the next start."""
     values = read()
     values[NETWORK_ACCESS] = bool(allowed)
+    write(values)
+
+
+def report_print_date() -> bool:
+    """Whether reports carry a "Report Printed Date" line. Off unless
+    someone turns it on, on the Reports page."""
+    return bool(read().get(REPORT_PRINT_DATE, False))
+
+
+def set_report_print_date(on: bool) -> None:
+    """Turns the "Report Printed Date" line on or off for every report."""
+    values = read()
+    values[REPORT_PRINT_DATE] = bool(on)
     write(values)
 
 

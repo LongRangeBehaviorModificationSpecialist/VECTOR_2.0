@@ -597,6 +597,27 @@ def set_network_access(allowed: bool, actor: str = "") -> None:
         )
 
 
+def set_report_print_date(on: bool, actor: str = "") -> None:
+    """Turns the "Report Printed Date" line on reports on or off, and
+    records who did it."""
+    was = settings.report_print_date()
+    settings.set_report_print_date(on)
+
+    with get_session() as session:
+        record_audit(
+            session,
+            action="SETTING_CHANGED",
+            table_name="(settings)",
+            summary=(
+                "report printed date turned "
+                f"{'on' if on else 'off'}"
+            ),
+            before={"report_print_date": was},
+            after={"report_print_date": bool(on)},
+            actor=actor or None,
+        )
+
+
 def value_in_use(session, model, column_name, value, exclude_pk=None) -> bool:
     """Return True if `value` already exists in `model.column_name`.
 

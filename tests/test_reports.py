@@ -184,6 +184,52 @@ def test_a_room_heading_prints_its_apostrophe_and_ampersand(case):
     assert "&amp;#x27;" not in html and "&amp;amp;" not in html
 
 
+@pytest.fixture
+def settings_file(tmp_path, monkeypatch):
+    import settings
+    monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "settings.json")
+    return settings
+
+
+def test_reports_leave_out_when_they_were_printed_by_default(
+        populated, settings_file):
+    for report_name in REPORT_NAMES:
+        assert "Report Printed Date" not in _build(report_name), report_name
+
+
+def test_the_printed_date_appears_once_asked_for(populated, settings_file):
+    settings_file.set_report_print_date(True)
+    for report_name in REPORT_NAMES:
+        assert "Report Printed Date" in _build(report_name), report_name
+
+
+def test_turning_the_printed_date_on_is_recorded(case, settings_file):
+    from models import AuditLog
+    from utils import set_report_print_date
+
+    set_report_print_date(True, actor="Doe, John")
+
+    assert settings_file.report_print_date() is True
+    with get_session() as session:
+        entry = (
+            session.query(AuditLog)
+            .filter(AuditLog.action == "SETTING_CHANGED")
+            .one()
+        )
+        assert entry.actor == "Doe, John"
+        assert "report printed date turned on" in entry.summary
+
+
+def test_the_print_window_copies_the_report_and_not_the_page():
+    """The window is opened by the click, in the browser, and copies only
+    #report-container -- which no longer holds the Print button."""
+    script = reports.print_window_script()
+    assert "window.open(" in script
+    assert "report-container" in script
+    assert "🖨️ Print Report" in script and "✕ Close" in script
+    script.encode("utf-8")  # no lone surrogates for the websocket
+
+
 def test_reports_survive_an_empty_case(case):
     """A case with no agents, rooms or evidence still renders."""
     for report_name in REPORT_NAMES:
