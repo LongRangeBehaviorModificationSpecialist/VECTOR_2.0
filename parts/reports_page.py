@@ -146,10 +146,10 @@ def build_reports_page() -> None:
 
         for k, v in list(report_buttons.items())[0:3]:
             ui.button(
-                v['text'],
-                on_click=lambda url=v['page_url']: ui.navigate.to(url),
-                color=style['color'],
-            ).props(style['props']).classes(style['classes'])
+                v["text"],
+                on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                color=style["color"],
+            ).props(style["props"]).classes(style["classes"])
 
     # ----- Second row of buttons -----
     with ui.row().classes(
@@ -157,10 +157,10 @@ def build_reports_page() -> None:
 
         for k, v in list(report_buttons.items())[3:6]:
             ui.button(
-                v['text'],
-                on_click=lambda url=v['page_url']: ui.navigate.to(url),
-                color=style['color'],
-            ).props(style['props']).classes(style['classes'])
+                v["text"],
+                on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                color=style["color"],
+            ).props(style["props"]).classes(style["classes"])
 
     # ----- Third row of buttons -----
     with ui.row().classes(
@@ -168,10 +168,10 @@ def build_reports_page() -> None:
 
         for k, v in list(report_buttons.items())[6:]:
             ui.button(
-                v['text'],
-                on_click=lambda url=v['page_url']: ui.navigate.to(url),
-                color=style['color'],
-            ).props(style['props']).classes(style['classes'])
+                v["text"],
+                on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                color=style["color"],
+            ).props(style["props"]).classes(style["classes"])
 
 def _printed_date_switch() -> None:
     """Whether each report says when it was printed. Off by default; it
@@ -232,7 +232,10 @@ def rooms_in_order(session) -> list:
 def rooms_with_item_counts(session) -> list[tuple[str, int]]:
     """Each room evidence was found in, with its item count, in label order."""
     counts = (
-        session.query(Evidence.EVIDLOCROOM, func.count(Evidence.EVIDLOCROOM))
+        session.query(
+            Evidence.EVIDLOCROOM, 
+            func.count(Evidence.EVIDLOCROOM)
+        )
         .group_by(Evidence.EVIDLOCROOM)
         .all()
     )
