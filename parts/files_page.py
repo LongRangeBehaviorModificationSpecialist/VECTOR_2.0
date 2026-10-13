@@ -14,10 +14,11 @@ from fastapi import Response
 from nicegui import app, ui
 
 from models import (
+    audit_timestamp,
     get_session,
     has_active_case,
+    record_audit,
     UploadedFiles,
-    audit_timestamp,
 )
 from program.config import Config
 from failures import explain, log
@@ -25,15 +26,22 @@ from live import refresh_on_change
 from navbar import build_navbar
 from auth import get_current_user_name, get_is_admin, is_authenticated
 from utils import (
+    derive_mime_type,
     get_mime_type,
     is_allowed_file,
     format_file_size,
     confirm_delete_all,
     require_active_case,
+    ALLOWED_MIME_TYPES,
     CONFIRM_TIMEOUT,
     WARN_TIMEOUT,
 )
 
+DOWNLOAD_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "sandbox",   # even if opened inline, no scripts run
+    "Cache-Control": "no-store",            # don't leave evidence in browser/proxy caches
+}
 
 # ----- Downloads -----
 def content_disposition(filename: str) -> str:
@@ -61,12 +69,32 @@ async def download_attachment(file_id: int) -> Response:
         record = session.get(UploadedFiles, file_id)
         if record is None:
             return Response(status_code=404)
+
         name = (record.FILENAME or f"file_{record.Z_PK}")
         name = name.replace("/", "_").replace("\\", "_")
+
+        stored = record.FILEMIMETYPE or ""
+        media_type = (
+            stored if stored in ALLOWED_MIME_TYPES
+            else "application/octet-stream"
+        )
+
+        record_audit(
+            session,
+            action="DOWNLOAD",
+            table_name="FILES",
+            row_pk=record.Z_PK,
+            summary=f"{name} (SHA-256 {record.FILESHA256 or 'n/a'})",
+            actor=get_current_user_name(),
+        )
+
         return Response(
             content=record.FILEDATA,
-            media_type=record.FILEMIMETYPE or "application/octet-stream",
-            headers={"Content-Disposition": content_disposition(name)},
+            media_type=media_type,
+            headers={
+                "Content-Disposition": content_disposition(name),
+                **DOWNLOAD_SECURITY_HEADERS,
+            },
         )
 
 
@@ -112,11 +140,10 @@ def build_uploads_page() -> None:
                     file_data = await uploaded_file.read()
                     file_size = len(file_data)
                     file_mime_type = (
-                        uploaded_file.content_type
-                        or "application/octet-stream"
+                        derive_mime_type(file_name, file_data)
                     )
                     # Determine MIME type using fallback
-                    file_mime_type = get_mime_type(file_name, file_mime_type)
+                    file_mime_type = derive_mime_type(file_name, file_data)
 
                     # Validate file type
                     if not is_allowed_file(file_mime_type):

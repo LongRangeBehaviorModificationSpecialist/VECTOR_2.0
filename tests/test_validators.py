@@ -13,6 +13,19 @@ from models import Agents, Cases, Evidence, Persons, Rooms, get_session
 import utils
 
 
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+def test_content_wins_over_the_name():
+    assert utils.derive_mime_type("photo.jpg", PNG) == "image/png"
+
+
+def test_unknown_content_is_not_trusted():
+    assert utils.derive_mime_type(
+        "evil.pdf",
+        b"MZ\x90\x00 not a pdf"
+    ) == "application/octet-stream"
+
+
 # ----- the crash paths -----
 
 def test_evidence_missing_room_is_reported_not_raised():

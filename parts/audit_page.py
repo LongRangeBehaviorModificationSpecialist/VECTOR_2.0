@@ -23,13 +23,14 @@ from navbar import build_navbar
 ACTION_CHOICES = [
     "All",
     "CREATE",
-    "UPDATE",
     "DELETE",
     "DELETE_ALL",
-    "IMPORT",
+    "DOWNLOAD",
     "EXPORT",
+    "IMPORT",
     "LOGIN",
     "LOGIN_FAILED",
+    "UPDATE",
 ]
 
 

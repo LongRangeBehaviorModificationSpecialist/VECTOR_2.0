@@ -7,6 +7,7 @@ File containing various functions used throughout the application.
 """
 import clock
 from datetime import datetime
+import filetype
 from functools import wraps
 from inspect import iscoroutinefunction
 import json
@@ -40,6 +41,9 @@ ZERO_TIMEOUT = 0
 
 AGENTS_JSON_PATH = Path(__file__).parent / "parts/agents.json"
 
+
+# Types with no magic number, so only the extension can identify them.
+_EXTENSION_ONLY = {"text/plain", "text/rtf", "application/rtf", "image/svg+xml"}
 
 # Allowed MIME types for images, videos, and documents
 ALLOWED_MIME_TYPES = {
@@ -91,6 +95,17 @@ mimetypes.add_type("application/gzip", ".tgz")
 mimetypes.add_type("application/vnd.rar", ".rar")
 mimetypes.add_type("application/x-bzip2", ".bz2")
 mimetypes.add_type("application/x-xz", ".xz")
+
+
+def derive_mime_type(file_name: str, data: bytes) -> str:
+    """MIME type from the file's content, never from the browser."""
+    kind = filetype.guess(data[:8192])
+    if kind:
+        return kind.mime
+    guessed, _ = mimetypes.guess_type(file_name)
+    if guessed in _EXTENSION_ONLY:
+        return guessed
+    return "application/octet-stream"   # not in the allowlist, so rejected
 
 
 def get_current_timestamp(format: str = "") -> str:
