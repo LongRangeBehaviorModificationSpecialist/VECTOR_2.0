@@ -34,6 +34,8 @@ from utils import (
     CONFIRM_TIMEOUT,
     WARN_TIMEOUT,
 )
+from parts.file_upload import upload_card
+from parts.file_table import files_table
 
 DOWNLOAD_SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",

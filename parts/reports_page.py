@@ -822,7 +822,7 @@ def build_agents_report_html(active_case: dict, agents: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="INVESTIGATORS AT SEARCH WARRANT SITE",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -863,7 +863,7 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
 
     Each item is displayed as vertical label/value rows with ALL fields.
 
-    This is the "AGENT COPY" version.
+    This is the AGENT COPY.
     """
 
     evid_rows = "".join([f"""
@@ -951,7 +951,7 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="FULL EVIDENCE INVENTORY LIST",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1106,7 +1106,7 @@ def build_evidence_by_room_report_html(
     header = build_case_header_html(
         active_case,
         page_title="EVIDENCE FOUND LIST BY ROOM",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
 
     footer = build_report_footer_html()
@@ -1223,7 +1223,7 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="ROOM LIST",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1277,7 +1277,7 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="PERSONS LIST",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1331,7 +1331,7 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="NOTES LIST",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1419,7 +1419,7 @@ def build_files_report_html(active_case: list, files: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="ATTACHED FILES LIST",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
