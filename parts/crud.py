@@ -26,60 +26,26 @@ from typing import Callable, Optional
 
 from nicegui import ui
 
-import clock
 from failures import explain, log
 from live import refresh_on_change
-from models import get_session, has_active_case
-from utils import (
-    require_active_case,
-    required_input,
-    required_select,
-    required_textarea,
-    CONFIRM_TIMEOUT,
-    WARN_TIMEOUT,
-    ZERO_TIMEOUT
+from models import get_session
+from parts.crud_dialogs import (
+    delete_all_section,
+    open_delete_dialog,
+    open_edit_dialog,
 )
-
-
-# ----- Field description -----
-@dataclass
-class Field:
-    """One column, and how it should be presented.
-
-    name:        the model column
-    label:       what the user sees
-    kind:        input | select | textarea
-    required:    renders with the red asterisk
-    options:     callable returning select options, evaluated per render
-                 so a newly added agent appears without a restart
-    props:       extra Quasar props, e.g. an input mask
-    placeholder: shown in the empty field
-    readonly:    displayed but not editable
-    in_form:     include in the add form
-    in_edit:     include in the edit dialog
-    in_table:    include as a table column
-    table_label: column heading, when it should differ from `label`
-    default:     callable producing the value for a fresh form
-    new_values:  let a select accept a value that is not in its options
-    now_button:  offer a button that fills the field with this machine's
-                 current date and time
-    """
-
-    name: str
-    label: str
-    kind: str = "input"
-    required: bool = False
-    options: Optional[Callable[[], list]] = None
-    props: str = ""
-    placeholder: str = ""
-    readonly: bool = False
-    in_form: bool = True
-    in_edit: bool = True
-    in_table: bool = True
-    table_label: Optional[str] = None
-    default: Optional[Callable[[], str]] = None
-    new_values: bool = False
-    now_button: bool = False
+# Field is re-exported: every page imports it from here.
+from parts.crud_widgets import (  # noqa: F401
+    Field,
+    notify_done,
+    notify_problem,
+    options_including,
+    select_value,
+    typed_choice,
+    _make_widget,
+    _values_from,
+)
+from utils import require_active_case
 
 
 @dataclass
@@ -131,6 +97,8 @@ class CrudSpec:
     live_defaults:  add-form fields whose default is worked out again when
                     another device changes the case, such as the next item
                     number
+    searchable:     whether a search box appears above the table. On for
+                    every table that grows; off for the one-row case
     """
 
     model: type
@@ -162,6 +130,7 @@ class CrudSpec:
     on_delete: Optional[Callable] = None
     delete_note: Optional[Callable[[dict], str]] = None
     live_defaults: tuple = ()
+    searchable: bool = True
 
     def __post_init__(self):
         self.entity_plural = self.entity_plural or f"{self.entity}s"
@@ -172,191 +141,6 @@ class CrudSpec:
         self.empty_text = (
             self.empty_text or f"No {self.entity_plural} have been entered"
         )
-
-
-# ----- Notification helpers -----
-def notify_problem(message: str) -> None:
-    """A problem the user has to acknowledge."""
-    ui.notify(
-        message,
-        type="warning",
-        timeout=WARN_TIMEOUT,
-        position="center",
-        close_button="OK",
-    )
-
-
-def notify_done(message: str) -> None:
-    """A confirmation that can fade."""
-    ui.notify(
-        message,
-        timeout=CONFIRM_TIMEOUT,
-        position="bottom",
-        close_button="OK",
-    )
-
-
-# ----- Widget construction -----
-def options_including(options, value):
-    """A dropdown's options, with the record's own value among them.
-
-    A stored value need not be on today's list: an agent from an imported
-    case is not on this machine's roster, and a room can be relabelled or
-    an agent deleted after evidence was logged against them. NiceGUI
-    refuses a value missing from the options, so the edit dialog failed to
-    open, with nothing on screen to say why.
-    """
-    if value in (None, ""):
-        return options
-    if isinstance(options, dict):
-        return options if value in options else {**options, value: value}
-    options = list(options)
-    return options if value in options else options + [value]
-
-
-def select_value(value):
-    """The value a dropdown opens with.
-
-    A dropdown left blank is saved as "", which is never one of its
-    options. NiceGUI refuses a value that is not an option, so the edit
-    dialog for any record with a blank dropdown -- a room with no agents
-    yet, an item nobody triaged -- failed to open, with nothing on screen.
-    """
-    return None if value == "" else value
-
-
-def typed_choice(text, options, current, allow_new: bool):
-    """What text typed into a dropdown becomes when the field is left.
-
-    An option matching the text, ignoring case -- or, where new values are
-    allowed, the text itself. None leaves the dropdown as it is.
-    """
-    text = (text or "").strip()
-    if not text or text == str(current or ""):
-        return None
-    choices = list(options.keys()) if isinstance(options, dict) else list(options)
-    for choice in choices:
-        if str(choice).lower() == text.lower():
-            return None if choice == current else choice
-    return text if allow_new else None
-
-
-def _keep_typed_text(select, allow_new: bool) -> None:
-    """Keeps what was typed into a dropdown when the field is left.
-
-    Quasar turns typed text into a value only on Enter. Clicking or tabbing
-    out of the field threw it away, so an agent's name that was not on the
-    roster had to be confirmed with Enter or it was lost.
-    """
-    typed = {"text": ""}
-
-    def remember(event) -> None:
-        typed["text"] = str(event.args or "")
-
-    def forget(_event=None) -> None:
-        # A choice picked from the list replaces whatever was typed.
-        typed["text"] = ""
-
-    def commit(_event=None) -> None:
-        text, typed["text"] = typed["text"], ""
-        choice = typed_choice(text, select.options, select.value, allow_new)
-        if choice is None:
-            return
-        options = select.options
-        present = options.keys() if isinstance(options, dict) else options
-        if choice not in present:
-            if isinstance(options, dict):
-                options = {**options, choice: choice}
-            else:
-                options = [*options, choice]
-        select.set_options(options, value=choice)
-
-    select.on("input-value", remember)
-    select.on_value_change(forget)
-    select.on("blur", commit)
-
-
-def _build_widget(spec_field: Field, value=None):
-    """Builds the input for one field."""
-    factory_required = {
-        "input": required_input,
-        "select": required_select,
-        "textarea": required_textarea,
-    }
-    factory_optional = {
-        "input": ui.input,
-        "select": ui.select,
-        "textarea": ui.textarea,
-    }
-
-    if spec_field.kind == "select":
-        value = select_value(value)
-
-    kwargs = {}
-    if value is not None:
-        kwargs["value"] = value
-    if spec_field.placeholder:
-        kwargs["placeholder"] = spec_field.placeholder
-
-    if spec_field.kind == "select":
-        options = options_including(
-            spec_field.options() if spec_field.options else [], value
-        )
-        kwargs["with_input"] = True
-        if spec_field.new_values:
-            kwargs["new_value_mode"] = "add"
-        if spec_field.required:
-            widget = factory_required["select"](
-                label=spec_field.label, options=options, **kwargs
-            )
-        else:
-            widget = factory_optional["select"](
-                options=options, label=spec_field.label, **kwargs
-            )
-    else:
-        if spec_field.required:
-            widget = factory_required[spec_field.kind](
-                label=spec_field.label, **kwargs
-            )
-        else:
-            widget = factory_optional[spec_field.kind](
-                label=spec_field.label, **kwargs
-            )
-
-    widget.classes("w-full")
-    if spec_field.props:
-        widget.props(spec_field.props)
-    if spec_field.readonly:
-        widget.props("readonly")
-    if spec_field.kind == "select" and not spec_field.readonly:
-        _keep_typed_text(widget, allow_new=spec_field.new_values)
-    return widget
-
-
-def _make_widget(spec_field: Field, value=None):
-    """Builds the input for one field, with its fill button if it has one."""
-    if not spec_field.now_button:
-        return _build_widget(spec_field, value)
-
-    with ui.column().classes("w-full gap-0"):
-        widget = _build_widget(spec_field, value)
-        widget.props(f'hint="Times are this machine\'s: {clock.zone_label()}"')
-        ui.button(
-            "Fill with current date/time",
-            icon="schedule",
-            on_click=lambda: widget.set_value(clock.case_time_now()),
-        ).props("flat dense no-caps").classes(
-            "self-end hover-border-blue"
-        )
-    return widget
-
-
-def _values_from(widgets: dict) -> dict:
-    """Reads the current value of every widget, normalised to str."""
-    return {
-        name: ("" if widget.value is None else widget.value)
-        for name, widget in widgets.items()
-    }
 
 
 # ----- The builder -----
@@ -478,8 +262,22 @@ def build_crud_page(spec: CrudSpec) -> None:
         ui.separator().classes("my-6")
         ui.label(spec.table_title).classes("text-xl font-bold mb-1")
 
+        # Finding item 47 among 120 by scrolling is how a detail gets
+        # missed. Quasar filters the rows the table already holds, so
+        # this costs no database work and keeps the sort order.
+        search_box = None
+        if spec.searchable:
+            search_box = ui.input(
+                placeholder=f"Search the {spec.entity_plural} below",
+            ).props("dense outlined clearable").classes(
+                "w-full max-w-md mb-2"
+            )
+
+        # Wide enough for a long evidence row, and never wider than
+        # the window: the table scrolls inside itself instead of taking
+        # the page with it.
         table_container = ui.column().classes(
-            "w-full max-w-6xl mx-auto items-center gap-2"
+            "w-full max-w-[1536px] px-2 mx-auto items-center gap-2"
         )
 
         def _row_dict(record) -> dict:
@@ -570,7 +368,18 @@ def build_crud_page(spec: CrudSpec) -> None:
                     row_key=spec.row_key,
                 )
                 table.props("dense flat")
+                # Fills its column rather than growing to fit the widest
+                # row, which is what leaves Quasar's own scrolling to do
+                # the work.
+                table.classes("w-full")
                 shown["table"] = table
+
+                if search_box is not None:
+                    table.bind_filter_from(
+                        search_box,
+                        "value",
+                        backward=lambda typed: typed or "",
+                    )
 
                 # Defined once here, not pasted into six page modules.
                 delete_button = (
@@ -600,249 +409,20 @@ def build_crud_page(spec: CrudSpec) -> None:
 
         # ----- Edit -----
         def _open_edit_dialog(event) -> None:
-            row = event.args
-            with ui.dialog() as edit_dialog, ui.card().classes(
-                "w-full max-w-lg p-6"
-            ):
-                ui.label(
-                    f"Edit {spec.entity}: {row.get(spec.label_field, '')}"
-                ).classes("text-lg font-semibold mb-4")
-
-                edit_widgets = {}
-                for spec_field in spec.fields:
-                    if not spec_field.in_edit:
-                        continue
-                    edit_widgets[spec_field.name] = _make_widget(
-                        spec_field, row.get(spec_field.name, "")
-                    )
-
-                with ui.row().classes("w-full justify-end gap-2 mt-4"):
-                    ui.button(
-                        "Cancel",
-                        on_click=edit_dialog.close,
-                        color="transparent",
-                    ).props("flat").classes("p-3 hover-border-blue")
-
-                    def on_save_update() -> None:
-                        values = _values_from(edit_widgets)
-
-                        if spec.validate(
-                            stage="update", values=values, row=row
-                        ):
-                            return
-
-                        if spec.on_before_update:
-                            spec.on_before_update(values)
-
-                        try:
-                            with get_session() as session:
-                                record = (
-                                    session.query(spec.model)
-                                    .filter_by(
-                                        **{spec.row_key: row[spec.row_key]}
-                                    )
-                                    .first()
-                                )
-                                if record is None:
-                                    notify_problem(
-                                        f"That {spec.entity} no longer "
-                                        "exists. It may have been deleted "
-                                        "on another device."
-                                    )
-                                    edit_dialog.close()
-                                    refresh_table()
-                                    return
-                                before = {
-                                    name: getattr(record, name)
-                                    for name in values
-                                }
-                                for name, value in values.items():
-                                    setattr(record, name, value)
-                                if spec.on_update:
-                                    spec.on_update(session, before, values)
-                        except Exception as err:
-                            log.exception("Could not update a %s", spec.entity)
-                            notify_problem(
-                                f"Could not update this {spec.entity}.\n\n"
-                                f"{explain(err, labels)}"
-                            )
-                            return
-
-                        notify_done(
-                            f"{spec.entity.title()} "
-                            f"{values.get(spec.label_field, '')} was updated."
-                        )
-                        edit_dialog.close()
-                        refresh_table()
-
-                    ui.button(
-                        f"Update {spec.entity}",
-                        on_click=on_save_update,
-                        color="var(--vsp-blue)",
-                    ).props("push").classes("p-3 hover-border-white")
-
-            edit_dialog.open()
+            open_edit_dialog(spec, event.args, labels, refresh_table)
 
         _open_edit_dialog = guard(_open_edit_dialog)
 
         # ----- Delete one -----
         def _open_delete_dialog(event) -> None:
-            # No button is drawn when deletes are off, but a crafted
-            # event could still arrive, so refuse it here as well.
-            if not spec.allow_delete:
-                return
-            row = event.args
-            label = row.get(spec.label_field, "")
-
-            with ui.dialog() as delete_dialog, ui.card().classes(
-                "max-w-sm p-6"
-            ):
-                ui.label("Confirm Deletion").classes(
-                    "mb-3 text-lg font-bold text-[var(--vsp-blue)]"
-                )
-                ui.label(
-                    f"Delete {spec.entity} {label}?"
-                ).classes("mb-2 text-base")
-
-                note = spec.delete_note(row) if spec.delete_note else ""
-
-                if note:
-                    ui.label(note).classes("mb-2 text-base text-[#F5B027]")
-
-                ui.label(
-                    "The record is removed, but the deletion and its "
-                    "contents are kept in the audit trail."
-                ).classes("mb-4 text-sm text-white")
-
-                with ui.row().classes("w-full justify-end gap-2"):
-                    ui.button(
-                        "Cancel",
-                        on_click=delete_dialog.close,
-                        color="transparent",
-                    ).props("flat").classes("p-3 hover-border-blue")
-
-                    def on_confirm_delete() -> None:
-                        try:
-                            with get_session() as session:
-                                record = (
-                                    session.query(spec.model)
-                                    .filter_by(
-                                        **{spec.row_key: row[spec.row_key]}
-                                    )
-                                    .first()
-                                )
-                                follow_up = ""
-                                if record is not None:
-                                    removed = {
-                                        spec_field.name: getattr(
-                                            record, spec_field.name, None
-                                        )
-                                        for spec_field in spec.fields
-                                    }
-                                    session.delete(record)
-                                    if spec.on_delete:
-                                        session.flush()
-                                        follow_up = (
-                                            spec.on_delete(session, removed)
-                                            or ""
-                                        )
-                        except Exception as err:
-                            log.exception("Could not delete a %s", spec.entity)
-                            notify_problem(
-                                f"Could not delete this {spec.entity}.\n\n"
-                                f"{explain(err, labels)}"
-                            )
-                            return
-
-                        notify_done(
-                            f"{spec.entity.title()} {label} was deleted."
-                            + (f" {follow_up}" if follow_up else "")
-                        )
-                        delete_dialog.close()
-                        refresh_table()
-
-                    ui.button(
-                        f"Delete {spec.entity}",
-                        on_click=on_confirm_delete,
-                        color="#ef4444",
-                    ).props("push").classes("p-3 hover-border-white")
-
-            delete_dialog.open()
+            open_delete_dialog(spec, event.args, labels, refresh_table)
 
         _open_delete_dialog = guard(_open_delete_dialog)
 
         # ----- Delete all -----
-        if spec.show_delete_all:
-            with ui.row().classes("w-full justify-center my-4"):
-
-                def _open_delete_all_dialog() -> None:
-                    with ui.dialog() as dialog, ui.card().classes(
-                        "max-w-sm p-6"
-                    ):
-                        ui.label("Warning!").classes(
-                            "text-lg font-bold mb-2 text-[var(--vsp-blue)]"
-                        )
-                        ui.label(
-                            f"This permanently deletes every "
-                            f"{spec.entity} in this case. The deletions "
-                            f"are kept in the audit trail, but the "
-                            f"records are gone."
-                        ).classes("mb-4 text-[var(--vsp-gray)]")
-
-                        with ui.row().classes("w-full justify-end gap-2"):
-                            ui.button(
-                                "Cancel",
-                                on_click=dialog.close,
-                                color="transparent",
-                            ).props("flat").classes("p-3 hover-border-blue")
-
-                            def on_confirm_delete_all() -> None:
-                                try:
-                                    with get_session() as session:
-                                        # Loaded and deleted individually
-                                        # so each removal reaches the
-                                        # audit trail; a bulk delete
-                                        # raises no ORM events.
-                                        for record in session.query(
-                                            spec.model
-                                        ).all():
-                                            session.delete(record)
-                                except Exception as err:
-                                    log.exception(
-                                        "Could not delete every %s",
-                                        spec.entity,
-                                    )
-                                    notify_problem(
-                                        "Nothing was deleted.\n\n"
-                                        f"{explain(err, labels)}"
-                                    )
-                                    dialog.close()
-                                    return
-
-                                notify_done(
-                                    f"All {spec.entity_plural} were deleted."
-                                )
-                                dialog.close()
-                                refresh_table()
-
-                            ui.button(
-                                "Delete All",
-                                on_click=on_confirm_delete_all,
-                                color="#ef4444",
-                            ).props("push").classes("p-3 hover-border-white")
-
-                    dialog.open()
-
-                _open_delete_all_dialog = guard(_open_delete_all_dialog)
-
-                delete_all_button = ui.button(
-                    f"Delete All {spec.entity_plural.title()}",
-                    on_click=_open_delete_all_dialog,
-                    color="#ef4444",
-                ).props("push").classes("p-3 hover-border-white")
-
-                if spec.requires_case:
-                    delete_all_button.set_enabled(has_active_case())
+        settle_delete_all = delete_all_section(
+            spec, labels, refresh_table, guard
+        )
 
         refresh_table()
 
@@ -853,7 +433,6 @@ def build_crud_page(spec: CrudSpec) -> None:
             for name in spec.live_defaults:
                 spec_field = next(f for f in form_fields if f.name == name)
                 form_widgets[name].set_value(spec_field.default())
-            if spec.show_delete_all and spec.requires_case:
-                delete_all_button.set_enabled(has_active_case())
+            settle_delete_all()
 
         refresh_on_change(_live_refresh)

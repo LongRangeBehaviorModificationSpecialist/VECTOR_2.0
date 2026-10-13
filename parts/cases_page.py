@@ -50,6 +50,8 @@ SPEC = CrudSpec(
     # A case is cleared through Start New Case on the home page, which
     # removes everything recorded against it rather than this table alone.
     show_delete_all=False,
+    # One row: a search box over it would be noise.
+    searchable=False,
     # Nor a delete button on the row, for the same reason: deleting the case
     # alone left its agents, rooms, evidence and notes for the next case.
     allow_delete=False,

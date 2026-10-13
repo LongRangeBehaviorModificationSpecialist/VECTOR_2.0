@@ -196,7 +196,7 @@ def test_a_failed_csv_import_leaves_the_case_unchanged(
         out_dir,
         notices
 ):
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
 
     # EVIDENCE.csv gains a second item 1. The tables before it in the
     # archive -- AGENTS and CASES -- used to be replaced before this failed.
@@ -227,7 +227,7 @@ def test_a_failed_json_import_leaves_the_case_unchanged(
         out_dir,
         notices
 ):
-    exported = import_export.export_vector_to_json(destination=out_dir)
+    exported = import_export.export_vector_to_json(destination=out_dir).zip_path
     payload = json.loads(exported.read_text(encoding="utf-8"))
     records = payload["tables"]["EVIDENCE"]["records"]
     records.append(dict(records[0]))
@@ -255,7 +255,7 @@ def test_importing_a_case_without_attachments_removes_the_old_ones(
     """An archive with no files folder used to leave the previous case's
     attachments in place, and wrote no import record.
     """
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
     _add_attachment("previous_case.jpg")
     with get_session() as session:
         imports_before = session.query(AuditLog).filter_by(
@@ -286,6 +286,25 @@ def test_a_csv_export_that_cannot_copy_attachments_stops(
     assert import_export.export_vector_to_csv(destination=out_dir) is None
     assert list(out_dir.iterdir()) == []
     assert any("Nothing was downloaded" in n for n in notices), notices
+
+
+@pytest.mark.parametrize("export", ["export_vector_to_csv",
+                                    "export_vector_to_json"])
+def test_an_export_that_cannot_be_recorded_is_not_handed_over(
+        populated,
+        out_dir,
+        notices,
+        monkeypatch,
+        export,
+):
+    """An export the audit trail cannot record is not handed over. A
+    failure before the record was begun raised again in the handler,
+    which named a variable not yet set."""
+    monkeypatch.setattr(import_export, "Cases", object())
+
+    assert getattr(import_export, export)(destination=out_dir) is None
+    assert any("could not be recorded in the audit trail" in n
+               for n in notices), notices
 
 
 def test_a_json_export_that_cannot_embed_attachments_stops(
@@ -328,10 +347,12 @@ def test_editing_and_deleting_move_the_version(populated):
 
 def test_reading_does_not_move_the_version(populated):
     before = models.data_version()
+    trail_before = models.audit_version()
     with get_session() as session:
         session.query(Agents).all()
         session.query(Evidence).count()
     assert models.data_version() == before
+    assert models.audit_version() == trail_before
 
 
 def test_a_failed_save_does_not_move_the_version(populated):
@@ -341,8 +362,8 @@ def test_a_failed_save_does_not_move_the_version(populated):
     assert models.data_version() == before
 
 
-def test_a_sign_in_record_does_not_move_the_version():
-    """Nothing on screen shows audit rows, so no page needs reloading."""
+def test_a_sign_in_record_does_not_move_the_case_version():
+    """No table of case data changes, so those pages must not reload."""
     before = models.data_version()
     with get_session() as session:
         record_audit(
@@ -355,6 +376,26 @@ def test_a_sign_in_record_does_not_move_the_version():
     assert models.data_version() == before
 
 
+def test_a_sign_in_record_moves_the_trail_version():
+    """The Audit Trail page exists to show exactly that entry, so it
+    watches this signal instead."""
+    before = models.audit_version()
+    with get_session() as session:
+        record_audit(session, action="LOGIN", table_name="users",
+                     summary="agent", actor="agent")
+    assert models.audit_version() > before
+
+
+def test_saving_a_record_moves_both_signals():
+    """A save writes the record and its audit entry in one commit."""
+    case_before = models.data_version()
+    trail_before = models.audit_version()
+    with get_session() as session:
+        session.add(_agent("Both, Signals"))
+    assert models.data_version() > case_before
+    assert models.audit_version() > trail_before
+
+
 def test_a_bulk_wipe_moves_the_version(populated):
     before = models.data_version()
     delete_all_data()
@@ -362,7 +403,7 @@ def test_a_bulk_wipe_moves_the_version(populated):
 
 
 def test_an_import_moves_the_version(populated, out_dir, notices):
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
     before = models.data_version()
     import_export.import_vector_from_csv(str(archive))
     assert models.data_version() > before

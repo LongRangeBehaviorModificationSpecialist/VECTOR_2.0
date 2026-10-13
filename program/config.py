@@ -52,11 +52,11 @@ def _env_int(name: str, default: int) -> int:
 class Config:
     """Application metadata and runtime settings."""
 
-    version = "0.92"
+    version = "0.95"
     authors = "SSA M. Sponheimer & SuSA M. Brown"
     dept = "Virginia State Police -- NOVA/DC ICAC"
     url = "github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0"
-    updated = "10-Sep-2026"
+    updated = "30-Sep-2026"
 
     # ----- Network -----
     # Loopback by default: the app is not reachable from the network
@@ -83,6 +83,14 @@ class Config:
     # Largest export accepted back in through Import. Higher than an
     # attachment, since an export carries every attachment in the case.
     MAX_IMPORT_BYTES = _env_int("VECTOR_MAX_IMPORT_MB", 2048) * 1024 * 1024
+
+    # ----- Sessions -----
+    # A tablet left on a kitchen counter at a scene stays signed in to
+    # the case until somebody closes the browser. A device nobody has
+    # touched for this many minutes signs out, after a warning. Set
+    # VECTOR_SESSION_IDLE_MINUTES=0 for a unit whose devices never leave
+    # a hand and whose scenes run long.
+    SESSION_IDLE_MINUTES = _env_int("VECTOR_SESSION_IDLE_MINUTES", 60)
 
     # ----- Paths (re-exported for convenience) -----
     PROJECT_ROOT = PROJECT_ROOT

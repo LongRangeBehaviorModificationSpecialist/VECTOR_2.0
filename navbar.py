@@ -16,6 +16,7 @@ the same question.
 from nicegui import ui
 
 from auth import is_authenticated
+from idle import sign_out_when_idle
 from live import refresh_on_change
 from models import check_case_info
 from program.config import STATIC_DIR
@@ -37,7 +38,7 @@ def _nav_dropdown(
         label,
         icon=icon
     ).props(f"flat color=white {props}").classes(classes):
-        with ui.menu() as menu:
+        with ui.menu():
             for item_label, callback in items:
                 if item_label == "---":
                     ui.separator()
@@ -51,9 +52,17 @@ def static_url(filename: str) -> str | None:
 
     The logo files are unit branding and are not distributed with the
     source, so a fresh checkout has none of them.
+
+    A leading "/static/" or "static/" is accepted and ignored. That is
+    the address a page writes by hand, and taking it literally would
+    look for a file of that name inside static/, find nothing, and drop
+    a logo that is sitting right there.
     """
-    if (STATIC_DIR / filename).is_file():
-        return f"/static/{filename}"
+    name = filename.lstrip("/")
+    if name.startswith("static/"):
+        name = name[len("static/"):]
+    if (STATIC_DIR / name).is_file():
+        return f"/static/{name}"
     return None
 
 
@@ -86,21 +95,29 @@ NAV_PAGES = [
 ]
 
 HELP_PAGES = [
+    ("Connect a Device", "/connect"),
     ("About App", "/about"),
     ("Help", "/help"),
 ]
 
 # The row of page buttons wrapped onto as many as five lines on a phone,
 # covering a fifth of the screen on every page, and onto two on a laptop.
-# Beside the case badge and the account menu the full row needs about
-# 1,250 px with a short name, so below NAV_ROW_MIN_WIDTH the pages fold into
-# one menu button. On a phone the badge shows just the case number and the
-# account menu just its icon, so the whole bar stays on one line.
+# Below NAV_ROW_MIN_WIDTH the pages fold into one menu button instead. On
+# a phone the badge shows just the case number and the account menu just
+# its icon, so the whole bar stays on one line.
+#
+# Measured in a browser with the case badge, the account menu and a short
+# name: the row needs 1,564 px with the roomy buttons below, and about
+# 1,300 px once their padding is tightened. So the padding is tightened
+# between NAV_ROW_MIN_WIDTH and NAV_ROW_ROOMY_WIDTH -- a laptop keeps the
+# whole row rather than folding it away, and a wide screen keeps the
+# roomier buttons.
 #
 # Everything is shown or hidden with VECTOR's own classes and !important:
 # Quasar's utilities -- .block, .row -- are !important themselves, and sit
 # in a layer that outranks this CSS.
 NAV_ROW_MIN_WIDTH = 1320
+NAV_ROW_ROOMY_WIDTH = 1600
 
 _NAV_CSS = f"""
 @media (max-width: {NAV_ROW_MIN_WIDTH - 0.02}px) {{
@@ -108,6 +125,12 @@ _NAV_CSS = f"""
 }}
 @media (min-width: {NAV_ROW_MIN_WIDTH}px) {{
     .nav-narrow {{ display: none !important; }}
+}}
+@media (min-width: {NAV_ROW_MIN_WIDTH}px) and (max-width: {NAV_ROW_ROOMY_WIDTH - 0.02}px) {{
+    .nav-wide .q-btn {{
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }}
 }}
 @media (max-width: 599.98px) {{
     .nav-not-phone {{ display: none !important; }}
@@ -162,10 +185,7 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
     with ui.header().classes("items-center bg-dark no-print"):
 
         # ----- Logo + Brand -----
-        # unit_logo("/static/novadc_icac.ico", "w-[32px] h-[32px]")
-        ui.image(
-            "/static/novadc_icac.ico",
-        ).classes("w-[32px] h-[32px]")
+        unit_logo("novadc_icac.ico", "w-[32px] h-[32px]")
 
         ui.link(
             "V·E·C·T·O·R",
@@ -175,6 +195,10 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
 
         if not is_authenticated():
             return
+
+        # Every signed-in page draws this bar, so this is the one place
+        # that has to watch for a device nobody is using.
+        sign_out_when_idle(username)
 
         # ----- Pages: a row of buttons on a wide screen... -----
         with ui.row().classes("nav-wide items-center gap-0 no-wrap"):

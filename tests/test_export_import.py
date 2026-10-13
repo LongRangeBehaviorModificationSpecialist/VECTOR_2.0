@@ -21,6 +21,7 @@ import pytest
 import import_export
 from models import (
     Agents,
+    AuditLog,
     Cases,
     Evidence,
     Notes,
@@ -88,7 +89,7 @@ def test_export_produces_an_archive(with_attachment, out_dir):
 
 def test_export_cleans_up_its_staging_directory(with_attachment, out_dir):
     """The unzipped case must not be left behind anywhere."""
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
     assert [p.name for p in out_dir.iterdir()] == [archive.name]
     assert list(Path(tempfile.gettempdir()).iterdir()) == []
 
@@ -100,7 +101,7 @@ def test_export_without_a_destination_stages_for_download(
     """What the Export button does: build the file in a private staging
     folder for the browser to download, never on the host's Desktop.
     """
-    archive = import_export.export_vector_to_csv()
+    archive = import_export.export_vector_to_csv().zip_path
     assert archive.exists()
     assert archive.parent.parent == Path(tempfile.gettempdir())
     assert archive.parent.name.startswith("vector_export_")
@@ -116,7 +117,10 @@ def test_manifest_records_the_ingest_hash(with_attachment, out_dir):
     entry = manifest["files"][0]
     assert entry["FILENAME"] == "scene_photo.jpg"
     assert entry["FILESHA256"] == hashlib.sha256(PAYLOAD).hexdigest()
-    assert entry["FILEHASH"] == hashlib.sha256(PAYLOAD).hexdigest()
+    assert entry["FILEHASH"] == hashlib.sha256(PAYLOAD).hexdigest().upper()
+    # Recorded in lower case at collection, recomputed in capitals now:
+    # the same digest, so the file is not reported as altered.
+    assert entry["FILEHASHMATCHES"] is True
     assert entry["FILEHASHMATCHES"] is True
     assert manifest["integrity_failures"] == []
 
@@ -231,7 +235,6 @@ def test_import_is_recorded_in_the_audit_trail(with_attachment, out_dir):
     archive = next(out_dir.glob("*.zip"))
 
     from utils import delete_all_data
-    from models import AuditLog
     delete_all_data()
     import_export.import_vector_from_csv(str(archive))
 
@@ -280,7 +283,7 @@ def test_an_archive_from_before_the_renames_still_imports(tmp_path):
             "SUSPECTDOB": "03-02-1984",
             "SUSPECTADDRESS": "14 Elm Street",
             "SUSPECTPHONE": "",
-            "PERSONNOTE": "Present at entry",
+            "SUSPECTNOTE": "Present at entry",
             "ENTEREDDATETIME": "",
         }]),
         "export_manifest.json": json.dumps({"files": [{
@@ -301,11 +304,58 @@ def test_an_archive_from_before_the_renames_still_imports(tmp_path):
         person = session.query(Persons).one()
         assert person.PERSONNAME == "O'Brien, Sean"
         assert person.PERSONDOB == "03-02-1984"
+        assert person.PERSONNOTE == "Present at entry"
         restored = session.query(UploadedFiles).one()
         assert restored.FILEDATA == photo
         assert restored.FILEMIMETYPE == "image/jpeg"
         assert restored.FILEUPLOADEDBY == "Doe, John"
         assert restored.FILEHASHEDDATETIME == "2026-09-01T08:10:00Z"
+
+
+def test_an_archive_from_before_personnote_still_imports(tmp_path):
+    """Exports made before PERSONS.SUSPECTNOTE became PERSONNOTE and the
+    manifest's FILEHASHEDAT became FILEHASHEDDATETIME -- every export
+    made with the version in use until now."""
+    photo = b"photo-from-the-version-before"
+    archive = tmp_path / "before_personnote.zip"
+    _zip(archive, {
+        "CASES.csv": _csv([{
+            "Z_PK": "1",
+            "CASENUMBER": "26-BEFORE",
+            "LOCATION": "1 Old Road",
+            "JURISDICTION": "Fairfax County",
+            "CASEDATETIMEBEGIN": "09-01-2026 08:00",
+            "CASEDATETIMEEND": "",
+        }]),
+        "PERSONS.csv": _csv([{
+            "Z_PK": "1",
+            "PERSONNAME": "Doe, Jane",
+            "PERSONDOB": "",
+            "PERSONADDRESS": "",
+            "PERSONPHONE": "",
+            "SUSPECTNOTE": "Resident, cooperative",
+            "ENTEREDDATETIME": "",
+        }]),
+        "export_manifest.json": json.dumps({"files": [{
+            "FILENAME": "scene.jpg",
+            "FILEHASH": hashlib.sha256(photo).hexdigest(),
+            "FILESHA256": hashlib.sha256(photo).hexdigest(),
+            "FILEHASHEDAT": "09-01-2026 08:10:00 -0400",
+            "FILEMIMETYPE": "image/jpeg",
+            "FILEUPLOADEDBY": "Doe, John",
+        }]}),
+        "files/scene.jpg": photo,
+    })
+
+    import_export.import_vector_from_csv(str(archive))
+
+    with get_session() as session:
+        assert session.query(Persons).one().PERSONNOTE == (
+            "Resident, cooperative"
+        )
+        restored = session.query(UploadedFiles).one()
+        assert restored.FILEDATA == photo
+        assert restored.FILEHASHEDDATETIME == "09-01-2026 08:10:00 -0400"
 
 
 def test_an_archive_from_upstream_keeps_its_evidence(tmp_path):
@@ -348,7 +398,26 @@ def test_an_archive_from_upstream_keeps_its_evidence(tmp_path):
         assert session.query(Evidence).one().EVIDDESC == "Laptop"
         restored = session.query(UploadedFiles).one()
         assert restored.FILEDATA == photo
-        assert restored.FILESHA256 == digest
+        # Nothing recorded at collection, so the digest taken on arrival
+        # stands in -- in capitals, as VECTOR now writes them.
+        assert restored.FILESHA256 == digest.upper()
+        # The manifest's lower-case digest is the same one: no mismatch.
+        entry = (
+            session.query(AuditLog)
+            .filter(AuditLog.action == "IMPORT")
+            .one()
+        )
+        assert json.loads(entry.after)["hash_mismatches"] == []
+
+
+def test_a_lower_case_digest_is_the_same_digest():
+    """Hex is not case-sensitive, and attachments collected before the
+    change to capitals carry lower-case digests."""
+    digest = hashlib.sha256(b"photo").hexdigest()
+    assert import_export.same_hash(digest, digest.upper())
+    assert import_export.same_hash(f" {digest}\n", digest.upper())
+    assert not import_export.same_hash(digest, hashlib.sha256(b"x").hexdigest())
+    assert not import_export.same_hash("", digest)
 
 
 # ----- Attachments that share a name -----
@@ -374,7 +443,7 @@ def test_attachments_sharing_a_name_all_survive_the_round_trip(case, out_dir):
                 )
             )
 
-    archive = import_export.export_vector_to_csv(destination=out_dir)
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
     with zipfile.ZipFile(archive) as zf:
         stored = [n for n in zf.namelist() if n.startswith("files/")]
     assert len({name.lower() for name in stored}) == 3
@@ -392,6 +461,50 @@ def test_attachments_sharing_a_name_all_survive_the_round_trip(case, out_dir):
 
 
 # ----- Staging cleanup -----
+
+@pytest.mark.parametrize(
+    "typed, safe",
+    [
+        ("26-1234", "26-1234"),
+        ("26:1234", "26_1234"),
+        ('ICAC?26 "A"', "ICAC_26_A"),
+        ('"26-1234"', "26-1234"),
+        ("a/b\\c|d*e<f>g", "a_b_c_d_e_f_g"),
+        ("case.", "case"),
+        ("", "UNKNOWN"),
+    ],
+)
+def test_a_case_number_becomes_a_file_name_windows_accepts(typed, safe):
+    assert import_export.safe_file_name(typed) == safe
+
+
+def test_a_case_number_windows_would_refuse_still_exports(case, out_dir):
+    """The case number names the export. With a colon or a question mark
+    in it the export stopped with "Could not start the export"."""
+    with get_session() as session:
+        session.query(Cases).one().CASENUMBER = "26:1234?A"
+
+    result = import_export.export_vector_to_csv(destination=out_dir)
+
+    assert result is not None
+    assert result.zip_path.is_file()
+    assert result.zip_path.name.startswith("26_1234_A_")
+
+
+def test_an_archive_named_in_capitals_imports(with_attachment, out_dir):
+    """A copy that arrives as CASE.ZIP is the same archive."""
+    archive = import_export.export_vector_to_csv(destination=out_dir).zip_path
+    shouted = archive.with_name("CASE.ZIP")
+    archive.rename(shouted)
+    from utils import delete_all_data
+    delete_all_data()
+
+    import_export.import_vector_from_csv(str(shouted))
+
+    with get_session() as session:
+        assert session.query(Cases).count() == 1
+        assert session.query(UploadedFiles).one().FILEDATA == PAYLOAD
+
 
 def test_stale_staging_is_removed_and_recent_staging_kept(out_dir):
     import os

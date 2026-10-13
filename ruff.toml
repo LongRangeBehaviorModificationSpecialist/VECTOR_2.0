@@ -1,0 +1,15 @@
+# Errors, not style.
+#
+# The suite catches behaviour; this catches the mistakes that hide until
+# a page is opened -- a name that does not exist, an import left behind
+# by code that moved, a value assigned and never read. Splitting the long
+# page builders produced one of each, and only a simulation caught them.
+#
+# Style rules are deliberately not enabled: this codebase has its own
+# conventions and a linter arguing about them would be noise.
+
+line-length = 100
+exclude = [".venv", "docs", "scratchpad", "__pycache__"]
+
+[lint]
+select = ["E9", "F"]

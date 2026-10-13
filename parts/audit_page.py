@@ -16,7 +16,8 @@ from nicegui import ui
 
 from auth import get_current_user_name, get_is_admin
 import clock
-from models import get_session, AuditLog
+from live import refresh_on_change
+from models import audit_version, get_session, verify_audit_chain, AuditLog
 from navbar import build_navbar
 
 
@@ -30,8 +31,14 @@ ACTION_CHOICES = [
     "IMPORT",
     "LOGIN",
     "LOGIN_FAILED",
-    "UPDATE",
+    "LOGOUT_IDLE",
+    "SETTING_CHANGED",
 ]
+
+# A long case runs to thousands of entries, and all of them at once is a
+# page nobody can read. Older ones are a button away rather than out of
+# reach, which they were when the newest 500 were all the page would show.
+PAGE_SIZE = 500
 
 
 def _format_changes(before: str | None, after: str | None) -> str:
@@ -58,6 +65,34 @@ def _format_changes(before: str | None, after: str | None) -> str:
     return "\n".join(lines)
 
 
+def show_chain_check() -> None:
+    """Walks the fingerprint chain and says what it found."""
+    intact, message = verify_audit_chain()
+
+    with ui.dialog() as result, ui.card().classes("max-w-md p-6"):
+        ui.label("Check of the audit trail").classes(
+            "text-lg font-bold mb-2"
+        )
+        ui.label(message).classes(
+            "text-sm mb-4 "
+            + ("text-green-400" if intact else "text-red-400")
+        )
+        ui.label(
+            "The check finds an entry changed or removed after it was "
+            "written. It cannot prove the trail is complete on its own, "
+            "because anyone able to write to the database could "
+            "recompute the chain: keep exports, which carry the trail as "
+            "it stood when they were made."
+        ).classes("text-xs text-gray-400 mb-4")
+
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Close", on_click=result.close).props("flat").classes(
+                "p-3 hover-border-blue"
+            )
+
+    result.open()
+
+
 def build_audit_page() -> None:
     """Builds the audit trail page."""
 
@@ -76,7 +111,9 @@ def build_audit_page() -> None:
 
         ui.label(
             "Every change to case data, in the order it happened. "
-            "Append-only -- entries cannot be edited or removed."
+            "Append-only -- entries cannot be edited or removed. Each "
+            "entry is fingerprinted onto the one before it, and Check "
+            "the trail walks that chain."
         ).classes("text-sm text-gray-400 mb-4 text-center max-w-2xl")
 
         with ui.row().classes(
@@ -94,13 +131,29 @@ def build_audit_page() -> None:
 
             ui.button(
                 "Search",
-                on_click=lambda: refresh_audit_table(),
+                on_click=lambda: search_again(),
                 color="var(--vsp-blue)",
             ).props("push").classes("p-3 hover-border-white")
 
+            ui.button(
+                "Check the trail",
+                on_click=lambda: show_chain_check(),
+            ).props("flat").classes("p-3 hover-border-blue")
+
         table_container = ui.column().classes(
-            "w-full max-w-6xl mx-auto items-center gap-2"
+            "w-full max-w-[1536px] px-2 mx-auto items-center gap-2"
         )
+
+        shown = {"limit": PAGE_SIZE}
+
+        def search_again() -> None:
+            """A new search starts at the newest entries again."""
+            shown["limit"] = PAGE_SIZE
+            refresh_audit_table()
+
+        def show_older() -> None:
+            shown["limit"] += PAGE_SIZE
+            refresh_audit_table()
 
         def refresh_audit_table() -> None:
             table_container.clear()
@@ -122,7 +175,12 @@ def build_audit_page() -> None:
                         | AuditLog.summary.ilike(like)
                     )
 
-                entries = query.order_by(AuditLog.id.desc()).limit(500).all()
+                matching = query.count()
+                entries = (
+                    query.order_by(AuditLog.id.desc())
+                    .limit(shown["limit"])
+                    .all()
+                )
 
                 rows = [
                     {
@@ -148,10 +206,12 @@ def build_audit_page() -> None:
                     ).classes("text-gray-500 italic")
                     return
 
-                ui.label(
-                    f"Showing {len(rows)} of {total} entries, "
-                    "most recent first."
-                ).classes("text-xs text-gray-500 mb-1")
+                counted = f"Showing {len(rows)} of {matching} entries"
+                if matching != total:
+                    counted += f" that match, out of {total} in the trail"
+                ui.label(f"{counted}, most recent first.").classes(
+                    "text-xs text-gray-500 mb-1"
+                )
 
                 columns = [
                     {
@@ -237,7 +297,19 @@ def build_audit_page() -> None:
                     """,
                 )
 
-        action_filter.on_value_change(lambda _: refresh_audit_table())
-        search_input.on("keydown.enter", lambda: refresh_audit_table())
+                if len(rows) < matching:
+                    remaining = matching - len(rows)
+                    ui.button(
+                        f"Show {min(PAGE_SIZE, remaining)} older "
+                        f"{'entry' if remaining == 1 else 'entries'}",
+                        on_click=show_older,
+                    ).props("flat").classes("p-3 mt-2 hover-border-blue")
+
+        action_filter.on_value_change(lambda _: search_again())
+        search_input.on("keydown.enter", search_again)
 
         refresh_audit_table()
+
+        # Follows the trail itself rather than case data: a sign-in on
+        # another device writes an entry and changes nothing else.
+        refresh_on_change(refresh_audit_table, version=audit_version)

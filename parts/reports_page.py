@@ -32,10 +32,13 @@ WORKFLOW FOR REPORT CREATION:
 
 from html import escape
 from nicegui import ui
+import json
+
 from sqlalchemy import func
 
 import clock
 from failures import explain, log
+import settings
 from models import (
     get_session,
     Agents,
@@ -52,10 +55,12 @@ from utils import (
     CASE_TIME_FORMAT,
     CONFIRM_TIMEOUT,
     WARN_TIMEOUT,
+    ZERO_TIMEOUT,
     evidence_number_key,
     get_case_info,
     get_print_date_time,
     parse_entered_date,
+    set_report_print_date,
     room_display_key,
     room_label_key,
 )
@@ -131,6 +136,8 @@ def build_reports_page() -> None:
             ui.label("|").classes("font-bold text-[var(--vsp-blue)]")
             ui.label("Reports Page")
 
+        _printed_date_switch()
+
     _remind_about_end_time()
 
     # ----- First row of buttons -----
@@ -165,6 +172,42 @@ def build_reports_page() -> None:
                 on_click=lambda url=v["page_url"]: ui.navigate.to(url),
                 color=style["color"],
             ).props(style["props"]).classes(style["classes"])
+
+def _printed_date_switch() -> None:
+    """Whether each report says when it was printed. Off by default; it
+    is this machine's choice, kept with its other settings, and every
+    change is in the audit trail."""
+
+    def on_change(event) -> None:
+        try:
+            set_report_print_date(bool(event.value), get_current_user_name())
+        except Exception as err:
+            log.exception("Could not change the printed-date setting")
+            ui.notify(
+                f"The setting was not changed.\n\n{explain(err)}",
+                multi_line=True,
+                classes="multi-line-notification",
+                type="warning",
+                timeout=ZERO_TIMEOUT,
+                position="center",
+                close_button="OK",
+            )
+            return
+        ui.notify(
+            "Reports now show when they were printed."
+            if event.value else
+            "Reports no longer show when they were printed.",
+            timeout=CONFIRM_TIMEOUT,
+            position="bottom",
+            close_button="OK",
+        )
+
+    ui.switch(
+        "Show the date and time each report is printed",
+        value=settings.report_print_date(),
+        on_change=on_change,
+    ).classes("text-sm text-[var(--vsp-gray)] mt-2")
+
 
 # ----- Order -----
 # Item numbers and room labels are text. Ordered by the database, the
@@ -274,7 +317,7 @@ def _remind_about_end_time() -> None:
                         f"Could not save the end time.\n\n{explain(err)}",
                         multi_line=True,
                         type="warning",
-                        timeout=WARN_TIMEOUT,
+                        timeout=ZERO_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -300,7 +343,13 @@ def _remind_about_end_time() -> None:
 
 
 def render_report_page(html_content: str) -> None:
-    """Wraps report HTML with navigation and print button."""
+    """Wraps report HTML with navigation and print button.
+
+    The button sits outside the report: the print window copies
+    everything inside #report-container, and with the button in there it
+    showed a second "Print Report" -- as "printPrint Report", its icon's
+    name standing in for an icon the print window has no font for.
+    """
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -308,14 +357,23 @@ def render_report_page(html_content: str) -> None:
 
     with ui.column().classes("w-full items-center"):
 
-        with ui.element().props("id='report-container'").classes("w-full"):
-
-            ui.button(
+        with ui.row().classes("w-full no-print"):
+            print_button = ui.button(
                 "Print Report",
-                on_click=open_report_window,
                 color="#1C69A8").props("push icon=print"
             ).classes("p-3 mb-4 no-print hover-border-white")
 
+        is_valid, errors = validate_case_for_report()
+        if is_valid:
+            # Opened in the browser by the click itself. Opened from the
+            # server after the click had made the round trip, the window
+            # was not the click's any more, and pop-up blockers -- Safari
+            # on an iPad by default -- stopped it.
+            print_button.on("click", js_handler=print_window_script())
+        else:
+            print_button.on_click(lambda: show_validation_errors(errors))
+
+        with ui.element().props("id='report-container'").classes("w-full"):
             ui.html(html_content)
 
 
@@ -686,7 +744,16 @@ def build_case_header_html(
         # the whole report route returns a 500 instead of redirecting.
         return ""
 
-    print_date_time = get_print_date_time()
+    # Off unless asked for on the Reports page: a time on the page that
+    # is neither when the search began nor when it ended invites the
+    # question of which one it is.
+    printed_row = ""
+    if settings.report_print_date():
+        printed_row = f"""
+            <tr>
+                <td class="header-data-label font-11">Report Printed Date:</td>
+                <td class="header-data-value font-11">{get_print_date_time()}</td>
+            </tr>"""
 
     report_header_table = f"""
     <div class="top-table">
@@ -715,10 +782,7 @@ def build_case_header_html(
                     {h(active_case["CASEDATETIMEEND"])}
                 </td>
             </tr>
-            <tr>
-                <td class="header-data-label font-11">Report Printed Date:</td>
-                <td class="header-data-value font-11">{print_date_time}</td>
-            </tr>
+            {printed_row}
         </table>
     </div>"""
 
@@ -931,9 +995,10 @@ def build_evidence_by_room_report_html(
         room_name = room[0]
         item_count = room[1]
 
-        # Singular vs plural
+        # Singular vs plural. Escaped once, where it is printed: escaped
+        # here as well, "Kid's Room" printed as "Kid&#x27;s Room".
         label = (
-            f"{h(room_name)}{space}:{double_space}({item_count} "
+            f"{room_name}{space}:{double_space}({item_count} "
             f"{'item' if item_count == 1 else 'items'})"
         )
 
@@ -977,7 +1042,7 @@ def build_evidence_by_room_report_html(
                 </td>
             </tr>
             <tr>
-                <td class="evid-data-label">Where Found</td>
+                <td class="evid-data-label">Where Found:</td>
                 <td class="evid-data-value px-6">
                     {h(e["EVIDLOCROOMDETAIL"])}
                 </td>
@@ -1036,7 +1101,7 @@ def build_evidence_by_room_report_html(
                 {evid_rows}
             </table>
         </div>
-        </br />"""
+        <br />"""
 
     header = build_case_header_html(
         active_case,
@@ -1611,17 +1676,7 @@ def print_files_report():
 
     with get_session() as session:
         active_case = get_case_info()
-        files = [
-            {
-                "Z_PK": f.Z_PK,
-                "FILENAME": f.FILENAME,
-                "FILEMIMETYPE": f.FILEMIMETYPE or "",
-                "FILEUPLOADDATE": f.FILEUPLOADDATE or "",
-                "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
-                "FILESHA256": f.FILESHA256 or "",
-            }
-            for f in session.query(UploadedFiles).order_by(UploadedFiles.Z_PK).all()
-        ]
+        files = files_report_rows(session)
 
         html = build_files_report_html(
             active_case=active_case,
@@ -1631,61 +1686,68 @@ def print_files_report():
     render_report_page(html_content=html)
 
 
-def open_report_window():
-    """Extracts the report innerHTML and opens it in a clean new tab.
+def files_report_rows(session) -> list[dict]:
+    """The attachments as the Files report lists them.
 
-    The report can be printed after validation has occured.
+    The attachment itself is not read: FILEDATA is deferred, and nothing
+    here touches it.
     """
+    return [
+        {
+            "Z_PK": f.Z_PK,
+            "FILENAME": f.FILENAME,
+            "FILEMIMETYPE": f.FILEMIMETYPE or "",
+            # Stored in UTC. Printed raw it read as a local time four
+            # or five hours out; shown in this machine's zone, with its
+            # offset, as the Files page shows it.
+            "FILEUPLOADDATE": (
+                clock.show_utc(f.FILEUPLOADDATE)
+                if f.FILEUPLOADDATE else ""
+            ),
+            "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
+            "FILESHA256": (f.FILESHA256 or "").upper(),
+        }
+        for f in session.query(UploadedFiles).order_by(UploadedFiles.Z_PK)
+    ]
 
-    # Validate all of the requirements are met before opening the report
-    is_valid, errors = validate_case_for_report()
-    if not is_valid:
-        show_validation_errors(errors)
-        return
 
-    REPORT_PRINT_STYLES = COMMON_STYLES.replace('"', '\\"')
+def print_window_script() -> str:
+    """The browser-side handler that opens the report in a print window.
 
-    ui.run_javascript(f"""
-        const reportContent = document.getElementById('report-container');
-        if (!reportContent) {{
+    The report's own HTML is copied into a clean page with the report
+    styles, a Print and a Close button, and the print dialog opened after
+    a moment. Run by the click in the browser, not from the server: see
+    render_report_page().
+    """
+    return """() => {
+        const report = document.getElementById('report-container');
+        if (!report) {
             alert('No report content found to print.');
             return;
-        }}
+        }
 
-        const html = reportContent.innerHTML;
-
-        const newWindow = window.open('', '_blank');
-        if (!newWindow) {{
-            alert('Pop-up blocked. Please allow pop-ups for this site.');
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('The browser blocked the print window. Allow pop-ups '
+                + 'for this address, or press Ctrl+P on this page.');
             return;
-        }}
+        }
 
-        const fullHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V·E·C·T·O·R</title>
-    <style>
-        {REPORT_PRINT_STYLES}
-    </style>
-</head>
-<body>
-    <div class="print-toolbar no-print">
-        <button class="print-btn" onclick="window.print()">🖨️ Print Report</button>
-        <button class="close-btn" onclick="window.close()">✕ Close</button>
-    </div>
-    <div class="report-body">
-        ${{html}}
-    </div>
-    <script>
-        // Auto-trigger print dialog after a short delay
-        setTimeout(() => {{ window.print(); }}, 500);
-    </script>
-</body>
-</html>`;
-
-        newWindow.document.write(fullHtml);
-        newWindow.document.close();
-        """
-    )
+        printWindow.document.write(
+            '<!DOCTYPE html><html lang="en"><head>'
+            + '<meta charset="UTF-8">'
+            + '<meta name="viewport" content="width=device-width, '
+            + 'initial-scale=1.0">'
+            + '<title>V·E·C·T·O·R</title>'
+            + '<style>' + STYLES + '</style></head><body>'
+            + '<div class="print-toolbar no-print">'
+            + '<button class="print-btn" onclick="window.print()">'
+            + '🖨️ Print Report</button> '
+            + '<button class="close-btn" onclick="window.close()">'
+            + '✕ Close</button></div>'
+            + '<div class="report-body">' + report.innerHTML + '</div>'
+            + '<scr' + 'ipt>setTimeout(() => window.print(), 500);</scr'
+            + 'ipt></body></html>'
+        );
+        printWindow.document.close();
+    }""".replace("STYLES", json.dumps(COMMON_STYLES))

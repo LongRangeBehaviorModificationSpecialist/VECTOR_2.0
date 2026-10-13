@@ -45,7 +45,7 @@ CREATE TABLE "PERSONS" (
     "SUSPECTDOB" VARCHAR,
     "SUSPECTADDRESS" VARCHAR,
     "SUSPECTPHONE" VARCHAR,
-    "PERSONNOTE" TEXT,
+    "SUSPECTNOTE" TEXT,
     "ENTEREDDATETIME" VARCHAR
 );
 CREATE TABLE "files" (
@@ -203,11 +203,11 @@ def test_person_columns_are_renamed(legacy_database):
     assert not {
         c for c in columns
         if c.startswith("SUSPECT")
-    } - {"SUSPECTNOTE"}
+    }
 
     connection = sqlite3.connect(legacy_database)
     row = connection.execute(
-        'SELECT "PERSONNAME", "PERSONDOB", "SUSPECTNOTE" FROM "PERSONS"'
+        'SELECT "PERSONNAME", "PERSONDOB", "PERSONNOTE" FROM "PERSONS"'
     ).fetchone()
     connection.close()
     assert row == ("O'Brien, Sean", "03-02-1984", "Present")
@@ -257,6 +257,101 @@ def test_new_columns_are_added_to_an_old_files_table(legacy_database):
     models.upgrade_database()
     columns = _columns(legacy_database, "FILES")
     assert {"FILESHA256", "FILEHASHEDDATETIME", "FILENOTE"} <= columns
+
+
+def test_a_database_from_before_the_note_and_hash_renames_opens(
+        tmp_path, monkeypatch):
+    """PERSONS.SUSPECTNOTE became PERSONNOTE and FILES.FILEHASHEDAT became
+    FILEHASHEDDATETIME. A database made before that has to open, with the
+    notes and the hashing times where the application now looks."""
+    path = tmp_path / "before_renames.db"
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        'CREATE TABLE "PERSONS" ("Z_PK" INTEGER PRIMARY KEY, '
+        '"PERSONNAME" VARCHAR NOT NULL, "PERSONDOB" VARCHAR, '
+        '"PERSONADDRESS" VARCHAR, "PERSONPHONE" VARCHAR, '
+        '"SUSPECTNOTE" TEXT, "ENTEREDDATETIME" VARCHAR);'
+        'CREATE TABLE "FILES" ("Z_PK" INTEGER PRIMARY KEY, '
+        '"FILENAME" VARCHAR NOT NULL, "FILEDATA" BLOB NOT NULL, '
+        '"FILESHA256" VARCHAR(64), "FILEHASHEDAT" VARCHAR);'
+    )
+    connection.execute(
+        'INSERT INTO "PERSONS" ("PERSONNAME", "SUSPECTNOTE") VALUES (?, ?)',
+        ("Doe, Jane", "Present at entry"),
+    )
+    connection.execute(
+        'INSERT INTO "FILES" ("FILENAME", "FILEDATA", "FILEHASHEDAT") '
+        "VALUES (?, ?, ?)",
+        ("scene.jpg", b"photo", "09-01-2026 08:10:00 -0400"),
+    )
+    connection.commit()
+    connection.close()
+
+    engine = _engine_for(path)
+    monkeypatch.setattr(models, "engine", engine)
+    monkeypatch.setattr(models, "APP_DB_PATH", path)
+    try:
+        models._rename_legacy_schema()
+    finally:
+        engine.dispose()
+
+    assert "PERSONNOTE" in _columns(path, "PERSONS")
+    assert "SUSPECTNOTE" not in _columns(path, "PERSONS")
+    assert "FILEHASHEDDATETIME" in _columns(path, "FILES")
+
+    connection = sqlite3.connect(path)
+    note = connection.execute('SELECT "PERSONNOTE" FROM "PERSONS"').fetchone()
+    hashed = connection.execute(
+        'SELECT "FILEHASHEDDATETIME" FROM "FILES"'
+    ).fetchone()
+    connection.close()
+    assert note == ("Present at entry",)
+    assert hashed == ("09-01-2026 08:10:00 -0400",)
+
+
+def test_hashing_times_are_carried_over_when_both_columns_exist(
+        tmp_path, monkeypatch):
+    """A version that added FILEHASHEDDATETIME empty, beside the old
+    FILEHASHEDAT, left the old times where nothing reads them. They are
+    copied across; anything already in the new column is kept."""
+    path = tmp_path / "both_columns.db"
+    connection = sqlite3.connect(path)
+    connection.execute(
+        'CREATE TABLE "FILES" ("Z_PK" INTEGER PRIMARY KEY, '
+        '"FILENAME" VARCHAR NOT NULL, "FILEDATA" BLOB NOT NULL, '
+        '"FILEHASHEDAT" VARCHAR, "FILEHASHEDDATETIME" VARCHAR)'
+    )
+    connection.executemany(
+        'INSERT INTO "FILES" ("FILENAME", "FILEDATA", "FILEHASHEDAT", '
+        '"FILEHASHEDDATETIME") VALUES (?, ?, ?, ?)',
+        [
+            ("old.jpg", b"a", "09-01-2026 08:10:00 -0400", None),
+            ("new.jpg", b"b", None, "09-28-2026 10:00:00 -0400"),
+        ],
+    )
+    connection.commit()
+    connection.close()
+
+    engine = _engine_for(path)
+    monkeypatch.setattr(models, "engine", engine)
+    monkeypatch.setattr(models, "APP_DB_PATH", path)
+    try:
+        models._rename_legacy_schema()
+        # And nothing more to do the second time.
+        models._rename_legacy_schema()
+    finally:
+        engine.dispose()
+
+    connection = sqlite3.connect(path)
+    rows = connection.execute(
+        'SELECT "FILENAME", "FILEHASHEDDATETIME" FROM "FILES" ORDER BY "Z_PK"'
+    ).fetchall()
+    connection.close()
+    assert rows == [
+        ("old.jpg", "09-01-2026 08:10:00 -0400"),
+        ("new.jpg", "09-28-2026 10:00:00 -0400"),
+    ]
+    assert len(list(tmp_path.glob("both_columns.db.bak-*"))) == 1
 
 
 # ----- Constraint rebuilds -----
