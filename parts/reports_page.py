@@ -233,7 +233,7 @@ def rooms_with_item_counts(session) -> list[tuple[str, int]]:
     """Each room evidence was found in, with its item count, in label order."""
     counts = (
         session.query(
-            Evidence.EVIDLOCROOM, 
+            Evidence.EVIDLOCROOM,
             func.count(Evidence.EVIDLOCROOM)
         )
         .group_by(Evidence.EVIDLOCROOM)
@@ -390,6 +390,8 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
     with get_session() as session:
 
         case = session.query(Cases).first()
+        evidence = session.query(Evidence).all()
+        rooms = session.query(Rooms).all()
 
         if not case:
             errors.append(
@@ -412,6 +414,10 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
         # Check Start Date/Time (required for complete reports)
         if not case.CASEDATETIMEBEGIN:
             errors.append("Start Date/Time is required for reports.")
+
+        for room in rooms:
+            if not room.ROOMFIRSTAGENT or not room.ROOMSECONDAGENT:
+                errors.append(f"Two agents are required for Room {room.ROOMLABEL}")
 
     return (len(errors) == 0, errors)
 

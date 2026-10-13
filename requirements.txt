@@ -9,8 +9,9 @@
 #     .venv/bin/pip install -r requirements.txt      (macOS / Linux)
 #     .venv\Scripts\pip install -r requirements.txt  (Windows)
 
-nicegui~=3.16
-SQLAlchemy~=2.0
-marshmallow~=4.3
 bcrypt~=5.0
+filetype~=1.2
+marshmallow~=4.3
+nicegui~=3.16
 pyzipper~=0.4
+SQLAlchemy~=2.0
