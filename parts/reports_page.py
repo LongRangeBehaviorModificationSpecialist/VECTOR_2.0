@@ -60,6 +60,7 @@ from utils import (
     get_case_info,
     get_print_date_time,
     parse_entered_date,
+    set_redact_agent_report,
     set_report_print_date,
     room_display_key,
     room_label_key,
@@ -106,6 +107,7 @@ report_buttons = {
     },
 }
 
+REDACTED = "[REDACTED]"
 
 # ----- HTML Escaping -----
 def h(value) -> str:
@@ -116,6 +118,24 @@ def h(value) -> str:
     window.
     """
     return escape("" if value is None else str(value))
+
+
+def open_report(url: str) -> None:
+    """Opens a report, after the checks that report needs."""
+    if url == "/reports/rooms":
+        missing = rooms_missing_agents()
+        if missing:
+            ui.notify(
+                rooms_missing_agents_message(missing),
+                multi_line=True,
+                classes="multi-line-notification",
+                type="warning",
+                timeout=WARN_TIMEOUT,
+                position="center",
+                close_button="OK",
+            )
+            return
+    ui.navigate.to(url)
 
 
 def build_reports_page() -> None:
@@ -137,6 +157,7 @@ def build_reports_page() -> None:
             ui.label("Reports Page")
 
         _printed_date_switch()
+        _redact_agent_report()
 
     _remind_about_end_time()
 
@@ -147,7 +168,8 @@ def build_reports_page() -> None:
         for k, v in list(report_buttons.items())[0:3]:
             ui.button(
                 v["text"],
-                on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                # on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                on_click=lambda url=v["page_url"]: open_report(url),
                 color=style["color"],
             ).props(style["props"]).classes(style["classes"])
 
@@ -158,7 +180,8 @@ def build_reports_page() -> None:
         for k, v in list(report_buttons.items())[3:6]:
             ui.button(
                 v["text"],
-                on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                # on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                on_click=lambda url=v["page_url"]: open_report(url),
                 color=style["color"],
             ).props(style["props"]).classes(style["classes"])
 
@@ -169,14 +192,18 @@ def build_reports_page() -> None:
         for k, v in list(report_buttons.items())[6:]:
             ui.button(
                 v["text"],
-                on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                # on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                on_click=lambda url=v["page_url"]: open_report(url),
                 color=style["color"],
             ).props(style["props"]).classes(style["classes"])
 
+
 def _printed_date_switch() -> None:
-    """Whether each report says when it was printed. Off by default; it
-    is this machine's choice, kept with its other settings, and every
-    change is in the audit trail."""
+    """Whether each report says when it was printed.
+
+    Off by default; it is this machine's choice, kept with its other settings,
+    and every change is in the audit trail.
+    """
 
     def on_change(event) -> None:
         try:
@@ -209,6 +236,44 @@ def _printed_date_switch() -> None:
     ).classes("text-sm text-[var(--vsp-gray)] mt-2")
 
 
+def _redact_agent_report() -> None:
+    """Whether the Agent List report hides agents' phone numbers and emails.
+
+    Off by default; it is this machine's choice, kept with its other
+    settings, and every change is in the audit trail.
+    """
+
+    def on_change(event) -> None:
+        try:
+            set_redact_agent_report(bool(event.value), get_current_user_name())
+        except Exception as err:
+            log.exception("Could not change the agent redaction setting")
+            ui.notify(
+                f"The setting was not changed.\n\n{explain(err)}",
+                multi_line=True,
+                classes="multi-line-notification",
+                type="warning",
+                timeout=ZERO_TIMEOUT,
+                position="center",
+                close_button="OK",
+            )
+            return
+        ui.notify(
+            "The Agent List now hides phone numbers and emails."
+            if event.value else
+            "The Agent List now shows phone numbers and emails.",
+            timeout=CONFIRM_TIMEOUT,
+            position="bottom",
+            close_button="OK",
+        )
+
+    ui.switch(
+        "Redact agent phone numbers and emails on the Agent List",
+        value=settings.redact_agent_report(),
+        on_change=on_change,
+    ).classes("text-sm text-[var(--vsp-gray)]")
+
+
 # ----- Order -----
 # Item numbers and room labels are text. Ordered by the database, the
 # return copy listed items 1, 10, 11, 12, 2, and room AA came between A
@@ -218,6 +283,30 @@ def evidence_in_order(session) -> list:
     return sorted(
         session.query(Evidence).all(),
         key=lambda item: evidence_number_key(item.EVIDNUM),
+    )
+
+
+def rooms_missing_agents() -> list[str]:
+    """Labels of rooms where either agent field is blank."""
+    with get_session() as session:
+        return [
+            room.ROOMLABEL
+            for room in rooms_in_order(session)
+            if not (room.ROOMFIRSTAGENT or "").strip()
+            or not (room.ROOMSECONDAGENT or "").strip()
+        ]
+
+
+def rooms_missing_agents_message(labels: list[str]) -> None:
+    """Tells the user what to fix, without listing every room."""
+    shown = ", ".join(labels[:10])
+    if len(labels) > 10:
+        shown += f", and {len(labels) - 10} more"
+    return (
+        "The Room List cannot be printed until a first and second agent "
+        "are entered for every room.\n\n"
+        f"Rooms missing an agent => {shown}.\n\n"
+        "Open the Rooms page and enter both agent names for each."
     )
 
 
@@ -415,10 +504,6 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
         if not case.CASEDATETIMEBEGIN:
             errors.append("Start Date/Time is required for reports.")
 
-        for room in rooms:
-            if not room.ROOMFIRSTAGENT or not room.ROOMSECONDAGENT:
-                errors.append(f"Two agents are required for Room {room.ROOMLABEL}")
-
     return (len(errors) == 0, errors)
 
 
@@ -537,10 +622,22 @@ COMMON_STYLES = """
         font-size: 10pt;
     }
 
+    .top-table .evid-table tr td.evid-data-label-header {
+        font-size: 10pt;
+        font-weight: bold;
+        padding: 0px 10px;
+        width: 30%
+    }
+
     .top-table .evid-table tr td.evid-data-value,
     .top-table .evid-table tr td.file-data-value {
         font-size: 12pt;
         padding: 0pt 6pt;
+    }
+
+    .top-table .evid-table tr td.spacer-row {
+        border-left: 1px solid transparent;
+        border-right: 1px solid transparent;
     }
 
     .bold {
@@ -697,7 +794,12 @@ td.header-data-value {
     text-align: left;
 }
 
+.top-table .evid-table tr td.spacer-row {
+    border-left: 1px solid transparent;
+    border-right: 1px solid transparent;
+}
 
+td.evid-data-label-header,
 td.evid-data-label,
 td.file-data-label {
     font-weight: normal;
@@ -805,16 +907,26 @@ def build_report_footer_html() -> str:
     """
 
 
-def build_agents_report_html(active_case: dict, agents: list) -> str:
-    """Generates the complete HTML for the Agent List report."""
+def build_agents_report_html(
+        active_case: dict,
+        agents: list,
+        redact_contacts: bool = False) -> str:
+    """Generates the complete HTML for the Agent List report.
+
+    With redact_contacts, each agent's phone and email are replaced by a
+    marker; the real values are never put into the HTML.
+    """
+
+    def contact(value) -> str:
+        return REDACTED if redact_contacts else h(value)
 
     agent_rows = "".join([f"""
         <tr>
             <td class="agent-table-data font-10">{h(a["AGENTNAME"])}</td>
             <td class="agent-table-data font-10">{h(a["AGENTPARENTAGENCY"])}</td>
             <td class="agent-table-data font-10">{h(a["AGENTPRIMARYROLE"])}</td>
-            <td class="agent-table-data font-10">{h(a["AGENTPHONE"])}</td>
-            <td class="agent-table-data font-10">{h(a["AGENTEMAIL"])}</td>
+            <td class="agent-table-data font-10">{contact(a["AGENTPHONE"])}</td>
+            <td class="agent-table-data font-10">{contact(a["AGENTEMAIL"])}</td>
         </tr>"""
         for a in agents]
     )
@@ -981,9 +1093,8 @@ def build_evidence_by_room_report_html(
 ) -> str:
     """Generates the complete HTML for the Evidence By Room report.
 
-    Groups evidence items under dark-background room headers with item counts.
-
-    Uses the same full detail layout as the AGENT COPY evidence report.
+    Groups evidence items under room headers with count of items found in
+    each room.
     """
 
     space = " "
@@ -1005,8 +1116,11 @@ def build_evidence_by_room_report_html(
         # Filter evidence items for this room
         room_items = [e for e in evidence if e["EVIDLOCROOM"] == room_name]
         evid_rows = "".join([f"""
+            <tr>
+                <td colspan="2" class="spacer-row">
+            </tr>
             <tr class="top-row">
-                <td class="evid-data-label bold">Item No.:</td>
+                <td class="evid-data-label-header">Item No.:</td>
                 <td class="evid-data-value px-6 bold">
                     {h(e["EVIDNUM"])}
                 </td>
@@ -1149,12 +1263,6 @@ def build_basic_evidence_report_html(
             </table>
             <table class="evid-table">
                 <tr>
-                    <td class="evid-data-label">Quantity:</td>
-                    <td class="evid-data-value px-6">
-                        {h(e["EVIDQTY"])}
-                    </td>
-                </tr>
-                <tr>
                     <td class="evid-data-label">Description:</td>
                     <td class="evid-data-value px-6">
                         {h(e["EVIDDESC"])}
@@ -1180,7 +1288,7 @@ def build_basic_evidence_report_html(
     header = build_case_header_html(
         active_case,
         page_title="SEARCH INVENTORY AND RETURN",
-        sub_title="(Return Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1467,7 +1575,8 @@ def print_agents_report():
 
     html = build_agents_report_html(
         active_case=active_case,
-        agents=agents
+        agents=agents,
+        redact_contacts=settings.redact_agent_report(),
     )
 
     render_report_page(html_content=html)
@@ -1586,6 +1695,23 @@ def print_rooms_report():
 
     if not is_authenticated():
         ui.navigate.to("/")
+        return
+
+    missing = rooms_missing_agents()
+    if missing:
+        build_navbar(
+            is_admin=get_is_admin(),
+            username=get_current_user_name(),
+        )
+        with ui.column().classes("items-center w-full mt-8 gap-4"):
+            ui.label(rooms_missing_agents_message(missing)).classes(
+                "text-lg text-center whitespace-pre-line"
+            )
+            ui.button(
+                "Go to Rooms",
+                on_click=lambda: ui.navigate.to("/rooms"),
+                color=style["color"],
+            ).props(style["props"])
         return
 
     with get_session() as session:

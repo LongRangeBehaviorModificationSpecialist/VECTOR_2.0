@@ -573,7 +573,7 @@ def confirm_new_case_handler() -> None:
                 ui.navigate.to("/cases")
 
             ui.button(
-                "Proceed (Delete All Data)",
+                "Delete All Data",
                 on_click=on_proceed,
                 color="#EF4444",
             ).props("push").classes("p-3 hover-border-white")

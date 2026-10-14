@@ -36,7 +36,7 @@ from sqlalchemy import exists, inspect
 from typing import Optional
 
 
-WARN_TIMEOUT = 4000
+WARN_TIMEOUT = 6000
 CONFIRM_TIMEOUT = 3500
 ZERO_TIMEOUT = 0
 
@@ -44,7 +44,12 @@ AGENTS_JSON_PATH = Path(__file__).parent / "parts/agents.json"
 
 
 # Types with no magic number, so only the extension can identify them.
-_EXTENSION_ONLY = {"text/plain", "text/rtf", "application/rtf", "image/svg+xml"}
+_EXTENSION_ONLY = {
+    "text/plain",
+    "text/rtf",
+    "application/rtf",
+    "image/svg+xml",
+}
 
 # Allowed MIME types for images, videos, and documents
 ALLOWED_MIME_TYPES = {
@@ -113,7 +118,7 @@ def derive_mime_type(file_name: str, data: bytes) -> str:
     guessed, _ = mimetypes.guess_type(file_name)
     if guessed in _EXTENSION_ONLY:
         return guessed
-    return "application/octet-stream"   # not in the allowlist, so rejected
+    return "application/octet-stream"  # not in the allowlist, so rejected
 
 
 def get_current_timestamp(format: str = "") -> str:
@@ -614,7 +619,8 @@ def set_network_access(allowed: bool, actor: str = "") -> None:
 
 def set_report_print_date(on: bool, actor: str = "") -> None:
     """Turns the "Report Printed Date" line on reports on or off, and
-    records who did it."""
+    records who did it.
+    """
     was = settings.report_print_date()
     settings.set_report_print_date(on)
 
@@ -629,6 +635,28 @@ def set_report_print_date(on: bool, actor: str = "") -> None:
             ),
             before={"report_print_date": was},
             after={"report_print_date": bool(on)},
+            actor=actor or None,
+        )
+
+
+def set_redact_agent_report(on: bool, actor: str = "") -> None:
+    """Turns redaction of agent phone numbers and emails on the Agent List
+    report on or off, and records who did it.
+    """
+    was = settings.redact_agent_report()
+    settings.set_redact_agent_report(on)
+
+    with get_session() as session:
+        record_audit(
+            session,
+            action="SETTING_CHANGED",
+            table_name="(settings)",
+            summary=(
+                "Agent Report contact redaction turned "
+                f"{'on' if on else 'off'}"
+            ),
+            before={"redact_agent_report": was},
+            after={"redact_agent_report": bool(on)},
             actor=actor or None,
         )
 

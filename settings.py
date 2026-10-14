@@ -38,7 +38,12 @@ SETTINGS_PATH = DB_DIR / "settings.json"
 
 NETWORK_ACCESS = "network_access"
 REPORT_PRINT_DATE = "report_print_date"
-DEFAULTS = {NETWORK_ACCESS: False, REPORT_PRINT_DATE: False}
+REDACT_AGENT_REPORT = "redact_agent_report"
+DEFAULTS = {
+    NETWORK_ACCESS: False,
+    REPORT_PRINT_DATE: False,
+    REDACT_AGENT_REPORT: False,
+    }
 
 # Set at startup from what VECTOR actually bound to, so a page can say
 # what is true now rather than what the setting says for next time.
@@ -84,8 +89,10 @@ def set_network_access(allowed: bool) -> None:
 
 
 def report_print_date() -> bool:
-    """Whether reports carry a "Report Printed Date" line. Off unless
-    someone turns it on, on the Reports page."""
+    """Whether reports carry a "Report Printed Date" line.
+
+    Off unless someone turns it on, on the Reports page.
+    """
     return bool(read().get(REPORT_PRINT_DATE, False))
 
 
@@ -96,10 +103,25 @@ def set_report_print_date(on: bool) -> None:
     write(values)
 
 
+def redact_agent_report() -> bool:
+    """Whether the Agent List report hides each agent's phone and email.
+
+    Off unless someone turns it on, on the Reports page.
+    """
+    return bool(read().get(REDACT_AGENT_REPORT, False))
+
+
+def set_redact_agent_report(on: bool) -> None:
+    """Turns redaction of the Agent List report on or off."""
+    values = read()
+    values[REDACT_AGENT_REPORT] = bool(on)
+    write(values)
+
+
 def host_to_bind(lan_flag: bool = False) -> str:
     """The address to listen on: every interface, or this machine only.
 
-    The --lan flag still wins, so a shortcut or a launcher can open it
+    The `--lan` flag still wins, so a shortcut or a launcher can open it
     for one run without changing what the machine does from then on.
     """
     if lan_flag or network_access():
@@ -183,14 +205,18 @@ def _adapter_addresses() -> list:
             for adapter in ifaddr.get_adapters():
                 for ip in adapter.ips:
                     if ip.is_IPv4:
-                        found.append((adapter.nice_name or adapter.name,
-                                      str(ip.ip)))
+                        found.append((
+                            adapter.nice_name or adapter.name,
+                            str(ip.ip)
+                        ))
         except Exception:
             found = []
     if not found:
         try:
-            for info in socket.getaddrinfo(socket.gethostname(), None,
-                                           socket.AF_INET):
+            for info in socket.getaddrinfo(
+                    socket.gethostname(),
+                    None,
+                    socket.AF_INET):
                 found.append(("", info[4][0]))
         except OSError:
             pass

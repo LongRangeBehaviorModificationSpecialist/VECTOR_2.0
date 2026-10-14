@@ -30,6 +30,7 @@ from auth import get_current_user_name
 from utils import (
     WARN_TIMEOUT,
     ZERO_TIMEOUT,
+    derive_mime_type,
     get_mime_type,
     is_allowed_file,
     require_active_case,
@@ -62,12 +63,12 @@ def upload_card(refresh_files: Callable[[], None]) -> None:
                 # reading it failed for anything over ~1 MB.
                 file_data = await uploaded_file.read()
                 file_size = len(file_data)
+                # Determine file MIME type
                 file_mime_type = (
-                    uploaded_file.content_type
-                    or "application/octet-stream"
+                    derive_mime_type(file_name, file_data)
                 )
-                # Determine MIME type using fallback
-                file_mime_type = get_mime_type(file_name, file_mime_type)
+
+                # file_mime_type = get_mime_type(file_name, file_mime_type)
 
                 # Validate file type
                 if not is_allowed_file(file_mime_type):

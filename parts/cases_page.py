@@ -43,9 +43,7 @@ SPEC = CrudSpec(
     # closes the form so nobody fills it in only to be turned away.
     max_records=1,
     limit_message=(
-        "A case is already open. To start a different one, use Start New "
-        "Case on the home page — it clears the current case after a "
-        "warning."
+        "<strong>A case is already open.</strong><br><br>To start a different one, use Start New Case on the home page — it clears the current case after a warning."
     ),
     # A case is cleared through Start New Case on the home page, which
     # removes everything recorded against it rather than this table alone.

@@ -39,8 +39,8 @@ from parts.file_table import files_table
 
 DOWNLOAD_SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
-    "Content-Security-Policy": "sandbox",   # even if opened inline, no scripts run
-    "Cache-Control": "no-store",            # don't leave evidence in browser/proxy caches
+    "Content-Security-Policy": "sandbox",  # even if opened inline, no scripts run
+    "Cache-Control": "no-store",  # don't leave evidence in browser/proxy caches
 }
 
 # ----- Downloads -----
@@ -84,7 +84,7 @@ async def download_attachment(file_id: int) -> Response:
             action="DOWNLOAD",
             table_name="FILES",
             row_pk=record.Z_PK,
-            summary=f"{name} (SHA-256 {record.FILESHA256 or 'n/a'})",
+            summary=f"{name} (SHA-256: {record.FILESHA256 or 'n/a'})",
             actor=get_current_user_name(),
         )
 
