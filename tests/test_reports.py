@@ -230,6 +230,32 @@ def test_the_print_window_copies_the_report_and_not_the_page():
     script.encode("utf-8")  # no lone surrogates for the websocket
 
 
+def test_the_print_window_names_its_report_and_case():
+    script = reports.print_window_script("Agent List", "26-DEMO-001")
+    assert "Agent List · 26-DEMO-001" in script
+    assert "This bar is not printed" in script
+    assert 'class=\\"print-toolbar no-print\\"' in script
+
+
+def test_a_case_number_cannot_break_the_print_window():
+    """The case number is typed in by an agent; in the window it is text."""
+    script = reports.print_window_script("Agent List", '<b>"26"</b>__STYLES__')
+    assert "<b>" not in script
+    assert "&lt;b&gt;" in script
+    assert "__STYLES__" in script  # left as typed, not filled in
+
+
+def test_the_print_window_has_a_white_page_of_its_own():
+    """Chrome opens the window dark when the computer is in dark mode, and
+    the report's text is black. The white page belongs to the window only:
+    the same report styles are drawn inside VECTOR's dark pages."""
+    assert "background: #FFFFFF" in reports.PRINT_WINDOW_STYLES
+    assert "html, body" not in reports.COMMON_STYLES
+    assert "PRINT_WINDOW_STYLES" not in reports.COMMON_STYLES
+    script = reports.print_window_script()
+    assert "background: #FFFFFF" in script
+
+
 def test_reports_survive_an_empty_case(case):
     """A case with no agents, rooms or evidence still renders."""
     for report_name in REPORT_NAMES:

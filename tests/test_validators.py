@@ -17,11 +17,25 @@ def test_content_wins_over_the_name():
     assert utils.derive_mime_type("photo.jpg", PNG) == "image/png"
 
 
-def test_unknown_content_is_not_trusted():
-    assert utils.derive_mime_type(
-        "evil.pdf",
-        b"MZ\x90\x00 not a pdf"
-    ) == "application/octet-stream"
+def test_a_program_named_pdf_is_not_trusted():
+    # Recognised from its content as a Windows program, whatever its
+    # name says, and so refused.
+    mime = utils.derive_mime_type("evil.pdf", b"MZ\x90\x00 not a pdf")
+    assert mime != "application/pdf"
+    assert not utils.is_allowed_file(mime)
+
+
+def test_unrecognised_content_is_not_trusted():
+    # Nothing in the content to go on, and the name is not one of the
+    # few text types that have no signature: refused.
+    mime = utils.derive_mime_type("evil.pdf", b"\x00\x01 nothing known")
+    assert mime == "application/octet-stream"
+    assert not utils.is_allowed_file(mime)
+
+
+def test_a_rar_archive_is_allowed():
+    mime = utils.derive_mime_type("photos.rar", b"Rar!\x1a\x07\x00" + b"\x00" * 32)
+    assert utils.is_allowed_file(mime)
 
 
 # ----- the crash paths -----

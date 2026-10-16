@@ -20,6 +20,21 @@ import navbar
 ROOT = Path(__file__).resolve().parent.parent
 
 
+# ----- Buttons -----
+def test_the_hover_line_is_for_a_mouse_only():
+    """An iPad keeps a tapped button "hovered", so the dashed line stayed
+    on it; and the transparent border that made room for the line left a
+    ring round every raised button."""
+    css = (ROOT / "main.py").read_text(encoding="utf-8")
+    start = css.index(".hover-border-white {")
+    block = css[start:css.index("/* Print styles */", start)]
+    assert "transparent" not in block
+    mouse_only = block.index("@media (hover: hover)")
+    assert ":hover" not in block[:mouse_only]
+    assert ".hover-border-white:hover" in block[mouse_only:]
+    assert ".hover-border-blue:hover" in block[mouse_only:]
+
+
 # ----- Logo -----
 def test_a_missing_logo_has_no_address(tmp_path, monkeypatch):
     monkeypatch.setattr(navbar, "STATIC_DIR", tmp_path)

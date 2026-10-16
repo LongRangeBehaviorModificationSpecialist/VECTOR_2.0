@@ -33,6 +33,7 @@ WORKFLOW FOR REPORT CREATION:
 from html import escape
 from nicegui import ui
 import json
+import re
 
 from sqlalchemy import func
 
@@ -297,7 +298,7 @@ def rooms_missing_agents() -> list[str]:
         ]
 
 
-def rooms_missing_agents_message(labels: list[str]) -> None:
+def rooms_missing_agents_message(labels: list[str]) -> str:
     """Tells the user what to fix, without listing every room."""
     shown = ", ".join(labels[:10])
     if len(labels) > 10:
@@ -431,7 +432,7 @@ def _remind_about_end_time() -> None:
     reminder.open()
 
 
-def render_report_page(html_content: str) -> None:
+def render_report_page(html_content: str, report_name: str = "") -> None:
     """Wraps report HTML with navigation and print button.
 
     The button sits outside the report: the print window copies
@@ -458,7 +459,11 @@ def render_report_page(html_content: str) -> None:
             # server after the click had made the round trip, the window
             # was not the click's any more, and pop-up blockers -- Safari
             # on an iPad by default -- stopped it.
-            print_button.on("click", js_handler=print_window_script())
+            case_number = (get_case_info() or {}).get("CASENUMBER", "")
+            print_button.on(
+                "click",
+                js_handler=print_window_script(report_name, case_number),
+            )
         else:
             print_button.on_click(lambda: show_validation_errors(errors))
 
@@ -479,8 +484,6 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
     with get_session() as session:
 
         case = session.query(Cases).first()
-        evidence = session.query(Evidence).all()
-        rooms = session.query(Rooms).all()
 
         if not case:
             errors.append(
@@ -1117,7 +1120,7 @@ def build_evidence_by_room_report_html(
         room_items = [e for e in evidence if e["EVIDLOCROOM"] == room_name]
         evid_rows = "".join([f"""
             <tr>
-                <td colspan="2" class="spacer-row">
+                <td colspan="2" class="spacer-row"></td>
             </tr>
             <tr class="top-row">
                 <td class="evid-data-label-header">Item No.:</td>
@@ -1579,7 +1582,7 @@ def print_agents_report():
         redact_contacts=settings.redact_agent_report(),
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Agent List")
 
 
 @ui.page("/reports/evidence")
@@ -1617,7 +1620,7 @@ def print_evidence_report():
         evidence=evidence
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Evidence List (Full)")
 
 
 @ui.page("/reports/evidence_by_room")
@@ -1657,7 +1660,7 @@ def print_evidence_by_room_report():
         unique_rooms=unique_rooms_list,
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Evidence List (By Room)")
 
 
 @ui.page("/reports/evidence_basic")
@@ -1687,7 +1690,7 @@ def print_basic_evidence_report():
         evidence=evidence
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Evidence List (Basic)")
 
 
 @ui.page("/reports/rooms")
@@ -1737,7 +1740,7 @@ def print_rooms_report():
         rooms=rooms
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Room List")
 
 
 @ui.page("/reports/persons")
@@ -1764,7 +1767,7 @@ def print_persons_report():
         persons=persons
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Persons List")
 
 
 @ui.page("/reports/notes")
@@ -1791,7 +1794,7 @@ def print_notes_report():
         notes=notes
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Notes List")
 
 
 @ui.page("/reports/files")
@@ -1809,7 +1812,7 @@ def print_files_report():
             files=files,
         )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="File List")
 
 
 def files_report_rows(session) -> list[dict]:
@@ -1837,15 +1840,134 @@ def files_report_rows(session) -> list[dict]:
     ]
 
 
-def print_window_script() -> str:
+# The print window's own styles, on top of the report's.
+PRINT_WINDOW_STYLES = """
+@media screen {
+    /* Chrome paints a new window dark when the computer is in dark mode,
+       and report text is black: without a page of its own the report was
+       all but unreadable until it printed. Printing is unaffected. */
+    html, body {
+        background: #FFFFFF;
+        color: #000000;
+    }
+    /* The page's padding moves onto the report, so the bar runs edge
+       to edge. */
+    body {
+        margin: 0;
+        padding: 0;
+    }
+    .report-body {
+        padding: 0 16px 24px;
+    }
+}
+
+/* Stays at the top while a long report is scrolled, so Print and Close
+   are always in reach. Marked no-print, so it never prints. */
+.print-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    margin: 0 0 16px;
+    background: #1E293B;
+    color: #FFFFFF;
+    font-family: -apple-system, "Segoe UI", system-ui, Arial, sans-serif;
+}
+
+.print-toolbar .tb-title {
+    flex: 1 1 220px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.print-toolbar .tb-title small {
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    color: #CBD5E1;
+}
+
+/* 44 px tall: the smallest target Apple recommends for a finger. */
+.print-toolbar button {
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 150px;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 8px;
+    font: 600 16px/1.2 -apple-system, "Segoe UI", system-ui, Arial, sans-serif;
+    cursor: pointer;
+}
+
+.print-toolbar .print-btn {
+    background: #2984D1;
+    border: 1px solid #2984D1;
+    color: #FFFFFF;
+}
+
+.print-toolbar .close-btn {
+    background: transparent;
+    border: 1px solid #94A3B8;
+    color: #FFFFFF;
+}
+
+.print-toolbar button:focus-visible {
+    outline: 3px solid #93C5FD;
+    outline-offset: 2px;
+}
+"""
+
+
+def print_toolbar_html(report_name: str = "", case_number: str = "") -> str:
+    """The bar across the top of the print window: which report and case
+    this is, and the Print and Close buttons."""
+    title = " · ".join(h(part) for part in (report_name, case_number) if part)
+    return (
+        '<div class="print-toolbar no-print">'
+        f'<div class="tb-title">{title or "Report"}'
+        "<small>This bar is not printed</small></div>"
+        '<button type="button" class="print-btn" onclick="window.print()">'
+        "🖨️ Print Report</button>"
+        '<button type="button" class="close-btn" onclick="window.close()">'
+        "✕ Close</button>"
+        "</div>"
+    )
+
+
+def print_window_script(report_name: str = "", case_number: str = "") -> str:
     """The browser-side handler that opens the report in a print window.
 
     The report's own HTML is copied into a clean page with the report
-    styles, a Print and a Close button, and the print dialog opened after
-    a moment. Run by the click in the browser, not from the server: see
-    render_report_page().
+    styles, a bar naming the report with Print and Close buttons, and the
+    print dialog opened after a moment. Run by the click in the browser,
+    not from the server: see render_report_page().
     """
-    return """() => {
+    title = " · ".join(h(part) for part in (report_name, case_number) if part)
+    values = {
+        "STYLES": json.dumps(COMMON_STYLES + PRINT_WINDOW_STYLES),
+        "TITLE": json.dumps(title or "V·E·C·T·O·R", ensure_ascii=False),
+        "TOOLBAR": json.dumps(
+            print_toolbar_html(report_name, case_number), ensure_ascii=False
+        ),
+    }
+    # One pass, so a case number can never be read as a placeholder.
+    return re.sub(
+        r"__(STYLES|TITLE|TOOLBAR)__",
+        lambda match: values[match.group(1)],
+        _PRINT_WINDOW_JS,
+    )
+
+
+_PRINT_WINDOW_JS = """() => {
         const report = document.getElementById('report-container');
         if (!report) {
             alert('No report content found to print.');
@@ -1864,16 +1986,12 @@ def print_window_script() -> str:
             + '<meta charset="UTF-8">'
             + '<meta name="viewport" content="width=device-width, '
             + 'initial-scale=1.0">'
-            + '<title>V·E·C·T·O·R</title>'
-            + '<style>' + STYLES + '</style></head><body>'
-            + '<div class="print-toolbar no-print">'
-            + '<button class="print-btn" onclick="window.print()">'
-            + '🖨️ Print Report</button> '
-            + '<button class="close-btn" onclick="window.close()">'
-            + '✕ Close</button></div>'
+            + '<title>' + __TITLE__ + '</title>'
+            + '<style>' + __STYLES__ + '</style></head><body>'
+            + __TOOLBAR__
             + '<div class="report-body">' + report.innerHTML + '</div>'
             + '<scr' + 'ipt>setTimeout(() => window.print(), 500);</scr'
             + 'ipt></body></html>'
         );
         printWindow.document.close();
-    }""".replace("STYLES", json.dumps(COMMON_STYLES))
+    }"""

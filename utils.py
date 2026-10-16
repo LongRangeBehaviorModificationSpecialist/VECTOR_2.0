@@ -94,6 +94,8 @@ ALLOWED_MIME_TYPES = {
     "application/gzip",
     "application/x-gzip",
     "application/vnd.rar",
+    # What derive_mime_type() calls a RAR file, from its content.
+    "application/x-rar-compressed",
     "application/x-bzip2",
     "application/x-xz",
 }

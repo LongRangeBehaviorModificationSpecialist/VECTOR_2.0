@@ -33,6 +33,7 @@ ACTION_CHOICES = [
     "LOGIN_FAILED",
     "LOGOUT_IDLE",
     "SETTING_CHANGED",
+    "UPDATE",
 ]
 
 # A long case runs to thousands of entries, and all of them at once is a

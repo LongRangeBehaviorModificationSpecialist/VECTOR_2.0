@@ -9,24 +9,25 @@ scene paperwork and exports the case as an encrypted archive.
 
 VECTOR runs on your own machine. Nothing is sent anywhere.
 
-`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `486 tests`
+`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `495 tests`
 
-> **About this fork.** VECTOR was created by SSA M. Sponheimer of the
-> Virginia State Police NOVA/DC ICAC
+> **About.** VECTOR was created by SSA M. Sponheimer of the Virginia
+> State Police NOVA/DC ICAC
 > ([original repository](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0)).
-> This fork stays in step with that project and adds security
-> hardening, an audit trail, optional database encryption, a test suite
-> and a cross-platform install. See
-> [What this fork adds](#what-this-fork-adds), and the full list offered
-> back to the original project in
-> [pull request #2](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/2).
+> Security hardening, an audit trail, optional database encryption, a
+> test suite and a cross-platform install were contributed from
+> [Hitman90210's fork](https://github.com/Hitman90210/VECTOR_2.0) and
+> merged into the original in pull requests
+> [#2](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/2) (16-Sep-2026) and
+> [#3](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/3) (13-Oct-2026). See
+> [What has been added](#what-has-been-added).
 
 ---
 
 ## Contents
 
 - [What it does](#what-it-does)
-- [What this fork adds](#what-this-fork-adds)
+- [What has been added](#what-has-been-added)
 - [Quick start](#quick-start)
 - [Requirements](#requirements)
 - [Install](#install)
@@ -83,9 +84,9 @@ VECTOR runs on your own machine. Nothing is sent anywhere.
 
 ---
 
-## What this fork adds
+## What has been added
 
-Everything the original does, plus:
+Everything the first version did, plus:
 
 | Area | Change |
 |------|--------|
@@ -97,21 +98,31 @@ Everything the original does, plus:
 | **Reliability** | Reports and export working; evidence numbering past item 9; room letters past Z; uploads over 1 MB; no more "database is locked"; imports that are all or nothing; failures explained in plain words, and kept on screen until acknowledged; reports in item-number order; dates checked before they are saved; evidence numbers that close up when an item is removed |
 | **Times** | Stamped in the machine's own time zone, with the offset from UTC; case times fill in from the clock, and Reports asks about a missing end time |
 | **Several devices** | Open pages refresh on their own when another device saves, and the case badge follows; on a phone or a small tablet the page buttons fold into one menu |
-| **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
+| **Data handling** | Case databases, and each machine's settings, kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
+| **Touch screens** | Raised buttons drawn cleanly on an iPad, with no hover border left behind by a tap; the print window's Print and Close buttons sized for a finger, in a bar that names the report and stays readable on a laptop in dark mode |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 486 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 495 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names, the
-refreshed interface, and (28-Sep-2026) the larger buttons with hover
+refreshed interface, (28-Sep-2026) the larger buttons with hover
 borders, the Files report, "Page X of Y" on printed reports, exports
 recorded in the audit trail and a hash for every table in the CSV
-manifest — with fixes made while bringing it across.
+manifest, and (13 and 14-Oct-2026) uploads typed by their content rather
+than their name, downloads recorded in the audit trail and sent with
+safety headers, a switch that hides agents' phone numbers and emails on
+the Agent List, a Room List that waits for both agents in every room,
+and a Cases page that shows the open case instead of a second form —
+with fixes made while bringing it across.
 
-Every change, with the reasoning behind it, is listed in
-[pull request #2](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/2)
-to the original project.
+Every change, with the reasoning behind it, is listed in pull requests
+[#2](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/2) and
+[#3](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/3) to the original project. The
+fixes made after the second merge are explained step by step, with the
+commands to find and make each one, in [docs/fixing-after-a-merge.md](docs/fixing-after-a-merge.md),
+and at more length, with screenshots, in
+[docs/VECTOR-fixing-after-a-merge.pdf](docs/VECTOR-fixing-after-a-merge.pdf).
 
 ---
 
@@ -218,7 +229,9 @@ VECTOR runs without them — each page shows just its title.
 Double-click `Start VECTOR.bat` (Windows) or `Start VECTOR.command`
 (macOS). It sets up `.venv` if it is missing, installs again if
 `requirements.txt` has changed since the last start — after an update,
-say — and then starts VECTOR. From a terminal instead:
+say — and then starts VECTOR. That install needs an internet connection;
+the 13-Oct-2026 update added one package, `filetype`, which reads what
+an uploaded file really is. From a terminal instead:
 
 **macOS / Linux**
 
@@ -312,6 +325,13 @@ looks right, then delete it — it is a full copy of the case.
 
 Exports made by earlier versions, and by the upstream project, still
 import: old table and column names are read as the names they became.
+
+**This machine's settings.** `db/settings.json` was briefly kept in
+version control (13 and 14-Oct-2026) and no longer is. Updating past
+that takes away the copy git put there, so network access, the printed
+date and Agent List redaction go back to off once; turn back on the ones
+you use. If git refuses to update because `db/settings.json` has local
+changes, move the file out of `db/`, update, and move it back.
 
 ---
 
@@ -409,10 +429,12 @@ All optional, read from the environment:
 | `VECTOR_REQUIRE_ENCRYPTION` | unset   | Set to `1` to refuse a plaintext database |
 | `VECTOR_SESSION_IDLE_MINUTES` | `60`  | Minutes untouched before a device signs out; `0` turns it off |
 
-Network access is not an environment variable: it is a setting an
-administrator changes in the Admin Panel, kept in `db/settings.json`
-so that it describes this machine rather than travelling with a copy
-of the case.
+Three things are settings rather than environment variables, because
+they describe this machine rather than travel with a copy of the case:
+network access, in the Admin Panel, and on the Reports page the printed
+date and Agent List redaction. They are kept in `db/settings.json`,
+which is not in version control, and every change to one is recorded in
+the audit trail.
 
 ---
 
@@ -422,8 +444,9 @@ Work top to bottom; each step feeds the next.
 
 1. **Case** — press **Start New Case** on the home page, then enter the
    number, address, jurisdiction and start time (`MM-DD-YYYY HH:MM`), or
-   press **Fill with current date/time**. If a case is already open,
-   VECTOR warns before clearing it
+   press **Fill with current date/time**. While a case is open, the Cases
+   page shows it in place of the form; **Start New Case** warns before
+   clearing it
 2. **Agents** — everyone on site. Saved to a roster that
    auto-populates at the next scene
 3. **Rooms** — letter the premises A, B, C…, and assign two agents to
@@ -436,12 +459,19 @@ Work top to bottom; each step feeds the next.
 6. **Notes** — timestamped narrative entries
 7. **Files** — photographs and documents, stored in the case database.
    On a phone or tablet a **Take a photograph** button opens the camera
-   straight into the case
+   straight into the case. VECTOR goes by what a file is, read from its
+   contents, not by its name: images, videos, documents and archives are
+   accepted, and a program renamed `photo.jpg` is refused. Every download
+   of a file is recorded in the audit trail
 8. **Reports** — eight printable layouts, including the basic
    inventory used as the return copy and the list of attached files.
-   **Print Report** opens the report on its own, ready to print. A
-   switch on the Reports page adds the date and time each report was
-   printed; it is off unless turned on. If the case has no end time yet,
+   **Print Report** opens the report in a window of its own, under a bar
+   naming the report and case with **Print Report** and **Close**; the
+   bar is not printed. Two switches on the Reports page, both off unless
+   turned on: one adds the date and time each report was printed, the
+   other hides agents' phone numbers and emails on the Agent List. The
+   Room List waits until every room has a first and second agent, and
+   names the rooms still missing one. If the case has no end time yet,
    the page offers to fill it in from this machine's clock
 
 The open case's number is shown in the top bar on every page. Until a
@@ -544,8 +574,10 @@ server.
 ## The audit trail
 
 Every change to case data is recorded — creations, edits, deletions,
-bulk wipes, imports, exports, and both successful and failed logins. Admins read
-it at **Welcome → Audit Trail**.
+bulk wipes, imports, exports, attachment downloads, setting changes,
+idle sign-outs, and both successful and failed logins. Admins read it at
+**Welcome → Audit Trail**, where the filter offers every kind of entry
+(a test checks that it does).
 
 Each entry records when (kept in UTC, shown in this machine's time
 zone), who, what action, which record, and the
@@ -740,9 +772,27 @@ is allowing Python.
 **A page refuses to save with "No active case!"** — open a case first
 with **Start New Case** on the home page.
 
-**"Open New Case" is greyed out** — a case is already open, and VECTOR
-holds one at a time. Export it if you need it, then use **Start New
-Case** on the home page to clear it and begin another.
+**The Cases page says "A case is already open" instead of showing the
+form** — VECTOR holds one case at a time. Export it if you need it, then
+use **Start New Case** on the home page to clear it and begin another.
+
+**An upload is refused as "not an allowed file type"** — VECTOR goes by
+what the file is, not its name. Images, videos, PDFs, Office documents,
+text and archives (ZIP, 7z, RAR, tar and gzip) are accepted. A file that
+is really something else — a program renamed `.jpg` — is refused on
+purpose. The message names the type it found.
+
+**The Room List will not print** — every room needs a first and a second
+agent. The message lists the rooms still missing one; enter them on the
+Rooms page.
+
+**"No module named filetype"** — VECTOR was started without the packages
+the latest update added. Start it with the launcher, which installs them,
+or run `pip install -r requirements.txt` in the virtual environment.
+
+**git refuses to update because of `db/settings.json`** — that file was
+in version control for two days in October 2026. Move it out of `db/`,
+update, and move it back.
 
 **A password change did not stick** — if `db/users.json` exists it
 seeds that account at startup only; it no longer overwrites a changed
@@ -782,7 +832,7 @@ assigned and never read. Style is left alone deliberately — this
 codebase has its own conventions and a linter arguing about them would
 be noise.
 
-486 tests, about fifteen seconds. They run against a temporary database
+495 tests, about fifteen seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -799,19 +849,19 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_page_specs.py` | 53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written |
 | `test_order_dates_and_files.py` | 29 | Reports and tables list items and rooms in order; renaming a room moves its evidence; impossible or half-typed dates are refused; attachment contents load only when read, and downloads keep their names |
 | `test_times_and_numbers.py` | 25 | Stamps carry this machine's time zone and offset, and UTC stamps already saved are rewritten once; both case times offer the fill button, and the end-time reminder never fills in a time before the start; typed text in a dropdown is kept; removing an item moves the later numbers down, audited |
-| `test_reports.py` | 34 | All eight reports render, carry the case header, and escape their values exactly once; the Files report prints upload times in local time; the printed date appears only when switched on, and the change is audited; the print window copies the report, not the page |
+| `test_reports.py` | 37 | All eight reports render, carry the case header, and escape their values exactly once; the Files report prints upload times in local time; the printed date appears only when switched on, and the change is audited; the print window copies the report, not the page, names its report and case without letting a typed case number into its markup, and keeps a white page of its own |
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
 | `test_json_export.py` | 23 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected, a lower-case collection hash not mistaken for tampering; older and upstream layouts import |
 | `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
 | `test_failures_and_live.py` | 24 | Failures are explained without the SQL; a failed import leaves the case unchanged, and an import clears attachments the new case lacks; exports stop rather than leave attachments out, and one the audit trail cannot record is not handed over; edit dialogs open for values no longer on a list; saves, wipes and imports move the change signal, while reads do not, and a sign-in moves the trail's signal alone |
 | `test_numbering.py` | 17 | Evidence numbering past item 9; room labels past Z |
-| `test_validators.py` | 16 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time |
+| `test_validators.py` | 20 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time; an upload's type comes from its content, so a program named .pdf is refused and a RAR archive is not |
 | `test_export_import.py` | 26 | CSV round trip preserves rows, bytes and provenance, including attachments sharing a name; encrypted archives; tampering detected, and a lower-case hash is the same hash; older and upstream archives import, including those with `SUSPECTNOTE` and `FILEHASHEDAT`, and one named `.ZIP`; any case number makes a file name Windows accepts; download staging is cleared |
 | `test_active_case.py` | 13 | Pages refuse to record without an open case; the Cases page still works; async handlers stay async |
 | `test_menu_rooms_and_passwords.py` | 13 | The page buttons and the menu share one list, and only administrators are offered Shutdown; a room without agents can be edited and survives a CSV round trip; a dropdown saved blank opens blank; an import knows when a file needs a password |
 | `test_dates.py` | 12 | Old-format case times, birth dates and note times are rewritten once and audited; nothing else is touched |
-| `test_logo_and_help.py` | 14 | A missing logo is left out rather than shown broken, whether it is named by file name or by its /static address; every button the Help page names exists |
-| `test_session_and_search.py` | 18 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for; every table that grows offers a search box and the one-case page does not |
+| `test_logo_and_help.py` | 15 | A missing logo is left out rather than shown broken, whether it is named by file name or by its /static address; every button the Help page names exists; the dashed hover line on buttons is for a mouse only |
+| `test_session_and_search.py` | 19 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for, as can every other action VECTOR records; every table that grows offers a search box and the one-case page does not |
 | `test_network_setting.py` | 28 | Network access is off until somebody turns it on and a damaged settings file reads as off; the flag opens it for one run and the setting from then on; the address given out is one another device could use, chosen from the adapter on the network this computer is on rather than VMware, Hyper-V, WSL or VPN adapters; and the change is recorded with who made it |
 | `test_launchers.py` | 5 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned |
 | `test_migration.py` | 13 | Old-schema databases — old names, old constraints — upgrade without losing a row, including the September renames of the person notes and hashing time; backups include the write-ahead log |
@@ -860,7 +910,7 @@ live.py                 refreshes open pages when another device saves
 utils.py                validators, the active-case guard, shared helpers
 import_export.py        CSV and JSON export and import
 navbar.py               top navigation and the case badge
-settings.py             what this machine does: network access, for now
+settings.py             this machine's settings: network, printed date, redaction
 home_page.py            login, main menu, the buttons on it
 parts/case_transfer.py  export, import and Delete All Data
 parts/admin_users.py    the Admin Panel's card, table and sessions
@@ -875,6 +925,7 @@ program/config.py       paths, network and upload settings
 program/inc/            Virginia jurisdictions, agencies, agent roles
 tools/                  demo case, database encryption and decryption
 tests/                  the test suite
+docs/                   field-test notes, and the guide to the October fixes (Markdown and PDF)
 ```
 
 ### Adding a field to an entity
@@ -923,7 +974,8 @@ NOVA/DC ICAC. The scene workflow — the lettered rooms, the separate
 witness, the return copy as its own report — comes from that original
 design.
 
-The changes in this fork are by
+The security, audit, encryption, testing and install work contributed
+through pull requests #2 and #3 is by
 [Hitman90210](https://github.com/Hitman90210).
 
 No license file has been published for the project. Ask the original
