@@ -119,8 +119,12 @@ def open_edit_dialog(
     edit_dialog.open()
 
 
-def open_delete_dialog(spec, row: dict, labels: dict,
-                       refresh: Callable[[], None]) -> None:
+def open_delete_dialog(
+        spec,
+        row: dict,
+        labels: dict,
+        refresh: Callable[[], None]
+) -> None:
     """Deletes one record, after saying what that will do."""
     # No button is drawn when deletes are off, but a crafted
     # event could still arrive, so refuse it here as well.
@@ -201,8 +205,12 @@ def open_delete_dialog(spec, row: dict, labels: dict,
     delete_dialog.open()
 
 
-def delete_all_section(spec, labels: dict, refresh: Callable[[], None],
-                       guard: Callable) -> Callable[[], None]:
+def delete_all_section(
+        spec,
+        labels: dict,
+        refresh: Callable[[], None],
+        guard: Callable
+) -> Callable[[], None]:
     """Draws Delete All, and returns what settles the button's state.
 
     The button is disabled while no case is open, which the page's live
