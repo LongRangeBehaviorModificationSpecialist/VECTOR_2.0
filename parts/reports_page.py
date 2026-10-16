@@ -297,7 +297,7 @@ def rooms_missing_agents() -> list[str]:
         ]
 
 
-def rooms_missing_agents_message(labels: list[str]) -> None:
+def rooms_missing_agents_message(labels: list[str]) -> str:
     """Tells the user what to fix, without listing every room."""
     shown = ", ".join(labels[:10])
     if len(labels) > 10:
@@ -479,8 +479,6 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
     with get_session() as session:
 
         case = session.query(Cases).first()
-        evidence = session.query(Evidence).all()
-        rooms = session.query(Rooms).all()
 
         if not case:
             errors.append(
@@ -1117,7 +1115,7 @@ def build_evidence_by_room_report_html(
         room_items = [e for e in evidence if e["EVIDLOCROOM"] == room_name]
         evid_rows = "".join([f"""
             <tr>
-                <td colspan="2" class="spacer-row">
+                <td colspan="2" class="spacer-row"></td>
             </tr>
             <tr class="top-row">
                 <td class="evid-data-label-header">Item No.:</td>
