@@ -284,26 +284,39 @@ the DELETE affirmation */
 }
 
 /*
-Added so border would appear when button is hovered. Also underline
-appears under the text and the text increase in size by 5.0%
+A dashed line inside a button while the mouse is over it.
+
+Drawn on the button's ::after, not as its border: the transparent border
+that kept room for it left a ring of the button's colour outside a raised
+button's face, so it looked like a button inside a button. (Not as an
+outline either: Quasar's no-outline class removes it, and its !important
+outranks ours.) And only where there is a mouse: an iPad keeps a tapped
+button "hovered" until something else is tapped, which stacked the
+dashed line on the raised edge and its shadow.
 */
 
 .hover-border-white {
-    border: 2px solid transparent;
     color: var(--vsp-white);
 }
 
-.hover-border-white:hover {
-    border: 2px dashed white;
-}
-
 .hover-border-blue {
-    border: 2px solid transparent;
     color: var(--vsp-blue);
 }
 
-.hover-border-blue:hover {
-    border: 2px dashed var(--vsp-blue);
+@media (hover: hover) {
+    .hover-border-white:hover::after,
+    .hover-border-blue:hover::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border: 2px dashed white;
+        border-radius: inherit;
+        pointer-events: none;
+    }
+
+    .hover-border-blue:hover::after {
+        border-color: var(--vsp-blue);
+    }
 }
 
 /* Print styles */
