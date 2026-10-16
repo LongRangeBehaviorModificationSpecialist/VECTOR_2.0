@@ -7,6 +7,11 @@ was fixed, and how to catch the same kind of thing yourself next time.
 Every step here can be done on your own machine in a few minutes. The
 commands are the ones actually used.
 
+A longer, illustrated version, with screenshots of each problem and fix
+and the real terminal output of every step, is
+[VECTOR-fixing-after-a-merge.pdf](VECTOR-fixing-after-a-merge.pdf) in this
+folder.
+
 **Contents**
 
 - [Set up once](#set-up-once)
