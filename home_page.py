@@ -420,7 +420,8 @@ the menu button (three lines) at the top left.
 1. **Start New Case** on the Home page opens the Case page. Enter the case
    number, location, jurisdiction and start time (`MM-DD-YYYY HH:MM`) — or
    press **Fill with current date/time** — then press **Open New Case**.
-   The case number now shows at the top of every page.
+   The case number now shows at the top of every page, and the Case page
+   shows the open case in place of the form.
 2. **Agents** — everyone on site.
 3. **Rooms** — the next room letter is filled in for you.
 4. **Evidence** — the next item number is filled in for you, and rooms and
@@ -432,11 +433,19 @@ the menu button (three lines) at the top left.
    order they were written.
 7. **Files** — photographs and documents. Each file is fingerprinted
    (SHA-256) when it is added, so a later change to it can be detected.
+   VECTOR reads what a file is from its contents, not its name: images,
+   videos, documents and archives are accepted, and a program renamed to
+   look like a photo is refused. Every download is recorded in the audit
+   trail.
 8. **Reports** — eight printable lists, including the inventory used as
-   the return copy. If the case is missing a detail a report needs, the
+   the return copy. **Print Report** opens the report in its own window,
+   with **Print Report** and **Close** in a bar across the top; the bar
+   is not printed. If the case is missing a detail a report needs, the
    page says which, and if it has no end time yet the page offers to fill
-   it in from this machine's clock. A switch on the Reports page adds the
-   date and time each report was printed.
+   it in from this machine's clock. **Print Room List** waits until every
+   room has both agents. Switches on the Reports page add the date and
+   time each report was printed, and hide agents' phone numbers and
+   emails on the Agent List.
 
 Until a case is open, the top bar shows **No Active Case** and the other
 pages will not save.
@@ -468,7 +477,8 @@ itself — notes, entries, uploads — carry their offset from UTC, such as
 - Administrators also see **Admin Panel** there, to add accounts, reset
   passwords, clear a sign-in lock and decide whether other devices may
   reach this machine; **Audit Trail**, a record of every
-  change; and **Shutdown**, which stops VECTOR for everyone.
+  change, sign-in and download; and **Shutdown**, which stops VECTOR for
+  everyone.
 - After {LOCK_AFTER_FAILURES} wrong passwords an account is locked for
   {LOCKOUT_MINUTES} minutes. An administrator can clear the lock sooner.
 - Passwords an administrator issues are shown once. Write them down before
