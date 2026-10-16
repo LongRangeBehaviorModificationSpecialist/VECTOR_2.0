@@ -5,6 +5,9 @@ for a given time is a function of its own, and which pages offer a
 search box is part of their spec.
 """
 
+import re
+from pathlib import Path
+
 import pytest
 
 import idle
@@ -78,6 +81,20 @@ def test_an_idle_sign_out_can_be_filtered_for_on_the_audit_page():
     """A filter that cannot name the action hides it from whoever is
     looking for the device that was left."""
     assert "LOGOUT_IDLE" in audit_page.ACTION_CHOICES
+
+
+def test_every_action_vector_records_can_be_filtered_for():
+    """The filter list is typed out by hand, and a merge once dropped
+    UPDATE from it -- the commonest entry after CREATE. Every action the
+    application writes is looked for in its source and must be offered."""
+    root = Path(audit_page.__file__).resolve().parent.parent
+    recorded = {"CREATE", "UPDATE", "DELETE"}  # written by the flush listener
+    for source in root.glob("*.py"):
+        recorded |= set(re.findall(r'action="([A-Z_]+)"', source.read_text("utf-8")))
+    for source in (root / "parts").glob("*.py"):
+        recorded |= set(re.findall(r'action="([A-Z_]+)"', source.read_text("utf-8")))
+    missing = recorded - set(audit_page.ACTION_CHOICES)
+    assert not missing, f"Not in the Audit Trail filter: {sorted(missing)}"
 
 
 # ----- The search box -----
