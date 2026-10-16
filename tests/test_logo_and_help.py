@@ -20,6 +20,21 @@ import navbar
 ROOT = Path(__file__).resolve().parent.parent
 
 
+# ----- Buttons -----
+def test_the_hover_line_is_for_a_mouse_only():
+    """An iPad keeps a tapped button "hovered", so the dashed line stayed
+    on it; and the transparent border that made room for the line left a
+    ring round every raised button."""
+    css = (ROOT / "main.py").read_text(encoding="utf-8")
+    start = css.index(".hover-border-white {")
+    block = css[start:css.index("/* Print styles */", start)]
+    assert "transparent" not in block
+    mouse_only = block.index("@media (hover: hover)")
+    assert ":hover" not in block[:mouse_only]
+    assert ".hover-border-white:hover" in block[mouse_only:]
+    assert ".hover-border-blue:hover" in block[mouse_only:]
+
+
 # ----- Logo -----
 def test_a_missing_logo_has_no_address(tmp_path, monkeypatch):
     monkeypatch.setattr(navbar, "STATIC_DIR", tmp_path)
@@ -38,6 +53,28 @@ def test_a_folder_is_not_taken_for_a_logo(tmp_path, monkeypatch):
     (tmp_path / "novadc_icac.png").mkdir()
     monkeypatch.setattr(navbar, "STATIC_DIR", tmp_path)
     assert navbar.static_url("novadc_icac.png") is None
+
+
+def test_a_logo_named_by_its_static_address_is_found(tmp_path, monkeypatch):
+    """/static/x.png is what a page would write by hand, so unit_logo()
+    takes that as well as the bare file name. Taking it literally is how
+    a logo that is present gets dropped."""
+    (tmp_path / "novadc_icac.png").write_bytes(b"pretend this is a png")
+    monkeypatch.setattr(navbar, "STATIC_DIR", tmp_path)
+
+    for named in ("novadc_icac.png",
+                  "static/novadc_icac.png",
+                  "/static/novadc_icac.png"):
+        assert navbar.static_url(named) == "/static/novadc_icac.png", named
+
+
+def test_a_missing_logo_is_still_left_out_whichever_way_it_is_named(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(navbar, "STATIC_DIR", tmp_path)
+
+    for named in ("novadc_icac.png", "/static/novadc_icac.png"):
+        assert navbar.static_url(named) is None, named
 
 
 def test_no_page_points_at_a_static_image_directly():
@@ -61,7 +98,10 @@ def test_no_page_points_at_a_static_image_directly():
 # ----- Help -----
 def _on_screen_text() -> str:
     """Source of everything that labels a button or menu, minus the help."""
-    sources = [(ROOT / "navbar.py").read_text(encoding="utf-8")]
+    sources = [
+        (ROOT / "navbar.py").read_text(encoding="utf-8"),
+        (ROOT / "idle.py").read_text(encoding="utf-8"),
+    ]
     sources += [
         path.read_text(encoding="utf-8")
         for path in sorted((ROOT / "parts").glob("*.py"))
@@ -78,8 +118,7 @@ def test_every_button_the_help_names_exists():
     missing = sorted(
         {name for name in named if name.lower() not in on_screen}
     )
-    assert (
-        not missing,
+    assert not missing, (
         f"the Help page names buttons that do not exist: {missing}"
     )
 

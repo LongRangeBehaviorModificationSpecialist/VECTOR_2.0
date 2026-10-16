@@ -11,7 +11,11 @@ Usage:
     Opens a browser at http://localhost:8080
 
     Or double-click "Start VECTOR.bat" (Windows) or "Start VECTOR.command"
-    (macOS), which set up .venv on first use.
+    (macOS, which hands over to "Start VECTOR.sh"). Either sets up .venv
+    on first use.
+
+    Whether other devices may reach it is a setting an administrator
+    turns on in the Admin Panel; --lan opens it for one run.
 """
 
 import ast
@@ -35,6 +39,7 @@ from auth import (
     require_login,
 )
 from models import get_users_session
+import settings
 from program.config import (
     Config,
     DB_DIR,
@@ -48,10 +53,14 @@ DEBUG_MODE = "--dev" in sys.argv
 
 
 # ----- Network exposure -----
-# Loopback unless explicitly opted in, so an install is never reachable
-# from the network by accident. See README "Access from another device".
+# Loopback unless somebody opts in, so an install is never reachable from
+# the network by accident. Two ways to opt in: the setting an admin turns
+# on in the Admin Panel, which is what this machine does from then on,
+# and --lan, which opens it for this run only. See README "Access from
+# another device".
 LAN_MODE = "--lan" in sys.argv
-HOST = "0.0.0.0" if LAN_MODE else Config.HOST
+HOST = settings.host_to_bind(LAN_MODE)
+settings.note_running_host(HOST)
 
 
 def get_storage_secret() -> str:
@@ -119,7 +128,7 @@ def bootstrap_first_admin():
         encoding="utf-8",
     )
 
-    print("  " + "\n" + "=" * 62)
+    print("\n  " + "=" * 62)
     print("  FIRST RUN - an administrator account has been created.")
     print("  " + "=" * 62)
     print("    Username:  admin")
@@ -262,27 +271,52 @@ the DELETE affirmation */
     white-space: pre-line;
 }
 
+/* Shown only where the pointer is a finger: the camera button, which a
+   desktop browser would answer with another file picker. */
+.touch-only {
+    display: none !important;
+}
+
+@media (pointer: coarse) {
+    .touch-only {
+        display: block !important;
+    }
+}
+
 /*
-Added so border would appear when button is hovered. Also underline
-appears under the text and the text increase in size by 5.0%
+A dashed line inside a button while the mouse is over it.
+
+Drawn on the button's ::after, not as its border: the transparent border
+that kept room for it left a ring of the button's colour outside a raised
+button's face, so it looked like a button inside a button. (Not as an
+outline either: Quasar's no-outline class removes it, and its !important
+outranks ours.) And only where there is a mouse: an iPad keeps a tapped
+button "hovered" until something else is tapped, which stacked the
+dashed line on the raised edge and its shadow.
 */
 
 .hover-border-white {
-    border: 2px solid transparent;
     color: var(--vsp-white);
 }
 
-.hover-border-white:hover {
-    border: 2px dashed white;
-}
-
 .hover-border-blue {
-    border: 2px solid transparent;
     color: var(--vsp-blue);
 }
 
-.hover-border-blue:hover {
-    border: 2px dashed var(--vsp-blue);
+@media (hover: hover) {
+    .hover-border-white:hover::after,
+    .hover-border-blue:hover::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border: 2px dashed white;
+        border-radius: inherit;
+        pointer-events: none;
+    }
+
+    .hover-border-blue:hover::after {
+        border-color: var(--vsp-blue);
+    }
 }
 
 /* Print styles */
@@ -324,11 +358,12 @@ appears under the text and the text increase in size by 5.0%
 # report sub-routes were not registered until somebody first visited
 # /reports -- so a bookmark or a page refresh returned 404. auth.py
 # removed the cycle, so the imports can sit where they belong.
-import home_page
+import home_page  # noqa: F401  (imported for its @ui.page routes)
 
 from parts.admin_page import build_admin_page
 from parts.agents_page import build_agents_page
 from parts.audit_page import build_audit_page
+from parts.connect_page import build_connect_page
 from parts.cases_page import build_cases_page
 from parts.evidence_page import build_evidence_page
 from parts.files_page import build_uploads_page
@@ -355,6 +390,7 @@ PAGES = [
     ("/reports", build_reports_page, False),
     ("/admin", build_admin_page, True),
     ("/audit", build_audit_page, True),
+    ("/connect", build_connect_page, False),
 ]
 
 for _route, _builder, _admin_only in PAGES:
@@ -462,13 +498,37 @@ if __name__ in {"__main__", "__mp_main__"}:
             shared=True,
         )
 
-    if LAN_MODE:
+    if HOST == "0.0.0.0":
+        how = "--lan" if LAN_MODE else "the setting in the Admin Panel"
         print(
-            "\n  ** LAN MODE ** VECTOR is reachable from other devices on "
-            "this network.\n"
+            "\n  ** ON THE NETWORK ** VECTOR is reachable from other "
+            f"devices on this network ({how}).\n"
             "  Traffic is unencrypted HTTP. Use only on a network you "
             "control.\n"
         )
+
+    @app.on_startup
+    def say_where_vector_is() -> None:
+        """One address for this computer and one for a tablet.
+
+        NiceGUI's own message listed an address for every network adapter
+        -- VMware, Hyper-V, WSL and VPN adapters included, none of which
+        a tablet can reach -- so it is turned off below in favour of
+        this.
+        """
+        lines = [
+            "",
+            "  VECTOR is running.",
+            f"    On this computer:  http://localhost:{Config.PORT}",
+        ]
+        if HOST == "0.0.0.0":
+            others = settings.addresses_for_other_devices()
+            if others:
+                lines.append(f"    On a tablet:       {others[0]}")
+            lines.append(
+                "    (Help -> Connect a Device shows it, and the others.)"
+            )
+        print("\n".join(lines) + "\n", flush=True)
 
     ui.run(
         title="V·E·C·T·O·R",
@@ -478,4 +538,5 @@ if __name__ in {"__main__", "__mp_main__"}:
         show=Config.SHOW_BROWSER,
         dark=True,
         storage_secret=get_storage_secret(),
+        show_welcome_message=False,
     )

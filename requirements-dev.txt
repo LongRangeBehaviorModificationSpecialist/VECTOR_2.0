@@ -10,3 +10,6 @@
 -r requirements.txt
 
 pytest~=8.3
+
+# Errors only -- see ruff.toml.
+ruff~=0.16

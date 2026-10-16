@@ -28,7 +28,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from models import (  # noqa: E402
     Agents,
-    AuditLog,
     Cases,
     Evidence,
     Notes,

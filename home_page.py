@@ -11,23 +11,10 @@ Handles:
     /shutdown        →   Stop the app (admins only)
 """
 
-from datetime import datetime
 from nicegui import ui
-import shutil
 import time
-from pathlib import Path
 
 from failures import explain, log
-from import_export import (
-    ExportResult,
-    export_vector_to_csv,
-    export_vector_to_json,
-    import_vector_from_csv,
-    import_vector_from_json,
-    looks_like_json_export,
-    needs_password,
-    new_staging_dir,
-)
 from auth import (
     clear_login_failures,
     failure_delay_seconds,
@@ -48,8 +35,18 @@ from models import (
     record_audit,
 )
 from navbar import build_navbar, unit_logo
+from parts.case_transfer import (
+    open_delete_all_dialog,
+    open_export_dialog,
+    open_import_dialog,
+)
 from program.config import Config
-from utils import delete_all_data, CONFIRM_TIMEOUT, WARN_TIMEOUT
+from utils import (
+    CONFIRM_TIMEOUT,
+    WARN_TIMEOUT,
+    ZERO_TIMEOUT,
+    delete_all_data,
+)
 
 
 style = {
@@ -121,9 +118,7 @@ def build_authenticated_home():
 
         # ----- Page Title and Header -----
 
-        ui.image(
-            "/static/novadc_icac.png",
-        ).classes("w-[150px] h-[150px] mb-2")
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-2")
 
         ui.label(
             "V·E·C·T·O·R Home"
@@ -201,365 +196,6 @@ def build_authenticated_home():
         with ui.row().classes(
             "flex justify-center items-center gap-8 py-1 w-full"):
 
-            # ----- EXPORT Button -----
-            def open_export_dialog():
-
-                with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
-
-                    ui.label(
-                        "Export Data..."
-                    ).classes("text-lg font-bold text-[var(--vsp-blue)]")
-
-                    ui.label(
-                        "Downloads the whole case -- every table, every "
-                        "attachment, and the audit trail -- through your "
-                        "browser, on whichever device you are using."
-                    ).classes("text-sm text-[var(--vsp-gray)]")
-
-                    ui.label("The file will be named :").classes(
-                        "text-sm text-[var(--vsp-gray)]"
-                    )
-
-                    ui.label(
-                        "'<case-number>_<datetime>_saved_results'"
-                    ).classes("text-base text-[var(--vsp-blue)]")
-
-                    # ----- Export format selection -----
-                    ui.label("Export format:").classes(
-                        "mt-2 text-sm font-semibold text-[var(--vsp-gray)]"
-                    )
-
-                    format_radio = ui.radio(
-                        {
-                            "csv": "CSV — one file per database table",
-                            "json": "JSON — all data in a single file",
-                            "both": "Both — export CSV ZIP and JSON together",
-                        },
-                        value="csv",
-                    ).classes("text-sm text-[var(--vsp-gray)]")
-
-                    ui.label(
-                        "CSV opens in Excel. JSON is one self-contained "
-                        "file with the attachments embedded, for handing "
-                        "the case to another system."
-                    ).classes("text-xs text-gray-400")
-
-                    # ----- Password option -----
-                    encrypt_checkbox = ui.checkbox(
-                        "Encrypt with password (AES-256)"
-                    ).classes("text-sm text-[var(--vsp-gray)]")
-
-                    password_input = ui.input(
-                        label="ENTER PASSWORD :",
-                        password=True,
-                    ).classes("w-full yellow-label text-sm")
-
-                    password_input.bind_visibility_from(
-                        encrypt_checkbox,
-                        "value",
-                    )
-
-                    def do_export():
-                        pwd = (
-                            password_input.value
-                            if encrypt_checkbox.value
-                            else None
-                        )
-
-                        if encrypt_checkbox.value and not pwd:
-                            ui.notify(
-                                "Please enter a password or uncheck "
-                                "encryption.",
-                                type="warning",
-                                timeout=WARN_TIMEOUT,
-                                position="center",
-                                close_button="OK",
-                            )
-                            return
-
-                        dialog.close()
-
-                        # ----- Run the selected exports -----
-                        # Each results file goes to the browser, so it
-                        # arrives on the device the export was asked from.
-                        results = []
-                        if format_radio.value in ("csv", "both"):
-                            result = export_vector_to_csv(password=pwd)
-                            if result is not None:
-                                results.append(result)
-
-                        if format_radio.value in ("json", "both"):
-                            result = export_vector_to_json(password=pwd)
-                            if result is not None:
-                                results.append(result)
-
-                        # Pass each file path to the browser to it can be
-                        # downloaded to a location choosen by the user.
-                        for result in results:
-                            ui.download.file(result.zip_path)
-
-                        for result in results:
-                            ui.notify(
-                                result.message,
-                                multi_line=True,
-                                classes="multi-line-notification",
-                                timeout=CONFIRM_TIMEOUT,
-                                position="bottom",
-                                close_button="OK",
-                            )
-
-                    with ui.row().classes("w-full justify-end gap-2 mt-4"):
-
-                        ui.button(
-                            "Cancel",
-                            on_click=dialog.close,
-                            color="transparent",
-                        ).props("flat").classes("p-3 hover-border-blue")
-
-                        ui.button(
-                            "Export Now",
-                            on_click=do_export,
-                            color="var(--vsp-blue)",
-                        ).props("push").classes("p-3 hover-border-white")
-
-                dialog.open()
-
-            # ----- IMPORT Button -----
-            def open_import_dialog():
-
-                with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
-
-                    ui.label("Import Data...").classes(
-                        "text-lg font-bold text-[var(--vsp-blue)]"
-                    )
-
-                    # No format to choose. The CSV archive and the JSON
-                    # export are told apart from the file itself, so
-                    # picking the wrong one cannot fail an import.
-                    ui.label(
-                        "Select a file previously exported from VECTOR -- "
-                        "either the ZIP archive or the JSON file. The "
-                        "format is detected from the file itself."
-                    ).classes("text-sm text-[var(--vsp-gray)]")
-
-                    ui.label(
-                        "WARNING :"
-                    ).classes("text-sm font-bold text-[#EF4444]")
-
-                    ui.label("This will REPLACE ALL existing data!").classes(
-                        "text-base text-[var(--vsp-gray)]"
-                    )
-
-                    picked = {"path": None, "folder": None, "locked": False}
-
-                    def discard_picked() -> None:
-                        if picked["folder"] is not None:
-                            shutil.rmtree(picked["folder"], ignore_errors=True)
-                        picked["path"] = picked["folder"] = None
-                        picked["locked"] = False
-
-                    async def on_file_picked(e) -> None:
-                        # Kept under the name it arrived with: the suffix is
-                        # part of how the format is recognised.
-                        discard_picked()
-                        folder = new_staging_dir("vector_import_upload_")
-                        name = Path(e.file.name).name or "import.zip"
-                        target = folder / name
-                        await e.file.save(target)
-                        picked["path"], picked["folder"] = target, folder
-                        picked_label.set_text(f"Chosen: {name}")
-                        # Whether it needs a password is read from the file
-                        # itself, so nobody has to remember to say so.
-                        locked = needs_password(target)
-                        picked["locked"] = locked
-                        password_note.set_visibility(locked)
-                        password_input.set_visibility(locked)
-                        import_button.enable()
-
-                    ui.upload(
-                        label="Choose the exported file (.zip or .json)",
-                        on_upload=on_file_picked,
-                        auto_upload=True,
-                        max_files=1,
-                        max_file_size=Config.MAX_IMPORT_BYTES,
-                    ).props('accept=".zip,.json" flat bordered').classes(
-                        "w-full"
-                    )
-
-                    picked_label = ui.label(
-                        "No file chosen yet."
-                    ).classes("text-sm text-[var(--vsp-gray)]")
-
-                    password_note = ui.label(
-                        "This file is protected with a password."
-                    ).classes("text-sm text-[#F5B027]")
-
-                    password_input = ui.input(
-                        label="ENTER THE FILE'S PASSWORD :",
-                        password=True,
-                    ).classes("w-full yellow-label text-sm")
-
-                    # Shown once a file that needs one has been chosen.
-                    password_note.set_visibility(False)
-                    password_input.set_visibility(False)
-
-                    def do_import():
-                        path = picked["path"]
-                        if path is None:
-                            ui.notify(
-                                "Choose the exported file first.",
-                                type="warning",
-                                timeout=WARN_TIMEOUT,
-                                position="center",
-                                close_button="OK",
-                            )
-                            return
-
-                        pwd = password_input.value if picked["locked"] else None
-
-                        if picked["locked"] and not pwd:
-                            ui.notify(
-                                "This file is protected with a password. "
-                                "Enter it to import the file.",
-                                type="warning",
-                                timeout=WARN_TIMEOUT,
-                                position="center",
-                                close_button="OK",
-                            )
-                            return
-
-                        dialog.close()
-
-                        # A .json, or a .zip holding one, goes through
-                        # the JSON reader; the CSV archive is also a
-                        # .zip, so the contents decide, not the suffix
-                        # alone.
-                        try:
-                            if looks_like_json_export(path):
-                                import_vector_from_json(
-                                    str(path), password=pwd
-                                )
-                            else:
-                                import_vector_from_csv(
-                                    str(path), password=pwd
-                                )
-                        finally:
-                            discard_picked()
-
-                    def cancel_import() -> None:
-                        discard_picked()
-                        dialog.close()
-
-                    with ui.row().classes("w-full justify-end gap-2 mt-4"):
-
-                        ui.button(
-                            "Cancel",
-                            on_click=cancel_import,
-                            color="transparent",
-                        ).props("flat").classes("p-3 hover-border-blue")
-
-                        import_button = ui.button(
-                            "Import Now",
-                            on_click=do_import,
-                            color="var(--vsp-blue)",
-                        ).props("push").classes("p-3 hover-border-white")
-
-                        import_button.disable()
-
-                dialog.open()
-
-            # ----- DELETE ALL Button -----
-
-            def open_delete_all_dialog():
-
-                with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
-
-                    ui.label("Delete All Data?").classes(
-                        "mb-3 text-lg font-bold text-[var(--vsp-blue)]"
-                    )
-
-                    ui.label(
-                        "Are you sure you want to delete all case "
-                        "data for this case? This CANNOT be undone!"
-                    ).classes(
-                        "mb-3 text-base text-[var(--vsp-gray)]"
-                    )
-
-                    # ----- User verification of destructive activity -----
-                    affirm_checkbox = ui.checkbox(
-                        "I understand the current data cannot be recovered.",
-                        value=False,
-                    ).classes("mb-3 text-base text-[var(--vsp-gray)]")
-
-                    affirm_input = (
-                        ui.input(
-                            label="AFFIRM BY TYPING 'DELETE' BELOW",
-                            password=False,
-                        )
-                        .classes("w-full yellow-label mb-3")
-                    )
-
-                    affirm_input.bind_visibility_from(
-                        affirm_checkbox,
-                        "value",
-                    )
-
-                    def do_delete():
-                        if not affirm_checkbox.value:
-                            ui.notify(
-                                "Tick the box to confirm you understand "
-                                "the data cannot be recovered.",
-                                type="warning",
-                                timeout=WARN_TIMEOUT,
-                                position="center",
-                                close_button="OK",
-                            )
-                            return
-
-                        if (affirm_input.value or "").strip() != "DELETE":
-                            ui.notify(
-                                "Type DELETE, in capital letters, to confirm.",
-                                type="warning",
-                                timeout=WARN_TIMEOUT,
-                                position="center",
-                                close_button="OK",
-                            )
-                            return
-
-                        dialog.close()
-
-                        try:
-                            delete_all_data()
-                        except Exception as err:
-                            log.exception("Data deletion failed")
-                            ui.notify(
-                                "No data was deleted, and the case is "
-                                f"unchanged.\n\n{explain(err)}",
-                                multi_line=True,
-                                classes="multi-line-notification",
-                                type="warning",
-                                timeout=WARN_TIMEOUT,
-                                position="center",
-                                close_button="OK",
-                            )
-                            return
-
-                    with ui.row().classes("w-full justify-end gap-2 mt-4"):
-
-                        ui.button(
-                            "Cancel",
-                            on_click=dialog.close,
-                            color="transparent",
-                        ).props("flat").classes("p-3 hover-border-blue")
-
-                        ui.button(
-                            "Delete all data",
-                            on_click=do_delete,
-                            color="#EF4444",
-                        ).props("push").classes("p-3 hover-border-white")
-
-                dialog.open()
-
             action_buttons = {
                 "0": {
                     "text":"📤 EXPORT CASE DATA",
@@ -591,9 +227,7 @@ def build_login_home():
 
     with ui.column().classes("items-center w-full mt-12"):
 
-        ui.image(
-            "/static/novadc_icac.png",
-        ).classes("w-[150px] h-[150px] mb-2")
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-2")
 
         ui.label(
             "-- V·E·C·T·O·R --"
@@ -786,7 +420,8 @@ the menu button (three lines) at the top left.
 1. **Start New Case** on the Home page opens the Case page. Enter the case
    number, location, jurisdiction and start time (`MM-DD-YYYY HH:MM`) — or
    press **Fill with current date/time** — then press **Open New Case**.
-   The case number now shows at the top of every page.
+   The case number now shows at the top of every page, and the Case page
+   shows the open case in place of the form.
 2. **Agents** — everyone on site.
 3. **Rooms** — the next room letter is filled in for you.
 4. **Evidence** — the next item number is filled in for you, and rooms and
@@ -798,13 +433,26 @@ the menu button (three lines) at the top left.
    order they were written.
 7. **Files** — photographs and documents. Each file is fingerprinted
    (SHA-256) when it is added, so a later change to it can be detected.
-8. **Reports** — seven printable lists, including the inventory used as
-   the return copy. If the case is missing a detail a report needs, the
+   VECTOR reads what a file is from its contents, not its name: images,
+   videos, documents and archives are accepted, and a program renamed to
+   look like a photo is refused. Every download is recorded in the audit
+   trail.
+8. **Reports** — eight printable lists, including the inventory used as
+   the return copy. **Print Report** opens the report in its own window,
+   with **Print Report** and **Close** in a bar across the top; the bar
+   is not printed. If the case is missing a detail a report needs, the
    page says which, and if it has no end time yet the page offers to fill
-   it in from this machine's clock.
+   it in from this machine's clock. **Print Room List** waits until every
+   room has both agents. Switches on the Reports page add the date and
+   time each report was printed, and hide agents' phone numbers and
+   emails on the Agent List.
 
 Until a case is open, the top bar shows **No Active Case** and the other
 pages will not save.
+
+Every table has a search box above it. Type part of a name, a room, an
+item number or a description and the list narrows to the rows that hold
+it; clear the box to see them all again.
 
 Times follow this machine's clock and time zone. The times VECTOR records
 itself — notes, entries, uploads — carry their offset from UTC, such as
@@ -827,15 +475,24 @@ itself — notes, entries, uploads — carry their offset from UTC, such as
 
 - Sign out from the **Welcome** menu at the top right, with **Logout**.
 - Administrators also see **Admin Panel** there, to add accounts, reset
-  passwords and clear a sign-in lock; **Audit Trail**, a record of every
-  change; and **Shutdown**, which stops VECTOR for everyone.
+  passwords, clear a sign-in lock and decide whether other devices may
+  reach this machine; **Audit Trail**, a record of every
+  change, sign-in and download; and **Shutdown**, which stops VECTOR for
+  everyone.
 - After {LOCK_AFTER_FAILURES} wrong passwords an account is locked for
   {LOCKOUT_MINUTES} minutes. An administrator can clear the lock sooner.
 - Passwords an administrator issues are shown once. Write them down before
   closing the message.
+- A device nobody has touched for {Config.SESSION_IDLE_MINUTES} minutes
+  signs out on its own, so a tablet left at a scene does not stay open on
+  the case. A warning appears first, with **Stay signed in** on it.
+  Records already saved are kept; a form filled in but not yet saved is
+  lost with the page, so save before walking away.
 
 #### Other pages
 
+- **Connect a Device** under **Help** — the address to type on a tablet
+  or a second laptop, and whether VECTOR is reachable from them at all.
 - **Tools** (or **Useful Links** on the Home page) — links to forensic
   software, DFIR and OSINT resources.
 - **Help** → **About App** — the version, and who wrote VECTOR.
@@ -911,7 +568,7 @@ def confirm_new_case_handler() -> None:
                         f"\n\n{explain(err)}",
                         multi_line=True,
                         type="warning",
-                        timeout=WARN_TIMEOUT,
+                        timeout=ZERO_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -926,7 +583,7 @@ def confirm_new_case_handler() -> None:
                 ui.navigate.to("/cases")
 
             ui.button(
-                "Proceed (Delete All Data)",
+                "Delete All Data",
                 on_click=on_proceed,
                 color="#EF4444",
             ).props("push").classes("p-3 hover-border-white")
@@ -937,8 +594,6 @@ def confirm_new_case_handler() -> None:
 @ui.page("/logout")
 def logout_page():
     """Logs out the current user."""
-    from nicegui import app
-
     sign_out()
 
     ui.notify(

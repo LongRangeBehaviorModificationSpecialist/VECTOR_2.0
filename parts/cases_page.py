@@ -43,13 +43,13 @@ SPEC = CrudSpec(
     # closes the form so nobody fills it in only to be turned away.
     max_records=1,
     limit_message=(
-        "A case is already open. To start a different one, use Start New "
-        "Case on the home page — it clears the current case after a "
-        "warning."
+        "<strong>A case is already open.</strong><br><br>To start a different one, use Start New Case on the home page — it clears the current case after a warning."
     ),
     # A case is cleared through Start New Case on the home page, which
     # removes everything recorded against it rather than this table alone.
     show_delete_all=False,
+    # One row: a search box over it would be noise.
+    searchable=False,
     # Nor a delete button on the row, for the same reason: deleting the case
     # alone left its agents, rooms, evidence and notes for the next case.
     allow_delete=False,

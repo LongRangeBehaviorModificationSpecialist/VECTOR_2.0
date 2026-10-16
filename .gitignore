@@ -21,6 +21,7 @@ env/
 /db/*.db-wal
 /db/*.db-shm
 /db/users.json
+/db/settings.json
 /parts/agents.json
 
 # ----- Scratch -----

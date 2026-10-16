@@ -5,17 +5,18 @@ auth.py
 
 Session state and route guards.
 
-Deliberately imports nothing from the rest of the application. Every
-page module previously reached into main.py for these three helpers,
-while main.py imported the pages -- a cycle that forced function-level
-imports throughout the codebase and left report routes unregistered
-until someone happened to visit /reports.
+Imports nothing from the pages, and from the rest of the application
+only the message timeouts in utils. Every page module previously reached
+into main.py for these three helpers, while main.py imported the pages
+-- a cycle that forced function-level imports throughout the codebase
+and left report routes unregistered until someone happened to visit
+/reports.
 """
 
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 import logging
-from utils import CONFIRM_TIMEOUT, WARN_TIMEOUT
+from utils import WARN_TIMEOUT
 
 from nicegui import app, ui
 
@@ -40,6 +41,16 @@ FAILURE_WINDOW_MINUTES = 30
 # answer "not signed in" rather than raising. Ending sessions is different:
 # if that fails, an administrator would be told a session is over when it
 # is not, so those failures are logged and reported to the caller.
+# ----- Reading the session -----
+# Every reader below reaches for app.storage, which needs a browser
+# request in scope. A timer, a background task, a test or a page being
+# torn down has none, and NiceGUI raises rather than returning nothing.
+#
+# Each catch below is that case, and each answers the way that fails
+# safe: not signed in, no name, not an admin, generation zero. The two
+# writers further down are different -- a failure there means an admin
+# is told a session ended when it did not, so those are logged and
+# reported to the caller.
 def is_authenticated() -> bool:
     """Checks if the current user is signed in (defaults to False).
 
@@ -70,6 +81,7 @@ def is_authenticated() -> bool:
 
         return True
     except Exception:
+        # No request in scope; see the note above.
         return False
 
 
@@ -78,6 +90,7 @@ def get_current_user_name() -> str:
     try:
         return app.storage.user.get("USERNAME", "")
     except Exception:
+        # No request in scope; see the note above.
         return ""
 
 
@@ -86,6 +99,7 @@ def get_is_admin() -> bool:
     try:
         return app.storage.user.get("ISADMIN", False)
     except Exception:
+        # No request in scope; see the note above.
         return False
 
 
@@ -122,6 +136,7 @@ def global_generation() -> int:
     try:
         return app.storage.general.get("session_generation", 0)
     except Exception:
+        # No request in scope; see the note above.
         return 0
 
 
@@ -132,6 +147,7 @@ def user_generation(user_name: str) -> int:
             user_name, 0
         )
     except Exception:
+        # No request in scope; see the note above.
         return 0
 
 
@@ -175,6 +191,8 @@ def _failures() -> dict:
     try:
         return dict(app.storage.general.get("login_failures", {}))
     except Exception:
+        # No request in scope; see the note above. No record of failures
+        # means no throttling this call, not a refused sign-in.
         return {}
 
 

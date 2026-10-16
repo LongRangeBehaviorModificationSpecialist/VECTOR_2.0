@@ -6,7 +6,9 @@ utils.py
 File containing various functions used throughout the application.
 """
 import clock
+import settings
 from datetime import datetime
+import filetype
 from functools import wraps
 from inspect import iscoroutinefunction
 import json
@@ -34,12 +36,20 @@ from sqlalchemy import exists, inspect
 from typing import Optional
 
 
-WARN_TIMEOUT = 4000
+WARN_TIMEOUT = 6000
 CONFIRM_TIMEOUT = 3500
 ZERO_TIMEOUT = 0
 
 AGENTS_JSON_PATH = Path(__file__).parent / "parts/agents.json"
 
+
+# Types with no magic number, so only the extension can identify them.
+_EXTENSION_ONLY = {
+    "text/plain",
+    "text/rtf",
+    "application/rtf",
+    "image/svg+xml",
+}
 
 # Allowed MIME types for images, videos, and documents
 ALLOWED_MIME_TYPES = {
@@ -51,6 +61,11 @@ ALLOWED_MIME_TYPES = {
     "image/webp",
     "image/svg+xml",
     "image/tiff",
+    # iPhones and iPads save photographs as HEIC. A browser uploading one
+    # from the camera usually converts it to JPEG; one copied from a
+    # phone or a Mac arrives as it is, and was refused.
+    "image/heic",
+    "image/heif",
     # Videos
     "video/mp4",
     "video/quicktime",
@@ -79,6 +94,8 @@ ALLOWED_MIME_TYPES = {
     "application/gzip",
     "application/x-gzip",
     "application/vnd.rar",
+    # What derive_mime_type() calls a RAR file, from its content.
+    "application/x-rar-compressed",
     "application/x-bzip2",
     "application/x-xz",
 }
@@ -91,6 +108,19 @@ mimetypes.add_type("application/gzip", ".tgz")
 mimetypes.add_type("application/vnd.rar", ".rar")
 mimetypes.add_type("application/x-bzip2", ".bz2")
 mimetypes.add_type("application/x-xz", ".xz")
+mimetypes.add_type("image/heic", ".heic")
+mimetypes.add_type("image/heif", ".heif")
+
+
+def derive_mime_type(file_name: str, data: bytes) -> str:
+    """MIME type from the file's content, never from the browser."""
+    kind = filetype.guess(data[:8192])
+    if kind:
+        return kind.mime
+    guessed, _ = mimetypes.guess_type(file_name)
+    if guessed in _EXTENSION_ONLY:
+        return guessed
+    return "application/octet-stream"  # not in the allowlist, so rejected
 
 
 def get_current_timestamp(format: str = "") -> str:
@@ -344,7 +374,7 @@ def confirm_delete_all(action: str, callback):
     """Shows a confirmation dialog before executing a destructive action."""
     with ui.dialog() as dialog, ui.card().classes("max-w-sm p-6"):
 
-        ui.label(f"Warning!").classes("text-lg font-bold mb-2 text-[#1C69A8]")
+        ui.label("Warning!").classes("text-lg font-bold mb-2 text-[#1C69A8]")
 
         ui.label(
             f"This will permanently delete ALL {action} from the database. "
@@ -563,13 +593,74 @@ def delete_all_data() -> None:
             before=counts,
         )
 
-    ui.notify(
-        "All case data has been deleted.",
-        type="warning",
-        timeout=WARN_TIMEOUT,
-        position="center",
-        close_button="OK",
-    )
+
+def set_network_access(allowed: bool, actor: str = "") -> None:
+    """Turns network access on or off, and records who did it.
+
+    The address a server listens on is fixed when the socket opens, so
+    this takes effect at the next start; the page offering it says so.
+    """
+    was = settings.network_access()
+    settings.set_network_access(allowed)
+
+    state = "on" if allowed else "off"
+    with get_session() as session:
+        record_audit(
+            session,
+            action="SETTING_CHANGED",
+            table_name="(settings)",
+            summary=(
+                f"network access turned {state}; "
+                "takes effect at the next start"
+            ),
+            before={"network_access": was},
+            after={"network_access": bool(allowed)},
+            actor=actor or None,
+        )
+
+
+def set_report_print_date(on: bool, actor: str = "") -> None:
+    """Turns the "Report Printed Date" line on reports on or off, and
+    records who did it.
+    """
+    was = settings.report_print_date()
+    settings.set_report_print_date(on)
+
+    with get_session() as session:
+        record_audit(
+            session,
+            action="SETTING_CHANGED",
+            table_name="(settings)",
+            summary=(
+                "report printed date turned "
+                f"{'on' if on else 'off'}"
+            ),
+            before={"report_print_date": was},
+            after={"report_print_date": bool(on)},
+            actor=actor or None,
+        )
+
+
+def set_redact_agent_report(on: bool, actor: str = "") -> None:
+    """Turns redaction of agent phone numbers and emails on the Agent List
+    report on or off, and records who did it.
+    """
+    was = settings.redact_agent_report()
+    settings.set_redact_agent_report(on)
+
+    with get_session() as session:
+        record_audit(
+            session,
+            action="SETTING_CHANGED",
+            table_name="(settings)",
+            summary=(
+                "Agent Report contact redaction turned "
+                f"{'on' if on else 'off'}"
+            ),
+            before={"redact_agent_report": was},
+            after={"redact_agent_report": bool(on)},
+            actor=actor or None,
+        )
 
 
 def value_in_use(session, model, column_name, value, exclude_pk=None) -> bool:

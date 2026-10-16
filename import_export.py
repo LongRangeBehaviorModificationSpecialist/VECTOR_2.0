@@ -17,6 +17,7 @@ import json
 from nicegui import ui
 from pathlib import Path
 import pyzipper
+import re
 import shutil
 import tempfile
 from typing import Optional
@@ -110,10 +111,21 @@ _FILE_ENTRY_ALIASES = {
     "uploaded_by": "FILEUPLOADEDBY",
     "hash_at_ingest": "FILESHA256",
     "hashed_at": "FILEHASHEDDATETIME",
+    "FILEHASHEDAT": "FILEHASHEDDATETIME",
     "file_hash": "FILEHASH",
     "matches_ingest_hash": "FILEHASHMATCHES",
     "data_base64": "FILEDATA_b64",
 }
+
+def same_hash(first, second) -> bool:
+    """Whether two SHA-256 digests are the same digest.
+
+    Hex is not case-sensitive: VECTOR now writes digests in capitals,
+    and every attachment collected before that was recorded in lower
+    case. Compared as text, each of those would read as altered.
+    """
+    return (first or "").strip().upper() == (second or "").strip().upper()
+
 
 def hash_file(path: Path, chunk_size: int = 65536) -> str:
     """Streamed SHA-256 of a file's contents."""
@@ -152,7 +164,7 @@ def _report_failure(message: str, err: BaseException) -> None:
         multi_line=True,
         classes="multi-line-notification",
         type="warning",
-        timeout=WARN_TIMEOUT,
+        timeout=ZERO_TIMEOUT,
         position="center",
         close_button="OK",
     )
@@ -246,12 +258,7 @@ def get_case_info_for_folder_name() -> str:
             )
             return ""
 
-        case_number = (
-            (case.CASENUMBER or "UNKNOWN")
-            .replace("/", "_")
-            .replace("\\", "_")
-            .replace(" ", "_")
-        )
+        case_number = safe_file_name(case.CASENUMBER or "UNKNOWN")
 
         begin_dt = case.CASEDATETIMEBEGIN or "UNKNOWN"
 
@@ -260,13 +267,29 @@ def get_case_info_for_folder_name() -> str:
             dt_str = begin_dt.strftime("%Y-%m-%d_%H%M%S")
         else:
             # Sanitize the string
-            dt_str = (
+            dt_str = safe_file_name(
                 str(begin_dt)
                 .replace(":", "")
                 .replace(" ", "_")
                 .replace("/", "")
             )
         return f"{case_number}_{dt_str}_saved_results"
+
+
+_NOT_IN_FILE_NAMES = re.compile(r'[<>:"/\\|?*\x00-\x1f\s]+')
+
+
+def safe_file_name(text: str) -> str:
+    """Text made fit to be part of a file name on Windows as well.
+
+    The case number names the export. One holding a character Windows
+    refuses -- "26:1234", "ICAC?26" -- stopped the export at the end of
+    the day with "Could not start the export". Those characters, and
+    spaces, become underscores, and any left at either end go -- with
+    trailing dots, which Windows also refuses.
+    """
+    cleaned = _NOT_IN_FILE_NAMES.sub("_", str(text)).strip("_. ")
+    return cleaned or "UNKNOWN"
 
 
 def get_column_names(model_class) -> list:
@@ -438,7 +461,9 @@ def export_vector_to_csv(
                     # the copy, so compare the two and say so if they
                     # disagree.
                     recorded = uf.FILESHA256 or ""
-                    verified = (not recorded) or recorded == sha256_hash
+                    verified = (not recorded) or same_hash(
+                        recorded, sha256_hash
+                    )
                     if not verified:
                         integrity_failures.append(archive_name)
 
@@ -462,6 +487,12 @@ def export_vector_to_csv(
                     )
 
                     num_files += 1
+
+                # Let go of this attachment's bytes before the next is
+                # read. The session keeps what it has loaded, so without
+                # this every photograph in the case was held in memory
+                # at once.
+                session.expire(uf, ["FILEDATA"])
 
     except Exception as err:
         # Carrying on would hand over an export without its attachments,
@@ -556,7 +587,6 @@ def export_vector_to_csv(
         with get_session() as session:
             case = session.query(Cases).order_by(Cases.Z_PK).first()
 
-            stage = "the audit record"
             record_audit(
                 session,
                 action="EXPORT",
@@ -572,16 +602,16 @@ def export_vector_to_csv(
                 }
             )
     except Exception as err:
-        ui.notify(
-            f"Failed to record action in {stage} → {err}.",
-            multi_line=True,
-            classes="multi-line-notification",
-            type="warning",
-            timeout=WARN_TIMEOUT,
-            position="center",
-            close_button="OK",
+        # Named the audit record through a "stage" set inside the try, so
+        # a failure before it was set raised again here; and printed the
+        # raw error to the console rather than logging it.
+        _report_failure(
+            "The CSV export was made but could not be recorded in the "
+            "audit trail, so it was not handed over. Nothing was "
+            "downloaded.",
+            err,
         )
-        print(f"{err}")
+        shutil.rmtree(work_dir, ignore_errors=True)
         return None
 
     # Delete the staging directory
@@ -630,7 +660,7 @@ def import_vector_from_csv(
         )
         return
 
-    if not zip_file.suffix == ".zip":
+    if zip_file.suffix.lower() != ".zip":
         ui.notify(
             "Please select a .zip file.",
             type="warning",
@@ -821,7 +851,7 @@ def import_vector_from_csv(
                         unlisted_files.append(file_path.name)
                     else:
                         expected = entry.get("FILEHASH")
-                        if expected and expected != actual_hash:
+                        if expected and not same_hash(expected, actual_hash):
                             hash_mismatches.append(file_path.name)
 
                     details = entry or {}
@@ -883,8 +913,10 @@ def import_vector_from_csv(
             + "\n\n".join(problems)
             + "\n\nThe import completed and has been recorded in the "
             "audit trail. Treat these files as unverified.",
+            multi_line=True,
+            classes="multi-line-notification",
             type="warning",
-            timeout=WARN_TIMEOUT,
+            timeout=ZERO_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -1055,7 +1087,9 @@ def export_vector_to_json(
                     hashlib.sha256(uploaded.FILEDATA).hexdigest().upper()
                 )
                 recorded = uploaded.FILESHA256 or ""
-                matches = (not recorded) or recorded == current_hash
+                matches = (not recorded) or same_hash(
+                    recorded, current_hash
+                )
                 if not matches:
                     integrity_failures.append(
                         uploaded.FILENAME or "(unnamed)"
@@ -1099,8 +1133,10 @@ def export_vector_to_json(
             + "\n".join(integrity_failures)
             + "\nThe export still completed. Investigate before relying "
             "on these files.",
+            multi_line=True,
+            classes="multi-line-notification",
             type="warning",
-            timeout=WARN_TIMEOUT,
+            timeout=ZERO_TIMEOUT,
             position="center",
             close_button="OK",
         )
@@ -1150,7 +1186,6 @@ def export_vector_to_json(
         with get_session() as session:
             case = session.query(Cases).order_by(Cases.Z_PK).first()
 
-            stage = "the audit record"
             record_audit(
                 session,
                 action="EXPORT",
@@ -1173,16 +1208,15 @@ def export_vector_to_json(
                 }
             )
     except Exception as err:
-        ui.notify(
-            f"Failed to record action in {stage} → {err}.",
-            multi_line=True,
-            classes="multi-line-notification",
-            type="warning",
-            timeout=WARN_TIMEOUT,
-            position="center",
-            close_button="OK",
+        # Named the audit record through a "stage" set inside the try, so
+        # a failure before it was set raised again here; and printed the
+        # raw error to the console rather than logging it.
+        _report_failure(
+            "The JSON export was made but could not be recorded in the "
+            "audit trail, so it was not handed over. Nothing was "
+            "downloaded.",
+            err,
         )
-        print(f"{err}")
         return None
 
     encrypted_note = " (AES-256 encrypted)" if password else ""
@@ -1347,7 +1381,7 @@ def import_vector_from_json(
                 actual_hash = hashlib.sha256(raw).hexdigest().upper()
 
                 expected = entry.get("FILEHASH")
-                if expected and expected != actual_hash:
+                if expected and not same_hash(expected, actual_hash):
                     hash_mismatches.append(
                         entry.get("FILENAME") or "(unnamed)"
                     )
@@ -1395,7 +1429,7 @@ def import_vector_from_json(
         if staging:
             shutil.rmtree(staging, ignore_errors=True)
         _report_failure(
-            "Nothing was imported (ln 1354), and the case is unchanged. The problem "
+            "Nothing was imported, and the case is unchanged. The problem "
             f"was in {stage}.",
             err,
         )
@@ -1416,7 +1450,7 @@ def import_vector_from_json(
             multi_line=True,
             classes="multi-line-notification",
             type="warning",
-            timeout=WARN_TIMEOUT,
+            timeout=ZERO_TIMEOUT,
             position="center",
             close_button="OK",
         )

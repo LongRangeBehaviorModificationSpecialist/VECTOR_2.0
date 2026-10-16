@@ -32,10 +32,14 @@ WORKFLOW FOR REPORT CREATION:
 
 from html import escape
 from nicegui import ui
+import json
+import re
+
 from sqlalchemy import func
 
 import clock
 from failures import explain, log
+import settings
 from models import (
     get_session,
     Agents,
@@ -52,10 +56,13 @@ from utils import (
     CASE_TIME_FORMAT,
     CONFIRM_TIMEOUT,
     WARN_TIMEOUT,
+    ZERO_TIMEOUT,
     evidence_number_key,
     get_case_info,
     get_print_date_time,
     parse_entered_date,
+    set_redact_agent_report,
+    set_report_print_date,
     room_display_key,
     room_label_key,
 )
@@ -101,6 +108,7 @@ report_buttons = {
     },
 }
 
+REDACTED = "[REDACTED]"
 
 # ----- HTML Escaping -----
 def h(value) -> str:
@@ -111,6 +119,24 @@ def h(value) -> str:
     window.
     """
     return escape("" if value is None else str(value))
+
+
+def open_report(url: str) -> None:
+    """Opens a report, after the checks that report needs."""
+    if url == "/reports/rooms":
+        missing = rooms_missing_agents()
+        if missing:
+            ui.notify(
+                rooms_missing_agents_message(missing),
+                multi_line=True,
+                classes="multi-line-notification",
+                type="warning",
+                timeout=WARN_TIMEOUT,
+                position="center",
+                close_button="OK",
+            )
+            return
+    ui.navigate.to(url)
 
 
 def build_reports_page() -> None:
@@ -131,6 +157,9 @@ def build_reports_page() -> None:
             ui.label("|").classes("font-bold text-[var(--vsp-blue)]")
             ui.label("Reports Page")
 
+        _printed_date_switch()
+        _redact_agent_report()
+
     _remind_about_end_time()
 
     # ----- First row of buttons -----
@@ -139,10 +168,11 @@ def build_reports_page() -> None:
 
         for k, v in list(report_buttons.items())[0:3]:
             ui.button(
-                v['text'],
-                on_click=lambda url=v['page_url']: ui.navigate.to(url),
-                color=style['color'],
-            ).props(style['props']).classes(style['classes'])
+                v["text"],
+                # on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                on_click=lambda url=v["page_url"]: open_report(url),
+                color=style["color"],
+            ).props(style["props"]).classes(style["classes"])
 
     # ----- Second row of buttons -----
     with ui.row().classes(
@@ -150,10 +180,11 @@ def build_reports_page() -> None:
 
         for k, v in list(report_buttons.items())[3:6]:
             ui.button(
-                v['text'],
-                on_click=lambda url=v['page_url']: ui.navigate.to(url),
-                color=style['color'],
-            ).props(style['props']).classes(style['classes'])
+                v["text"],
+                # on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                on_click=lambda url=v["page_url"]: open_report(url),
+                color=style["color"],
+            ).props(style["props"]).classes(style["classes"])
 
     # ----- Third row of buttons -----
     with ui.row().classes(
@@ -161,10 +192,88 @@ def build_reports_page() -> None:
 
         for k, v in list(report_buttons.items())[6:]:
             ui.button(
-                v['text'],
-                on_click=lambda url=v['page_url']: ui.navigate.to(url),
-                color=style['color'],
-            ).props(style['props']).classes(style['classes'])
+                v["text"],
+                # on_click=lambda url=v["page_url"]: ui.navigate.to(url),
+                on_click=lambda url=v["page_url"]: open_report(url),
+                color=style["color"],
+            ).props(style["props"]).classes(style["classes"])
+
+
+def _printed_date_switch() -> None:
+    """Whether each report says when it was printed.
+
+    Off by default; it is this machine's choice, kept with its other settings,
+    and every change is in the audit trail.
+    """
+
+    def on_change(event) -> None:
+        try:
+            set_report_print_date(bool(event.value), get_current_user_name())
+        except Exception as err:
+            log.exception("Could not change the printed-date setting")
+            ui.notify(
+                f"The setting was not changed.\n\n{explain(err)}",
+                multi_line=True,
+                classes="multi-line-notification",
+                type="warning",
+                timeout=ZERO_TIMEOUT,
+                position="center",
+                close_button="OK",
+            )
+            return
+        ui.notify(
+            "Reports now show when they were printed."
+            if event.value else
+            "Reports no longer show when they were printed.",
+            timeout=CONFIRM_TIMEOUT,
+            position="bottom",
+            close_button="OK",
+        )
+
+    ui.switch(
+        "Show the date and time each report is printed",
+        value=settings.report_print_date(),
+        on_change=on_change,
+    ).classes("text-sm text-[var(--vsp-gray)] mt-2")
+
+
+def _redact_agent_report() -> None:
+    """Whether the Agent List report hides agents' phone numbers and emails.
+
+    Off by default; it is this machine's choice, kept with its other
+    settings, and every change is in the audit trail.
+    """
+
+    def on_change(event) -> None:
+        try:
+            set_redact_agent_report(bool(event.value), get_current_user_name())
+        except Exception as err:
+            log.exception("Could not change the agent redaction setting")
+            ui.notify(
+                f"The setting was not changed.\n\n{explain(err)}",
+                multi_line=True,
+                classes="multi-line-notification",
+                type="warning",
+                timeout=ZERO_TIMEOUT,
+                position="center",
+                close_button="OK",
+            )
+            return
+        ui.notify(
+            "The Agent List now hides phone numbers and emails."
+            if event.value else
+            "The Agent List now shows phone numbers and emails.",
+            timeout=CONFIRM_TIMEOUT,
+            position="bottom",
+            close_button="OK",
+        )
+
+    ui.switch(
+        "Redact agent phone numbers and emails on the Agent List",
+        value=settings.redact_agent_report(),
+        on_change=on_change,
+    ).classes("text-sm text-[var(--vsp-gray)]")
+
 
 # ----- Order -----
 # Item numbers and room labels are text. Ordered by the database, the
@@ -175,6 +284,30 @@ def evidence_in_order(session) -> list:
     return sorted(
         session.query(Evidence).all(),
         key=lambda item: evidence_number_key(item.EVIDNUM),
+    )
+
+
+def rooms_missing_agents() -> list[str]:
+    """Labels of rooms where either agent field is blank."""
+    with get_session() as session:
+        return [
+            room.ROOMLABEL
+            for room in rooms_in_order(session)
+            if not (room.ROOMFIRSTAGENT or "").strip()
+            or not (room.ROOMSECONDAGENT or "").strip()
+        ]
+
+
+def rooms_missing_agents_message(labels: list[str]) -> str:
+    """Tells the user what to fix, without listing every room."""
+    shown = ", ".join(labels[:10])
+    if len(labels) > 10:
+        shown += f", and {len(labels) - 10} more"
+    return (
+        "The Room List cannot be printed until a first and second agent "
+        "are entered for every room.\n\n"
+        f"Rooms missing an agent => {shown}.\n\n"
+        "Open the Rooms page and enter both agent names for each."
     )
 
 
@@ -189,7 +322,10 @@ def rooms_in_order(session) -> list:
 def rooms_with_item_counts(session) -> list[tuple[str, int]]:
     """Each room evidence was found in, with its item count, in label order."""
     counts = (
-        session.query(Evidence.EVIDLOCROOM, func.count(Evidence.EVIDLOCROOM))
+        session.query(
+            Evidence.EVIDLOCROOM,
+            func.count(Evidence.EVIDLOCROOM)
+        )
         .group_by(Evidence.EVIDLOCROOM)
         .all()
     )
@@ -271,7 +407,7 @@ def _remind_about_end_time() -> None:
                         f"Could not save the end time.\n\n{explain(err)}",
                         multi_line=True,
                         type="warning",
-                        timeout=WARN_TIMEOUT,
+                        timeout=ZERO_TIMEOUT,
                         position="center",
                         close_button="OK",
                     )
@@ -296,8 +432,14 @@ def _remind_about_end_time() -> None:
     reminder.open()
 
 
-def render_report_page(html_content: str) -> None:
-    """Wraps report HTML with navigation and print button."""
+def render_report_page(html_content: str, report_name: str = "") -> None:
+    """Wraps report HTML with navigation and print button.
+
+    The button sits outside the report: the print window copies
+    everything inside #report-container, and with the button in there it
+    showed a second "Print Report" -- as "printPrint Report", its icon's
+    name standing in for an icon the print window has no font for.
+    """
     build_navbar(
         is_admin=get_is_admin(),
         username=get_current_user_name(),
@@ -305,14 +447,27 @@ def render_report_page(html_content: str) -> None:
 
     with ui.column().classes("w-full items-center"):
 
-        with ui.element().props("id='report-container'").classes("w-full"):
-
-            ui.button(
+        with ui.row().classes("w-full no-print"):
+            print_button = ui.button(
                 "Print Report",
-                on_click=open_report_window,
                 color="#1C69A8").props("push icon=print"
             ).classes("p-3 mb-4 no-print hover-border-white")
 
+        is_valid, errors = validate_case_for_report()
+        if is_valid:
+            # Opened in the browser by the click itself. Opened from the
+            # server after the click had made the round trip, the window
+            # was not the click's any more, and pop-up blockers -- Safari
+            # on an iPad by default -- stopped it.
+            case_number = (get_case_info() or {}).get("CASENUMBER", "")
+            print_button.on(
+                "click",
+                js_handler=print_window_script(report_name, case_number),
+            )
+        else:
+            print_button.on_click(lambda: show_validation_errors(errors))
+
+        with ui.element().props("id='report-container'").classes("w-full"):
             ui.html(html_content)
 
 
@@ -329,7 +484,6 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
     with get_session() as session:
 
         case = session.query(Cases).first()
-        evidence = session.query(Evidence).all()
 
         if not case:
             errors.append(
@@ -471,10 +625,22 @@ COMMON_STYLES = """
         font-size: 10pt;
     }
 
+    .top-table .evid-table tr td.evid-data-label-header {
+        font-size: 10pt;
+        font-weight: bold;
+        padding: 0px 10px;
+        width: 30%
+    }
+
     .top-table .evid-table tr td.evid-data-value,
     .top-table .evid-table tr td.file-data-value {
         font-size: 12pt;
         padding: 0pt 6pt;
+    }
+
+    .top-table .evid-table tr td.spacer-row {
+        border-left: 1px solid transparent;
+        border-right: 1px solid transparent;
     }
 
     .bold {
@@ -631,7 +797,12 @@ td.header-data-value {
     text-align: left;
 }
 
+.top-table .evid-table tr td.spacer-row {
+    border-left: 1px solid transparent;
+    border-right: 1px solid transparent;
+}
 
+td.evid-data-label-header,
 td.evid-data-label,
 td.file-data-label {
     font-weight: normal;
@@ -678,7 +849,16 @@ def build_case_header_html(
         # the whole report route returns a 500 instead of redirecting.
         return ""
 
-    print_date_time = get_print_date_time()
+    # Off unless asked for on the Reports page: a time on the page that
+    # is neither when the search began nor when it ended invites the
+    # question of which one it is.
+    printed_row = ""
+    if settings.report_print_date():
+        printed_row = f"""
+            <tr>
+                <td class="header-data-label font-11">Report Printed Date:</td>
+                <td class="header-data-value font-11">{get_print_date_time()}</td>
+            </tr>"""
 
     report_header_table = f"""
     <div class="top-table">
@@ -707,10 +887,7 @@ def build_case_header_html(
                     {h(active_case["CASEDATETIMEEND"])}
                 </td>
             </tr>
-            <tr>
-                <td class="header-data-label font-11">Report Printed Date:</td>
-                <td class="header-data-value font-11">{print_date_time}</td>
-            </tr>
+            {printed_row}
         </table>
     </div>"""
 
@@ -733,16 +910,26 @@ def build_report_footer_html() -> str:
     """
 
 
-def build_agents_report_html(active_case: dict, agents: list) -> str:
-    """Generates the complete HTML for the Agent List report."""
+def build_agents_report_html(
+        active_case: dict,
+        agents: list,
+        redact_contacts: bool = False) -> str:
+    """Generates the complete HTML for the Agent List report.
+
+    With redact_contacts, each agent's phone and email are replaced by a
+    marker; the real values are never put into the HTML.
+    """
+
+    def contact(value) -> str:
+        return REDACTED if redact_contacts else h(value)
 
     agent_rows = "".join([f"""
         <tr>
             <td class="agent-table-data font-10">{h(a["AGENTNAME"])}</td>
             <td class="agent-table-data font-10">{h(a["AGENTPARENTAGENCY"])}</td>
             <td class="agent-table-data font-10">{h(a["AGENTPRIMARYROLE"])}</td>
-            <td class="agent-table-data font-10">{h(a["AGENTPHONE"])}</td>
-            <td class="agent-table-data font-10">{h(a["AGENTEMAIL"])}</td>
+            <td class="agent-table-data font-10">{contact(a["AGENTPHONE"])}</td>
+            <td class="agent-table-data font-10">{contact(a["AGENTEMAIL"])}</td>
         </tr>"""
         for a in agents]
     )
@@ -750,7 +937,7 @@ def build_agents_report_html(active_case: dict, agents: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="INVESTIGATORS AT SEARCH WARRANT SITE",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -791,7 +978,7 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
 
     Each item is displayed as vertical label/value rows with ALL fields.
 
-    This is the "AGENT COPY" version.
+    This is the AGENT COPY.
     """
 
     evid_rows = "".join([f"""
@@ -879,7 +1066,7 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="FULL EVIDENCE INVENTORY LIST",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -909,9 +1096,8 @@ def build_evidence_by_room_report_html(
 ) -> str:
     """Generates the complete HTML for the Evidence By Room report.
 
-    Groups evidence items under dark-background room headers with item counts.
-
-    Uses the same full detail layout as the AGENT COPY evidence report.
+    Groups evidence items under room headers with count of items found in
+    each room.
     """
 
     space = " "
@@ -923,17 +1109,21 @@ def build_evidence_by_room_report_html(
         room_name = room[0]
         item_count = room[1]
 
-        # Singular vs plural
+        # Singular vs plural. Escaped once, where it is printed: escaped
+        # here as well, "Kid's Room" printed as "Kid&#x27;s Room".
         label = (
-            f"{h(room_name)}{space}:{double_space}({item_count} "
+            f"{room_name}{space}:{double_space}({item_count} "
             f"{'item' if item_count == 1 else 'items'})"
         )
 
         # Filter evidence items for this room
         room_items = [e for e in evidence if e["EVIDLOCROOM"] == room_name]
         evid_rows = "".join([f"""
+            <tr>
+                <td colspan="2" class="spacer-row"></td>
+            </tr>
             <tr class="top-row">
-                <td class="evid-data-label bold">Item No.:</td>
+                <td class="evid-data-label-header">Item No.:</td>
                 <td class="evid-data-value px-6 bold">
                     {h(e["EVIDNUM"])}
                 </td>
@@ -969,7 +1159,7 @@ def build_evidence_by_room_report_html(
                 </td>
             </tr>
             <tr>
-                <td class="evid-data-label">Where Found</td>
+                <td class="evid-data-label">Where Found:</td>
                 <td class="evid-data-value px-6">
                     {h(e["EVIDLOCROOMDETAIL"])}
                 </td>
@@ -1028,12 +1218,12 @@ def build_evidence_by_room_report_html(
                 {evid_rows}
             </table>
         </div>
-        </br />"""
+        <br />"""
 
     header = build_case_header_html(
         active_case,
         page_title="EVIDENCE FOUND LIST BY ROOM",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
 
     footer = build_report_footer_html()
@@ -1076,12 +1266,6 @@ def build_basic_evidence_report_html(
             </table>
             <table class="evid-table">
                 <tr>
-                    <td class="evid-data-label">Quantity:</td>
-                    <td class="evid-data-value px-6">
-                        {h(e["EVIDQTY"])}
-                    </td>
-                </tr>
-                <tr>
                     <td class="evid-data-label">Description:</td>
                     <td class="evid-data-value px-6">
                         {h(e["EVIDDESC"])}
@@ -1107,7 +1291,7 @@ def build_basic_evidence_report_html(
     header = build_case_header_html(
         active_case,
         page_title="SEARCH INVENTORY AND RETURN",
-        sub_title="(Return Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1150,7 +1334,7 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="ROOM LIST",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1204,7 +1388,7 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="PERSONS LIST",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1258,7 +1442,7 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="NOTES LIST",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1346,7 +1530,7 @@ def build_files_report_html(active_case: list, files: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="ATTACHED FILES LIST",
-        sub_title="(Agent Copy)",
+        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1394,10 +1578,11 @@ def print_agents_report():
 
     html = build_agents_report_html(
         active_case=active_case,
-        agents=agents
+        agents=agents,
+        redact_contacts=settings.redact_agent_report(),
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Agent List")
 
 
 @ui.page("/reports/evidence")
@@ -1435,7 +1620,7 @@ def print_evidence_report():
         evidence=evidence
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Evidence List (Full)")
 
 
 @ui.page("/reports/evidence_by_room")
@@ -1475,7 +1660,7 @@ def print_evidence_by_room_report():
         unique_rooms=unique_rooms_list,
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Evidence List (By Room)")
 
 
 @ui.page("/reports/evidence_basic")
@@ -1505,7 +1690,7 @@ def print_basic_evidence_report():
         evidence=evidence
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Evidence List (Basic)")
 
 
 @ui.page("/reports/rooms")
@@ -1513,6 +1698,23 @@ def print_rooms_report():
 
     if not is_authenticated():
         ui.navigate.to("/")
+        return
+
+    missing = rooms_missing_agents()
+    if missing:
+        build_navbar(
+            is_admin=get_is_admin(),
+            username=get_current_user_name(),
+        )
+        with ui.column().classes("items-center w-full mt-8 gap-4"):
+            ui.label(rooms_missing_agents_message(missing)).classes(
+                "text-lg text-center whitespace-pre-line"
+            )
+            ui.button(
+                "Go to Rooms",
+                on_click=lambda: ui.navigate.to("/rooms"),
+                color=style["color"],
+            ).props(style["props"])
         return
 
     with get_session() as session:
@@ -1538,7 +1740,7 @@ def print_rooms_report():
         rooms=rooms
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Room List")
 
 
 @ui.page("/reports/persons")
@@ -1565,7 +1767,7 @@ def print_persons_report():
         persons=persons
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Persons List")
 
 
 @ui.page("/reports/notes")
@@ -1592,7 +1794,7 @@ def print_notes_report():
         notes=notes
     )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="Notes List")
 
 
 @ui.page("/reports/files")
@@ -1603,81 +1805,193 @@ def print_files_report():
 
     with get_session() as session:
         active_case = get_case_info()
-        files = [
-            {
-                "Z_PK": f.Z_PK,
-                "FILENAME": f.FILENAME,
-                "FILEMIMETYPE": f.FILEMIMETYPE or "",
-                "FILEUPLOADDATE": f.FILEUPLOADDATE or "",
-                "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
-                "FILESHA256": f.FILESHA256 or "",
-            }
-            for f in session.query(UploadedFiles).order_by(UploadedFiles.Z_PK).all()
-        ]
+        files = files_report_rows(session)
 
         html = build_files_report_html(
             active_case=active_case,
             files=files,
         )
 
-    render_report_page(html_content=html)
+    render_report_page(html_content=html, report_name="File List")
 
 
-def open_report_window():
-    """Extracts the report innerHTML and opens it in a clean new tab.
+def files_report_rows(session) -> list[dict]:
+    """The attachments as the Files report lists them.
 
-    The report can be printed after validation has occured.
+    The attachment itself is not read: FILEDATA is deferred, and nothing
+    here touches it.
     """
+    return [
+        {
+            "Z_PK": f.Z_PK,
+            "FILENAME": f.FILENAME,
+            "FILEMIMETYPE": f.FILEMIMETYPE or "",
+            # Stored in UTC. Printed raw it read as a local time four
+            # or five hours out; shown in this machine's zone, with its
+            # offset, as the Files page shows it.
+            "FILEUPLOADDATE": (
+                clock.show_utc(f.FILEUPLOADDATE)
+                if f.FILEUPLOADDATE else ""
+            ),
+            "FILEUPLOADEDBY": f.FILEUPLOADEDBY or "",
+            "FILESHA256": (f.FILESHA256 or "").upper(),
+        }
+        for f in session.query(UploadedFiles).order_by(UploadedFiles.Z_PK)
+    ]
 
-    # Validate all of the requirements are met before opening the report
-    is_valid, errors = validate_case_for_report()
-    if not is_valid:
-        show_validation_errors(errors)
-        return
 
-    REPORT_PRINT_STYLES = COMMON_STYLES.replace('"', '\\"')
+# The print window's own styles, on top of the report's.
+PRINT_WINDOW_STYLES = """
+@media screen {
+    /* Chrome paints a new window dark when the computer is in dark mode,
+       and report text is black: without a page of its own the report was
+       all but unreadable until it printed. Printing is unaffected. */
+    html, body {
+        background: #FFFFFF;
+        color: #000000;
+    }
+    /* The page's padding moves onto the report, so the bar runs edge
+       to edge. */
+    body {
+        margin: 0;
+        padding: 0;
+    }
+    .report-body {
+        padding: 0 16px 24px;
+    }
+}
 
-    ui.run_javascript(f"""
-        const reportContent = document.getElementById('report-container');
-        if (!reportContent) {{
+/* Stays at the top while a long report is scrolled, so Print and Close
+   are always in reach. Marked no-print, so it never prints. */
+.print-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    margin: 0 0 16px;
+    background: #1E293B;
+    color: #FFFFFF;
+    font-family: -apple-system, "Segoe UI", system-ui, Arial, sans-serif;
+}
+
+.print-toolbar .tb-title {
+    flex: 1 1 220px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.print-toolbar .tb-title small {
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    color: #CBD5E1;
+}
+
+/* 44 px tall: the smallest target Apple recommends for a finger. */
+.print-toolbar button {
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 150px;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 8px;
+    font: 600 16px/1.2 -apple-system, "Segoe UI", system-ui, Arial, sans-serif;
+    cursor: pointer;
+}
+
+.print-toolbar .print-btn {
+    background: #2984D1;
+    border: 1px solid #2984D1;
+    color: #FFFFFF;
+}
+
+.print-toolbar .close-btn {
+    background: transparent;
+    border: 1px solid #94A3B8;
+    color: #FFFFFF;
+}
+
+.print-toolbar button:focus-visible {
+    outline: 3px solid #93C5FD;
+    outline-offset: 2px;
+}
+"""
+
+
+def print_toolbar_html(report_name: str = "", case_number: str = "") -> str:
+    """The bar across the top of the print window: which report and case
+    this is, and the Print and Close buttons."""
+    title = " · ".join(h(part) for part in (report_name, case_number) if part)
+    return (
+        '<div class="print-toolbar no-print">'
+        f'<div class="tb-title">{title or "Report"}'
+        "<small>This bar is not printed</small></div>"
+        '<button type="button" class="print-btn" onclick="window.print()">'
+        "🖨️ Print Report</button>"
+        '<button type="button" class="close-btn" onclick="window.close()">'
+        "✕ Close</button>"
+        "</div>"
+    )
+
+
+def print_window_script(report_name: str = "", case_number: str = "") -> str:
+    """The browser-side handler that opens the report in a print window.
+
+    The report's own HTML is copied into a clean page with the report
+    styles, a bar naming the report with Print and Close buttons, and the
+    print dialog opened after a moment. Run by the click in the browser,
+    not from the server: see render_report_page().
+    """
+    title = " · ".join(h(part) for part in (report_name, case_number) if part)
+    values = {
+        "STYLES": json.dumps(COMMON_STYLES + PRINT_WINDOW_STYLES),
+        "TITLE": json.dumps(title or "V·E·C·T·O·R", ensure_ascii=False),
+        "TOOLBAR": json.dumps(
+            print_toolbar_html(report_name, case_number), ensure_ascii=False
+        ),
+    }
+    # One pass, so a case number can never be read as a placeholder.
+    return re.sub(
+        r"__(STYLES|TITLE|TOOLBAR)__",
+        lambda match: values[match.group(1)],
+        _PRINT_WINDOW_JS,
+    )
+
+
+_PRINT_WINDOW_JS = """() => {
+        const report = document.getElementById('report-container');
+        if (!report) {
             alert('No report content found to print.');
             return;
-        }}
+        }
 
-        const html = reportContent.innerHTML;
-
-        const newWindow = window.open('', '_blank');
-        if (!newWindow) {{
-            alert('Pop-up blocked. Please allow pop-ups for this site.');
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('The browser blocked the print window. Allow pop-ups '
+                + 'for this address, or press Ctrl+P on this page.');
             return;
-        }}
+        }
 
-        const fullHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V·E·C·T·O·R</title>
-    <style>
-        {REPORT_PRINT_STYLES}
-    </style>
-</head>
-<body>
-    <div class="print-toolbar no-print">
-        <button class="print-btn" onclick="window.print()">🖨️ Print Report</button>
-        <button class="close-btn" onclick="window.close()">✕ Close</button>
-    </div>
-    <div class="report-body">
-        ${{html}}
-    </div>
-    <script>
-        // Auto-trigger print dialog after a short delay
-        setTimeout(() => {{ window.print(); }}, 500);
-    </script>
-</body>
-</html>`;
-
-        newWindow.document.write(fullHtml);
-        newWindow.document.close();
-        """
-    )
+        printWindow.document.write(
+            '<!DOCTYPE html><html lang="en"><head>'
+            + '<meta charset="UTF-8">'
+            + '<meta name="viewport" content="width=device-width, '
+            + 'initial-scale=1.0">'
+            + '<title>' + __TITLE__ + '</title>'
+            + '<style>' + __STYLES__ + '</style></head><body>'
+            + __TOOLBAR__
+            + '<div class="report-body">' + report.innerHTML + '</div>'
+            + '<scr' + 'ipt>setTimeout(() => window.print(), 500);</scr'
+            + 'ipt></body></html>'
+        );
+        printWindow.document.close();
+    }"""
