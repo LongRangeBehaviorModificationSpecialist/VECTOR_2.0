@@ -9,7 +9,7 @@ scene paperwork and exports the case as an encrypted archive.
 
 VECTOR runs on your own machine. Nothing is sent anywhere.
 
-`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `486 tests`
+`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `491 tests`
 
 > **About this fork.** VECTOR was created by SSA M. Sponheimer of the
 > Virginia State Police NOVA/DC ICAC
@@ -100,7 +100,7 @@ Everything the original does, plus:
 | **Data handling** | Case databases kept out of version control; a fictional demo case for evaluation; automatic schema upgrades with backups; attachments downloaded straight from the database, with no copy left on disk |
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 486 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 491 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names, the
@@ -782,7 +782,7 @@ assigned and never read. Style is left alone deliberately — this
 codebase has its own conventions and a linter arguing about them would
 be noise.
 
-486 tests, about fifteen seconds. They run against a temporary database
+491 tests, about fifteen seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -805,13 +805,13 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
 | `test_failures_and_live.py` | 24 | Failures are explained without the SQL; a failed import leaves the case unchanged, and an import clears attachments the new case lacks; exports stop rather than leave attachments out, and one the audit trail cannot record is not handed over; edit dialogs open for values no longer on a list; saves, wipes and imports move the change signal, while reads do not, and a sign-in moves the trail's signal alone |
 | `test_numbering.py` | 17 | Evidence numbering past item 9; room labels past Z |
-| `test_validators.py` | 16 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time |
+| `test_validators.py` | 20 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time; an upload's type comes from its content, so a program named .pdf is refused and a RAR archive is not |
 | `test_export_import.py` | 26 | CSV round trip preserves rows, bytes and provenance, including attachments sharing a name; encrypted archives; tampering detected, and a lower-case hash is the same hash; older and upstream archives import, including those with `SUSPECTNOTE` and `FILEHASHEDAT`, and one named `.ZIP`; any case number makes a file name Windows accepts; download staging is cleared |
 | `test_active_case.py` | 13 | Pages refuse to record without an open case; the Cases page still works; async handlers stay async |
 | `test_menu_rooms_and_passwords.py` | 13 | The page buttons and the menu share one list, and only administrators are offered Shutdown; a room without agents can be edited and survives a CSV round trip; a dropdown saved blank opens blank; an import knows when a file needs a password |
 | `test_dates.py` | 12 | Old-format case times, birth dates and note times are rewritten once and audited; nothing else is touched |
 | `test_logo_and_help.py` | 14 | A missing logo is left out rather than shown broken, whether it is named by file name or by its /static address; every button the Help page names exists |
-| `test_session_and_search.py` | 18 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for; every table that grows offers a search box and the one-case page does not |
+| `test_session_and_search.py` | 19 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for, as can every other action VECTOR records; every table that grows offers a search box and the one-case page does not |
 | `test_network_setting.py` | 28 | Network access is off until somebody turns it on and a damaged settings file reads as off; the flag opens it for one run and the setting from then on; the address given out is one another device could use, chosen from the adapter on the network this computer is on rather than VMware, Hyper-V, WSL or VPN adapters; and the change is recorded with who made it |
 | `test_launchers.py` | 5 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned |
 | `test_migration.py` | 13 | Old-schema databases — old names, old constraints — upgrade without losing a row, including the September renames of the person notes and hashing time; backups include the write-ahead log |
