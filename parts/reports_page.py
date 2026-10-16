@@ -72,7 +72,6 @@ style = {
     "props": "push",
     "classes": "w-70 p-6 hover-border-white"
 }
-# "classes": "w-full p-4 my-0 hover-border-white"
 report_buttons = {
     "0": {
         "text": "Print Agent List",
