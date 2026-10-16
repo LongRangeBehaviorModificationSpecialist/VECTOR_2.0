@@ -29,8 +29,12 @@ from parts.crud_widgets import (
 )
 
 
-def open_edit_dialog(spec, row: dict, labels: dict,
-                     refresh: Callable[[], None]) -> None:
+def open_edit_dialog(
+        spec,
+        row: dict,
+        labels: dict,
+        refresh: Callable[[], None]
+) -> None:
     """Edits one record, and redraws the table once it is saved."""
     with ui.dialog() as edit_dialog, ui.card().classes(
         "w-full max-w-lg p-6"
