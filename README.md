@@ -120,7 +120,9 @@ Every change, with the reasoning behind it, is listed in pull requests
 [#2](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/2) and
 [#3](https://github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0/pull/3) to the original project. The
 fixes made after the second merge are explained step by step, with the
-commands to find and make each one, in [docs/fixing-after-a-merge.md](docs/fixing-after-a-merge.md).
+commands to find and make each one, in [docs/fixing-after-a-merge.md](docs/fixing-after-a-merge.md),
+and at more length, with screenshots, in
+[docs/VECTOR-fixing-after-a-merge.pdf](docs/VECTOR-fixing-after-a-merge.pdf).
 
 ---
 
@@ -923,7 +925,7 @@ program/config.py       paths, network and upload settings
 program/inc/            Virginia jurisdictions, agencies, agent roles
 tools/                  demo case, database encryption and decryption
 tests/                  the test suite
-docs/                   field-test notes, and the guide to the October fixes
+docs/                   field-test notes, and the guide to the October fixes (Markdown and PDF)
 ```
 
 ### Adding a field to an entity
