@@ -62,7 +62,9 @@ def open_edit_dialog(
                 values = _values_from(edit_widgets)
 
                 if spec.validate(
-                    stage="update", values=values, row=row
+                    stage="update",
+                    values=values,
+                    row=row,
                 ):
                     return
 
@@ -80,21 +82,23 @@ def open_edit_dialog(
                         )
                         if record is None:
                             notify_problem(
-                                f"That {spec.entity} no longer "
-                                "exists. It may have been deleted "
-                                "on another device."
+                                f"That {spec.entity} no longer exists. It may "
+                                "have been deleted on another device."
                             )
                             edit_dialog.close()
                             refresh()
                             return
+
                         before = {
                             name: getattr(record, name)
                             for name in values
                         }
                         for name, value in values.items():
                             setattr(record, name, value)
+
                         if spec.on_update:
                             spec.on_update(session, before, values)
+
                 except Exception as err:
                     log.exception("Could not update a %s", spec.entity)
                     notify_problem(
@@ -141,7 +145,9 @@ def open_delete_dialog(
         ui.label(
             f"Delete {spec.entity} {label}?"
         ).classes("mb-2 text-base")
+
         note = spec.delete_note(row) if spec.delete_note else ""
+
         if note:
             ui.label(note).classes("mb-2 text-base text-[#F5B027]")
         ui.label(
@@ -166,7 +172,9 @@ def open_delete_dialog(
                             )
                             .first()
                         )
+
                         follow_up = ""
+
                         if record is not None:
                             removed = {
                                 spec_field.name: getattr(
@@ -174,6 +182,7 @@ def open_delete_dialog(
                                 )
                                 for spec_field in spec.fields
                             }
+
                             session.delete(record)
                             if spec.on_delete:
                                 session.flush()
@@ -181,8 +190,9 @@ def open_delete_dialog(
                                     spec.on_delete(session, removed)
                                     or ""
                                 )
+
                 except Exception as err:
-                    log.exception("Could not delete a %s", spec.entity)
+                    log.exception(f"Could not delete a {spec.entity}")
                     notify_problem(
                         f"Could not delete this {spec.entity}.\n\n"
                         f"{explain(err, labels)}"
@@ -227,10 +237,9 @@ def delete_all_section(
                         "text-lg font-bold mb-2 text-[var(--vsp-blue)]"
                     )
                     ui.label(
-                        f"This permanently deletes every "
-                        f"{spec.entity} in this case. The deletions "
-                        f"are kept in the audit trail, but the "
-                        f"records are gone."
+                        f"This permanently deletes every {spec.entity} in"
+                        f"this case. The deletions are kept in the audit "
+                        f"trail, but the records are gone."
                     ).classes("mb-4 text-[var(--vsp-gray)]")
 
                     with ui.row().classes("w-full justify-end gap-2"):
@@ -250,6 +259,7 @@ def delete_all_section(
                                         spec.model
                                     ).all():
                                         session.delete(record)
+
                             except Exception as err:
                                 log.exception(
                                     "Could not delete every %s",
