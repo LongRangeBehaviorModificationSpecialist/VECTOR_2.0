@@ -243,10 +243,9 @@ def delete_all_section(
                         def on_confirm_delete_all() -> None:
                             try:
                                 with get_session() as session:
-                                    # Loaded and deleted individually
-                                    # so each removal reaches the
-                                    # audit trail; a bulk delete
-                                    # raises no ORM events.
+                                    # Loaded and deleted individually so each
+                                    # removal reaches the audit trail; a bulk
+                                    # delete raises no ORM events.
                                     for record in session.query(
                                         spec.model
                                     ).all():
