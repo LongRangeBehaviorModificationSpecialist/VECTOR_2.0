@@ -70,7 +70,7 @@ from utils import (
 style = {
     "color": "#1C69A8",
     "props": "push",
-    "classes": "w-75 p-6 hover-border-white"
+    "classes": "w-70 p-6 hover-border-white"
 }
 # "classes": "w-full p-4 my-0 hover-border-white"
 report_buttons = {
@@ -129,20 +129,7 @@ def recorded(value) -> str:
 
 
 def open_report(url: str) -> None:
-    """Opens a report, after the checks that report needs."""
-    # if url == "/reports/rooms":
-    #     missing = rooms_missing_agents()
-    #     if missing:
-    #         ui.notify(
-    #             rooms_missing_agents_message(missing),
-    #             multi_line=True,
-    #             classes="multi-line-notification",
-    #             type="warning",
-    #             timeout=WARN_TIMEOUT,
-    #             position="center",
-    #             close_button="OK",
-    #         )
-    #         return
+    """Opens a report."""
     ui.navigate.to(url)
 
 
@@ -431,6 +418,7 @@ def _remind_about_end_time() -> None:
                         close_button="OK",
                     )
                     return
+
                 reminder.close()
                 ui.notify(
                     message,
@@ -471,7 +459,7 @@ def render_report_page(html_content: str, report_name: str = "") -> None:
             print_button = ui.button(
                 "Print Report",
                 color="#1C69A8").props("push icon=print"
-            ).classes("w-65 p-6 hover-border-white")
+            ).classes("w-70 p-6 hover-border-white")
                     # p-3 mb-4 no-print hover-border-white
 
         is_valid, errors = validate_case_for_report()

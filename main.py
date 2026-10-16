@@ -534,7 +534,7 @@ if __name__ in {"__main__", "__mp_main__"}:
         title="V·E·C·T·O·R",
         host=HOST,
         port=Config.PORT,
-        reload=DEBUG_MODE,  # or "False"
+        reload=DEBUG_MODE,
         show=Config.SHOW_BROWSER,
         dark=True,
         storage_secret=get_storage_secret(),
