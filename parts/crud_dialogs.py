@@ -29,8 +29,12 @@ from parts.crud_widgets import (
 )
 
 
-def open_edit_dialog(spec, row: dict, labels: dict,
-                     refresh: Callable[[], None]) -> None:
+def open_edit_dialog(
+        spec,
+        row: dict,
+        labels: dict,
+        refresh: Callable[[], None]
+) -> None:
     """Edits one record, and redraws the table once it is saved."""
     with ui.dialog() as edit_dialog, ui.card().classes(
         "w-full max-w-lg p-6"
@@ -58,7 +62,9 @@ def open_edit_dialog(spec, row: dict, labels: dict,
                 values = _values_from(edit_widgets)
 
                 if spec.validate(
-                    stage="update", values=values, row=row
+                    stage="update",
+                    values=values,
+                    row=row,
                 ):
                     return
 
@@ -76,21 +82,23 @@ def open_edit_dialog(spec, row: dict, labels: dict,
                         )
                         if record is None:
                             notify_problem(
-                                f"That {spec.entity} no longer "
-                                "exists. It may have been deleted "
-                                "on another device."
+                                f"That {spec.entity} no longer exists. It may "
+                                "have been deleted on another device."
                             )
                             edit_dialog.close()
                             refresh()
                             return
+
                         before = {
                             name: getattr(record, name)
                             for name in values
                         }
                         for name, value in values.items():
                             setattr(record, name, value)
+
                         if spec.on_update:
                             spec.on_update(session, before, values)
+
                 except Exception as err:
                     log.exception("Could not update a %s", spec.entity)
                     notify_problem(
@@ -115,8 +123,12 @@ def open_edit_dialog(spec, row: dict, labels: dict,
     edit_dialog.open()
 
 
-def open_delete_dialog(spec, row: dict, labels: dict,
-                       refresh: Callable[[], None]) -> None:
+def open_delete_dialog(
+        spec,
+        row: dict,
+        labels: dict,
+        refresh: Callable[[], None]
+) -> None:
     """Deletes one record, after saying what that will do."""
     # No button is drawn when deletes are off, but a crafted
     # event could still arrive, so refuse it here as well.
@@ -133,7 +145,9 @@ def open_delete_dialog(spec, row: dict, labels: dict,
         ui.label(
             f"Delete {spec.entity} {label}?"
         ).classes("mb-2 text-base")
+
         note = spec.delete_note(row) if spec.delete_note else ""
+
         if note:
             ui.label(note).classes("mb-2 text-base text-[#F5B027]")
         ui.label(
@@ -158,7 +172,9 @@ def open_delete_dialog(spec, row: dict, labels: dict,
                             )
                             .first()
                         )
+
                         follow_up = ""
+
                         if record is not None:
                             removed = {
                                 spec_field.name: getattr(
@@ -166,6 +182,7 @@ def open_delete_dialog(spec, row: dict, labels: dict,
                                 )
                                 for spec_field in spec.fields
                             }
+
                             session.delete(record)
                             if spec.on_delete:
                                 session.flush()
@@ -173,8 +190,9 @@ def open_delete_dialog(spec, row: dict, labels: dict,
                                     spec.on_delete(session, removed)
                                     or ""
                                 )
+
                 except Exception as err:
-                    log.exception("Could not delete a %s", spec.entity)
+                    log.exception(f"Could not delete a {spec.entity}")
                     notify_problem(
                         f"Could not delete this {spec.entity}.\n\n"
                         f"{explain(err, labels)}"
@@ -197,8 +215,12 @@ def open_delete_dialog(spec, row: dict, labels: dict,
     delete_dialog.open()
 
 
-def delete_all_section(spec, labels: dict, refresh: Callable[[], None],
-                       guard: Callable) -> Callable[[], None]:
+def delete_all_section(
+        spec,
+        labels: dict,
+        refresh: Callable[[], None],
+        guard: Callable
+) -> Callable[[], None]:
     """Draws Delete All, and returns what settles the button's state.
 
     The button is disabled while no case is open, which the page's live
@@ -215,10 +237,9 @@ def delete_all_section(spec, labels: dict, refresh: Callable[[], None],
                         "text-lg font-bold mb-2 text-[var(--vsp-blue)]"
                     )
                     ui.label(
-                        f"This permanently deletes every "
-                        f"{spec.entity} in this case. The deletions "
-                        f"are kept in the audit trail, but the "
-                        f"records are gone."
+                        f"This permanently deletes every {spec.entity} in "
+                        f"this case. The deletions are kept in the audit "
+                        f"trail, but the records are gone."
                     ).classes("mb-4 text-[var(--vsp-gray)]")
 
                     with ui.row().classes("w-full justify-end gap-2"):
@@ -231,14 +252,14 @@ def delete_all_section(spec, labels: dict, refresh: Callable[[], None],
                         def on_confirm_delete_all() -> None:
                             try:
                                 with get_session() as session:
-                                    # Loaded and deleted individually
-                                    # so each removal reaches the
-                                    # audit trail; a bulk delete
-                                    # raises no ORM events.
+                                    # Loaded and deleted individually so each
+                                    # removal reaches the audit trail; a bulk
+                                    # delete raises no ORM events.
                                     for record in session.query(
                                         spec.model
                                     ).all():
                                         session.delete(record)
+
                             except Exception as err:
                                 log.exception(
                                     "Could not delete every %s",

@@ -51,7 +51,6 @@ def get_exportable_models() -> list:
         Evidence,
         Persons,
         Notes,
-        # UploadedFiles,  # MAS added 09-21-26
         AuditLog,
     )
 
@@ -62,7 +61,6 @@ def get_exportable_models() -> list:
         (Evidence, "EVIDENCE"),
         (Persons, "PERSONS"),
         (Notes, "NOTES"),
-        # (UploadedFiles, "FILES"),  # MAS added 09-21-26
         # The audit trail travels with the case: an export that drops it
         # cannot answer what changed after collection.
         (AuditLog, "AUDIT"),

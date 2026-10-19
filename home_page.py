@@ -52,7 +52,7 @@ from utils import (
 style = {
     "color": "var(--vsp-blue)",
     "props": "push",
-    "classes": "w-75 p-6 hover-border-white",
+    "classes": "w-70 p-6 hover-border-white",
 }
 
 home_page_buttons = {
@@ -219,7 +219,7 @@ def build_authenticated_home():
                     v["text"],
                     on_click=v["command"],
                     color=v["color"],
-                ).props("push").classes("w-75 p-6 hover-border-white")
+                ).props("push").classes("w-70 p-6 hover-border-white")
 
 
 def build_login_home():

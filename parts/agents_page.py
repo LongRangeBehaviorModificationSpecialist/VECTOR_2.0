@@ -144,8 +144,17 @@ SPEC = CrudSpec(
             kind="select",
             options=load_role_options,
         ),
-        Field("AGENTPHONE", "Phone Number"),
-        Field("AGENTEMAIL", "Email"),
+        Field(
+            "AGENTPHONE",
+            "Phone Number",
+            placeholder="(###) ###-####",
+            props='mask="(###) ###-####"',
+            ),
+        Field(
+            "AGENTEMAIL",
+            "Email",
+            placeholder="email@agency.com",
+            ),
         Field("AGENTNOTE", "Notes"),
         Field(
             "ENTEREDDATETIME",

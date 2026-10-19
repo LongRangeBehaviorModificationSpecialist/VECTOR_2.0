@@ -70,9 +70,8 @@ from utils import (
 style = {
     "color": "#1C69A8",
     "props": "push",
-    "classes": "w-75 p-6 hover-border-white"
+    "classes": "w-70 p-6 hover-border-white"
 }
-# "classes": "w-full p-4 my-0 hover-border-white"
 report_buttons = {
     "0": {
         "text": "Print Agent List",
@@ -80,7 +79,7 @@ report_buttons = {
     },
     "1": {
         "text": "Print Room List",
-        "page_url": "/reports/rooms",
+        "page_url": "/reports/check_rooms_agents",
     },
     "2": {
         "text": "Print Evidence List (Full)",
@@ -109,6 +108,7 @@ report_buttons = {
 }
 
 REDACTED = "[REDACTED]"
+NOT_RECORDED = "[NOT RECORDED]"
 
 # ----- HTML Escaping -----
 def h(value) -> str:
@@ -121,21 +121,14 @@ def h(value) -> str:
     return escape("" if value is None else str(value))
 
 
+def recorded(value) -> str:
+    """Escaped text for a report cell, or a marker if nothing is recorded."""
+    text = "" if value is None else str(value).strip()
+    return h(value) if text else NOT_RECORDED
+
+
 def open_report(url: str) -> None:
-    """Opens a report, after the checks that report needs."""
-    if url == "/reports/rooms":
-        missing = rooms_missing_agents()
-        if missing:
-            ui.notify(
-                rooms_missing_agents_message(missing),
-                multi_line=True,
-                classes="multi-line-notification",
-                type="warning",
-                timeout=WARN_TIMEOUT,
-                position="center",
-                close_button="OK",
-            )
-            return
+    """Opens a report."""
     ui.navigate.to(url)
 
 
@@ -163,37 +156,45 @@ def build_reports_page() -> None:
     _remind_about_end_time()
 
     # ----- First row of buttons -----
+    # Contains buttons for the following reports :
+    # (1) Print Agent List
+    # (2) Print Room List
+    # (3) Print Evidence List (Full)
     with ui.row().classes(
             "flex justify-center items-center gap-8 my-1 py-1 w-full"):
 
         for k, v in list(report_buttons.items())[0:3]:
             ui.button(
                 v["text"],
-                # on_click=lambda url=v["page_url"]: ui.navigate.to(url),
                 on_click=lambda url=v["page_url"]: open_report(url),
                 color=style["color"],
             ).props(style["props"]).classes(style["classes"])
 
     # ----- Second row of buttons -----
+    # Contains buttons for the following reports :
+    # (1) Print Evidence List (By Room)
+    # (2) Print Evidence List (Basic)
+    # (3) Print Persons List
     with ui.row().classes(
             "flex justify-center items-center gap-8 my-1 py-1 w-full"):
 
         for k, v in list(report_buttons.items())[3:6]:
             ui.button(
                 v["text"],
-                # on_click=lambda url=v["page_url"]: ui.navigate.to(url),
                 on_click=lambda url=v["page_url"]: open_report(url),
                 color=style["color"],
             ).props(style["props"]).classes(style["classes"])
 
     # ----- Third row of buttons -----
+    # Contains buttons for the following reports :
+    # (1) Print Notes List
+    # (2) Print File List
     with ui.row().classes(
                 "flex justify-center items-center gap-8 my-1 py-1 w-full"):
 
         for k, v in list(report_buttons.items())[6:]:
             ui.button(
                 v["text"],
-                # on_click=lambda url=v["page_url"]: ui.navigate.to(url),
                 on_click=lambda url=v["page_url"]: open_report(url),
                 color=style["color"],
             ).props(style["props"]).classes(style["classes"])
@@ -288,7 +289,11 @@ def evidence_in_order(session) -> list:
 
 
 def rooms_missing_agents() -> list[str]:
-    """Labels of rooms where either agent field is blank."""
+    """Labels of rooms where either agent field is blank.
+
+    Returns:
+        List of rooms where no Agent name is listed.
+    """
     with get_session() as session:
         return [
             room.ROOMLABEL
@@ -303,12 +308,25 @@ def rooms_missing_agents_message(labels: list[str]) -> str:
     shown = ", ".join(labels[:10])
     if len(labels) > 10:
         shown += f", and {len(labels) - 10} more"
+
     return (
-        "The Room List cannot be printed until a first and second agent "
-        "are entered for every room.\n\n"
+        "Some rooms are missing agent names.\n\n"
+        "Enter the names on the Rooms page, or print the list with those "
+        "names marked '[NOT RECORDED]'.\n\n"
         f"Rooms missing an agent => {shown}.\n\n"
-        "Open the Rooms page and enter both agent names for each."
     )
+
+
+def rooms_missing_agents_banner(message: str) -> None:
+    """Renders the missing-agents warning banner."""
+    with ui.column().classes("items-center w-full"):
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-4")
+        with ui.row().classes("text-2xl font-normal text-center"):
+            ui.label("V·E·C·T·O·R")
+            ui.label("|").classes("font-bold text-[var(--vsp-blue)]")
+            ui.label("Reports Page")
+        # Put the message INSIDE the column, via a real widget:
+        ui.markdown(message).classes("text-center text-lg py-12")
 
 
 def rooms_in_order(session) -> list:
@@ -412,6 +430,7 @@ def _remind_about_end_time() -> None:
                         close_button="OK",
                     )
                     return
+
                 reminder.close()
                 ui.notify(
                     message,
@@ -447,11 +466,12 @@ def render_report_page(html_content: str, report_name: str = "") -> None:
 
     with ui.column().classes("w-full items-center"):
 
-        with ui.row().classes("w-full no-print"):
+        with ui.row().classes(
+            "w-full no-print items-center justify-center py-3"):
             print_button = ui.button(
                 "Print Report",
                 color="#1C69A8").props("push icon=print"
-            ).classes("p-3 mb-4 no-print hover-border-white")
+            ).classes("w-70 p-6 hover-border-white")
 
         is_valid, errors = validate_case_for_report()
         if is_valid:
@@ -467,7 +487,7 @@ def render_report_page(html_content: str, report_name: str = "") -> None:
         else:
             print_button.on_click(lambda: show_validation_errors(errors))
 
-        with ui.element().props("id='report-container'").classes("w-full"):
+        with ui.element().props("id='report-container'").classes("w-full max-w-2xl my-12"):
             ui.html(html_content)
 
 
@@ -556,9 +576,9 @@ COMMON_STYLES = """
         color: #FF0000;
     }
     */
-}
+        }
 
-@media print {
+        @media print {
     .no-print {
         display: none !important;
     }
@@ -575,12 +595,14 @@ COMMON_STYLES = """
         page-break-inside: avoid !important;
     }
 
+
     .top-table .agent-table thead tr th.agent-table-header,
     .top-table .note-table thead tr th.note-table-header,
     .top-table .person-table thead tr th.person-table-header,
     .top-table .room-table thead tr th.room-table-header {
-        padding: 0pt 0pt 3pt 5pt;
+        padding: 5px 5px 3px 5px;
     }
+
 
     .header-table tr td.header-data-value,
     .evid-table-room-row-label,
@@ -611,6 +633,12 @@ COMMON_STYLES = """
         font-size: 11pt;
         padding: 5px 5px 3px 5px;
         vertical-align: "center";
+    }
+
+    .top-table .evid-table-top tr td.evid-table-item-row {
+        background-color: #FFFFFF;
+        color: #000000;
+        font-size: 10pt;
     }
 
     .top-table .evid-table tr,
@@ -737,9 +765,22 @@ td.header-data-value {
 .person-table-header {
     border-collapse: collapse;
     font-weight: 650;
-    padding: 0pt 5pt;
     text-align: left;
+    white-space: nowrap;
 }
+
+/* The Room ID heading must never wrap; the column shrinks to fit it.
+.room-table-header-id {
+    white-space: nowrap;
+    width: 1%;
+    text-align: left;
+}*/
+
+/*
+.room-table td.room-id-cell {
+    padding-right: 25pt;
+}
+*/
 
 .agent-table thead tr,
 .note-table thead tr,
@@ -747,6 +788,15 @@ td.header-data-value {
 .person-table thead tr {
     border-top: 0px solid black;
     border-bottom: 1px solid black;
+}
+
+.no-data {
+    border-bottom: 1px dotted black;
+    font-weight: bold;
+    height: 6em;
+    padding: 0pt;
+    text-align: center;
+    vertical-align: center;
 }
 
 .agent-table-data,
@@ -781,7 +831,8 @@ td.header-data-value {
 }
 
 .evid-table-top td {
-    background-color: #D6EEEE;
+    background-color: #1E293B;
+    color: #CBD5E1;
 }
 
 .evid-table td,
@@ -1319,14 +1370,15 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
 
     room_rows = "".join([f"""
             <tr>
-                <td class="room-table-data">
+                <td class="room-table-data room-id-cell">
                     {h(r["ROOMLABEL"])}
                 </td>
                 <td class="room-table-data font-10">{h(r["ROOMDESC"])}</td>
-                <td class="room-table-data font-10">{h(r["ROOMFIRSTAGENT"])}</td>
-                <td class="room-table-data font-10">{h(r["ROOMSECONDAGENT"])}</td>
+                <td class="room-table-data font-10">{recorded(r["ROOMFIRSTAGENT"])}</td>
+                <td class="room-table-data font-10">{recorded(r["ROOMSECONDAGENT"])}</td>
                 <td class="room-table-data font-10">{h(r["ROOMNOTE"])}</td>
-            </tr>"""
+            </tr>
+            """
             for r in rooms
         ]
     )
@@ -1353,7 +1405,7 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
         <table class="room-table">
             <thead>
                 <tr>
-                    <th class="room-table-header font-10">Room ID</th>
+                    <th class="room-table-header room-table-header-id font-10">Room ID</th>
                     <th class="room-table-header font-10">Room Name</th>
                     <th class="room-table-header font-10">Searched By (1)</th>
                     <th class="room-table-header font-10">Searched By (2)</th>
@@ -1373,17 +1425,25 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
 def build_persons_report_html(active_case: list, persons: list) -> str:
     """Generates the complete HTML for the Person List report."""
 
-    person_rows = "".join([f"""
+    if not persons:
+        person_rows = """
+        <tr>
+            <td class="no-data font-10" colspan="5">[ NO DATA FOUND ]</td>
+        </tr>
+        """
+    else:
+        person_rows = "".join([f"""
         <tr>
             <td class="person-table-data font-10">{h(p["PERSONNAME"])}</td>
             <td class="person-table-data font-10">{h(p["PERSONDOB"])}</td>
             <td class="person-table-data font-10">{h(p["PERSONADDRESS"])}</td>
             <td class="person-table-data font-10">{h(p["PERSONPHONE"])}</td>
             <td class="person-table-data font-10">{h(p["PERSONNOTE"])}</td>
-        </tr>"""
-        for p in persons
-        ]
-    )
+        </tr>
+        """
+            for p in persons
+            ]
+        )
 
     header = build_case_header_html(
         active_case,
@@ -1427,7 +1487,14 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 def build_notes_report_html(active_case: list, notes: list) -> str:
     """Generates the complete HTML for the Notes report."""
 
-    note_rows = "".join([f"""
+    if not notes:
+        note_rows = """
+        <tr>
+            <td class="no-data font-10" colspan="4">[ NO DATA FOUND ]</td>
+        </tr>
+        """
+    else:
+        note_rows = "".join([f"""
         <tr>
             <td class="note-table-data font-10">{h(n["NOTEDATETIME"])}</td>
             <td class="note-table-data font-10">{h(n["NOTEDATETIMEUPDATED"])}</td>
@@ -1435,9 +1502,9 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
             <td class="note-table-data font-10">{h(n["NOTETEXT"])}</td>
         </tr>
         """
-        for n in notes
-        ]
-    )
+            for n in notes
+            ]
+        )
 
     header = build_case_header_html(
         active_case,
@@ -1693,28 +1760,47 @@ def print_basic_evidence_report():
     render_report_page(html_content=html, report_name="Evidence List (Basic)")
 
 
-@ui.page("/reports/rooms")
-def print_rooms_report():
+@ui.page("/reports/check_rooms_agents")
+def check_rooms_agents():
 
     if not is_authenticated():
         ui.navigate.to("/")
         return
 
-    missing = rooms_missing_agents()
-    if missing:
+    missing_labels = rooms_missing_agents()
+    if missing_labels:
         build_navbar(
             is_admin=get_is_admin(),
             username=get_current_user_name(),
         )
-        with ui.column().classes("items-center w-full mt-8 gap-4"):
-            ui.label(rooms_missing_agents_message(missing)).classes(
-                "text-lg text-center whitespace-pre-line"
-            )
+        with ui.column().classes("items-center w-full mt-4 mb-4"):
+            message = rooms_missing_agents_message(labels=missing_labels)
+            if message:
+                rooms_missing_agents_banner(message=message)
+
+        with ui.row().classes(
+            "flex justify-center items-center gap-12 my-6 w-full"):
+            ui.button(
+                "Print Report Without Names",
+                on_click=lambda: ui.navigate.to("/reports/rooms"),
+                color=style["color"],
+            ).props(style["props"]).classes(style["classes"])
+
             ui.button(
                 "Go to Rooms",
                 on_click=lambda: ui.navigate.to("/rooms"),
                 color=style["color"],
-            ).props(style["props"])
+            ).props(style["props"]).classes(style["classes"])
+        return
+    else:
+        ui.navigate.to("/reports/rooms")
+
+
+@ui.page("/reports/rooms")
+def print_rooms_report():
+
+    if not is_authenticated():
+        ui.navigate.to("/")
         return
 
     with get_session() as session:
@@ -1843,15 +1929,19 @@ def files_report_rows(session) -> list[dict]:
 # The print window's own styles, on top of the report's.
 PRINT_WINDOW_STYLES = """
 @media screen {
-    /* Chrome paints a new window dark when the computer is in dark mode,
-       and report text is black: without a page of its own the report was
-       all but unreadable until it printed. Printing is unaffected. */
+    /*
+    Chrome paints a new window dark when the computer is in dark mode,
+    and report text is black: without a page of its own the report was
+    all but unreadable until it printed. Printing is unaffected.
+    */
+
     html, body {
         background: #FFFFFF;
         color: #000000;
     }
-    /* The page's padding moves onto the report, so the bar runs edge
-       to edge. */
+    /*
+    The page's padding moves onto the report, so the bar runs edge to edge.
+    */
     body {
         margin: 0;
         padding: 0;
@@ -1861,8 +1951,10 @@ PRINT_WINDOW_STYLES = """
     }
 }
 
-/* Stays at the top while a long report is scrolled, so Print and Close
-   are always in reach. Marked no-print, so it never prints. */
+/*
+Stays at the top while a long report is scrolled, so Print and Close buttons
+are always in reach. Marked no-print, so it never prints.
+*/
 .print-toolbar {
     position: sticky;
     top: 0;
@@ -1910,14 +2002,24 @@ PRINT_WINDOW_STYLES = """
 
 .print-toolbar .print-btn {
     background: #2984D1;
-    border: 1px solid #2984D1;
+    border: 2px solid #2984D1;
     color: #FFFFFF;
+}
+
+.print-toolbar .print-btn:hover {
+    inset: 3px;
+    border: 2px dashed white;
 }
 
 .print-toolbar .close-btn {
     background: transparent;
     border: 1px solid #94A3B8;
     color: #FFFFFF;
+}
+
+.print-toolbar .close-btn:hover {
+    inset: 3px;
+    border: 2px dashed #2984D1;
 }
 
 .print-toolbar button:focus-visible {
@@ -1927,14 +2029,17 @@ PRINT_WINDOW_STYLES = """
 """
 
 
-def print_toolbar_html(report_name: str = "", case_number: str = "") -> str:
+def print_toolbar_html(
+        report_name: str = "",
+        case_number: str = ""
+) -> str:
     """The bar across the top of the print window: which report and case
     this is, and the Print and Close buttons."""
     title = " · ".join(h(part) for part in (report_name, case_number) if part)
     return (
         '<div class="print-toolbar no-print">'
         f'<div class="tb-title">{title or "Report"}'
-        "<small>This bar is not printed</small></div>"
+        "<small>[ This title bar is not printed ]</small></div>"
         '<button type="button" class="print-btn" onclick="window.print()">'
         "🖨️ Print Report</button>"
         '<button type="button" class="close-btn" onclick="window.close()">'
@@ -1943,7 +2048,10 @@ def print_toolbar_html(report_name: str = "", case_number: str = "") -> str:
     )
 
 
-def print_window_script(report_name: str = "", case_number: str = "") -> str:
+def print_window_script(
+        report_name: str = "",
+        case_number: str = ""
+) -> str:
     """The browser-side handler that opens the report in a print window.
 
     The report's own HTML is copied into a clean page with the report
@@ -1977,7 +2085,7 @@ _PRINT_WINDOW_JS = """() => {
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
             alert('The browser blocked the print window. Allow pop-ups '
-                + 'for this address, or press Ctrl+P on this page.');
+                + 'for this address, or press Ctrl + P on this page.');
             return;
         }
 
