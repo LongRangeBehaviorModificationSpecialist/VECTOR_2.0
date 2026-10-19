@@ -5,10 +5,10 @@ detail. Most people need less than this:
 
 - [README](../README.md) — what VECTOR is, and the short version of
   everything here.
-- [INSTALL.md](INSTALL.md) — installing it, step by step.
+- [00 START HERE](../00%20START%20HERE/) — installing it, step by step, with pictures.
 - The **Help** page inside VECTOR — using it at a scene.
 
-`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `518 tests`
+`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `537 tests`
 
 ---
 
@@ -90,7 +90,7 @@ Everything the first version did, plus:
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Touch screens** | Raised buttons drawn cleanly on an iPad, with no hover border left behind by a tap; the print window's Print and Close buttons sized for a finger, in a bar that names the report and stays readable on a laptop in dark mode |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 518 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 537 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names, the
@@ -238,6 +238,15 @@ Your browser opens at <http://localhost:8080>.
 VECTOR runs only while that window is open. Closing it, or
 pressing `Ctrl+C`, stops the application; nothing is left running in
 the background.
+
+The first start also asks once whether to put a VECTOR shortcut on the
+desktop, with VECTOR's icon (no answer in 30 seconds counts as yes).
+`tools/make_shortcut.py` makes it the way each system does: a `.lnk`
+through Windows' own shortcut maker, a small `VECTOR.app` on a Mac that
+opens the launcher in Terminal, and a `.desktop` entry on Linux. A
+shortcut holds the folder it was made in, which is why one is not
+shipped; run the script again after moving the folder. The icons are in
+`static/icons/`.
 
 ### First run
 
@@ -823,7 +832,7 @@ assigned and never read. Style is left alone deliberately — this
 codebase has its own conventions and a linter arguing about them would
 be noise.
 
-518 tests, about fifteen seconds. They run against a temporary database
+537 tests, about fifteen seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -836,7 +845,7 @@ export is round-tripped and compared row for row and byte for byte.
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `test_modules_import.py` | 37 | Every module imports: a page builder moved into a new file cannot break the application without failing here |
+| `test_modules_import.py` | 38 | Every module imports: a page builder moved into a new file cannot break the application without failing here |
 | `test_page_specs.py` | 53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written |
 | `test_order_dates_and_files.py` | 29 | Reports and tables list items and rooms in order; renaming a room moves its evidence; impossible or half-typed dates are refused; attachment contents load only when read, and downloads keep their names |
 | `test_times_and_numbers.py` | 25 | Stamps carry this machine's time zone and offset, and UTC stamps already saved are rewritten once; both case times offer the fill button, and the end-time reminder never fills in a time before the start; typed text in a dropdown is kept; removing an item moves the later numbers down, audited |
@@ -854,7 +863,8 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_logo_and_help.py` | 21 | A missing logo is left out rather than shown broken, whether it is named by file name or by its /static address; every button the Help page names exists, every topic has a title and text, and the Room List's print-anyway option replaced the old rule; the dashed hover line on buttons is for a mouse only |
 | `test_session_and_search.py` | 19 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for, as can every other action VECTOR records; every table that grows offers a search box and the one-case page does not |
 | `test_network_setting.py` | 28 | Network access is off until somebody turns it on and a damaged settings file reads as off; the flag opens it for one run and the setting from then on; the address given out is one another device could use, chosen from the adapter on the network this computer is on rather than VMware, Hyper-V, WSL or VPN adapters; and the change is recorded with who made it |
-| `test_launchers.py` | 5 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned |
+| `test_launchers.py` | 11 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned; both offer the desktop shortcut once and cannot be held up by it; the Start files in 00 START HERE hand over to them, and the guide there finds every picture |
+| `test_shortcut.py` | 12 | The icon files hold every size each system asks for, PNG only where Windows reads it; the Mac app is a complete bundle that opens the launcher in Terminal; the Linux entry starts VECTOR in a terminal; on Windows a real .lnk points at the launcher with the icon, and a blocked one says how to make it by hand |
 | `test_migration.py` | 13 | Old-schema databases — old names, old constraints — upgrade without losing a row, including the September renames of the person notes and hashing time; backups include the write-ahead log |
 | `test_audit_chain.py` | 13 | Every entry is fingerprinted as it is written; an entry changed or removed afterwards is found and named; entries from before the chain are fingerprinted once by the upgrade, before anything else writes to the trail, and the check says which could not be checked |
 | `test_audit.py` | 9 | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
@@ -887,6 +897,7 @@ case data.
 ## How the code is laid out
 
 ```
+00 START HERE/          the install guide (and its PDF), and both Start files
 Start VECTOR.bat        double-click launcher for Windows
 Start VECTOR.command double-click launcher for macOS, runs the .sh
 Start VECTOR.sh         the macOS launcher itself
@@ -914,7 +925,7 @@ parts/crud_dialogs.py   edit, delete and delete-all
 parts/*_page.py         one file per screen
 program/config.py       paths, network and upload settings
 program/inc/            Virginia jurisdictions, agencies, agent roles
-tools/                  demo case, database encryption and decryption
+tools/                  demo case, encryption, and make_shortcut.py (the desktop shortcut)
 tests/                  the test suite
 docs/                   field-test notes, and the guide to the October fixes (Markdown and PDF)
 ```

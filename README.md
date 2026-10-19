@@ -49,18 +49,23 @@ It runs on your own laptop. Nothing is sent anywhere.
 
 ## Install
 
+**Open the [00 START HERE](00%20START%20HERE/) folder.** It has the install guide,
+with pictures, as a PDF to read or print, and the files that start
+VECTOR. In short:
+
 1. **Install Python 3.10 or newer** from [python.org](https://www.python.org/downloads/).
    On Windows, tick **"Add python.exe to PATH"** on the installer's first screen.
 2. **Download VECTOR**: the green **Code** button above, then **Download ZIP**.
    Unzip it to a folder you will keep, such as `Documents\VECTOR`.
-3. **Double-click** `Start VECTOR.bat` (Windows) or `Start VECTOR.command` (Mac).
-   The first start takes a few minutes and needs the internet; after that
+3. **Double-click** `Start VECTOR (Windows).bat` or `Start VECTOR (Mac).command`
+   in **00 START HERE**. The first start takes a few minutes and needs the
+   internet, and offers a desktop shortcut with VECTOR's icon; after that
    it starts straight away.
 4. **Sign in** as `admin` with the one-time password the VECTOR window shows,
    then choose your own.
 
 The step-by-step version, with what each screen looks like and what to do
-when something goes wrong, is **[docs/INSTALL.md](docs/INSTALL.md)**.
+when something goes wrong, is in **[00 START HERE](00%20START%20HERE/)**.
 
 ---
 
@@ -105,7 +110,7 @@ internet once. If you use `git`, run `git pull` instead.
 
 | Document | For |
 |---|---|
-| [docs/INSTALL.md](docs/INSTALL.md) | Installing VECTOR, step by step |
+| [00 START HERE](00%20START%20HERE/) | Installing VECTOR, step by step, with pictures (also as a PDF) |
 | The **Help** page, inside VECTOR | Using it at a scene |
 | [docs/REFERENCE.md](docs/REFERENCE.md) | Everything in detail: settings, tablets, upgrading, security, encryption, troubleshooting, tests and how the code is laid out |
 | [docs/fixing-after-a-merge.md](docs/fixing-after-a-merge.md) ([PDF](docs/VECTOR-fixing-after-a-merge.pdf)) | Checking changes before you push them |
