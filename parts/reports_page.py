@@ -1416,7 +1416,7 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
     if not persons:
         person_rows = """
         <tr>
-            <td class="no-data font-10" colspan="4">[ NO DATA FOUND ]</td>
+            <td class="no-data font-10" colspan="5">[ NO DATA FOUND ]</td>
         </tr>
         """
     else:
