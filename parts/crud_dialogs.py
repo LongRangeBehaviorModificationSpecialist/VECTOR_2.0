@@ -237,7 +237,7 @@ def delete_all_section(
                         "text-lg font-bold mb-2 text-[var(--vsp-blue)]"
                     )
                     ui.label(
-                        f"This permanently deletes every {spec.entity} in"
+                        f"This permanently deletes every {spec.entity} in "
                         f"this case. The deletions are kept in the audit "
                         f"trail, but the records are gone."
                     ).classes("mb-4 text-[var(--vsp-gray)]")
