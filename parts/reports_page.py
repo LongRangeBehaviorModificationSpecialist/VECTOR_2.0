@@ -1750,6 +1750,11 @@ def print_basic_evidence_report():
 
 @ui.page("/reports/check_rooms_agents")
 def check_rooms_agents():
+
+    if not is_authenticated():
+        ui.navigate.to("/")
+        return
+
     missing = rooms_missing_agents()
     if missing:
         build_navbar(
