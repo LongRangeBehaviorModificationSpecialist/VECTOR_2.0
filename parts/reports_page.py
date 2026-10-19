@@ -24,7 +24,7 @@ WORKFLOW FOR REPORT CREATION:
     (2) That function calls `get_case_info()` ->
     (3) `build_<type>_report_html(active_case=active_case,
             <type>=<type>)` compiles the html string for report ->
-        (a) `build_case_header_html(active_case, page_title, sub_title)`
+        (a) `build_case_header_html(active_case and page_title)`
         (b) `build_report_footer_html()`
     (4) `render_report_page()` is run with the output from step 3 (html_content)
 
@@ -551,13 +551,22 @@ def show_validation_errors(errors: list[str]) -> None:
         )
 
 
-# ----- Common Print Styles -----
+# ----- Report Styles -----
+#
+# Order matters here. Rules of equal weight are decided by whichever comes
+# last, so the sheet runs: tokens -> utilities -> page frame -> components
+# -> @media print. Print is last on purpose: it only has to say what is
+# DIFFERENT on paper, and it wins over the screen rules above it.
+#
+# Class naming:
+#   report-*        the frame shared by every report (wrapper, titles, footer)
+#   header-*        the case-information table at the top of every report
+#   item-bar*       the dark "Item #" / room-name bar above a detail table
+#   detail-*        the label/value tables (evidence reports and file list)
+#   <name>-table*   the column-style list tables (agent, note, room, person)
 COMMON_STYLES = """
 @page {
-    margin-top: 0.65in;
-    margin-right: 0.5in;
-    margin-bottom: 0.75in;
-    margin-left: 0.5in;
+    margin: 0.65in 0.5in 0.75in 0.5in;
 
     @bottom-center {
         content: "Page " counter(page) " of " counter(pages);
@@ -567,117 +576,13 @@ COMMON_STYLES = """
         font-weight: bold;
         margin-bottom: 0.5in;
     }
-    /*
-    @bottom-left {
-        content: "Confidential";
-        font-family: "Arial", sans-serif;
-        font-size: 9pt;
-        font-weight: bold;
-        color: #FF0000;
-    }
-    */
-        }
-
-        @media print {
-    .no-print {
-        display: none !important;
-    }
-    body {
-        background: white !important;
-        color: black !important;
-    }
-    .top-table .agent-table thead tr th.agent-table-header,
-    .top-table .note-table thead tr th.note-table-header,
-    .top-table .person-table thead tr th.person-table-header,
-    .top-table .room-table thead tr th.room-table-header {
-        border-collapse: collapse;
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-    }
-
-
-    .top-table .agent-table thead tr th.agent-table-header,
-    .top-table .note-table thead tr th.note-table-header,
-    .top-table .person-table thead tr th.person-table-header,
-    .top-table .room-table thead tr th.room-table-header {
-        padding: 5px 5px 3px 5px;
-    }
-
-
-    .header-table tr td.header-data-value,
-    .evid-table-room-row-label,
-    .top-table .evid-table tr td.evid-table-item-label {
-        font-family: "Times New Roman", Times, serif;
-        font-size: 11pt;
-    }
-
-    .header-table tr td.header-data-label,
-    .header-table tr td.header-data-value {
-        vertical-align: "bottom";
-    }
-
-    .agent-table thead,
-    .note-table thead,
-    .room-table thead,
-    .person-table thead {
-        display: table-header-group; /* repeads <thead> on each printed page */
-    }
-
-    .top-table .agent-table tbody tr td.agent-table-data,
-    .top-table .evid-table tr td.evid-data-value,
-    .top-table .file-table tr td.file-data-value,
-    .top-table .note-table tbody tr td.note-table-data,
-    .top-table .person-table tbody tr td.person-table-data,
-    .top-table .room-table tbody tr td.room-table-data {
-        font-family: "Times New Roman", Times, serif;
-        font-size: 11pt;
-        padding: 5px 5px 3px 5px;
-        vertical-align: "center";
-    }
-
-    .top-table .evid-table-top tr td.evid-table-item-row {
-        background-color: #FFFFFF;
-        color: #000000;
-        font-size: 10pt;
-    }
-
-    .top-table .evid-table tr,
-    .top-table .file-table tr {
-        height: 1.45rem;
-    }
-
-    .top-table .header-table tr td.header-data-label,
-    .report-title p.fs-5,
-    .top-table .evid-table tr td.evid-data-label,
-    .top-table .file-table tr td.file-data-label {
-        font-size: 10pt;
-    }
-
-    .top-table .evid-table tr td.evid-data-label-header {
-        font-size: 10pt;
-        font-weight: bold;
-        padding: 0px 10px;
-        width: 30%
-    }
-
-    .top-table .evid-table tr td.evid-data-value,
-    .top-table .evid-table tr td.file-data-value {
-        font-size: 12pt;
-        padding: 0pt 6pt;
-    }
-
-    .top-table .evid-table tr td.spacer-row {
-        border-left: 1px solid transparent;
-        border-right: 1px solid transparent;
-    }
-
-    .bold {
-        font-weight: bold;
-    }
 }
 
 :root {
-    --gray: #D1D5DC;
+    --report-gray: #D1D5DC;
+    --report-dark: #1E293B;
+    --report-dark-text: #CBD5E1;
+    --default-padding: 2pt 8pt 2pt 8pt;
 }
 
 body {
@@ -688,69 +593,60 @@ body {
     padding: 1em;
 }
 
-.bold { font-weight: bold; }
-
-.top-row {
-    background-color: var(--gray);
-}
-
-.report-title {
-    text-align: center;
-    margin-bottom: 1em;
-}
-
-.font-08 { font-size: 8pt; }
-.font-09 { font-size: 9pt; }
+/* ----- Utilities (before the components, so a component's own size wins) */
 .font-10 { font-size: 10pt; }
 .font-11 { font-size: 11pt; }
-.font-12 { font-size: 12pt; }
-.font-13 { font-size: 13pt; }
-.font-16 { font-size: 16pt; }
 
-.fs-3 {
-    font-weight: bold;
-    margin: 1em auto 0.25em auto;
-    text-align: center;
-}
-
-.fs-5 {
-    margin: 0 auto 2em auto;
-    text-align: center;
-}
-
-td.px-6 {
-    padding: 0px 8px;
-}
-
-.top-table {
+/* ----- Page frame ----- */
+.report-wrap {
     padding-left: 5%;
     padding-right: 5%;
 }
 
+.report-heading {
+    text-align: center;
+}
+
+.report-title {
+    font-size: 11pt;
+    font-weight: bold;
+    margin: 0 auto 2em auto;
+    text-align: center;
+}
+
+.report-end {
+    font-size: 11pt;
+    font-weight: 600;
+    margin-top: 2rem;
+    text-align: center;
+}
+
+/* ----- Case information block ----- */
 .header-table {
     border-collapse: collapse;
-    margin-bottom: 2em;
-    margin-right: auto;
-    margin-left: auto;
+    line-height: 1.5em;
+    margin: 0 auto 2em auto;
     table-layout: fixed;
     width: 100%;
 }
 
-td.header-data-label {
+.header-label {
     font-size: 11pt;
-    padding: 5px 10px;
+    padding: var(--default-padding);
+    vertical-align: bottom;
     width: 30%;
 }
 
-td.header-data-value {
+td.header-value {
     border-bottom: 1px dotted black;
     font-family: "Times New Roman", Times, serif;
-    padding: 0px 10px;
+    padding: var(--default-padding);
     vertical-align: bottom;
     width: 70%;
 }
 
-/* Shared table styles */
+
+/* ----- List tables: agent, note, room, person ----- */
 .agent-table,
 .note-table,
 .room-table,
@@ -759,35 +655,33 @@ td.header-data-value {
     width: 100%;
 }
 
+.agent-table thead tr,
+.note-table thead tr,
+.room-table thead tr,
+.person-table thead tr {
+    border-bottom: 1px solid black;
+}
+
 .agent-table-header,
 .note-table-header,
 .room-table-header,
 .person-table-header {
     border-collapse: collapse;
+    font-size: 10pt;
     font-weight: 650;
     text-align: left;
     white-space: nowrap;
 }
 
-/* The Room ID heading must never wrap; the column shrinks to fit it.
-.room-table-header-id {
-    white-space: nowrap;
-    width: 1%;
-    text-align: left;
-}*/
-
-/*
-.room-table td.room-id-cell {
-    padding-right: 25pt;
-}
-*/
-
-.agent-table thead tr,
-.note-table thead tr,
-.room-table thead tr,
-.person-table thead tr {
-    border-top: 0px solid black;
-    border-bottom: 1px solid black;
+.agent-table-data,
+.note-table-data,
+.room-table-data,
+.person-table-data {
+    border-bottom: 1px dotted black;
+    font-size: 10pt;
+    height: 1.85em;
+    padding: 0pt 5pt;
+    vertical-align: middle;
 }
 
 .no-data {
@@ -796,83 +690,141 @@ td.header-data-value {
     height: 6em;
     padding: 0pt;
     text-align: center;
-    vertical-align: center;
+    vertical-align: middle;
 }
 
-.agent-table-data,
-.note-table-data,
-.room-table-data,
-.person-table-data {
-    border-bottom: 1px dotted black;
-    height: 1.85em;
-    padding: 0pt 5pt;
-    vertical-align: center;
-}
-
-.evid-table-top,
-.evid-table,
-.file-table {
+/* ----- Item bar: the dark "Item #" / room-name strip above a table ----- */
+.item-bar,
+.detail-table {
     border-collapse: collapse;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 auto;
     table-layout: fixed;
     width: 100%;
 }
 
-.evid-table,
-.file-table {
-    margin-bottom: 1.5em;
-}
-
-.evid-table-top td,
-.evid-table td,
-.file-table td {
-    border: 1px solid black;
-}
-
-.evid-table-top td {
-    background-color: #1E293B;
-    color: #CBD5E1;
-}
-
-.evid-table td,
-.file-table td {
-    height: 1.5em;
-}
-
-.evid-table-item-row {
+.item-bar-cell {
+    background-color: var(--report-dark);
+    color: var(--report-dark-text);
     font-size: 10pt;
     font-weight: bold;
     height: 1.65em;
-    padding: 2px 10px;
+    padding: var(--default-padding);
     text-align: left;
+    vertical-align: middle;
 }
 
-.top-table .evid-table tr td.spacer-row {
+/* ----- Detail tables: one label column, one value column ----- */
+.detail-table {
+    margin-bottom: 1.5em;
+}
+
+.detail-table col.col-label { width: 30%; }
+.detail-table col.col-value { width: 70%; }
+
+.detail-table {
+    border: 1px solid black;
+}
+
+.detail-table td.detail-label {
+    height: 1.5em;
+}
+
+.detail-label {
+    border-bottom: 1px dotted black;
+    border-right: 1px dotted black;
+    font-size: 10pt;
+    font-weight: normal;
+    padding: var(--default-padding);
+    vertical-align: middle;
+}
+
+.detail-value {
+    border-bottom: 1px dotted black;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 11pt;
+    overflow-wrap: break-word;
+    padding: var(--default-padding);
+    vertical-align: middle;
+    word-wrap: break-word;
+}
+
+/* The shaded "Item No." / "File No." row that opens each item. */
+.detail-title-row {
+    background-color: var(--report-gray);
+}
+
+.detail-title-row .detail-label,
+.detail-title-row .detail-value {
+    font-weight: bold;
+}
+
+/* A gap row between items. The td. prefix is needed to outweigh the
+   border set on every .detail-table td above. */
+.detail-table td.detail-spacer {
     border-left: 1px solid transparent;
     border-right: 1px solid transparent;
 }
 
-td.evid-data-label-header,
-td.evid-data-label,
-td.file-data-label {
-    font-weight: normal;
-    padding: 0px 10px;
-    width: 30%;
-}
+/* ----- Paper only: what differs from the screen ----- */
+@media print {
+    .no-print {
+        display: none !important;
+    }
 
-td.evid-data-value,
-td.file-data-value {
-    font-family: "Times New Roman", Times, serif;
-    padding: 0px 10px;
-    width: 70%;
-    word-wrap: break-word;
-}
+    body {
+        background: white !important;
+        color: black !important;
+    }
 
-.end {
-    font-weight: 600;
-    margin-top: 2rem;
-    text-align: center;
+    .header-label {
+        font-size: 10pt;
+        vertical-align: middle;
+    }
+
+    .header-value {
+        font-size: 11pt;
+        vertical-align: middle;
+    }
+
+    /* Repeat the column headings on every printed page. */
+    .agent-table thead,
+    .note-table thead,
+    .room-table thead,
+    .person-table thead {
+        display: table-header-group;
+    }
+
+    .agent-table-header,
+    .note-table-header,
+    .room-table-header,
+    .person-table-header {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        padding: 5px 5px 3px 5px;
+    }
+
+    .agent-table-data,
+    .note-table-data,
+    .room-table-data,
+    .person-table-data {
+        font-family: "Times New Roman", Times, serif;
+        padding: 5px 5px 3px 5px;
+    }
+
+    /* Ink-friendly: the dark bar prints as plain black text. */
+    .item-bar-cell {
+        background-color: #FFFFFF;
+        border: 1px solid transparent;
+        color: #000000;
+    }
+
+    .detail-value {
+        padding: var(--default-padding);
+    }
+
+    .detail-table td.detail-spacer {
+        border-top: 1px solid transparent;
+    }
 }
 """
 
@@ -880,7 +832,6 @@ td.file-data-value {
 def build_case_header_html(
         active_case: dict | None,
         page_title: str,
-        sub_title: str
 ) -> str:
     """Generates the standard report title + case info header HTML."""
     if not active_case:
@@ -907,34 +858,34 @@ def build_case_header_html(
     if settings.report_print_date():
         printed_row = f"""
             <tr>
-                <td class="header-data-label font-11">Report Printed Date:</td>
-                <td class="header-data-value font-11">{get_print_date_time()}</td>
+                <td class="header-label">Report Printed Date:</td>
+                <td class="header-value">{get_print_date_time()}</td>
             </tr>"""
 
     report_header_table = f"""
-    <div class="top-table">
+    <div class="report-wrap">
         <table class="header-table">
             <tr>
-                <td class="header-data-label font-11">Investigation Number:</td>
-                <td class="header-data-value font-11">{h(active_case["CASENUMBER"])}</td>
+                <td class="header-label">Investigation Number:</td>
+                <td class="header-value">{h(active_case["CASENUMBER"])}</td>
             </tr>
             <tr>
-                <td class="header-data-label font-11">Site Address:</td>
-                <td class="header-data-value font-11">{h(active_case["LOCATION"])}</td>
+                <td class="header-label">Site Address:</td>
+                <td class="header-value">{h(active_case["LOCATION"])}</td>
             </tr>
             <tr>
-                <td class="header-data-label font-11">Jurisdiction:</td>
-                <td class="header-data-value font-11">{h(active_case["JURISDICTION"])}</td>
+                <td class="header-label">Jurisdiction:</td>
+                <td class="header-value">{h(active_case["JURISDICTION"])}</td>
             </tr>
             <tr>
-                <td class="header-data-label font-11">Starting Date and Time:</td>
-                <td class="header-data-value font-11">
+                <td class="header-label">Starting Date and Time:</td>
+                <td class="header-value">
                     {h(active_case["CASEDATETIMEBEGIN"])}
                 </td>
             </tr>
             <tr>
-                <td class="header-data-label font-11">Ending Date and Time:</td>
-                <td class="header-data-value font-11">
+                <td class="header-label">Ending Date and Time:</td>
+                <td class="header-value">
                     {h(active_case["CASEDATETIMEEND"])}
                 </td>
             </tr>
@@ -943,9 +894,8 @@ def build_case_header_html(
     </div>"""
 
     return f"""
-    <div class="report-title">
-        <p class="fs-3 font-11">{page_title}</p>
-        <p class="fs-5 font-8">{sub_title}</p>
+    <div class="report-heading">
+        <p class="report-title">{page_title}</p>
     </div>
     {report_header_table}
     """
@@ -955,7 +905,7 @@ def build_report_footer_html() -> str:
     """Generates the standard END OF REPORT footer."""
 
     return """
-    <p class="end font-11">
+    <p class="report-end">
         &ndash;&ensp;&ndash;&ensp;END OF REPORT&ensp;&ndash;&ensp;&ndash;
     </p>
     """
@@ -976,11 +926,11 @@ def build_agents_report_html(
 
     agent_rows = "".join([f"""
         <tr>
-            <td class="agent-table-data font-10">{h(a["AGENTNAME"])}</td>
-            <td class="agent-table-data font-10">{h(a["AGENTPARENTAGENCY"])}</td>
-            <td class="agent-table-data font-10">{h(a["AGENTPRIMARYROLE"])}</td>
-            <td class="agent-table-data font-10">{contact(a["AGENTPHONE"])}</td>
-            <td class="agent-table-data font-10">{contact(a["AGENTEMAIL"])}</td>
+            <td class="agent-table-data">{h(a["AGENTNAME"])}</td>
+            <td class="agent-table-data">{h(a["AGENTPARENTAGENCY"])}</td>
+            <td class="agent-table-data">{h(a["AGENTPRIMARYROLE"])}</td>
+            <td class="agent-table-data">{contact(a["AGENTPHONE"])}</td>
+            <td class="agent-table-data">{contact(a["AGENTEMAIL"])}</td>
         </tr>"""
         for a in agents]
     )
@@ -988,7 +938,6 @@ def build_agents_report_html(
     header = build_case_header_html(
         active_case,
         page_title="INVESTIGATORS AT SEARCH WARRANT SITE",
-        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1003,15 +952,15 @@ def build_agents_report_html(
 </head>
 <body>
     {header}
-    <div class="top-table">
+    <div class="report-wrap">
         <table class="agent-table">
             <thead>
                 <tr>
-                    <th class="agent-table-header font-10">Agent Name</th>
-                    <th class="agent-table-header font-10">Agency</th>
-                    <th class="agent-table-header font-10">Primary Role</th>
-                    <th class="agent-table-header font-10">Phone Number</th>
-                    <th class="agent-table-header font-10">Email</th>
+                    <th class="agent-table-header">Agent Name</th>
+                    <th class="agent-table-header">Agency</th>
+                    <th class="agent-table-header">Primary Role</th>
+                    <th class="agent-table-header">Phone Number</th>
+                    <th class="agent-table-header">Email</th>
                 </tr>
             </thead>
             <tbody>
@@ -1019,6 +968,85 @@ def build_agents_report_html(
             </tbody>
         </table>
     </div>
+    {footer}
+</body>
+</html>"""
+
+# The label/value rows of an evidence item, in print order. The label is
+# what is printed; the key is the field in the evidence dict.
+EVIDENCE_FIELDS = [
+    ("Quantity:", "EVIDQTY"),
+    ("Description:", "EVIDDESC"),
+    ("Model #:", "EVIDMODELNUMBER"),
+    ("Serial #:", "EVIDSERIALNUMBER"),
+    ("Location:", "EVIDLOCROOM"),
+    ("Where Found:", "EVIDLOCROOMDETAIL"),
+    ("Located By:", "EVIDFOUNDBY"),
+    ("Witnessed By:", "EVIDFOUNDBYWITNESS"),
+    ("Photographed:", "EVIDPICTAKEN"),
+    ("Item Triaged:", "EVIDTRIAGED"),
+    ("Item Triaged By:", "EVIDTRIAGEDBY"),
+    ("Notes:", "EVIDNOTE"),
+]
+
+# The return copy shows only these, in the same order as above.
+_BASIC_EVIDENCE_KEYS = ("EVIDDESC", "EVIDMODELNUMBER", "EVIDSERIALNUMBER")
+BASIC_EVIDENCE_FIELDS = [
+    field for field in EVIDENCE_FIELDS if field[1] in _BASIC_EVIDENCE_KEYS
+]
+
+# Sets the 30/70 split for every .detail-table. It has to be a colgroup:
+# see the note above .detail-table in COMMON_STYLES.
+DETAIL_COLGROUP = (
+    '<colgroup><col class="col-label"><col class="col-value"></colgroup>'
+)
+
+
+def detail_rows(item: dict, fields: list[tuple[str, str]]) -> str:
+    """The label/value <tr> rows for one item. Values are escaped here."""
+    return "".join(
+        f"""
+            <tr>
+                <td class="detail-label">{label}</td>
+                <td class="detail-value">{h(item[key])}</td>
+            </tr>"""
+        for label, key in fields
+    )
+
+
+def item_bar_html(text_html: str) -> str:
+    """The dark bar above an item's table.
+
+    text_html goes in as written, so escape database values with h()
+    before passing them.
+    """
+    return f"""
+        <table class="item-bar">
+            <tr>
+                <td class="item-bar-cell">{text_html}</td>
+            </tr>
+        </table>"""
+
+
+def report_document_html(
+        title: str,
+        header: str,
+        body: str,
+        footer: str
+) -> str:
+    """Wraps a report's pieces in the complete HTML page."""
+    return f"""<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8" />
+    <title>V·E·C·T·O·R | {title}</title>
+    <style>
+        {COMMON_STYLES}
+    </style>
+</head>
+<body>
+    {header}
+    {body}
     {footer}
 </body>
 </html>"""
@@ -1032,112 +1060,27 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
     This is the AGENT COPY.
     """
 
-    evid_rows = "".join([f"""
-        <table class="evid-table-top">
-            <tr>
-                <td class="evid-table-item-row">
-                    Item #:&ensp;{h(e["EVIDNUM"])}
-                </td>
-            </tr>
-        </table>
-        <table class="evid-table">
-            <tr>
-                <td class="evid-data-label">Quantity:</td>
-                <td class="evid-data-value px-6">{h(e["EVIDQTY"])}</td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Description:</td>
-                <td class="evid-data-value px-6">{h(e["EVIDDESC"])}</td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Model #:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDMODELNUMBER"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Serial #:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDSERIALNUMBER"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Location:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDLOCROOM"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Where Found:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDLOCROOMDETAIL"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Located By:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDFOUNDBY"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Witnessed By:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDFOUNDBYWITNESS"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Photographed:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDPICTAKEN"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Item Triaged:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDTRIAGED"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Item Triaged By:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDTRIAGEDBY"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Notes:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDNOTE"])}
-                </td>
-            </tr>
+    evid_tables = "".join(
+        item_bar_html(f"Item #:&ensp;{h(e['EVIDNUM'])}")
+        + f"""
+        <table class="detail-table">
+            {DETAIL_COLGROUP}
+            {detail_rows(e, EVIDENCE_FIELDS)}
         </table>"""
-            for e in evidence
-        ]
+        for e in evidence
     )
 
     header = build_case_header_html(
         active_case,
         page_title="FULL EVIDENCE INVENTORY LIST",
-        sub_title="",
     )
-    footer = build_report_footer_html()
 
-    return f"""<!DOCTYPE html>
-<html lang="en" dir="ltr">
-<head>
-    <meta charset="utf-8" />
-    <title>V·E·C·T·O·R | Evidence Inventory List</title>
-    <style>
-        {COMMON_STYLES}
-    </style>
-</head>
-<body>
-    {header}
-    <div class="top-table">
-        {evid_rows}
-    </div>
-    {footer}
-</body>
-</html>"""
+    return report_document_html(
+        title="Evidence Inventory List",
+        header=header,
+        body=f'<div class="report-wrap">{evid_tables}</div>',
+        footer=build_report_footer_html(),
+    )
 
 
 def build_evidence_by_room_report_html(
@@ -1167,106 +1110,28 @@ def build_evidence_by_room_report_html(
             f"{'item' if item_count == 1 else 'items'})"
         )
 
-        # Filter evidence items for this room
-        room_items = [e for e in evidence if e["EVIDLOCROOM"] == room_name]
-        evid_rows = "".join([f"""
+        # Each item: a spacer row, the shaded "Item No." row, then its
+        # label/value rows, all in the one table for the room.
+        item_rows = "".join(
+            f"""
             <tr>
-                <td colspan="2" class="spacer-row"></td>
+                <td class="detail-spacer"></td>
+                <td class="detail-spacer"></td>
             </tr>
-            <tr class="top-row">
-                <td class="evid-data-label-header">Item No.:</td>
-                <td class="evid-data-value px-6 bold">
-                    {h(e["EVIDNUM"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Quantity:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDQTY"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Description:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDDESC"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Model #:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDMODELNUMBER"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Serial #:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDSERIALNUMBER"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Location:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDLOCROOM"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Where Found:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDLOCROOMDETAIL"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Located By:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDFOUNDBY"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Witnessed By:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDFOUNDBYWITNESS"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Photographed:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDPICTAKEN"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Item Triaged:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDTRIAGED"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Item Triaged By:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDTRIAGEDBY"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="evid-data-label">Notes:</td>
-                <td class="evid-data-value px-6">
-                    {h(e["EVIDNOTE"])}
-                </td>
-            </tr>
-            """
-            for e in room_items
-        ]
-    )
+            <tr class="detail-title-row">
+                <td class="detail-label">Item No.:</td>
+                <td class="detail-value">{h(e["EVIDNUM"])}</td>
+            </tr>{detail_rows(e, EVIDENCE_FIELDS)}"""
+            for e in evidence
+            if e["EVIDLOCROOM"] == room_name
+        )
 
         room_tables += f"""
-        <div class="top-table">
-            <table class="evid-table-top">
-                <tr>
-                    <td class="evid-table-item-row">
-                        {h(label)}
-                    </td>
-                </tr>
-            </table>
-            <table class="evid-table">
-                {evid_rows}
+        <div class="report-wrap">
+            {item_bar_html(h(label))}
+            <table class="detail-table">
+                {DETAIL_COLGROUP}
+                {item_rows}
             </table>
         </div>
         <br />"""
@@ -1274,26 +1139,14 @@ def build_evidence_by_room_report_html(
     header = build_case_header_html(
         active_case,
         page_title="EVIDENCE FOUND LIST BY ROOM",
-        sub_title="",
     )
 
-    footer = build_report_footer_html()
-
-    return f"""<!DOCTYPE html>
-<html lang="en" dir="ltr">
-<head>
-    <meta charset="utf-8" />
-    <title>V·E·C·T·O·R | Evidence Found By Room</title>
-    <style>
-        {COMMON_STYLES}
-    </style>
-</head>
-<body>
-    {header}
-    {room_tables}
-    {footer}
-</body>
-</html>"""
+    return report_document_html(
+        title="Evidence Found By Room",
+        header=header,
+        body=room_tables,
+        footer=build_report_footer_html(),
+    )
 
 
 def build_basic_evidence_report_html(
@@ -1307,62 +1160,27 @@ def build_basic_evidence_report_html(
     This is the "RETURN COPY" version.
     """
 
-    evid_rows = "".join([f"""
-            <table class="evid-table-top">
-                <tr>
-                    <td class="evid-table-item-row">
-                        Item #:&ensp;{h(e["EVIDNUM"])}
-                    </td>
-                </tr>
-            </table>
-            <table class="evid-table">
-                <tr>
-                    <td class="evid-data-label">Description:</td>
-                    <td class="evid-data-value px-6">
-                        {h(e["EVIDDESC"])}
-                    </td>
-                </tr>
-                <tr>
-                    <td class="evid-data-label">Model #:</td>
-                    <td class="evid-data-value px-6">
-                        {h(e["EVIDMODELNUMBER"])}
-                    </td>
-                </tr>
-                <tr>
-                    <td class="evid-data-label">Serial #:</td>
-                    <td class="evid-data-value px-6">
-                        {h(e["EVIDSERIALNUMBER"])}
-                    </td>
-                </tr>
-            </table>"""
-            for e in evidence
-        ]
+    evid_tables = "".join(
+        item_bar_html(f"Item #:&ensp;{h(e['EVIDNUM'])}")
+        + f"""
+        <table class="detail-table">
+            {DETAIL_COLGROUP}
+            {detail_rows(e, BASIC_EVIDENCE_FIELDS)}
+        </table>"""
+        for e in evidence
     )
 
     header = build_case_header_html(
         active_case,
         page_title="SEARCH INVENTORY AND RETURN",
-        sub_title="",
     )
-    footer = build_report_footer_html()
 
-    return f"""<!DOCTYPE html>
-<html lang="en" dir="ltr">
-<head>
-    <meta charset="utf-8" />
-    <title>V·E·C·T·O·R | Basic Evidence Inventory List</title>
-    <style>
-        {COMMON_STYLES}
-    </style>
-</head>
-<body>
-    {header}
-    <div class="top-table">
-        {evid_rows}
-    </div>
-    {footer}
-</body>
-</html>"""
+    return report_document_html(
+        title="Basic Evidence Inventory List",
+        header=header,
+        body=f'<div class="report-wrap">{evid_tables}</div>',
+        footer=build_report_footer_html(),
+    )
 
 
 def build_rooms_report_html(active_case: list, rooms: list) -> str:
@@ -1370,13 +1188,21 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
 
     room_rows = "".join([f"""
             <tr>
-                <td class="room-table-data room-id-cell">
+                <td class="room-table-data">
                     {h(r["ROOMLABEL"])}
                 </td>
-                <td class="room-table-data font-10">{h(r["ROOMDESC"])}</td>
-                <td class="room-table-data font-10">{recorded(r["ROOMFIRSTAGENT"])}</td>
-                <td class="room-table-data font-10">{recorded(r["ROOMSECONDAGENT"])}</td>
-                <td class="room-table-data font-10">{h(r["ROOMNOTE"])}</td>
+                <td class="room-table-data">
+                    {h(r["ROOMDESC"])}
+                </td>
+                <td class="room-table-data">
+                    {recorded(r["ROOMFIRSTAGENT"])}
+                </td>
+                <td class="room-table-data">
+                    {recorded(r["ROOMSECONDAGENT"])}
+                </td>
+                <td class="room-table-data">
+                    {h(r["ROOMNOTE"])}
+                </td>
             </tr>
             """
             for r in rooms
@@ -1386,8 +1212,8 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="ROOM LIST",
-        sub_title="",
     )
+
     footer = build_report_footer_html()
 
     return f"""<!DOCTYPE html>
@@ -1401,15 +1227,15 @@ def build_rooms_report_html(active_case: list, rooms: list) -> str:
 </head>
 <body>
     {header}
-    <div class="top-table">
+    <div class="report-wrap">
         <table class="room-table">
             <thead>
                 <tr>
-                    <th class="room-table-header room-table-header-id font-10">Room ID</th>
-                    <th class="room-table-header font-10">Room Name</th>
-                    <th class="room-table-header font-10">Searched By (1)</th>
-                    <th class="room-table-header font-10">Searched By (2)</th>
-                    <th class="room-table-header font-10">Notes</th>
+                    <th class="room-table-header">Room ID</th>
+                    <th class="room-table-header">Room Name</th>
+                    <th class="room-table-header">Searched By (1)</th>
+                    <th class="room-table-header">Searched By (2)</th>
+                    <th class="room-table-header">Notes</th>
                 </tr>
             </thead>
             <tbody>
@@ -1434,11 +1260,11 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
     else:
         person_rows = "".join([f"""
         <tr>
-            <td class="person-table-data font-10">{h(p["PERSONNAME"])}</td>
-            <td class="person-table-data font-10">{h(p["PERSONDOB"])}</td>
-            <td class="person-table-data font-10">{h(p["PERSONADDRESS"])}</td>
-            <td class="person-table-data font-10">{h(p["PERSONPHONE"])}</td>
-            <td class="person-table-data font-10">{h(p["PERSONNOTE"])}</td>
+            <td class="person-table-data">{h(p["PERSONNAME"])}</td>
+            <td class="person-table-data">{h(p["PERSONDOB"])}</td>
+            <td class="person-table-data">{h(p["PERSONADDRESS"])}</td>
+            <td class="person-table-data">{h(p["PERSONPHONE"])}</td>
+            <td class="person-table-data">{h(p["PERSONNOTE"])}</td>
         </tr>
         """
             for p in persons
@@ -1448,7 +1274,6 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="PERSONS LIST",
-        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1463,15 +1288,15 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
 </head>
 <body>
     {header}
-    <div class="top-table">
+    <div class="report-wrap">
         <table class="person-table">
             <thead>
                 <tr>
-                    <th class="person-table-header font-10">Person Name</th>
-                    <th class="person-table-header font-10">DOB</th>
-                    <th class="person-table-header font-10">Address</th>
-                    <th class="person-table-header font-10">Phone #</th>
-                    <th class="person-table-header font-10">Notes</th>
+                    <th class="person-table-header">Person Name</th>
+                    <th class="person-table-header">DOB</th>
+                    <th class="person-table-header">Address</th>
+                    <th class="person-table-header">Phone #</th>
+                    <th class="person-table-header">Notes</th>
                 </tr>
             </thead>
             <tbody>
@@ -1496,10 +1321,10 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
     else:
         note_rows = "".join([f"""
         <tr>
-            <td class="note-table-data font-10">{h(n["NOTEDATETIME"])}</td>
-            <td class="note-table-data font-10">{h(n["NOTEDATETIMEUPDATED"])}</td>
-            <td class="note-table-data font-10">{h(n["NOTEAUTHOR"])}</td>
-            <td class="note-table-data font-10">{h(n["NOTETEXT"])}</td>
+            <td class="note-table-data">{h(n["NOTEDATETIME"])}</td>
+            <td class="note-table-data">{h(n["NOTEDATETIMEUPDATED"])}</td>
+            <td class="note-table-data">{h(n["NOTEAUTHOR"])}</td>
+            <td class="note-table-data">{h(n["NOTETEXT"])}</td>
         </tr>
         """
             for n in notes
@@ -1509,7 +1334,6 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
     header = build_case_header_html(
         active_case,
         page_title="NOTES LIST",
-        sub_title="",
     )
     footer = build_report_footer_html()
 
@@ -1524,14 +1348,14 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
 </head>
 <body>
     {header}
-    <div class="top-table">
+    <div class="report-wrap">
         <table class="note-table">
             <thead>
                 <tr>
-                    <th class="note-table-header font-10">Date/Time Added</th>
-                    <th class="note-table-header font-10">Date/Time Updated</th>
-                    <th class="note-table-header font-10">Author</th>
-                    <th class="note-table-header font-10">Text</th>
+                    <th class="note-table-header">Date/Time Added</th>
+                    <th class="note-table-header">Date/Time Updated</th>
+                    <th class="note-table-header">Author</th>
+                    <th class="note-table-header">Text</th>
                 </tr>
             </thead>
             <tbody>
@@ -1551,73 +1375,47 @@ def build_files_report_html(active_case: list, files: list) -> str:
     FILEUPLOADEDBY, and FILESHA256.
     """
 
-    file_rows = "".join([f"""
-        <table class="file-table">
-            <tr class="top-row">
-                <td class="file-data-label bold">File No.:</td>
-                <td class="file-data-value px-6 bold">
-                    {h(f["Z_PK"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="file-data-label">File Name:</td>
-                <td class="file-data-value px-6">
-                    {h(f["FILENAME"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="file-data-label">File Type:</td>
-                <td class="file-data-value px-6">
-                    {h(f["FILEMIMETYPE"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="file-data-label">Uploaded Date/Time:</td>
-                <td class="file-data-value px-6">
-                    {h(f["FILEUPLOADDATE"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="file-data-label">Uploaded By:</td>
-                <td class="file-data-value px-6">
-                    {h(f["FILEUPLOADEDBY"])}
-                </td>
-            </tr>
-            <tr>
-                <td class="file-data-label">File Hash (SHA256):</td>
-                <td class="file-data-value px-6">
-                    {h(f["FILESHA256"])}
-                </td>
-            </tr>
+    file_fields = [
+        ("File Name:", "FILENAME"),
+        ("File Type:", "FILEMIMETYPE"),
+        ("Uploaded Date/Time:", "FILEUPLOADDATE"),
+        ("Uploaded By:", "FILEUPLOADEDBY"),
+        ("File Hash (SHA256):", "FILESHA256"),
+    ]
+
+    file_tables = "".join(
+        item_bar_html(f"File #:&ensp;{h(f['Z_PK'])}")
+        + f"""
+        <table class="detail-table">
+            {DETAIL_COLGROUP}
+            {detail_rows(f, file_fields)}
         </table>"""
-            for f in files
-        ]
+        for f in files
     )
+
+    # file_tables = "".join(
+    #     f"""
+    #     <table class="detail-table">
+    #         {DETAIL_COLGROUP}
+    #         <tr class="detail-title-row">
+    #             <td class="detail-label">File No.:</td>
+    #             <td class="detail-value">{h(f["Z_PK"])}</td>
+    #         </tr>{detail_rows(f, file_fields)}
+    #     </table>"""
+    #     for f in files
+    # )
 
     header = build_case_header_html(
         active_case,
         page_title="ATTACHED FILES LIST",
-        sub_title="",
     )
-    footer = build_report_footer_html()
 
-    return f"""<!DOCTYPE html>
-<html lang="en" dir="ltr">
-<head>
-    <meta charset="utf-8" />
-    <title>V·E·C·T·O·R | Attached Files List</title>
-    <style>
-        {COMMON_STYLES}
-    </style>
-</head>
-<body>
-    {header}
-    <div class="top-table">
-        {file_rows}
-    </div>
-    {footer}
-</body>
-</html>"""
+    return report_document_html(
+        title="Attached Files List",
+        header=header,
+        body=f'<div class="report-wrap">{file_tables}</div>',
+        footer=build_report_footer_html(),
+    )
 
 
 @ui.page("/reports/agents")
@@ -1668,8 +1466,8 @@ def print_evidence_report():
                 "EVIDNUM": e.EVIDNUM,
                 "EVIDQTY": e.EVIDQTY,
                 "EVIDDESC": e.EVIDDESC,
-                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "N/A",
-                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "N/A",
+                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "[NOT RECORDED]",
+                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "[NOT RECORDED]",
                 "EVIDLOCROOM": e.EVIDLOCROOM,
                 "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
                 "EVIDFOUNDBY": e.EVIDFOUNDBY,
@@ -1677,7 +1475,7 @@ def print_evidence_report():
                 "EVIDPICTAKEN": e.EVIDPICTAKEN,
                 "EVIDTRIAGED": e.EVIDTRIAGED,
                 "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY or "N/A",
-                "EVIDNOTE": e.EVIDNOTE or "N/A",
+                "EVIDNOTE": e.EVIDNOTE or "[NOT RECORDED]",
             }
             for e in evidence_in_order(session)
         ]
@@ -1699,16 +1497,14 @@ def print_evidence_by_room_report():
 
     with get_session() as session:
         active_case = get_case_info()
-
         unique_rooms_list = rooms_with_item_counts(session)
-
         evidence = [
             {
                 "EVIDNUM": e.EVIDNUM,
                 "EVIDQTY": e.EVIDQTY,
                 "EVIDDESC": e.EVIDDESC,
-                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "N/A",
-                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "N/A",
+                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "[NOT RECORDED]",
+                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "[NOT RECORDED]",
                 "EVIDLOCROOM": e.EVIDLOCROOM,
                 "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
                 "EVIDFOUNDBY": e.EVIDFOUNDBY,
@@ -1716,7 +1512,7 @@ def print_evidence_by_room_report():
                 "EVIDPICTAKEN": e.EVIDPICTAKEN,
                 "EVIDTRIAGED": e.EVIDTRIAGED,
                 "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY or "N/A",
-                "EVIDNOTE": e.EVIDNOTE or "N/A",
+                "EVIDNOTE": e.EVIDNOTE or "[NOT RECORDED]",
             }
             for e in evidence_in_order(session)
         ]
@@ -1738,16 +1534,14 @@ def print_basic_evidence_report():
         return
 
     with get_session() as session:
-
         active_case = get_case_info()
-
         evidence = [
             {
                 "EVIDNUM": e.EVIDNUM,
                 "EVIDQTY": e.EVIDQTY,
                 "EVIDDESC": e.EVIDDESC,
-                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "N/A",
-                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "N/A",
+                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "[NOT RECORDED]",
+                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "[NOT RECORDED]",
             }
             for e in evidence_in_order(session)
         ]
@@ -1831,6 +1625,7 @@ def print_rooms_report():
 
 @ui.page("/reports/persons")
 def print_persons_report():
+
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -1858,6 +1653,7 @@ def print_persons_report():
 
 @ui.page("/reports/notes")
 def print_notes_report():
+
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -1885,6 +1681,7 @@ def print_notes_report():
 
 @ui.page("/reports/files")
 def print_files_report():
+
     if not is_authenticated():
         ui.navigate.to("/")
         return
@@ -1956,18 +1753,18 @@ Stays at the top while a long report is scrolled, so Print and Close buttons
 are always in reach. Marked no-print, so it never prints.
 */
 .print-toolbar {
+    align-items: center;
+    background: #1E293B;
+    color: #FFFFFF;
+    display: flex;
+    flex-wrap: wrap;
+    font-family: -apple-system, "Segoe UI", system-ui, Arial, sans-serif;
+    gap: 12px;
+    margin: 0 0 16px;
+    padding: 10px 16px;
     position: sticky;
     top: 0;
     z-index: 10;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 16px;
-    margin: 0 0 16px;
-    background: #1E293B;
-    color: #FFFFFF;
-    font-family: -apple-system, "Segoe UI", system-ui, Arial, sans-serif;
 }
 
 .print-toolbar .tb-title {
@@ -1978,26 +1775,26 @@ are always in reach. Marked no-print, so it never prints.
 }
 
 .print-toolbar .tb-title small {
+    color: #CBD5E1;
     display: block;
     font-size: 12px;
     font-weight: 400;
-    color: #CBD5E1;
 }
 
 /* 44 px tall: the smallest target Apple recommends for a finger. */
 .print-toolbar button {
-    -webkit-appearance: none;
-    appearance: none;
-    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    min-width: 150px;
-    min-height: 44px;
-    padding: 0 20px;
+    appearance: none;
     border-radius: 8px;
-    font: 600 16px/1.2 -apple-system, "Segoe UI", system-ui, Arial, sans-serif;
     cursor: pointer;
+    display: inline-flex;
+    font: 600 16px/1.2 -apple-system, "Segoe UI", system-ui, Arial, sans-serif;
+    gap: 8px;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 150px;
+    padding: 0 20px;
+    -webkit-appearance: none;
 }
 
 .print-toolbar .print-btn {
@@ -2007,8 +1804,8 @@ are always in reach. Marked no-print, so it never prints.
 }
 
 .print-toolbar .print-btn:hover {
-    inset: 3px;
     border: 2px dashed white;
+    inset: 3px;
 }
 
 .print-toolbar .close-btn {
@@ -2018,8 +1815,8 @@ are always in reach. Marked no-print, so it never prints.
 }
 
 .print-toolbar .close-btn:hover {
-    inset: 3px;
     border: 2px dashed #2984D1;
+    inset: 3px;
 }
 
 .print-toolbar button:focus-visible {
