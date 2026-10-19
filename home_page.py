@@ -35,6 +35,7 @@ from models import (
     record_audit,
 )
 from navbar import build_navbar, unit_logo
+from parts.help_page import build_help_page
 from parts.case_transfer import (
     open_delete_all_dialog,
     open_export_dialog,
@@ -407,98 +408,6 @@ def about_page():
 
 
 # ----- Help Page -----
-# Names in bold are the buttons and menus as they appear on screen. The
-# test suite checks each one still exists, so renaming a button fails a
-# test instead of leaving the help out of date.
-HELP_TEXT = f"""
-#### Working a search
-
-VECTOR holds one case at a time. Work through the pages in this order —
-each one feeds the next. On a phone or a small tablet, the pages are under
-the menu button (three lines) at the top left.
-
-1. **Start New Case** on the Home page opens the Case page. Enter the case
-   number, location, jurisdiction and start time (`MM-DD-YYYY HH:MM`) — or
-   press **Fill with current date/time** — then press **Open New Case**.
-   The case number now shows at the top of every page, and the Case page
-   shows the open case in place of the form.
-2. **Agents** — everyone on site.
-3. **Rooms** — the next room letter is filled in for you.
-4. **Evidence** — the next item number is filled in for you, and rooms and
-   agents are picked from the lists you made. Delete an item that was not
-   seized after all, and the items after it move down one number, so the
-   list never skips.
-5. **People** — suspects and others present.
-6. **Notes** — timestamped, signed with your account, and listed in the
-   order they were written.
-7. **Files** — photographs and documents. Each file is fingerprinted
-   (SHA-256) when it is added, so a later change to it can be detected.
-   VECTOR reads what a file is from its contents, not its name: images,
-   videos, documents and archives are accepted, and a program renamed to
-   look like a photo is refused. Every download is recorded in the audit
-   trail.
-8. **Reports** — eight printable lists, including the inventory used as
-   the return copy. **Print Report** opens the report in its own window,
-   with **Print Report** and **Close** in a bar across the top; the bar
-   is not printed. If the case is missing a detail a report needs, the
-   page says which, and if it has no end time yet the page offers to fill
-   it in from this machine's clock. **Print Room List** waits until every
-   room has both agents. Switches on the Reports page add the date and
-   time each report was printed, and hide agents' phone numbers and
-   emails on the Agent List.
-
-Until a case is open, the top bar shows **No Active Case** and the other
-pages will not save.
-
-Every table has a search box above it. Type part of a name, a room, an
-item number or a description and the list narrows to the rows that hold
-it; clear the box to see them all again.
-
-Times follow this machine's clock and time zone. The times VECTOR records
-itself — notes, entries, uploads — carry their offset from UTC, such as
-`UTC-04:00`.
-
-#### Getting the case out
-
-- **Export Case Data** on the Home page downloads the whole case to the
-  device you are using. CSV opens in Excel; JSON is a single file for other
-  systems. Tick the encryption box to protect the file with a password — a
-  forgotten password cannot be recovered.
-- **Import Case Data** replaces the case with a file exported earlier.
-  Choose the .zip or .json file; if it was exported with a password,
-  VECTOR asks for it.
-- **Delete All Data** empties the case; accounts and the audit trail are
-  kept. **Start New Case** does the same, after a warning, when a case is
-  already open. Neither can be undone, so export first.
-
-#### Accounts
-
-- Sign out from the **Welcome** menu at the top right, with **Logout**.
-- Administrators also see **Admin Panel** there, to add accounts, reset
-  passwords, clear a sign-in lock and decide whether other devices may
-  reach this machine; **Audit Trail**, a record of every
-  change, sign-in and download; and **Shutdown**, which stops VECTOR for
-  everyone.
-- After {LOCK_AFTER_FAILURES} wrong passwords an account is locked for
-  {LOCKOUT_MINUTES} minutes. An administrator can clear the lock sooner.
-- Passwords an administrator issues are shown once. Write them down before
-  closing the message.
-- A device nobody has touched for {Config.SESSION_IDLE_MINUTES} minutes
-  signs out on its own, so a tablet left at a scene does not stay open on
-  the case. A warning appears first, with **Stay signed in** on it.
-  Records already saved are kept; a form filled in but not yet saved is
-  lost with the page, so save before walking away.
-
-#### Other pages
-
-- **Connect a Device** under **Help** — the address to type on a tablet
-  or a second laptop, and whether VECTOR is reachable from them at all.
-- **Tools** (or **Useful Links** on the Home page) — links to forensic
-  software, DFIR and OSINT resources.
-- **Help** → **About App** — the version, and who wrote VECTOR.
-"""
-
-
 @ui.page("/help")
 def help_page():
     if not is_authenticated():
@@ -510,11 +419,7 @@ def help_page():
         username=get_current_user_name(),
     )
 
-    with ui.column().classes("w-full items-center"):
-        with ui.column().classes("items-center w-full mt-8 max-w-3xl"):
-            ui.label("Help").classes("text-2xl font-bold mb-6")
-            with ui.card().classes("p-6 w-full"):
-                ui.markdown(HELP_TEXT).classes("text-sm")
+    build_help_page()
 
 
 # ----- Confirm New Case Handler -----

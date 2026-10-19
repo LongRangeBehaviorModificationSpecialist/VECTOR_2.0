@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-import home_page
+from parts import help_page
 import navbar
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -105,14 +105,14 @@ def _on_screen_text() -> str:
     sources += [
         path.read_text(encoding="utf-8")
         for path in sorted((ROOT / "parts").glob("*.py"))
+        if path.name != "help_page.py"
     ]
-    home_source = (ROOT / "home_page.py").read_text(encoding="utf-8")
-    sources.append(home_source.split("HELP_TEXT = ")[0])
+    sources.append((ROOT / "home_page.py").read_text(encoding="utf-8"))
     return "\n".join(sources).lower()
 
 
 def test_every_button_the_help_names_exists():
-    named = re.findall(r"\*\*(.+?)\*\*", home_page.HELP_TEXT)
+    named = re.findall(r"\*\*(.+?)\*\*", help_page.HELP_TEXT)
     assert len(named) > 10, named
     on_screen = _on_screen_text()
     missing = sorted(
@@ -124,7 +124,7 @@ def test_every_button_the_help_names_exists():
 
 
 def test_the_help_does_not_use_old_names():
-    assert "Case Info" not in home_page.HELP_TEXT
+    assert "Case Info" not in help_page.HELP_TEXT
 
 
 @pytest.mark.parametrize("topic", [
@@ -135,11 +135,34 @@ def test_the_help_does_not_use_old_names():
     "Delete All Data",
 ])
 def test_the_help_covers(topic):
-    assert topic.lower() in home_page.HELP_TEXT.lower()
+    assert topic.lower() in help_page.HELP_TEXT.lower()
+
+
+@pytest.mark.parametrize("topic", [
+    "Print Report Without Names",   # the Room List with names missing
+    "Connect a Device",              # tablets
+    "x12",                           # a phone extension
+    "pop-ups",                       # the print window
+])
+def test_the_help_covers_what_agents_ask(topic):
+    assert topic.lower() in help_page.HELP_TEXT.lower()
+
+
+def test_the_help_no_longer_says_the_room_list_waits():
+    """Since the author's 70120de the Room List can be printed with
+    names missing; the help said it waited for both agents."""
+    assert "waits until every" not in help_page.HELP_TEXT
+
+
+def test_each_help_topic_has_an_icon_a_title_and_text():
+    titles = [title for _icon, title, _text in help_page.HELP_SECTIONS]
+    assert len(titles) == len(set(titles)) >= 10
+    for icon, title, text in help_page.HELP_SECTIONS:
+        assert icon and title and len(text.strip()) > 40, title
 
 
 def test_the_help_states_the_real_lockout_rule():
     from auth import LOCK_AFTER_FAILURES, LOCKOUT_MINUTES
 
-    assert f"After {LOCK_AFTER_FAILURES} wrong passwords" in home_page.HELP_TEXT
-    assert f"{LOCKOUT_MINUTES} minutes" in home_page.HELP_TEXT
+    assert f"After {LOCK_AFTER_FAILURES} wrong passwords" in help_page.HELP_TEXT
+    assert f"{LOCKOUT_MINUTES} minutes" in help_page.HELP_TEXT
