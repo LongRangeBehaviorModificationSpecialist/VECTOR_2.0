@@ -69,13 +69,13 @@ exit /b 1
 :install_failed
 echo.
 echo Installing the packages failed. Check the internet connection and try again.
-echo See "Troubleshooting" in README.md.
+echo See "If VECTOR does not start" in docs\INSTALL.md.
 pause
 exit /b 1
 
 :failed
 echo.
 echo VECTOR stopped with an error. The message above says why.
-echo See "Troubleshooting" in README.md.
+echo See "If VECTOR does not start" in docs\INSTALL.md.
 pause
 exit /b 1

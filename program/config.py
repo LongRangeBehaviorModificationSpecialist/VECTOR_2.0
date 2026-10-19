@@ -60,7 +60,7 @@ class Config:
 
     # ----- Network -----
     # Loopback by default: the app is not reachable from the network
-    # unless someone deliberately opts in. See README "Access from
+    # unless someone deliberately opts in. See docs/REFERENCE.md "Access from
     # another device".
     #   VECTOR_HOST=0.0.0.0  (or --lan) exposes it to the local network.
     HOST = os.environ.get("VECTOR_HOST", "127.0.0.1")

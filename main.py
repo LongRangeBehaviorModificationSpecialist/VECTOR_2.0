@@ -56,7 +56,7 @@ DEBUG_MODE = "--dev" in sys.argv
 # Loopback unless somebody opts in, so an install is never reachable from
 # the network by accident. Two ways to opt in: the setting an admin turns
 # on in the Admin Panel, which is what this machine does from then on,
-# and --lan, which opens it for this run only. See README "Access from
+# and --lan, which opens it for this run only. See docs/REFERENCE.md "Access from
 # another device".
 LAN_MODE = "--lan" in sys.argv
 HOST = settings.host_to_bind(LAN_MODE)

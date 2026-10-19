@@ -17,7 +17,7 @@ cd "$(dirname "$0")" || exit 1
 fail() {
     echo
     echo "$1"
-    echo "See \"Troubleshooting\" in README.md."
+    echo "See \"If VECTOR does not start\" in docs/INSTALL.md."
     read -r -p "Press Return to close this window. " _
     exit 1
 }
