@@ -308,12 +308,25 @@ def rooms_missing_agents_message(labels: list[str]) -> str:
     shown = ", ".join(labels[:10])
     if len(labels) > 10:
         shown += f", and {len(labels) - 10} more"
+
     return (
-        "The Room List cannot be printed until a first and second agent "
-        "are entered for every room.\n\n"
+        "Some rooms are missing agent names.\n\n"
+        "Enter the names on the Rooms page, or print the list with those "
+        "names marked '[NOT RECORDED]'.\n\n"
         f"Rooms missing an agent => {shown}.\n\n"
-        "Open the Rooms page and enter both agent names for each."
     )
+
+
+def rooms_missing_agents_banner(message: str) -> None:
+    """Renders the missing-agents warning banner."""
+    with ui.column().classes("items-center w-full"):
+        unit_logo("novadc_icac.png", "w-[150px] h-[150px] mb-4")
+        with ui.row().classes("text-2xl font-normal text-center"):
+            ui.label("V·E·C·T·O·R")
+            ui.label("|").classes("font-bold text-[var(--vsp-blue)]")
+            ui.label("Reports Page")
+        # Put the message INSIDE the column, via a real widget:
+        ui.markdown(message).classes("text-center text-lg py-12")
 
 
 def rooms_in_order(session) -> list:
@@ -459,7 +472,6 @@ def render_report_page(html_content: str, report_name: str = "") -> None:
                 "Print Report",
                 color="#1C69A8").props("push icon=print"
             ).classes("w-70 p-6 hover-border-white")
-                    # p-3 mb-4 no-print hover-border-white
 
         is_valid, errors = validate_case_for_report()
         if is_valid:
@@ -1755,19 +1767,19 @@ def check_rooms_agents():
         ui.navigate.to("/")
         return
 
-    missing = rooms_missing_agents()
-    if missing:
+    missing_labels = rooms_missing_agents()
+    if missing_labels:
         build_navbar(
             is_admin=get_is_admin(),
             username=get_current_user_name(),
         )
-        with ui.column().classes("items-center w-full mt-8 gap-4"):
-            ui.label(rooms_missing_agents_message(missing)).classes(
-                "text-lg text-center whitespace-pre-line"
-            )
+        with ui.column().classes("items-center w-full mt-4 mb-4"):
+            message = rooms_missing_agents_message(labels=missing_labels)
+            if message:
+                rooms_missing_agents_banner(message=message)
 
         with ui.row().classes(
-            "flex justify-center items-center gap-8 my-1 py-12 w-full"):
+            "flex justify-center items-center gap-12 my-6 w-full"):
             ui.button(
                 "Print Report Without Names",
                 on_click=lambda: ui.navigate.to("/reports/rooms"),
