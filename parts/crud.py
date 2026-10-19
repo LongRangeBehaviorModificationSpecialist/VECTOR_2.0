@@ -271,7 +271,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                     widget.value = ""
 
         def _submit() -> None:
-            values = _values_from(form_widgets)
+            values = _values_from(form_widgets, spec.fields)
 
             if spec.on_before_create:
                 spec.on_before_create(values)

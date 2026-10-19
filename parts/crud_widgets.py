@@ -49,6 +49,8 @@ class Field:
     new_values:  let a select accept a value that is not in its options
     now_button:  offer a button that fills the field with this machine's
                  current date and time
+    tidy:        callable that puts typed text into the form it is saved
+                 in, e.g. a phone number; given trimmed, non-empty text
     """
 
     name: str
@@ -66,6 +68,7 @@ class Field:
     default: Optional[Callable[[], str]] = None
     new_values: bool = False
     now_button: bool = False
+    tidy: Optional[Callable[[str], str]] = None
 
 # ----- Notification helpers -----
 def notify_problem(message: str) -> None:
@@ -262,6 +265,17 @@ def _clean(value):
     return value
 
 
-def _values_from(widgets: dict) -> dict:
-    """Reads the current value of every widget, as it is to be saved."""
-    return {name: _clean(widget.value) for name, widget in widgets.items()}
+def _values_from(widgets: dict, fields=()) -> dict:
+    """Reads the current value of every widget, as it is to be saved.
+
+    A field with a `tidy` step has its text put into its saved form here,
+    so the add form and the edit dialog save it the same way.
+    """
+    tidy = {field.name: field.tidy for field in fields if field.tidy}
+    values = {}
+    for name, widget in widgets.items():
+        value = _clean(widget.value)
+        if name in tidy and isinstance(value, str) and value:
+            value = tidy[name](value)
+        values[name] = value
+    return values

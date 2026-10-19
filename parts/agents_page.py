@@ -15,6 +15,7 @@ from models import Agents
 from navbar import build_navbar
 from parts.crud import CrudSpec, Field, build_crud_page
 from utils import (
+    format_phone,
     get_agent_dict,
     get_current_timestamp,
     is_duplicate_agent_in_json,
@@ -144,11 +145,14 @@ SPEC = CrudSpec(
             kind="select",
             options=load_role_options,
         ),
+        # No input mask: one forced exactly ten digits, so an extension
+        # or a foreign number could not be typed. A US number is tidied
+        # to (703) 555-1234 when it is saved; anything else is kept.
         Field(
             "AGENTPHONE",
             "Phone Number",
-            placeholder="(###) ###-####",
-            props='mask="(###) ###-####"',
+            placeholder="(703) 555-1234 x12",
+            tidy=format_phone,
             ),
         Field(
             "AGENTEMAIL",

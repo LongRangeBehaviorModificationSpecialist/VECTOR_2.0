@@ -59,7 +59,7 @@ def open_edit_dialog(
             ).props("flat").classes("p-3 hover-border-blue")
 
             def on_save_update() -> None:
-                values = _values_from(edit_widgets)
+                values = _values_from(edit_widgets, spec.fields)
 
                 if spec.validate(
                     stage="update",
