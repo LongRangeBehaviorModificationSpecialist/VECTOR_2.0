@@ -8,7 +8,7 @@ detail. Most people need less than this:
 - [00 START HERE](../00%20START%20HERE/) — installing it, step by step, with pictures.
 - The **Help** page inside VECTOR — using it at a scene.
 
-`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `538 tests`
+`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `540 tests`
 
 ---
 
@@ -90,7 +90,7 @@ Everything the first version did, plus:
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Touch screens** | Raised buttons drawn cleanly on an iPad, with no hover border left behind by a tap; the print window's Print and Close buttons sized for a finger, in a bar that names the report and stays readable on a laptop in dark mode |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 538 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 540 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names, the
@@ -837,7 +837,7 @@ assigned and never read. Style is left alone deliberately — this
 codebase has its own conventions and a linter arguing about them would
 be noise.
 
-538 tests, about fifteen seconds. They run against a temporary database
+540 tests, about fifteen seconds. They run against a temporary database
 and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
@@ -869,7 +869,7 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_session_and_search.py` | 19 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for, as can every other action VECTOR records; every table that grows offers a search box and the one-case page does not |
 | `test_network_setting.py` | 28 | Network access is off until somebody turns it on and a damaged settings file reads as off; the flag opens it for one run and the setting from then on; the address given out is one another device could use, chosen from the adapter on the network this computer is on rather than VMware, Hyper-V, WSL or VPN adapters; and the change is recorded with who made it |
 | `test_launchers.py` | 12 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned; both offer the desktop shortcut once and cannot be held up by it; the Start files in 00 START HERE hand over to them, and the guide there finds every picture; the Download ZIP leaves out the tests and the developer tools and nothing else |
-| `test_shortcut.py` | 12 | The icon files hold every size each system asks for, PNG only where Windows reads it; the Mac app is a complete bundle that opens the launcher in Terminal; the Linux entry starts VECTOR in a terminal; on Windows a real .lnk points at the launcher with the icon, and a blocked one says how to make it by hand |
+| `test_shortcut.py` | 14 | The icon files hold every size each system asks for, PNG only where Windows reads it; the Mac app is a complete bundle that opens the launcher in Terminal; the Linux entry starts VECTOR in a terminal; on Windows a real .lnk points at the launcher with the icon, and a blocked one says how to make it by hand; an unrelated VECTOR.app is never deleted, and a Linux entry survives any folder name |
 | `test_migration.py` | 13 | Old-schema databases — old names, old constraints — upgrade without losing a row, including the September renames of the person notes and hashing time; backups include the write-ahead log |
 | `test_audit_chain.py` | 13 | Every entry is fingerprinted as it is written; an entry changed or removed afterwards is found and named; entries from before the chain are fingerprinted once by the upgrade, before anything else writes to the trail, and the check says which could not be checked |
 | `test_audit.py` | 9 | Creates, edits, deletions, bulk wipes; blobs stay out of the log |

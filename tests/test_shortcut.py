@@ -110,15 +110,49 @@ def test_making_the_mac_app_again_replaces_it(tmp_path):
     assert (app / "Contents" / "Info.plist").is_file()
 
 
+def test_a_vector_app_it_did_not_make_is_left_alone(tmp_path):
+    """Replacing the shortcut deletes the old one; something else that
+    happens to be called VECTOR.app must never be deleted."""
+    other = tmp_path / "VECTOR.app" / "Contents"
+    other.mkdir(parents=True)
+    with open(other / "Info.plist", "wb") as plist:
+        plistlib.dump({"CFBundleIdentifier": "com.example.other"}, plist)
+    (other / "keep.txt").write_text("not ours", encoding="utf-8")
+    with pytest.raises(make_shortcut.ShortcutError) as caught:
+        make_shortcut.make_mac_app(tmp_path)
+    assert "left alone" in str(caught.value)
+    assert (other / "keep.txt").read_text(encoding="utf-8") == "not ours"
+
+
 # ----- Linux -----
+
+def _read_desktop_exec(entry: str) -> str:
+    """The one argument of an Exec line, decoded as a desktop does: the
+    file's string escaping first, then the quoting, then %% to %."""
+    line = next(l for l in entry.splitlines() if l.startswith("Exec="))
+    value = line[len("Exec="):].replace("\\\\", "\\")
+    assert value.startswith('"') and value.endswith('"'), value
+    out, chars = "", iter(value[1:-1])
+    for ch in chars:
+        out += next(chars) if ch == "\\" else ch
+    return out.replace("%%", "%")
+
 
 def test_the_linux_entry_starts_vector_in_a_terminal(tmp_path):
     made = make_shortcut.make_linux_entry(tmp_path)
     entry = made.read_text(encoding="utf-8")
     assert entry.startswith("[Desktop Entry]\n")
-    assert f'Exec="{ROOT / "Start VECTOR.sh"}"' in entry
-    assert f"Icon={ICONS / 'vector-256.png'}" in entry
+    assert _read_desktop_exec(entry) == str(ROOT / "Start VECTOR.sh")
+    assert "Icon=" in entry and "vector-256.png" in entry
     assert "Terminal=true" in entry
+
+
+def test_the_linux_entry_survives_any_folder_name():
+    """Quotes, $, backticks, backslashes and % in the folder's name must
+    reach the launcher unchanged, not end the argument or expand."""
+    folder = Path('/home/agent/Case "26" $HOME `id` back\\slash 100%')
+    entry = make_shortcut.linux_desktop_entry(folder)
+    assert _read_desktop_exec(entry) == str(folder / "Start VECTOR.sh")
 
 
 # ----- Windows -----

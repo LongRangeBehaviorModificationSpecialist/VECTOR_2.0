@@ -117,10 +117,28 @@ def mac_launcher_script(folder: Path) -> str:
     )
 
 
+BUNDLE_ID = "local.vector.launcher"
+
+
+def _made_by_us(app: Path) -> bool:
+    """Whether an existing VECTOR.app is one this script made, and so
+    one it may replace. Anything else of that name is left alone."""
+    try:
+        with open(app / "Contents" / "Info.plist", "rb") as plist:
+            return plistlib.load(plist).get("CFBundleIdentifier") == BUNDLE_ID
+    except (OSError, plistlib.InvalidFileException, ValueError):
+        return False
+
+
 def make_mac_app(dest: Path | None = None) -> Path:
     dest = dest or Path.home() / "Desktop"
     app = dest / f"{NAME}.app"
     contents = app / "Contents"
+    if app.exists() and not _made_by_us(app):
+        raise ShortcutError(
+            f"There is already a {app.name} in {dest} that VECTOR did not "
+            f"make, so it was left alone. {MAC_BY_HAND}"
+        )
     try:
         if app.exists():
             shutil.rmtree(app)
@@ -134,7 +152,7 @@ def make_mac_app(dest: Path | None = None) -> Path:
             plistlib.dump({
                 "CFBundleName": NAME,
                 "CFBundleDisplayName": NAME,
-                "CFBundleIdentifier": "local.vector.launcher",
+                "CFBundleIdentifier": BUNDLE_ID,
                 "CFBundleExecutable": NAME,
                 "CFBundleIconFile": "vector",
                 "CFBundlePackageType": "APPL",
@@ -154,16 +172,31 @@ LINUX_BY_HAND = (
 )
 
 
+def _desktop_string(text: str) -> str:
+    """A value as a .desktop file writes it: a backslash is doubled."""
+    return text.replace("\\", "\\\\")
+
+
+def _desktop_exec_argument(path: Path) -> str:
+    """One quoted argument of an Exec line, by the Desktop Entry spec:
+    inside the quotes " ` $ and \\ take a backslash; then the file's own
+    string escaping doubles every backslash; and % is written %%. A
+    folder named with any of these still starts VECTOR."""
+    quoted = "".join("\\" + ch if ch in '"`$\\' else ch for ch in str(path))
+    return '"' + _desktop_string(quoted).replace("%", "%%") + '"'
+
+
 def linux_desktop_entry(folder: Path) -> str:
     launcher = folder / "Start VECTOR.sh"
+    icon = folder / "static" / "icons" / "vector-256.png"
     return (
         "[Desktop Entry]\n"
         "Type=Application\n"
         f"Name={NAME}\n"
         "Comment=Start VECTOR\n"
-        f'Exec="{launcher}"\n'
-        f"Path={folder}\n"
-        f"Icon={ICONS / 'vector-256.png'}\n"
+        f"Exec={_desktop_exec_argument(launcher)}\n"
+        f"Path={_desktop_string(str(folder))}\n"
+        f"Icon={_desktop_string(str(icon))}\n"
         "Terminal=true\n"
         "Categories=Office;\n"
     )
