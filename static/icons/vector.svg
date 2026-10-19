@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <title>VECTOR</title>
+  <!-- The VECTOR shortcut icon for Windows and Linux: a white "V" on the
+       app's blue. The Mac version, vector-mac.svg, is the same mark on
+       Apple's icon grid. -->
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3497E6"/>
+      <stop offset="1" stop-color="#15508A"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="236" height="236" rx="54" fill="url(#blue)"/>
+  <rect x="12" y="12" width="232" height="232" rx="52" fill="none"
+        stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="4"/>
+  <path d="M62 66 L128 196 L194 66" fill="none" stroke="#FFFFFF"
+        stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

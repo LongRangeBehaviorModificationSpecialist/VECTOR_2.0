@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <title>VECTOR</title>
+  <!-- The VECTOR icon on Apple's icon grid: the body is 824 of 1024,
+       with room around it for the shadow, as macOS icons are drawn. The
+       same mark as vector.svg. -->
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3497E6"/>
+      <stop offset="1" stop-color="#15508A"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000"
+                    flood-opacity="0.30"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#blue)"
+        filter="url(#shadow)"/>
+  <rect x="106" y="106" width="812" height="812" rx="179" fill="none"
+        stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="10"/>
+  <path d="M282 295 L512 749 L742 295" fill="none" stroke="#FFFFFF"
+        stroke-width="119" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
