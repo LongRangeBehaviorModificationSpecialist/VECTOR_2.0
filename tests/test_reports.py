@@ -233,7 +233,7 @@ def test_the_print_window_copies_the_report_and_not_the_page():
 def test_the_print_window_names_its_report_and_case():
     script = reports.print_window_script("Agent List", "26-DEMO-001")
     assert "Agent List · 26-DEMO-001" in script
-    assert "This bar is not printed" in script
+    assert "[ This title bar is not printed ]" in script
     assert 'class=\\"print-toolbar no-print\\"' in script
 
 
