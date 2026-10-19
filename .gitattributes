@@ -4,3 +4,18 @@
 *.bat     text eol=crlf
 *.command text eol=lf
 *.sh      text eol=lf
+
+# Left out of GitHub's "Download ZIP" (and git archive): what only a
+# developer uses. The download is what an agent installs from, and it
+# reads more easily without them; a git clone still has everything.
+# A folder needs both lines: "/tests/" would match nothing here, since a
+# pattern in this file does not reach the files inside a folder.
+/tests                export-ignore
+/tests/**             export-ignore
+/.github              export-ignore
+/.github/**           export-ignore
+/requirements-dev.txt export-ignore
+/ruff.toml            export-ignore
+/pytest.ini           export-ignore
+/.gitattributes       export-ignore
+/.gitignore           export-ignore

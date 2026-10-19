@@ -116,8 +116,9 @@ internet once. If you use `git`, run `git pull` instead.
 | [docs/fixing-after-a-merge.md](docs/fixing-after-a-merge.md) ([PDF](docs/VECTOR-fixing-after-a-merge.pdf)) | Checking changes before you push them |
 | [docs/field-test-2026-09-29.md](docs/field-test-2026-09-29.md) | Notes from the first search warrant VECTOR was used on |
 
-**Developers:** `pip install -r requirements-dev.txt`, then `ruff check .`
-and `pytest` before every push. See
+**Developers:** clone with `git`; the Download ZIP leaves out the tests
+and the developer tools. Then `pip install -r requirements-dev.txt`, and
+`ruff check .` and `pytest` before every push. See
 [docs/REFERENCE.md](docs/REFERENCE.md#how-the-code-is-laid-out).
 
 ---

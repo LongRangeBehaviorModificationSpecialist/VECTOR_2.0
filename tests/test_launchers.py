@@ -8,7 +8,11 @@ return with "$'\\r': command not found" -- and they are pinned in
 .gitattributes, which a rename leaves behind.
 """
 
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -107,3 +111,35 @@ def test_the_start_here_guide_shows_its_pictures():
 def test_the_launchers_point_at_the_start_here_guide_when_they_fail():
     for path in (WINDOWS, MAC_SCRIPT):
         assert "00 START HERE" in path.read_text(encoding="utf-8"), path.name
+
+
+# ----- The Download ZIP -----
+
+LEFT_OUT = [
+    "tests/conftest.py", ".github/workflows/tests.yml",
+    "requirements-dev.txt", "ruff.toml", "pytest.ini",
+]
+KEPT = [
+    "main.py", "requirements.txt", "Start VECTOR.bat", "Start VECTOR.sh",
+    "Start VECTOR.command", "00 START HERE/README.md",
+    "00 START HERE/VECTOR install guide.pdf",
+    "00 START HERE/Start VECTOR (Windows).bat",
+    "00 START HERE/Start VECTOR (Mac).command", "tools/make_shortcut.py",
+    "static/icons/vector.ico", "docs/REFERENCE.md",
+    "docs/images/install/sign-in.png", "parts/help_page.py",
+]
+
+
+def test_the_download_zip_leaves_out_only_what_developers_use():
+    """GitHub's Download ZIP honours export-ignore. An agent should get
+    everything that runs VECTOR and everything the guide shows, and
+    none of the tests or the CI setup."""
+    if not shutil.which("git") or not (ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
+    out = subprocess.run(
+        ["git", "check-attr", "export-ignore", "--", *LEFT_OUT, *KEPT],
+        cwd=ROOT, capture_output=True, text=True,
+    ).stdout
+    found = {line.split(": ")[0]: line.rsplit(": ", 1)[1] for line in out.splitlines()}
+    assert all(found[path] == "set" for path in LEFT_OUT), found
+    assert all(found[path] == "unspecified" for path in KEPT), found
