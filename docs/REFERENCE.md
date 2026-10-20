@@ -1,7 +1,5 @@
 # VECTOR Reference File
 
----
-
 Everything about installing, running and looking after VECTOR, in detail. Most people need less than this:
 
 - [README.md](../README.md) — what VECTOR is, and the short version of everything here.
@@ -15,8 +13,6 @@ Everything about installing, running and looking after VECTOR, in detail. Most p
 ---
 
 ## 1.0 Contents
-
----
 
 - [2.0 What It Does](#20-what-it-does)
 - [3.0 What Has Been Added](#30-what-has-been-added)
@@ -53,8 +49,6 @@ Everything about installing, running and looking after VECTOR, in detail. Most p
 
 ## 2.0 What It Does
 
----
-
 ***On scene***
 
 - **Case** — number, address, jurisdiction, and when the search began and ended.
@@ -81,8 +75,6 @@ Everything about installing, running and looking after VECTOR, in detail. Most p
 ---
 
 ## 3.0 What Has Been Added
-
----
 
 Everything the first version did, plus:
 
@@ -111,8 +103,6 @@ The fixes made after the second merge are explained step by step, with the comma
 ---
 
 ## 4.0 Quick Start
-
----
 
 With [Python 3.10 or newer](#requirements) installed, double-click the launcher in the project folder:
 
@@ -145,8 +135,6 @@ The sections below cover each step in full.
 
 ## 5.0 Requirements
 
----
-
 - **Python 3.10 or newer**
 - About 200 MB of disk for the virtual environment
 
@@ -169,8 +157,6 @@ brew install python
 ---
 
 ## 6.0 Install
-
----
 
 Clone the repository, then from inside the project folder:
 
@@ -200,15 +186,11 @@ No compiler is needed. Every dependency ships as a prebuilt wheel for Windows, I
 
 ### 6.1 Unit Branding
 
----
-
 The logos and the browser tab icon are not distributed with the source. See [`static/README.md`](../static/README.md) for the filenames. VECTOR runs without them — each page shows just its title.
 
 ---
 
 ## 7.0 Running The Application
-
----
 
 Double-click `Start VECTOR.bat` (on Windows) or `Start VECTOR.command` (on macOS). It sets up Python virtual environment (`.venv`) if it is missing, installs again if `requirements.txt` has changed since the last start — after an update, say — and then starts VECTOR. That install needs an internet connection; the 13-Oct-2026 update added one package, `filetype`, which reads what an uploaded file really is. From a terminal instead:
 
@@ -234,8 +216,6 @@ The first start also asks once whether to put a VECTOR shortcut on the desktop, 
 
 ### 7.1 First Run
 
----
-
 VECTOR creates its databases and prints a one-time administrator password:
 
 ```
@@ -253,8 +233,6 @@ Every password VECTOR issues — at first run, when an admin creates an account,
 ---
 
 ### 7.2 Upgrading An Existing Database
-
----
 
 If you already have databases from an earlier version, the first start after upgrading brings them up to date. Each database is copied to a timestamped `.bak` beside it before anything changes, and every step runs once:
 
@@ -288,8 +266,6 @@ Exports made by earlier versions, and by the upstream project, still import: old
 ---
 
 ## 8.0 Access From Another Device
-
----
 
 By default VECTOR listens on **loopback only** — it is not reachable from the network, and nothing on your Wi-Fi can see it.
 
@@ -339,8 +315,6 @@ Any device that reaches the port gets the login page, so several agents can work
 
 ### 8.1 Settings
 
----
-
 All optional, read from the environment:
 
 | Variable                      | Default     | Effect                                                        |
@@ -362,8 +336,6 @@ Three things are settings rather than environment variables, because they descri
 ---
 
 ## 9.0 Using The Application
-
----
 
 Work top to bottom; each step feeds the next.
 
@@ -395,8 +367,6 @@ The **Help** page inside VECTOR (top bar) explains all of this in short topics, 
 
 ### 9.1 Importing And Exporting Case Data
 
----
-
 **Export** offers two formats — or **Both** at once — downloaded through your browser and optionally sealed with an AES-256 password. The file arrives on whichever device you exported from, a tablet on `--lan` included, and lands wherever that browser saves downloads:
 
 | Format   | What it is                                                                  | Use it for                                           |
@@ -415,8 +385,6 @@ An import is all or nothing. If any part of the file cannot be read, nothing is 
 ---
 
 ## 10.0 Accounts & Sessions
-
----
 
 **Creating an account.** An admin enters a username in the Admin Panel and gets a one-time password back, shown once. The new account must change it at first sign-in and is never an admin.
 
@@ -446,8 +414,6 @@ Session state is persisted, so an invalidation survives a restart of the server.
 
 ## 11.0 The Audit Trail
 
----
-
 Every change to case data is recorded — creations, edits, deletions, bulk wipes, imports, exports, attachment downloads, setting changes, sign-outs, and both successful and failed logins — and so is every change to the accounts: one created, reset, unlocked or deleted, a password changed, Sign Everyone Out, and a shutdown. Those used to be missing, so who had reset a colleague's password was nowhere to be found. Admins read it at **Welcome => Audit Trail**, where the filter offers every kind of entry (a test checks that it does).
 
 Each entry records when (kept in UTC, shown in this machine's time zone), who, what action, which record, and the field-level before and after. Deletions keep the complete row, so a mis-click is recoverable from the trail even though the record is gone.
@@ -467,8 +433,6 @@ The trail is captured at the database layer rather than in each page, so a new s
 ---
 
 ## 12.0 How Data Is Protected
-
----
 
 Be clear about this before deciding where VECTOR runs.
 
@@ -498,8 +462,6 @@ By default the case database is ordinary SQLite: no password, not obfuscated. A 
 
 ## 13.0 Encrypting The Case Database
 
----
-
 Optional, and off until you turn it on. An existing install keeps working untouched.
 
 ```
@@ -514,8 +476,6 @@ Optional, and off until you turn it on. An existing install keeps working untouc
 
 ### 13.1 There Is No Recovery
 
----
-
 No reset, no backdoor, no key escrow. **If the passphrase is lost, the case is lost** — not delayed, lost. Record it somewhere your unit already trusts with credentials *before* you encrypt anything.
 
 The tool takes the passphrase twice, backs up each database to a timestamped `.plaintext-backup`, writes an encrypted copy, verifies it opens with the same row counts, and only then replaces the original. If anything fails, nothing is replaced.
@@ -525,8 +485,6 @@ Start VECTOR, confirm the case looks right, then delete the `.plaintext-backup` 
 ---
 
 ### 13.2 Supplying The Passphrase
-
----
 
 VECTOR needs it at every start, and takes the first of these it finds:
 
@@ -544,8 +502,6 @@ Set `VECTOR_REQUIRE_ENCRYPTION=1` to refuse to start on a plaintext database, so
 
 ### 13.3 What It Does And Does Not Protect
 
----
-
 **Protects.** A laptop lost, stolen or handed in for repair, and a backup copied somewhere it should not have gone. The file is unreadable without the passphrase.
 
 **Does not protect.** Anything while VECTOR is running and unlocked. The passphrase is in memory, reports render in the browser, and exports are written in the clear unless you encrypt those too. It is not a substitute for full-disk encryption, and it does nothing about a machine someone is sitting in front of.
@@ -553,8 +509,6 @@ Set `VECTOR_REQUIRE_ENCRYPTION=1` to refuse to start on a plaintext database, so
 ---
 
 ### 13.4 Going Back
-
----
 
 ```
 .venv/bin/python tools/decrypt_database.py
@@ -565,8 +519,6 @@ Converts back to plaintext, keeping the encrypted original as a backup. Worth kn
 ---
 
 ## 14.0 Known Limitations
-
----
 
 Read these before relying on VECTOR for a case that will be charged.
 
@@ -581,8 +533,6 @@ Read these before relying on VECTOR for a case that will be charged.
 ---
 
 ## 15.0 Troubleshooting
-
----
 
 **The launcher says "Python 3.10 or newer is needed".**  Install Python from [python.org](https://www.python.org/downloads/). On Windows, tick **"Add python.exe to PATH"** on the installer's first screen. Then double-click the launcher again.
 
@@ -624,8 +574,6 @@ Read these before relying on VECTOR for a case that will be charged.
 
 ## 16.0 Tests
 
----
-
 The tests and the developer tools are in a `git clone`. GitHub's **Download ZIP** leaves them out, along with the CI setup -- see `export-ignore` in `.gitattributes` -- because the download is what an agent installs from.
 
 ```
@@ -644,42 +592,40 @@ That workflow also runs `ruff check`, configured in [`ruff.toml`](../ruff.toml) 
 
 The suite exists because of a specific failure: a variable rename reached the models and the CRUD pages but not the report or export code, and every report returned HTTP 500 for an unknown period with nothing to catch it. Coverage is aimed at that class of bug — each report is rendered and asserted to contain the case number, and the export is round-tripped and compared row for row and byte for byte.
 
-| File                                 | Tests | Covers                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ------------------------------------ | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `test_modules_import.py`           |    38 | Every module imports: a page builder moved into a new file cannot break the application without failing here                                                                                                                                                                                                                                                                                                          |
-| `test_page_specs.py`               |    53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written                                                                                                                                                                                                              |
-| `test_order_dates_and_files.py`    |    29 | Reports and tables list items and rooms in order; renaming a room moves its evidence; impossible or half-typed dates are refused; attachment contents load only when read, and downloads keep their names                                                                                                                                                                                                             |
-| `test_times_and_numbers.py`        |    25 | Stamps carry this machine's time zone and offset, and UTC stamps already saved are rewritten once; both case times offer the fill button, and the end-time reminder never fills in a time before the start; typed text in a dropdown is kept; removing an item moves the later numbers down, audited                                                                                                                  |
-| `test_reports.py`                  |    37 | All eight reports render, carry the case header, and escape their values exactly once; the Files report prints upload times in local time; the printed date appears only when switched on, and the change is audited; the print window copies the report, not the page, names its report and case without letting a typed case number into its markup, and keeps a white page of its own                              |
-| `test_crypto.py`                   |    22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file                                                                                                                                                                                                                                                                                                  |
-| `test_json_export.py`              |    23 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected, a lower-case collection hash not mistaken for tampering; older and upstream layouts import                                                                                                                                                                                                                   |
-| `test_auth.py`                     |    20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account                                                                                                                                                                                                                                                                                                                    |
-| `test_accounts_and_sessions.py`    |    44 | A one-time password opens Change Password and nothing else, and replacing it signs the account's other devices out; a page whose session was ended cannot save, delete, upload or export, notices within seconds, and the sign-in page says why; the sign-in never pauses VECTOR's shared loop; made-up names drop off the failure list; every account change reaches the audit trail                                 |
-| `test_left_behind.py`              |    11 | An import that fails — a damaged manifest or archive, or something nobody foresaw — leaves no unpacked copy of the case in the temp folder, and says what happened; the start-up clean-up recognises one left by an older VECTOR; a run of the tests removes its own database folder                                                                                                                                |
-| `test_failures_and_live.py`        |    24 | Failures are explained without the SQL; a failed import leaves the case unchanged, and an import clears attachments the new case lacks; exports stop rather than leave attachments out, and one the audit trail cannot record is not handed over; edit dialogs open for values no longer on a list; saves, wipes and imports move the change signal, while reads do not, and a sign-in moves the trail's signal alone |
-| `test_numbering.py`                |    17 | Evidence numbering past item 9; room labels past Z                                                                                                                                                                                                                                                                                                                                                                    |
-| `test_validators.py`               |    20 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time; an upload's type comes from its content, so a program named .pdf is refused and a RAR archive is not                                                                                                                                                                                                           |
-| `test_export_import.py`            |    26 | CSV round trip preserves rows, bytes and provenance, including attachments sharing a name; encrypted archives; tampering detected, and a lower-case hash is the same hash; older and upstream archives import, including those with `SUSPECTNOTE` and `FILEHASHEDAT`, and one named `.ZIP`; any case number makes a file name Windows accepts; download staging is cleared                                      |
-| `test_active_case.py`              |    13 | Pages refuse to record without an open case; the Cases page still works; async handlers stay async                                                                                                                                                                                                                                                                                                                    |
-| `test_menu_rooms_and_passwords.py` |    13 | The page buttons and the menu share one list, and only administrators are offered Shutdown; a room without agents can be edited and survives a CSV round trip; a dropdown saved blank opens blank; an import knows when a file needs a password                                                                                                                                                                       |
-| `test_dates.py`                    |    12 | Old-format case times, birth dates and note times are rewritten once and audited; nothing else is touched                                                                                                                                                                                                                                                                                                             |
-| `test_logo_and_help.py`            |    21 | A missing logo is left out rather than shown broken, whether it is named by file name or by its /static address; every button the Help page names exists, every topic has a title and text, and the Room List's print-anyway option replaced the old rule; the dashed hover line on buttons is for a mouse only                                                                                                       |
-| `test_session_and_search.py`       |    19 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for, as can every other action VECTOR records; every table that grows offers a search box and the one-case page does not                                                                                                                         |
-| `test_network_setting.py`          |    28 | Network access is off until somebody turns it on and a damaged settings file reads as off; the flag opens it for one run and the setting from then on; the address given out is one another device could use, chosen from the adapter on the network this computer is on rather than VMware, Hyper-V, WSL or VPN adapters; and the change is recorded with who made it                                                |
-| `test_launchers.py`                |    12 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned; both offer the desktop shortcut once and cannot be held up by it; the Start files in 00 START HERE hand over to them, and the guide there finds every picture; the Download ZIP leaves out the tests and the developer tools and nothing else         |
-| `test_shortcut.py`                 |    14 | The icon files hold every size each system asks for, PNG only where Windows reads it; the Mac app is a complete bundle that opens the launcher in Terminal; the Linux entry starts VECTOR in a terminal; on Windows a real .lnk points at the launcher with the icon, and a blocked one says how to make it by hand; an unrelated VECTOR.app is never deleted, and a Linux entry survives any folder name             |
-| `test_migration.py`                |    13 | Old-schema databases — old names, old constraints — upgrade without losing a row, including the September renames of the person notes and hashing time; backups include the write-ahead log                                                                                                                                                                                                                         |
-| `test_audit_chain.py`              |    13 | Every entry is fingerprinted as it is written; an entry changed or removed afterwards is found and named; entries from before the chain are fingerprinted once by the upgrade, before anything else writes to the trail, and the check says which could not be checked                                                                                                                                                |
-| `test_audit.py`                    |     9 | Creates, edits, deletions, bulk wipes; blobs stay out of the log                                                                                                                                                                                                                                                                                                                                                      |
-| `test_entry_edges.py`              |    26 | Typed values are saved without surrounding spaces, so a trailing space cannot make a second agent; iPhone photographs (HEIC) are accepted; an agent roster that cannot be written is not a failed save; a phone number can be typed any way, a US one is saved as (703) 555-1234 with any extension, and anything else as typed                                                                                       |
-| `test_messages.py`                 |     5 | A failed save or import stays on screen until acknowledged, a confirmation fades, the wipe itself shows nothing, and no debugging note reaches a message                                                                                                                                                                                                                                                              |
-| `test_constraints.py`              |     8 | The constraints that were removed, and the four that must stay                                                                                                                                                                                                                                                                                                                                                        |
+| File | Tests | Covers |
+| ---- | ----- | ------ |
+| `test_modules_import.py` | 38 | Every module imports: a page builder moved into a new file cannot break the application without failing here |
+| `test_page_specs.py` | 53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written |
+| `test_order_dates_and_files.py` | 29 | Reports and tables list items and rooms in order; renaming a room moves its evidence; impossible or half-typed dates are refused; attachment contents load only when read, and downloads keep their names |
+| `test_times_and_numbers.py` | 25 | Stamps carry this machine's time zone and offset, and UTC stamps already saved are rewritten once; both case times offer the fill button, and the end-time reminder never fills in a time before the start; typed text in a dropdown is kept; removing an item moves the later numbers down, audited |
+| `test_reports.py` | 37 | All eight reports render, carry the case header, and escape their values exactly once; the Files report prints upload times in local time; the printed date appears only when switched on, and the change is audited; the print window copies the report, not the page, names its report and case without letting a typed case number into its markup, and keeps a white page of its own |
+| `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
+| `test_json_export.py` | 23 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected, a lower-case collection hash not mistaken for tampering; older and upstream layouts import |
+| `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
+| `test_accounts_and_sessions.py` | 44 | A one-time password opens Change Password and nothing else, and replacing it signs the account's other devices out; a page whose session was ended cannot save, delete, upload or export, notices within seconds, and the sign-in page says why; the sign-in never pauses VECTOR's shared loop; made-up names drop off the failure list; every account change reaches the audit trail |
+| `test_left_behind.py` | 11 | An import that fails — a damaged manifest or archive, or something nobody foresaw — leaves no unpacked copy of the case in the temp folder, and says what happened; the start-up clean-up recognises one left by an older VECTOR; a run of the tests removes its own database folder |
+| `test_failures_and_live.py` | 24 | Failures are explained without the SQL; a failed import leaves the case unchanged, and an import clears attachments the new case lacks; exports stop rather than leave attachments out, and one the audit trail cannot record is not handed over; edit dialogs open for values no longer on a list; saves, wipes and imports move the change signal, while reads do not, and a sign-in moves the trail's signal alone |
+| `test_numbering.py` | 17 | Evidence numbering past item 9; room labels past Z |
+| `test_validators.py` | 20 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time; an upload's type comes from its content, so a program named .pdf is refused and a RAR archive is not |
+| `test_export_import.py` | 26 | CSV round trip preserves rows, bytes and provenance, including attachments sharing a name; encrypted archives; tampering detected, and a lower-case hash is the same hash; older and upstream archives import, including those with `SUSPECTNOTE` and `FILEHASHEDAT`, and one named `.ZIP`; any case number makes a file name Windows accepts; download staging is cleared |
+| `test_active_case.py` | 13 | Pages refuse to record without an open case; the Cases page still works; async handlers stay async |
+| `test_menu_rooms_and_passwords.py` | 13 | The page buttons and the menu share one list, and only administrators are offered Shutdown; a room without agents can be edited and survives a CSV round trip; a dropdown saved blank opens blank; an import knows when a file needs a password |
+| `test_dates.py` | 12 | Old-format case times, birth dates and note times are rewritten once and audited; nothing else is touched |
+| `test_logo_and_help.py` | 21 | A missing logo is left out rather than shown broken, whether it is named by file name or by its /static address; every button the Help page names exists, every topic has a title and text, and the Room List's print-anyway option replaced the old rule; the dashed hover line on buttons is for a mouse only |
+| `test_session_and_search.py` | 19 | A session idle past the limit ends and one short of it warns, a timeout of zero never signs anyone out, an idle sign-out reaches the audit trail and can be filtered for, as can every other action VECTOR records; every table that grows offers a search box and the one-case page does not |
+| `test_network_setting.py` | 28 | Network access is off until somebody turns it on and a damaged settings file reads as off; the flag opens it for one run and the setting from then on; the address given out is one another device could use, chosen from the adapter on the network this computer is on rather than VMware, Hyper-V, WSL or VPN adapters; and the change is recorded with who made it |
+| `test_launchers.py` | 12 | Both macOS launchers are present, the double-clickable one hands over to the script, arguments pass through, and the line endings each system needs are pinned; both offer the desktop shortcut once and cannot be held up by it; the Start files in 00 START HERE hand over to them, and the guide there finds every picture; the Download ZIP leaves out the tests and the developer tools and nothing else |
+| `test_shortcut.py` | 14 | The icon files hold every size each system asks for, PNG only where Windows reads it; the Mac app is a complete bundle that opens the launcher in Terminal; the Linux entry starts VECTOR in a terminal; on Windows a real .lnk points at the launcher with the icon, and a blocked one says how to make it by hand; an unrelated VECTOR.app is never deleted, and a Linux entry survives any folder name |
+| `test_migration.py` | 13 | Old-schema databases — old names, old constraints — upgrade without losing a row, including the September renames of the person notes and hashing time; backups include the write-ahead log |
+| `test_audit_chain.py` | 13 | Every entry is fingerprinted as it is written; an entry changed or removed afterwards is found and named; entries from before the chain are fingerprinted once by the upgrade, before anything else writes to the trail, and the check says which could not be checked |
+| `test_audit.py` | 9 | Creates, edits, deletions, bulk wipes; blobs stay out of the log |
+| `test_entry_edges.py` | 26 | Typed values are saved without surrounding spaces, so a trailing space cannot make a second agent; iPhone photographs (HEIC) are accepted; an agent roster that cannot be written is not a failed save; a phone number can be typed any way, a US one is saved as (703) 555-1234 with any extension, and anything else as typed |
+| `test_messages.py` | 5 | A failed save or import stays on screen until acknowledged, a confirmation fades, the wipe itself shows nothing, and no debugging note reaches a message |
+| `test_constraints.py` | 8 | The constraints that were removed, and the four that must stay |
 
 ---
 
 ## 17.0 Demo Data
-
----
 
 A checkout ships with no case and no accounts; both are created on first run. To load a worked example instead — a fictional twelve-item search with agents, rooms, people and notes:
 
