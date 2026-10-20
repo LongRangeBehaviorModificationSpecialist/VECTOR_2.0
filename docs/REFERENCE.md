@@ -641,8 +641,6 @@ Everything it loads is invented: placeholder names, `example.invalid` addresses,
 
 ## 18.0 How The Code Is Laid Out
 
----
-
 ```
 00 START HERE/          the install guide (and its PDF), and both Start files
 Start VECTOR.bat        double-click launcher for Windows
@@ -681,8 +679,6 @@ docs/                   field-test notes, and the guide to the October fixes (Ma
 
 ### 18.1 Adding A Field To An Entity
 
----
-
 Entity pages are declarations, not code. To add a column, add it to the model in `models.py` and add one `Field` to that page's `SPEC` — the form input, the table column, the edit dialog and the delete confirmation all follow from it.
 
 ```python
@@ -696,8 +692,6 @@ Field("EVIDCONDITION", "Condition", kind="select",
 
 ### 18.2 Adding A Page
 
----
-
 Write the builder, then add one line to `PAGES` in `main.py`:
 
 ```python
@@ -710,8 +704,6 @@ The guard comes from that table. Writing it by hand per route is how `/admin` en
 
 ## 19.0 Development
 
----
-
 ```
 .venv/bin/python main.py --dev
 ```
@@ -721,8 +713,6 @@ Reloads on save. Note that a reload re-runs startup each time.
 ---
 
 ## 20.0 Credits
-
----
 
 VECTOR was created by **SSA M. Sponheimer**, Virginia State Police [NOVA/DC ICAC](https://novadcicac.vsp.virginia.gov/). The scene workflow — the lettered rooms, the separate witness, the return copy as its own report — comes from that original design.
 
