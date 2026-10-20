@@ -19,6 +19,7 @@ from typing import Callable
 
 from nicegui import ui
 
+from auth import require_session
 from failures import explain, log
 from models import get_session, has_active_case
 from parts.crud_widgets import (
@@ -58,8 +59,11 @@ def open_edit_dialog(
                 color="transparent",
             ).props("flat").classes("p-3 hover-border-blue")
 
+            # A dialog can stay open while the session it came from is
+            # ended; the save checks again.
+            @require_session
             def on_save_update() -> None:
-                values = _values_from(edit_widgets)
+                values = _values_from(edit_widgets, spec.fields)
 
                 if spec.validate(
                     stage="update",
@@ -162,6 +166,7 @@ def open_delete_dialog(
                 color="transparent",
             ).props("flat").classes("p-3 hover-border-blue")
 
+            @require_session
             def on_confirm_delete() -> None:
                 try:
                     with get_session() as session:
@@ -249,6 +254,7 @@ def delete_all_section(
                             color="transparent",
                         ).props("flat").classes("p-3 hover-border-blue")
 
+                        @require_session
                         def on_confirm_delete_all() -> None:
                             try:
                                 with get_session() as session:

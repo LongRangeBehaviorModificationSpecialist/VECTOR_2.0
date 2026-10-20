@@ -33,12 +33,13 @@ logging.basicConfig(
 )
 
 from auth import (
+    finish_password_change,
     get_current_user_name,
-    is_authenticated,
     require_admin,
     require_login,
+    signed_in_with_temporary_password,
 )
-from models import get_users_session
+from models import get_users_session, record_account_event
 import settings
 from program.config import (
     Config,
@@ -56,8 +57,8 @@ DEBUG_MODE = "--dev" in sys.argv
 # Loopback unless somebody opts in, so an install is never reachable from
 # the network by accident. Two ways to opt in: the setting an admin turns
 # on in the Admin Panel, which is what this machine does from then on,
-# and --lan, which opens it for this run only. See README "Access from
-# another device".
+# and --lan, which opens it for this run only. See "Access from another
+# device" in docs/REFERENCE.md.
 LAN_MODE = "--lan" in sys.argv
 HOST = settings.host_to_bind(LAN_MODE)
 settings.note_running_host(HOST)
@@ -403,7 +404,11 @@ def change_password_page():
 
     from models import get_users_session, Users
 
-    if not is_authenticated():
+    # Only for replacing a temporary password. A full sign-in has nothing
+    # to do here -- and a page that changed a password without asking for
+    # the current one would let anyone passing an unattended tablet lock
+    # its owner out.
+    if not signed_in_with_temporary_password():
         ui.navigate.to("/")
         return
 
@@ -453,21 +458,70 @@ def change_password_page():
                     )
                     return
 
-                # There is no shared default password to exclude any
-                # more; every issued password is unique to the account.
+                # The session may have ended since the page was drawn: an
+                # administrator reset the password again, or deleted the
+                # account.
+                if not signed_in_with_temporary_password():
+                    ui.navigate.to("/")
+                    return
 
                 with get_users_session() as session:
                     user = (
                         session.query(Users)
-                        .filter_by(USERNAME=username)
+                        .filter_by(USERNAME=username, ISACTIVE=True)
                         .first()
                     )
-                    if user:
+                    if user is None:
+                        changed = None
+                    elif user.check_password_correction(new_pass.value):
+                        # The temporary password typed again is not a
+                        # change.
+                        changed = False
+                    else:
                         user.set_password(new_pass.value)
                         user.MUSTCHANGEPASSWORD = False
+                        changed = {
+                            "Z_PK": user.Z_PK,
+                            "ISADMIN": bool(user.ISADMIN),
+                        }
+
+                if changed is None:
+                    ui.notify(
+                        "This account no longer exists. Ask an "
+                        "administrator.",
+                        type="warning",
+                        timeout=WARN_TIMEOUT,
+                        position="center",
+                        close_button="OK",
+                    )
+                    ui.navigate.to("/logout")
+                    return
+
+                if changed is False:
+                    ui.notify(
+                        "That is the temporary password. Choose a new "
+                        "one of your own.",
+                        type="warning",
+                        timeout=WARN_TIMEOUT,
+                        position="center",
+                        close_button="OK",
+                    )
+                    return
+
+                ended = finish_password_change(username, changed["ISADMIN"])
+                record_account_event(
+                    action="PASSWORD_CHANGED",
+                    row_pk=changed["Z_PK"],
+                    summary=f"{username} replaced a temporary password",
+                    actor=username,
+                )
 
                 ui.notify(
-                    "Password changed.",
+                    "Password changed."
+                    + ("" if ended else
+                       " Other devices signed in to this account could "
+                       "NOT be signed out; ask an administrator to use "
+                       "Sign Everyone Out."),
                     timeout=WARN_TIMEOUT,
                     position="bottom",
                     close_button="OK",
@@ -480,6 +534,14 @@ def change_password_page():
                 "Save Password",
                 on_click=save_new_password,
             ).props("push").classes("w-full mt-4 p-3 hover-border-white")
+
+            # Every other page sends a temporary password back here, so
+            # this is the way out for someone who is not ready to choose.
+            ui.button(
+                "Sign out instead",
+                on_click=lambda: ui.navigate.to("/logout"),
+                color="transparent",
+            ).props("flat").classes("w-full mt-2 p-3 hover-border-blue")
 
 
 # ----- Run -----

@@ -36,8 +36,22 @@ echo Installing the packages VECTOR needs...
 copy /y requirements.txt "%INSTALLED%" >nul
 
 :run
+rem The first start offers a desktop shortcut with VECTOR's icon, once.
+if not exist ".venv\shortcut.offered" call :offer_shortcut
 "%VENV_PY%" main.py %*
 if errorlevel 1 goto :failed
+exit /b 0
+
+
+:offer_shortcut
+rem No answer in 30 seconds counts as yes. Asked once either way; run
+rem tools\make_shortcut.py to make one later, or again after a move.
+echo.
+choice /c YN /t 30 /d Y /m "Put a VECTOR shortcut on the desktop"
+if errorlevel 2 goto :shortcut_offered
+"%VENV_PY%" tools\make_shortcut.py
+:shortcut_offered
+type nul > ".venv\shortcut.offered"
 exit /b 0
 
 
@@ -69,13 +83,13 @@ exit /b 1
 :install_failed
 echo.
 echo Installing the packages failed. Check the internet connection and try again.
-echo See "Troubleshooting" in README.md.
+echo See "If VECTOR does not start" in the guide in the "00 START HERE" folder.
 pause
 exit /b 1
 
 :failed
 echo.
 echo VECTOR stopped with an error. The message above says why.
-echo See "Troubleshooting" in README.md.
+echo See "If VECTOR does not start" in the guide in the "00 START HERE" folder.
 pause
 exit /b 1

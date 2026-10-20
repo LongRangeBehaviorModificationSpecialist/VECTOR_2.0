@@ -27,7 +27,12 @@ from auth import (
     invalidate_user_sessions,
     lockout_seconds_remaining,
 )
-from models import get_users_session, Users, generate_one_time_password
+from models import (
+    generate_one_time_password,
+    get_users_session,
+    record_account_event,
+    Users,
+)
 import settings
 from utils import (
     CONFIRM_TIMEOUT,
@@ -98,6 +103,15 @@ def add_user_card(refresh_users: Callable[[], None]) -> None:
                 one_time = generate_one_time_password()
                 new_user.set_password(one_time)
                 session.add(new_user)
+                session.flush()
+                new_pk = new_user.Z_PK
+
+            record_account_event(
+                action="USER_CREATED",
+                row_pk=new_pk,
+                summary=f"{uname} (not an admin; must change password)",
+                actor=get_current_user_name(),
+            )
 
             ui.notify(
                 f"User '{uname}' created.\n\n"
@@ -325,6 +339,7 @@ def users_table() -> Callable[[], None]:
                                             .first()
                                         )
 
+                                        one_time = None
                                         if user:
                                             one_time = (
                                                 generate_one_time_password()
@@ -332,12 +347,38 @@ def users_table() -> Callable[[], None]:
                                             user.set_password(one_time)
                                             user.MUSTCHANGEPASSWORD = True
 
+                                    if one_time is None:
+                                        # Deleted on another device while
+                                        # this dialog was open.
+                                        ui.notify(
+                                            f"'{row['USERNAME']}' no longer "
+                                            "exists, so nothing was reset.",
+                                            type="warning",
+                                            timeout=WARN_TIMEOUT,
+                                            position="center",
+                                            close_button="OK",
+                                        )
+                                        reset_dialog.close()
+                                        refresh_users_table()
+                                        return
+
                                     # A reset that leaves the old
                                     # session working is not a reset.
                                     ended = invalidate_user_sessions(
                                         row["USERNAME"]
                                     )
                                     clear_login_failures(row["USERNAME"])
+                                    record_account_event(
+                                        action="PASSWORD_RESET",
+                                        row_pk=row["Z_PK"],
+                                        summary=(
+                                            f"{row['USERNAME']}: a new "
+                                            "one-time password, sessions "
+                                            + ("ended" if ended else
+                                               "NOT ended")
+                                        ),
+                                        actor=get_current_user_name(),
+                                    )
 
                                     ui.notify(
                                         f"Password for "
@@ -446,6 +487,7 @@ def users_table() -> Callable[[], None]:
                                             delete_dialog.close()
                                             return
 
+                                        deleted = user is not None
                                         if user:
                                             session.delete(user)
 
@@ -456,6 +498,18 @@ def users_table() -> Callable[[], None]:
                                         row["USERNAME"]
                                     )
                                     clear_login_failures(row["USERNAME"])
+                                    if deleted:
+                                        record_account_event(
+                                            action="USER_DELETED",
+                                            row_pk=row["Z_PK"],
+                                            summary=(
+                                                f"{row['USERNAME']}, "
+                                                "sessions "
+                                                + ("ended" if ended else
+                                                   "NOT ended")
+                                            ),
+                                            actor=get_current_user_name(),
+                                        )
 
                                     ui.notify(
                                         f"User \"{row['USERNAME']}\" "
@@ -495,6 +549,12 @@ def users_table() -> Callable[[], None]:
                             return
 
                         clear_login_failures(row["USERNAME"])
+                        record_account_event(
+                            action="LOCK_CLEARED",
+                            row_pk=row["Z_PK"],
+                            summary=row["USERNAME"],
+                            actor=get_current_user_name(),
+                        )
                         ui.notify(
                             f"Sign-in lock cleared for "
                             f"'{row['USERNAME']}'.",
@@ -547,6 +607,9 @@ def session_controls() -> None:
                         if not get_is_admin():
                             ui.navigate.to("/")
                             return
+                        # Named before the sessions end: this admin's own
+                        # ends with them.
+                        admin_name = get_current_user_name()
                         if not invalidate_all_sessions():
                             ui.notify(
                                 "The sessions could NOT be ended. The "
@@ -559,6 +622,12 @@ def session_controls() -> None:
                             )
                             dialog.close()
                             return
+                        record_account_event(
+                            action="SIGN_OUT_ALL",
+                            table_name="(session)",
+                            summary="every session on every device ended",
+                            actor=admin_name,
+                        )
                         dialog.close()
                         ui.navigate.to("/")
 

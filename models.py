@@ -12,6 +12,7 @@ import clock
 from contextlib import contextmanager
 import hashlib
 import itertools
+import logging
 import secrets
 from datetime import datetime, timezone
 import json
@@ -446,13 +447,24 @@ class Users(UsersBase):
 
     def check_password_correction(self, attempted_password: str) -> bool:
         """Checks a plaintext password against the stored bcrypt hash."""
-        try:
-            return bcrypt.checkpw(
-                attempted_password.encode("utf-8"),
-                self.PASSWORDHASH.encode("utf-8"),
-            )
-        except (ValueError, TypeError):
-            return False
+        return password_matches(attempted_password, self.PASSWORDHASH)
+
+
+def password_matches(attempted_password: str, stored_hash: str) -> bool:
+    """Checks a plaintext password against a stored bcrypt hash.
+
+    Apart from the account itself so the sign-in page can run it in a
+    thread: bcrypt takes a quarter of a second by design, and on
+    VECTOR's own event loop that quarter second stopped every connected
+    device.
+    """
+    try:
+        return bcrypt.checkpw(
+            attempted_password.encode("utf-8"),
+            stored_hash.encode("utf-8"),
+        )
+    except (AttributeError, ValueError, TypeError):
+        return False
 
 
 class AuditLog(Base):
@@ -634,6 +646,44 @@ def record_audit(
             after=json.dumps(after, default=str) if after else None,
         )
     )
+
+
+def record_account_event(
+        action: str,
+        summary: str = "",
+        actor: str | None = None,
+        row_pk=None,
+        table_name: str = "users",
+) -> bool:
+    """Writes one account or session event to the audit trail: an
+    account created, reset, unlocked or deleted, a password changed, a
+    sign-out, Sign Everyone Out, a shutdown.
+
+    None of these used to reach the trail, which records everything else
+    -- so who created an account, or reset a colleague's password, was
+    nowhere to be found.
+
+    Accounts live in users.db and the trail in app_data.db, so the two
+    cannot share a transaction; this runs once the change has been made.
+    A trail that cannot be written is logged rather than undoing a
+    change already made. Returns False when it could not be written.
+    """
+    try:
+        with get_session() as session:
+            record_audit(
+                session,
+                action=action,
+                table_name=table_name,
+                row_pk=row_pk,
+                summary=summary,
+                actor=actor,
+            )
+    except Exception:
+        logging.getLogger("vector").exception(
+            "Could not record %s in the audit trail", action
+        )
+        return False
+    return True
 
 
 # Bound to the app_data sessionmaker specifically, not to Session as a

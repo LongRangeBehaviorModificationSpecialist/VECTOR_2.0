@@ -52,16 +52,16 @@ def _env_int(name: str, default: int) -> int:
 class Config:
     """Application metadata and runtime settings."""
 
-    version = "0.96"
+    version = "0.98"
     authors = "SSA M. Sponheimer & SuSA M. Brown"
     dept = "Virginia State Police -- NOVA/DC ICAC"
     url = "github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0"
-    updated = "15-Oct-2026"
+    updated = "19-Oct-2026"
 
     # ----- Network -----
     # Loopback by default: the app is not reachable from the network
-    # unless someone deliberately opts in. See README "Access from
-    # another device".
+    # unless someone deliberately opts in. See "Access from another
+    # device" in docs/REFERENCE.md.
     #   VECTOR_HOST=0.0.0.0  (or --lan) exposes it to the local network.
     HOST = os.environ.get("VECTOR_HOST", "127.0.0.1")
     PORT = _env_int("VECTOR_PORT", 8080)

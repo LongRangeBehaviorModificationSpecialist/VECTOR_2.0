@@ -185,7 +185,13 @@ def _clear_case_tables(session) -> None:
 # on `--lan` included -- and no copy is left on the host's Desktop. Imports
 # arrive the same way, as an upload. Neither is needed once the download or
 # the import has happened, so anything left for over an hour is removed.
-STAGING_PREFIXES = ("vector_export_", "vector_import_upload_")
+#
+# The two folders an import unpacks into are on the list as well
+# ("vector_import_" also covers the uploads). Each holds the whole case,
+# photographs included, unencrypted even when the export was not; an
+# import that failed part-way used to leave one behind for good, under a
+# name this clean-up did not recognise.
+STAGING_PREFIXES = ("vector_export_", "vector_import_", "vector_json_import_")
 # Set value to 1 hour (3,600 seconds)
 STAGING_MAX_AGE_SECONDS = 60 * 60
 
@@ -670,7 +676,21 @@ def import_vector_from_csv(
 
     # ----- Extract the zip to a temporary directory -----
     temp_dir = Path(tempfile.mkdtemp(prefix="vector_import_"))
+    try:
+        _import_csv_archive(zip_file, password, temp_dir)
+    finally:
+        # However the import ended -- finished, refused, or stopped by
+        # something nobody foresaw -- the unpacked case goes.
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
+
+def _import_csv_archive(
+        zip_file: Path,
+        password: Optional[str],
+        temp_dir: Path,
+) -> None:
+    """The CSV import itself, unpacking into temp_dir, which the caller
+    removes however this ends."""
     try:
         if password:
             # ----- Decrypt and extract -----
@@ -687,7 +707,6 @@ def import_vector_from_csv(
                     position="center",
                     close_button="OK",
                 )
-                shutil.rmtree(temp_dir, ignore_errors=True)
                 return
         else:
 
@@ -704,7 +723,6 @@ def import_vector_from_csv(
                     position="center",
                     close_button="OK",
                 )
-                shutil.rmtree(temp_dir, ignore_errors=True)
                 return
 
     except Exception as err:
@@ -713,7 +731,6 @@ def import_vector_from_csv(
             "is unchanged.",
             err,
         )
-        shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
     # ----- Check for manifest -----
@@ -732,8 +749,21 @@ def import_vector_from_csv(
         import_dir = temp_dir
 
     if manifest_path.exists():
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = json.load(f)
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+            if not isinstance(manifest, dict):
+                raise ValueError("the manifest is not a VECTOR manifest")
+        except (OSError, UnicodeDecodeError, ValueError) as err:
+            # A damaged file, or not a VECTOR export. This used to stop
+            # the import with no message at all.
+            _report_failure(
+                "That file's export_manifest.json could not be read, so "
+                "it cannot be imported. Nothing was imported, and the "
+                "case is unchanged.",
+                err,
+            )
+            return
         print(
             f"Importing from export dated: "
             f"{manifest.get('export_date', 'unknown')}"
@@ -762,7 +792,6 @@ def import_vector_from_csv(
             position="center",
             close_button="OK",
         )
-        shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
     # ----- Replace the case, all or nothing -----
@@ -891,7 +920,6 @@ def import_vector_from_csv(
             f"was in {stage}.",
             err,
         )
-        shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
     if hash_mismatches or unlisted_files:
@@ -922,9 +950,6 @@ def import_vector_from_csv(
     # An archive from before the date format changed would otherwise be
     # scrambled the first time someone edits a case time or a birth date.
     normalise_legacy_dates()
-
-    # ----- Clean up temporary directory -----
-    shutil.rmtree(temp_dir, ignore_errors=True)
 
     table_lines = " | ".join(imported_tables)
 
@@ -1243,8 +1268,6 @@ def import_vector_from_json(
     by the one in the export, so the receiving machine keeps its own
     history.
     """
-    from models import UploadedFiles
-
     source_path = Path(str(source).strip("\"'"))
     if not source_path.exists():
         ui.notify(
@@ -1256,18 +1279,36 @@ def import_vector_from_json(
         )
         return
 
-    staging = None
+    staging = (
+        Path(tempfile.mkdtemp(prefix="vector_json_import_"))
+        if source_path.suffix.lower() == ".zip" else None
+    )
+    try:
+        _import_json_file(source, source_path, password, staging)
+    finally:
+        # However the import ended, the unwrapped case goes.
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
+
+
+def _import_json_file(
+        source: str,
+        source_path: Path,
+        password: Optional[str],
+        staging: Optional[Path],
+) -> None:
+    """The JSON import itself. An archive is unwrapped into staging,
+    which the caller removes however this ends."""
+    from models import UploadedFiles
 
     # ----- Unwrap an encrypted archive -----
-    if source_path.suffix.lower() == ".zip":
-        staging = Path(tempfile.mkdtemp(prefix="vector_json_import_"))
+    if staging is not None:
         try:
             with pyzipper.AESZipFile(source_path, "r") as archive:
                 if password:
                     archive.setpassword(password.encode("utf-8"))
                 archive.extractall(staging)
         except RuntimeError:
-            shutil.rmtree(staging, ignore_errors=True)
             ui.notify(
                 "Could not open that archive. If it is encrypted, check "
                 "the password.",
@@ -1277,10 +1318,17 @@ def import_vector_from_json(
                 close_button="OK",
             )
             return
+        except Exception as err:
+            # A damaged archive: a bad checksum, a broken entry.
+            _report_failure(
+                "Could not open that archive; it may be damaged. Nothing "
+                "was imported, and the case is unchanged.",
+                err,
+            )
+            return
 
         candidates = list(staging.rglob("*.json"))
         if not candidates:
-            shutil.rmtree(staging, ignore_errors=True)
             ui.notify(
                 "No .json file inside that archive.",
                 type="warning",
@@ -1294,9 +1342,7 @@ def import_vector_from_json(
     try:
         with open(source_path, "r", encoding="utf-8") as handle:
             payload = json.load(handle)
-    except (json.JSONDecodeError, OSError) as err:
-        if staging:
-            shutil.rmtree(staging, ignore_errors=True)
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as err:
         ui.notify(
             f"Could not read that file → {err}.",
             type="warning",
@@ -1307,8 +1353,6 @@ def import_vector_from_json(
         return
 
     if not isinstance(payload, dict) or "tables" not in payload:
-        if staging:
-            shutil.rmtree(staging, ignore_errors=True)
         ui.notify(
             "That is not a VECTOR JSON export - it has no 'tables' "
             "section.",
@@ -1424,8 +1468,6 @@ def import_vector_from_json(
             )
 
     except Exception as err:
-        if staging:
-            shutil.rmtree(staging, ignore_errors=True)
         _report_failure(
             "Nothing was imported, and the case is unchanged. The problem "
             f"was in {stage}.",
@@ -1435,8 +1477,6 @@ def import_vector_from_json(
 
     normalise_legacy_dates()
 
-    if staging:
-        shutil.rmtree(staging, ignore_errors=True)
 
     if hash_mismatches:
         ui.notify(

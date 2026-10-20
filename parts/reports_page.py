@@ -51,7 +51,12 @@ from models import (
     UploadedFiles,
 )
 from navbar import build_navbar, unit_logo
-from auth import is_authenticated, get_current_user_name, get_is_admin
+from auth import (
+    get_current_user_name,
+    get_is_admin,
+    is_authenticated,
+    require_session,
+)
 from utils import (
     CASE_TIME_FORMAT,
     CONFIRM_TIMEOUT,
@@ -207,6 +212,7 @@ def _printed_date_switch() -> None:
     and every change is in the audit trail.
     """
 
+    @require_session
     def on_change(event) -> None:
         try:
             set_report_print_date(bool(event.value), get_current_user_name())
@@ -245,6 +251,7 @@ def _redact_agent_report() -> None:
     settings, and every change is in the audit trail.
     """
 
+    @require_session
     def on_change(event) -> None:
         try:
             set_redact_agent_report(bool(event.value), get_current_user_name())

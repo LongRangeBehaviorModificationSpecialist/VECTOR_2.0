@@ -29,11 +29,19 @@ ACTION_CHOICES = [
     "DOWNLOAD",
     "EXPORT",
     "IMPORT",
+    "LOCK_CLEARED",
     "LOGIN",
     "LOGIN_FAILED",
+    "LOGOUT",
     "LOGOUT_IDLE",
+    "PASSWORD_CHANGED",
+    "PASSWORD_RESET",
     "SETTING_CHANGED",
+    "SHUTDOWN",
+    "SIGN_OUT_ALL",
     "UPDATE",
+    "USER_CREATED",
+    "USER_DELETED",
 ]
 
 # A long case runs to thousands of entries, and all of them at once is a

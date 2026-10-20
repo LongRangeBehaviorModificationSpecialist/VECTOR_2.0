@@ -38,6 +38,52 @@ def test_a_value_that_is_not_text_is_left_alone():
     assert _values_from(_widgets(FILESIZE=12)) == {"FILESIZE": 12}
 
 
+# ----- Phone numbers -----
+
+@pytest.mark.parametrize("typed, saved", [
+    ("7035551234", "(703) 555-1234"),
+    ("703-555-1234", "(703) 555-1234"),
+    ("703.555.1234", "(703) 555-1234"),
+    ("(703) 555-1234", "(703) 555-1234"),
+    ("1-703-555-1234", "(703) 555-1234"),
+    ("+1 703 555 1234", "(703) 555-1234"),
+    ("703-555-1234 x12", "(703) 555-1234 x12"),
+    ("703 555 1234 ext. 4021", "(703) 555-1234 x4021"),
+    ("(703) 555-1234 extension 7", "(703) 555-1234 x7"),
+])
+def test_a_us_number_is_saved_one_way(typed, saved):
+    assert utils.format_phone(typed) == saved
+
+
+@pytest.mark.parametrize("typed", [
+    "555-0101",              # seven digits: saved before the mask existed
+    "+44 20 7946 0958",      # a foreign number
+    "4021",                  # an internal line
+    "703-555-CALL",          # letters
+    "see dispatch",
+])
+def test_anything_else_is_kept_as_typed(typed):
+    assert utils.format_phone(typed) == typed
+
+
+def test_the_phone_field_takes_any_number_and_tidies_it_on_save():
+    """A mask forced exactly ten digits: no extensions, no foreign
+    numbers, and 555-0101 shown as "(555) 010-1" in the edit dialog."""
+    phone = next(f for f in agents_page.SPEC.fields if f.name == "AGENTPHONE")
+    assert "mask" not in phone.props
+    assert phone.tidy is utils.format_phone
+    values = _values_from(
+        _widgets(AGENTPHONE=" 703 555 1234 x12 ", AGENTNAME="Doe, John"),
+        agents_page.SPEC.fields,
+    )
+    assert values == {"AGENTPHONE": "(703) 555-1234 x12", "AGENTNAME": "Doe, John"}
+
+
+def test_an_empty_phone_stays_empty():
+    values = _values_from(_widgets(AGENTPHONE=""), agents_page.SPEC.fields)
+    assert values == {"AGENTPHONE": ""}
+
+
 def test_a_trailing_space_no_longer_makes_a_second_agent(case):
     """"Doe, John " passed the duplicate check beside "Doe, John", because
     the check trimmed and the save did not."""

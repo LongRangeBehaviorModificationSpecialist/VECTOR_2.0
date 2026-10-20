@@ -26,6 +26,7 @@ from typing import Callable, Optional
 
 from nicegui import ui
 
+from auth import require_session
 from failures import explain, log
 from live import refresh_on_change
 from models import get_session
@@ -149,7 +150,12 @@ def build_crud_page(spec: CrudSpec) -> None:
 
     # Records belong to a case. The Cases page is the exception: it is
     # where a case is opened, so it has to work before one exists.
-    guard = require_active_case if spec.requires_case else (lambda f: f)
+    case_guard = require_active_case if spec.requires_case else (lambda f: f)
+
+    # And every action needs a session that is still current: a page left
+    # open after its account was deleted kept saving under that name.
+    def guard(handler):
+        return require_session(case_guard(handler))
 
     # Column names as the page shows them, for explaining a failed save.
     labels = {f.name: f.label for f in spec.fields}
@@ -271,7 +277,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                     widget.value = ""
 
         def _submit() -> None:
-            values = _values_from(form_widgets)
+            values = _values_from(form_widgets, spec.fields)
 
             if spec.on_before_create:
                 spec.on_before_create(values)

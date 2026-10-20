@@ -15,3 +15,19 @@ scene.
 
 A logo appears on the next page load. The browser tab icon is picked up
 when VECTOR is restarted.
+
+## VECTOR's own icon
+
+`icons/` holds the icon the desktop shortcut uses
+(`tools/make_shortcut.py`): a white "V" on the app's blue.
+
+| File                   | Used for                                          |
+|------------------------|---------------------------------------------------|
+| `icons/vector.svg`     | The drawing, for Windows and Linux                |
+| `icons/vector-mac.svg` | The same mark on Apple's icon grid                |
+| `icons/vector.ico`     | Windows: 16 to 256 px                             |
+| `icons/vector.icns`    | macOS: 16 to 1024 px, Retina sizes included       |
+| `icons/vector-256.png` | Linux                                             |
+| `icons/vector-512.png` | Anywhere a large picture of the icon is needed    |
+
+These are distributed with VECTOR, unlike the unit branding above.

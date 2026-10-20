@@ -18,7 +18,7 @@ import pytest
 import import_export
 import navbar
 import utils
-from home_page import HELP_TEXT
+from parts.help_page import HELP_TEXT
 
 
 @pytest.fixture

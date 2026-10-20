@@ -538,6 +538,37 @@ def is_allowed_file(mime_type: str) -> bool:
     return mime_type in ALLOWED_MIME_TYPES
 
 
+# An extension at the end of a number: "x12", "ext. 12", "extension 12".
+_PHONE_EXTENSION = re.compile(r"\s*(?:x|ext\.?|extension)\s*(\d+)\s*$", re.IGNORECASE)
+
+
+def format_phone(text: str) -> str:
+    """A phone number as it is saved.
+
+    A US number -- ten digits, or eleven starting with 1 -- is written
+    the one way, (703) 555-1234, with any extension kept after it as
+    x12. Anything else -- a foreign number, a four-digit internal line,
+    a number with letters in it -- is kept exactly as typed. A mask on
+    the field used to force ten digits, which refused extensions and
+    foreign numbers and showed a number saved earlier, 555-0101, as
+    "(555) 010-1".
+    """
+    text = (text or "").strip()
+    match = _PHONE_EXTENSION.search(text)
+    number, extension = (
+        (text[:match.start()], match.group(1)) if match else (text, "")
+    )
+    if not number or re.search(r"[^\d\s().+\-]", number):
+        return text
+    digits = re.sub(r"\D", "", number)
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if len(digits) != 10:
+        return text
+    formatted = f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+    return f"{formatted} x{extension}" if extension else formatted
+
+
 def format_file_size(size_bytes: int) -> str:
     """Formats file size into human-readable format."""
     if size_bytes < 1024:

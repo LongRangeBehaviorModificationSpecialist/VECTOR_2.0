@@ -17,7 +17,7 @@ cd "$(dirname "$0")" || exit 1
 fail() {
     echo
     echo "$1"
-    echo "See \"Troubleshooting\" in README.md."
+    echo "See \"If VECTOR does not start\" in the guide in the \"00 START HERE\" folder."
     read -r -p "Press Return to close this window. " _
     exit 1
 }
@@ -44,6 +44,20 @@ if ! cmp -s requirements.txt .venv/requirements.installed; then
     .venv/bin/python -m pip install --disable-pip-version-check -r requirements.txt ||
         fail "Installing the packages failed. Check the internet connection and try again."
     cp requirements.txt .venv/requirements.installed
+fi
+
+# The first start offers a desktop shortcut with VECTOR's icon, once. No
+# answer in 30 seconds counts as yes. Run tools/make_shortcut.py to make
+# one later, or again after the folder moves.
+if [ ! -f .venv/shortcut.offered ]; then
+    echo
+    read -r -t 30 -p "Put a VECTOR shortcut on the desktop? [Y/n] " answer || answer=""
+    echo
+    case "$answer" in
+        [Nn]*) ;;
+        *) .venv/bin/python tools/make_shortcut.py ;;
+    esac
+    : > .venv/shortcut.offered
 fi
 
 .venv/bin/python main.py "$@" ||

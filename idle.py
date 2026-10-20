@@ -27,7 +27,7 @@ Imports nothing from the pages that use it.
 
 from nicegui import ui
 
-from auth import sign_out
+from auth import is_authenticated, leave_ended_session, sign_out
 from failures import log
 from models import get_session, record_audit
 from program.config import Config
@@ -203,3 +203,24 @@ def sign_out_when_idle(username: str = "") -> ui.timer | None:
             close_warning()
 
     return ui.timer(CHECK_EVERY_SECONDS, check)
+
+
+# ----- A session ended somewhere else -----
+# Read from the server's own record of the session, with no question to
+# the browser, so it can be asked often.
+CHECK_SESSION_EVERY_SECONDS = 5.0
+
+
+def leave_when_signed_out() -> ui.timer:
+    """Takes this page to the sign-in page once its session has ended.
+
+    Deleting an account, resetting its password and Sign Everyone Out
+    each end sessions at once, but a page already open used to carry on
+    -- listing, saving and deleting -- until somebody moved off it. Runs
+    whatever the idle timeout, which can be turned off.
+    """
+    def check() -> None:
+        if not is_authenticated():
+            leave_ended_session()
+
+    return ui.timer(CHECK_SESSION_EVERY_SECONDS, check)

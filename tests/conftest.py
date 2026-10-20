@@ -8,6 +8,7 @@ suite works against a temporary database and never touches db/.
 """
 
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -55,6 +56,18 @@ def _create_schema():
     models.Base.metadata.create_all(models.engine)
     models.UsersBase.metadata.create_all(models.users_engine)
     yield
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Removes this run's database folder once the run is over.
+
+    Nothing did, so every run left one in the temp folder: about three
+    hundred of them, 134 MB, by October. The connections are closed
+    first, since Windows will not delete a database file still open.
+    """
+    models.engine.dispose()
+    models.users_engine.dispose()
+    shutil.rmtree(_TEST_DB_DIR, ignore_errors=True)
 
 
 @pytest.fixture(autouse=True)
