@@ -15,6 +15,7 @@ and left report routes unregistered until someone happened to visit
 
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from inspect import iscoroutinefunction
 import logging
 from utils import WARN_TIMEOUT
 
@@ -51,8 +52,13 @@ FAILURE_WINDOW_MINUTES = 30
 # writers further down are different -- a failure there means an admin
 # is told a session ended when it did not, so those are logged and
 # reported to the caller.
-def is_authenticated() -> bool:
-    """Checks if the current user is signed in (defaults to False).
+def _session_store():
+    """This browser's own storage. Raises outside a browser request."""
+    return app.storage.user
+
+
+def _signed_in() -> bool:
+    """Whether this browser signed in, with a session still current.
 
     A session is valid only while the generation counters it was
     stamped with at sign-in still match. That is what lets an admin end
@@ -60,23 +66,20 @@ def is_authenticated() -> bool:
     its session working until the browser closed.
     """
     try:
-        if not app.storage.user.get("authenticated", False):
+        store = _session_store()
+        if not store.get("authenticated", False):
             return False
 
-        if app.storage.user.get("session_generation", 0) < (
-            global_generation()
-        ):
+        if store.get("session_generation", 0) < global_generation():
             return False
 
-        user_name = app.storage.user.get("USERNAME", "")
+        user_name = store.get("USERNAME", "")
         # A session stored before the keys were renamed has no USERNAME.
         # Treat it as signed out rather than letting it through nameless.
         if not user_name:
             return False
 
-        if app.storage.user.get("user_generation", 0) < user_generation(
-            user_name
-        ):
+        if store.get("user_generation", 0) < user_generation(user_name):
             return False
 
         return True
@@ -85,45 +88,179 @@ def is_authenticated() -> bool:
         return False
 
 
+def password_change_pending() -> bool:
+    """Whether this session signed in with a temporary password that has
+    not been replaced yet."""
+    try:
+        return bool(_session_store().get("must_change_password", False))
+    except Exception:
+        # No request in scope; see the note above.
+        return False
+
+
+def is_authenticated() -> bool:
+    """Checks if the current user is signed in (defaults to False).
+
+    A temporary password -- a new account's, or one an administrator
+    has just reset -- does not count. It opens one page, Change
+    Password. It used to be a full sign-in: the change was offered once,
+    and Home, or any page typed into the address bar, carried on without
+    it, so a temporary password could stay in use for good.
+    """
+    return _signed_in() and not password_change_pending()
+
+
+def signed_in_with_temporary_password() -> bool:
+    """Signed in, but only to replace a temporary password."""
+    return _signed_in() and password_change_pending()
+
+
+def where_to_sign_in() -> str:
+    """The page for a browser that is not fully signed in."""
+    return "/change-password" if signed_in_with_temporary_password() else "/"
+
+
 def get_current_user_name() -> str:
     """Gets the current username (defaults to empty)."""
     try:
-        return app.storage.user.get("USERNAME", "")
+        return _session_store().get("USERNAME", "")
     except Exception:
         # No request in scope; see the note above.
         return ""
 
 
 def get_is_admin() -> bool:
-    """Checks if the current user is an admin (defaults to False)."""
+    """Checks if the current user is an admin (defaults to False).
+
+    Only while the session is current. An administrator's page left
+    open after Sign Everyone Out, or after a password reset, could
+    otherwise still create, reset and delete accounts.
+    """
+    if not is_authenticated():
+        return False
     try:
-        return app.storage.user.get("ISADMIN", False)
+        return bool(_session_store().get("ISADMIN", False))
     except Exception:
         # No request in scope; see the note above.
         return False
 
 
-def sign_in(user_name: str, is_admin: bool) -> None:
+def sign_in(
+        user_name: str,
+        is_admin: bool,
+        must_change_password: bool = False,
+) -> None:
     """Records a successful authentication in the session.
 
     The generation counters are stamped here and checked on every
     request, which is what makes it possible to sign a user out
-    remotely -- see invalidate_user_sessions().
+    remotely -- see invalidate_user_sessions(). With
+    must_change_password the session opens Change Password and nothing
+    else, until finish_password_change().
     """
-    app.storage.user["authenticated"] = True
-    app.storage.user["USERNAME"] = user_name
-    app.storage.user["ISADMIN"] = is_admin
-    app.storage.user["session_generation"] = global_generation()
-    app.storage.user["user_generation"] = user_generation(user_name)
+    store = _session_store()
+    store["authenticated"] = True
+    store["USERNAME"] = user_name
+    store["ISADMIN"] = is_admin
+    store["must_change_password"] = bool(must_change_password)
+    store["session_ended_notice"] = False
+    store["session_generation"] = global_generation()
+    store["user_generation"] = user_generation(user_name)
+
+
+def finish_password_change(user_name: str, is_admin: bool) -> bool:
+    """Makes this session a full sign-in once a temporary password has
+    been replaced.
+
+    Every other session of the account ends first -- including one
+    opened somewhere else with the same temporary password, which could
+    otherwise set a password of its own over this one. Returns False
+    when those sessions could not be ended.
+    """
+    ended = invalidate_user_sessions(user_name)
+    sign_in(user_name, is_admin)
+    return ended
 
 
 def sign_out() -> None:
     """Clears the session."""
-    app.storage.user["authenticated"] = False
-    app.storage.user["USERNAME"] = ""
-    app.storage.user["ISADMIN"] = False
-    app.storage.user["session_generation"] = 0
-    app.storage.user["user_generation"] = 0
+    store = _session_store()
+    store["authenticated"] = False
+    store["USERNAME"] = ""
+    store["ISADMIN"] = False
+    store["must_change_password"] = False
+    store["session_generation"] = 0
+    store["user_generation"] = 0
+
+
+# ----- A page whose session has ended -----
+# Ending a session -- deleting the account, resetting its password, Sign
+# Everyone Out -- stopped the next page load, but a page already open
+# kept working: it saved, deleted and uploaded until somebody moved off
+# it, under the name of an account that might no longer exist. Each page
+# now notices within a few seconds (see idle.py), and every save,
+# delete, upload, import and export checks before it acts.
+def note_session_ended() -> None:
+    """Leaves word for the sign-in page that this device was signed out,
+    so it can say so rather than simply appearing.
+
+    Only for a session ended from elsewhere, which still reads as signed
+    in here. Logout and the idle timeout clear the session themselves,
+    and someone who pressed Logout needs no explanation.
+    """
+    try:
+        store = _session_store()
+        if store.get("authenticated", False):
+            store["session_ended_notice"] = True
+    except Exception:
+        # No request in scope; see the note above.
+        pass
+
+
+def take_session_ended_notice() -> bool:
+    """Whether this device was just signed out; asking clears it."""
+    try:
+        store = _session_store()
+        noticed = bool(store.get("session_ended_notice", False))
+        if noticed:
+            store["session_ended_notice"] = False
+        return noticed
+    except Exception:
+        # No request in scope; see the note above.
+        return False
+
+
+def leave_ended_session() -> None:
+    """Sends a page whose session has ended to the sign-in page."""
+    note_session_ended()
+    ui.navigate.to(where_to_sign_in())
+
+
+def require_session(handler):
+    """Refuses an action from a page whose session has ended.
+
+    For the handlers behind buttons, not for pages: a route checks the
+    session as it is drawn, with require_login. An async handler -- the
+    file upload -- stays async, so NiceGUI still awaits it.
+    """
+    if iscoroutinefunction(handler):
+        @wraps(handler)
+        async def async_guarded(*args, **kwargs):
+            if not is_authenticated():
+                leave_ended_session()
+                return None
+            return await handler(*args, **kwargs)
+
+        return async_guarded
+
+    @wraps(handler)
+    def guarded(*args, **kwargs):
+        if not is_authenticated():
+            leave_ended_session()
+            return None
+        return handler(*args, **kwargs)
+
+    return guarded
 
 
 # ----- Session invalidation -----
@@ -232,9 +369,38 @@ def failure_delay_seconds(user_name: str) -> float:
     return min(2.0, 0.5 * (count - SLOW_AFTER_FAILURES + 1))
 
 
+def _expired(record, now: datetime) -> bool:
+    """Whether a failure record no longer counts for anything: its
+    failures have aged out, and any lock it set has run out."""
+    try:
+        first_seen = datetime.fromisoformat(record.get("first_seen", ""))
+        if now - first_seen <= timedelta(minutes=FAILURE_WINDOW_MINUTES):
+            return False
+        locked_until = record.get("locked_until")
+        return not locked_until or datetime.fromisoformat(locked_until) <= now
+    except (AttributeError, TypeError, ValueError):
+        # Unreadable, so it can neither slow nor lock anybody.
+        return True
+
+
+def _without_expired(failures: dict) -> dict:
+    """The failure records that still count.
+
+    Every name ever tried used to stay on the list, and a name that was
+    never an account is never cleared by a successful sign-in -- so
+    anyone who could reach the port could grow it without limit, by
+    trying made-up names.
+    """
+    now = _now()
+    return {
+        name: record for name, record in failures.items()
+        if not _expired(record, now)
+    }
+
+
 def record_login_failure(user_name: str) -> int:
     """Counts one failed attempt. Returns the new failure count."""
-    failures = _failures()
+    failures = _without_expired(_failures())
     record = failures.get(user_name, {})
 
     # Failures age out, so an account is not locked by attempts spread
@@ -282,7 +448,7 @@ def require_login(page_builder):
     @wraps(page_builder)
     def guarded(*args, **kwargs):
         if not is_authenticated():
-            ui.navigate.to("/")
+            ui.navigate.to(where_to_sign_in())
             return None
         return page_builder(*args, **kwargs)
 
@@ -295,7 +461,7 @@ def require_admin(page_builder):
     @wraps(page_builder)
     def guarded(*args, **kwargs):
         if not is_authenticated():
-            ui.navigate.to("/")
+            ui.navigate.to(where_to_sign_in())
             return None
         if not get_is_admin():
             ui.notify(

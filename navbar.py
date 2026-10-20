@@ -16,7 +16,7 @@ the same question.
 from nicegui import ui
 
 from auth import is_authenticated
-from idle import sign_out_when_idle
+from idle import leave_when_signed_out, sign_out_when_idle
 from live import refresh_on_change
 from models import check_case_info
 from program.config import STATIC_DIR
@@ -197,8 +197,10 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
             return
 
         # Every signed-in page draws this bar, so this is the one place
-        # that has to watch for a device nobody is using.
+        # that has to watch for a device nobody is using -- and for a
+        # session ended from another device.
         sign_out_when_idle(username)
+        leave_when_signed_out()
 
         # ----- Pages: a row of buttons on a wide screen... -----
         with ui.row().classes("nav-wide items-center gap-0 no-wrap"):

@@ -101,6 +101,8 @@ def _on_screen_text() -> str:
     sources = [
         (ROOT / "navbar.py").read_text(encoding="utf-8"),
         (ROOT / "idle.py").read_text(encoding="utf-8"),
+        # The Change Password page.
+        (ROOT / "main.py").read_text(encoding="utf-8"),
     ]
     sources += [
         path.read_text(encoding="utf-8")

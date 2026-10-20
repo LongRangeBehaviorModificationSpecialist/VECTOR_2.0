@@ -20,6 +20,7 @@ from pathlib import Path
 
 from nicegui import ui
 
+from auth import require_session
 from failures import explain, log
 from import_export import (
     export_vector_to_csv,
@@ -98,6 +99,7 @@ def open_export_dialog() -> None:
             "value",
         )
 
+        @require_session
         def do_export():
             pwd = (
                 password_input.value
@@ -246,6 +248,7 @@ def open_import_dialog() -> None:
         password_note.set_visibility(False)
         password_input.set_visibility(False)
 
+        @require_session
         def do_import():
             path = picked["path"]
             if path is None:
@@ -286,6 +289,22 @@ def open_import_dialog() -> None:
                     import_vector_from_csv(
                         str(path), password=pwd
                     )
+            except Exception as err:
+                # The importers explain every failure they expect. This is
+                # for one they did not, which used to end the import with
+                # nothing on screen at all.
+                log.exception("The import stopped unexpectedly")
+                ui.notify(
+                    "The import stopped with a problem VECTOR did not "
+                    "expect. Look over the case before relying on it."
+                    f"\n\n{explain(err)}",
+                    multi_line=True,
+                    classes="multi-line-notification",
+                    type="warning",
+                    timeout=ZERO_TIMEOUT,
+                    position="center",
+                    close_button="OK",
+                )
             finally:
                 discard_picked()
 
@@ -350,6 +369,7 @@ def open_delete_all_dialog() -> None:
             "value",
         )
 
+        @require_session
         def do_delete():
             if not affirm_checkbox.value:
                 ui.notify(

@@ -163,10 +163,13 @@ not a hotel's or the venue's Wi-Fi.
 
     ("lock", "Accounts and passwords", f"""
 - An administrator adds accounts in **Admin Panel** (account menu, top
-  right). A new password is shown once: write it down. The person
-  changes it the first time they sign in.
+  right). A new password is shown once: write it down. The first time
+  the person signs in, VECTOR shows **Change Password** and nothing
+  else until they choose a password of their own.
 - Forgotten password: an administrator presses **Reset** next to the
-  account and gives them the new one.
+  account and gives them the new one. It works the same way.
+- Choosing a new password signs out any other device that was signed
+  in to the account.
 - After {LOCK_AFTER_FAILURES} wrong passwords an account is locked for
   {LOCKOUT_MINUTES} minutes. An administrator can clear the lock sooner.
 - A device nobody touches for {Config.SESSION_IDLE_MINUTES} minutes signs
@@ -174,15 +177,17 @@ not a hotel's or the venue's Wi-Fi.
   Anything already saved is kept; a form you were still filling in is
   lost, so save before you walk away.
 - A device has gone missing? **Sign Everyone Out** in the Admin Panel
-  ends every session at once.
+  ends every session at once. A page left open on any device goes back
+  to the sign-in page within seconds, and saves nothing more.
 - Sign out with **Logout** in the account menu.
 """),
 
     ("history", "Audit Trail", """
 - Administrators: account menu, then **Audit Trail**.
-- It records every change, sign-in, export and download: who, when, and
-  what changed. Nothing in VECTOR can edit or delete an entry, not even
-  an administrator.
+- It records every change, sign-in, sign-out, export and download, and
+  every account an administrator adds, resets, unlocks or deletes: who,
+  when, and what changed. Nothing in VECTOR can edit or delete an entry,
+  not even an administrator.
 - Choose an action to filter by, or search for a name or an item.
 - **Check the trail** confirms no entry has been altered outside VECTOR
   since it was written.

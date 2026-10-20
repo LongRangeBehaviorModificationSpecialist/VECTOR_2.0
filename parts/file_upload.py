@@ -26,7 +26,7 @@ from models import (
     UploadedFiles,
 )
 from program.config import Config
-from auth import get_current_user_name
+from auth import get_current_user_name, require_session
 from utils import (
     WARN_TIMEOUT,
     ZERO_TIMEOUT,
@@ -49,6 +49,7 @@ def upload_card(refresh_files: Callable[[], None]) -> None:
             "and (4) Archive files."
         ).classes("text-sm text-gray-400 mb-2")
 
+        @require_session
         @require_active_case
         async def handle_upload(e) -> None:
             """Handles file upload from ui.upload component."""

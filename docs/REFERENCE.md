@@ -8,7 +8,7 @@ detail. Most people need less than this:
 - [00 START HERE](../00%20START%20HERE/) — installing it, step by step, with pictures.
 - The **Help** page inside VECTOR — using it at a scene.
 
-`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `540 tests`
+`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `595 tests`
 
 ---
 
@@ -90,7 +90,7 @@ Everything the first version did, plus:
 | **Maintainability** | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard |
 | **Touch screens** | Raised buttons drawn cleanly on an iPad, with no hover border left behind by a tap; the print window's Print and Close buttons sized for a finger, in a bar that names the report and stays readable on a laptop in dark mode |
 | **Install** | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder |
-| **Tests** | 540 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
+| **Tests** | 595 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption |
 
 It also carries the original project's most recent work — JSON export,
 the active-case badge and guard, the capitalised column names, the
@@ -532,6 +532,16 @@ says which table the problem was in.
 and gets a one-time password back, shown once. The new account must
 change it at first sign-in and is never an admin.
 
+**A one-time password opens one page.** Until it is replaced, it opens
+Change Password and nothing else: every other page, and every attachment
+download, sends it back there. It used to be a full sign-in once that
+page was skipped — Home, or any address typed in, carried on without the
+change. The one-time password typed again is refused, and choosing a new
+one ends every other session the account has open, so a second device
+signed in with the same one-time password cannot set a password over it.
+Change Password is for that and nothing else; a signed-in user is sent
+away from it.
+
 **Resetting one.** The reset button issues a fresh one-time password,
 ends every session that account has open, and clears any sign-in lock.
 A reset that left the old session working would not be a reset.
@@ -539,8 +549,14 @@ A reset that left the old session working would not be a reset.
 **Failed sign-ins.** After three failures VECTOR starts pausing before
 each attempt, and after ten it locks the account for fifteen minutes.
 Failures older than thirty minutes are forgotten, so attempts spread
-across a shift never accumulate into a lock. Every attempt — successful
-or not — is in the audit trail.
+across a shift never accumulate into a lock, and a name that was never
+an account is dropped from the list once its failures have aged out.
+Every attempt — successful or not — is in the audit trail.
+
+The pause holds up that sign-in and nothing else, and so does the
+password check itself, which bcrypt makes take a quarter of a second on
+purpose. Both used to run on the loop that serves every device, so each
+wrong password stopped every tablet at the scene for up to two seconds.
 
 The numbers are deliberately forgiving. An agent mistyping a password
 at 3am on a scene must not be shut out of evidence logging.
@@ -566,6 +582,14 @@ ends every session on every device at once. Use it when a device goes
 missing, or when someone leaves the team. Deleting or resetting a single
 account signs out only that account.
 
+**A page already open notices.** Ending a session used to stop only the
+next page load: a page already open kept saving, deleting and uploading
+until somebody moved off it, under the name of an account that might no
+longer exist. Now each page checks every five seconds and goes to the
+sign-in page, which says the device was signed out. Every save, delete,
+upload, import and export checks as well before it acts, so nothing gets
+in during those five seconds either.
+
 Session state is persisted, so an invalidation survives a restart of the
 server.
 
@@ -575,7 +599,11 @@ server.
 
 Every change to case data is recorded — creations, edits, deletions,
 bulk wipes, imports, exports, attachment downloads, setting changes,
-idle sign-outs, and both successful and failed logins. Admins read it at
+sign-outs, and both successful and failed logins — and so is every
+change to the accounts: one created, reset, unlocked or deleted, a
+password changed, Sign Everyone Out, and a shutdown. Those used to be
+missing, so who had reset a colleague's password was nowhere to be
+found. Admins read it at
 **Welcome → Audit Trail**, where the filter offers every kind of entry
 (a test checks that it does).
 
@@ -837,8 +865,8 @@ assigned and never read. Style is left alone deliberately — this
 codebase has its own conventions and a linter arguing about them would
 be noise.
 
-540 tests, about fifteen seconds. They run against a temporary database
-and never touch `db/`. The encryption tests skip themselves when the
+595 tests, about twenty-five seconds. They run against a temporary
+database, which they remove when they finish, and never touch `db/`. The encryption tests skip themselves when the
 SQLCipher driver is not installed.
 
 The suite exists because of a specific failure: a variable rename
@@ -858,6 +886,8 @@ export is round-tripped and compared row for row and byte for byte.
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
 | `test_json_export.py` | 23 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected, a lower-case collection hash not mistaken for tampering; older and upstream layouts import |
 | `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
+| `test_accounts_and_sessions.py` | 44 | A one-time password opens Change Password and nothing else, and replacing it signs the account's other devices out; a page whose session was ended cannot save, delete, upload or export, notices within seconds, and the sign-in page says why; the sign-in never pauses VECTOR's shared loop; made-up names drop off the failure list; every account change reaches the audit trail |
+| `test_left_behind.py` | 11 | An import that fails — a damaged manifest or archive, or something nobody foresaw — leaves no unpacked copy of the case in the temp folder, and says what happened; the start-up clean-up recognises one left by an older VECTOR; a run of the tests removes its own database folder |
 | `test_failures_and_live.py` | 24 | Failures are explained without the SQL; a failed import leaves the case unchanged, and an import clears attachments the new case lacks; exports stop rather than leave attachments out, and one the audit trail cannot record is not handed over; edit dialogs open for values no longer on a list; saves, wipes and imports move the change signal, while reads do not, and a sign-in moves the trail's signal alone |
 | `test_numbering.py` | 17 | Evidence numbering past item 9; room labels past Z |
 | `test_validators.py` | 20 | Every validator reports rather than crashing, and the domain rules hold, including one case at a time; an upload's type comes from its content, so a program named .pdf is refused and a RAR archive is not |

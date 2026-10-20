@@ -20,6 +20,7 @@ from typing import Callable
 import clock
 from nicegui import ui
 
+from auth import require_session
 from failures import explain, log
 from models import get_session, has_active_case, UploadedFiles
 from utils import (
@@ -206,6 +207,7 @@ def files_table() -> Callable[[], None]:
                 ui.download.from_url(f"/attachments/{e.args['Z_PK']}")
 
             # ----- Delete confirmation dialog -----
+            @require_session
             @require_active_case
             def open_delete_dialog(e) -> None:
                 """Confirms and deletes a file."""
@@ -242,6 +244,7 @@ def files_table() -> Callable[[], None]:
                             color="transparent",
                         ).props("flat").classes("p-3 hover-border-blue")
 
+                        @require_session
                         def on_confirm_delete() -> None:
                             try:
                                 with get_session() as session:
@@ -292,6 +295,7 @@ def files_table() -> Callable[[], None]:
 
     with ui.row().classes("w-full justify-center my-2"):
 
+        @require_session
         def delete_all_files() -> None:
             try:
                 with get_session() as session:
