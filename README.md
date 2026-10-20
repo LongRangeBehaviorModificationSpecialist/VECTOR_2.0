@@ -42,7 +42,8 @@ It runs on your own laptop. Nothing is sent anywhere.
 
 **Throughout**
 
-- An **audit trail** of every change, sign-in and download
+- An **audit trail** of every change, sign-in and download, and every
+  account an administrator adds, resets or removes
 - **Accounts** for each agent, and tablets on the same Wi-Fi if you allow it
 
 ---
@@ -92,6 +93,9 @@ page.
   cannot be recovered.
 - **Tablets connect over plain HTTP.** Use a network you control, such as
   your own hotspot.
+- **A device lost or left behind?** **Sign Everyone Out** in the Admin
+  Panel. Any page still open on it goes back to the sign-in page within
+  seconds and can save nothing more.
 - **Every change is in the audit trail**, which nothing in VECTOR can edit.
 
 ---

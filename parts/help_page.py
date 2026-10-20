@@ -207,6 +207,9 @@ not a hotel's or the venue's Wi-Fi.
   and says why. Read it and press OK. The technical detail is in the
   VECTOR window, for whoever looks after the laptop.
 - *Locked out*: wait {LOCKOUT_MINUTES} minutes, or ask an administrator.
+- *"This device was signed out"*: an administrator ended the session, or
+  the account's password was changed on another device. Sign in again;
+  anything saved before then is kept.
 """),
 
     ("info", "About VECTOR", """

@@ -52,7 +52,7 @@ def _env_int(name: str, default: int) -> int:
 class Config:
     """Application metadata and runtime settings."""
 
-    version = "0.97"
+    version = "0.98"
     authors = "SSA M. Sponheimer & SuSA M. Brown"
     dept = "Virginia State Police -- NOVA/DC ICAC"
     url = "github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0"

@@ -126,7 +126,9 @@ picture, and the folder names will be your own.*
    ![The sign-in page](../docs/images/install/sign-in.png)
 
 3. VECTOR asks you to choose your own password. Type it twice and press
-   **Save Password**.
+   **Save Password**. It must be a new one: the one-time password is
+   refused here. Until you choose one, VECTOR shows only this page.
+   Not ready? **Sign out instead**.
 
    ![Choosing your own password](../docs/images/install/change-password.png)
 
@@ -149,7 +151,8 @@ Give each agent their own account, so the audit trail shows who did what.
    ![Adding an account in the Admin Panel](../docs/images/install/admin-add-user.png)
 
 3. VECTOR shows a one-time password **once**. Write it down and give it to
-   the agent. They choose their own the first time they sign in.
+   the agent. They choose their own the first time they sign in, before
+   VECTOR shows them anything else.
 
 New accounts are never administrators.
 
