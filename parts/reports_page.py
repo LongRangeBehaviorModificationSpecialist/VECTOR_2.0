@@ -588,8 +588,8 @@ COMMON_STYLES = """
 :root {
     --report-gray: #D1D5DC;
     --report-dark: #1E293B;
-    --report-dark-text: #CBD5E1;
-    --default-padding: 2pt 8pt 2pt 8pt;
+    --report-dark-text: #E7E5E4;
+    --default-padding: 3pt 8pt 0pt 8pt;
 }
 
 body {
@@ -601,10 +601,9 @@ body {
 }
 
 /* ----- Utilities (before the components, so a component's own size wins) */
-.font-10 { font-size: 10pt; }
-.font-11 { font-size: 11pt; }
 
 /* ----- Page frame ----- */
+
 .report-wrap {
     padding-left: 5%;
     padding-right: 5%;
@@ -629,18 +628,22 @@ body {
 }
 
 /* ----- Case information block ----- */
+
 .header-table {
     border-collapse: collapse;
-    line-height: 1.5em;
     margin: 0 auto 2em auto;
     table-layout: fixed;
     width: 100%;
 }
 
-.header-label {
+.header-table tr td {
+    line-height: 1.65em;
+    vertical-align: bottom;
+}
+
+td.header-label {
     font-size: 11pt;
     padding: var(--default-padding);
-    vertical-align: bottom;
     width: 30%;
 }
 
@@ -648,12 +651,11 @@ td.header-value {
     border-bottom: 1px dotted black;
     font-family: "Times New Roman", Times, serif;
     padding: var(--default-padding);
-    vertical-align: bottom;
     width: 70%;
 }
 
-
 /* ----- List tables: agent, note, room, person ----- */
+
 .agent-table,
 .note-table,
 .room-table,
@@ -693,6 +695,7 @@ td.header-value {
 
 .no-data {
     border-bottom: 1px dotted black;
+    font-size: 10pt;
     font-weight: bold;
     height: 6em;
     padding: 0pt;
@@ -701,6 +704,7 @@ td.header-value {
 }
 
 /* ----- Item bar: the dark "Item #" / room-name strip above a table ----- */
+
 .item-bar,
 .detail-table {
     border-collapse: collapse;
@@ -710,8 +714,9 @@ td.header-value {
 }
 
 .item-bar-cell {
-    background-color: var(--report-dark);
-    color: var(--report-dark-text);
+    /*background-color: var(--report-dark);*/
+    /*color: var(--report-dark-text);*/
+    color: black;
     font-size: 10pt;
     font-weight: bold;
     height: 1.65em;
@@ -721,19 +726,18 @@ td.header-value {
 }
 
 /* ----- Detail tables: one label column, one value column ----- */
+
 .detail-table {
     margin-bottom: 1.5em;
+    border: 1px solid black;
 }
 
 .detail-table col.col-label { width: 30%; }
 .detail-table col.col-value { width: 70%; }
 
-.detail-table {
-    border: 1px solid black;
-}
-
-.detail-table td.detail-label {
-    height: 1.5em;
+.detail-table td.detail-label,
+.detail-table td.detail-value {
+    height: 1.65em;
 }
 
 .detail-label {
@@ -756,24 +760,37 @@ td.header-value {
 }
 
 /* The shaded "Item No." / "File No." row that opens each item. */
+
 .detail-title-row {
-    background-color: var(--report-gray);
+    background-color: var(--report-gray) !important;
     border-top: 1px solid black
 }
 
 .detail-title-row .detail-label,
 .detail-title-row .detail-value {
+    border-top: 1px solid black;
     font-weight: bold;
 }
 
-/* A gap row between items. The td. prefix is needed to outweigh the
-   border set on every .detail-table td above. */
+/*
+A gap row between items. The td. prefix is needed to outweigh the
+border set on every .detail-table td above.
+*/
+
 .detail-table td.detail-spacer {
-    border-left: 1px solid transparent;
+    border-top: 1px solid transparent;
     border-right: 1px solid transparent;
+    border-bottom: 1px solid black;
+    border-left: 1px solid transparent;
+    height: 1rem;
 }
 
+.last-row {
+    border-bottom: 2px solid black;
+    }
+
 /* ----- Paper only: what differs from the screen ----- */
+
 @media print {
     .no-print {
         display: none !important;
@@ -795,6 +812,7 @@ td.header-value {
     }
 
     /* Repeat the column headings on every printed page. */
+
     .agent-table thead,
     .note-table thead,
     .room-table thead,
@@ -820,6 +838,7 @@ td.header-value {
     }
 
     /* Ink-friendly: the dark bar prints as plain black text. */
+
     .item-bar-cell {
         background-color: #FFFFFF;
         border: 1px solid transparent;
@@ -833,6 +852,14 @@ td.header-value {
 
     .detail-table td.detail-spacer {
         border-top: 1px solid transparent;
+        border-right: 1px solid transparent;
+        border-bottom: 1px solid black;
+        border-left: 1px solid transparent;
+        height: 1rem;
+    }
+
+    .last-row {
+        border-bottom: 2px solid black;
     }
 }
 """
@@ -875,25 +902,41 @@ def build_case_header_html(
     <div class="report-wrap">
         <table class="header-table">
             <tr>
-                <td class="header-label">Investigation Number:</td>
-                <td class="header-value">{h(active_case["CASENUMBER"])}</td>
+                <td class="header-label">
+                    Investigation Number:
+                </td>
+                <td class="header-value">
+                    {h(active_case["CASENUMBER"])}
+                </td>
             </tr>
             <tr>
-                <td class="header-label">Site Address:</td>
-                <td class="header-value">{h(active_case["LOCATION"])}</td>
+                <td class="header-label">
+                    Site Address:
+                </td>
+                <td class="header-value">
+                    {h(active_case["LOCATION"])}
+                </td>
             </tr>
             <tr>
-                <td class="header-label">Jurisdiction:</td>
-                <td class="header-value">{h(active_case["JURISDICTION"])}</td>
+                <td class="header-label">
+                    Jurisdiction:
+                </td>
+                <td class="header-value">
+                    {h(active_case["JURISDICTION"])}
+                </td>
             </tr>
             <tr>
-                <td class="header-label">Starting Date and Time:</td>
+                <td class="header-label">
+                    Starting Date and Time:
+                </td>
                 <td class="header-value">
                     {h(active_case["CASEDATETIMEBEGIN"])}
                 </td>
             </tr>
             <tr>
-                <td class="header-label">Ending Date and Time:</td>
+                <td class="header-label">
+                    Ending Date and Time:
+                </td>
                 <td class="header-value">
                     {h(active_case["CASEDATETIMEEND"])}
                 </td>
@@ -981,6 +1024,7 @@ def build_agents_report_html(
 </body>
 </html>"""
 
+
 # The label/value rows of an evidence item, in print order. The label is
 # what is printed; the key is the field in the evidence dict.
 EVIDENCE_FIELDS = [
@@ -1007,19 +1051,27 @@ BASIC_EVIDENCE_FIELDS = [
 # Sets the 30/70 split for every .detail-table. It has to be a colgroup:
 # see the note above .detail-table in COMMON_STYLES.
 DETAIL_COLGROUP = (
-    '<colgroup><col class="col-label"><col class="col-value"></colgroup>'
+'<colgroup><col class="col-label"><col class="col-value"></colgroup>'
 )
 
 
-def detail_rows(item: dict, fields: list[tuple[str, str]]) -> str:
-    """The label/value <tr> rows for one item. Values are escaped here."""
+def detail_rows(
+        item: dict,
+        fields: list[tuple[str, str]],
+        last_row_class: str = ""
+) -> str:
+    """The label/value <tr> rows for one item. Values are escaped here.
+
+    last_row_class, when given, is added to the item's final <tr>
+    """
+    last = len(fields) - 1
     return "".join(
         f"""
-            <tr>
+            <tr{f' class="{last_row_class}"' if last_row_class and n == last else ""}>
                 <td class="detail-label">{label}</td>
                 <td class="detail-value">{h(item[key])}</td>
             </tr>"""
-        for label, key in fields
+        for n, (label, key) in enumerate(fields)
     )
 
 
@@ -1072,10 +1124,10 @@ def build_evidence_report_html(active_case: list, evidence: list) -> str:
     evid_tables = "".join(
         item_bar_html(f"Item #:&ensp;{h(e['EVIDNUM'])}")
         + f"""
-        <table class="detail-table">
-            {DETAIL_COLGROUP}
-            {detail_rows(e, EVIDENCE_FIELDS)}
-        </table>"""
+    <table class="detail-table">
+        {DETAIL_COLGROUP}
+        {detail_rows(e, EVIDENCE_FIELDS, last_row_class="last-row")}
+    </table>"""
         for e in evidence
     )
 
@@ -1130,7 +1182,8 @@ def build_evidence_by_room_report_html(
             <tr class="detail-title-row">
                 <td class="detail-label">Item No.:</td>
                 <td class="detail-value">{h(e["EVIDNUM"])}</td>
-            </tr>{detail_rows(e, EVIDENCE_FIELDS)}"""
+            </tr>
+            {detail_rows(e, EVIDENCE_FIELDS, last_row_class="last-row")}"""
             for e in evidence
             if e["EVIDLOCROOM"] == room_name
         )
@@ -1174,7 +1227,7 @@ def build_basic_evidence_report_html(
         + f"""
         <table class="detail-table">
             {DETAIL_COLGROUP}
-            {detail_rows(e, BASIC_EVIDENCE_FIELDS)}
+            {detail_rows(e, BASIC_EVIDENCE_FIELDS, last_row_class="last-row")}
         </table>"""
         for e in evidence
     )
@@ -1263,7 +1316,7 @@ def build_persons_report_html(active_case: list, persons: list) -> str:
     if not persons:
         person_rows = """
         <tr>
-            <td class="no-data font-10" colspan="5">[ NO DATA FOUND ]</td>
+            <td class="no-data" colspan="5">[ NO DATA FOUND ]</td>
         </tr>
         """
     else:
@@ -1324,7 +1377,7 @@ def build_notes_report_html(active_case: list, notes: list) -> str:
     if not notes:
         note_rows = """
         <tr>
-            <td class="no-data font-10" colspan="4">[ NO DATA FOUND ]</td>
+            <td class="no-data" colspan="4">[ NO DATA FOUND ]</td>
         </tr>
         """
     else:
@@ -1384,7 +1437,7 @@ def build_files_report_html(active_case: list, files: list) -> str:
     FILEUPLOADEDBY, and FILESHA256.
     """
 
-    file_fields = [
+    FILE_FIELDS = [
         ("File Name:", "FILENAME"),
         ("File Type:", "FILEMIMETYPE"),
         ("Uploaded Date/Time:", "FILEUPLOADDATE"),
@@ -1397,7 +1450,7 @@ def build_files_report_html(active_case: list, files: list) -> str:
         + f"""
         <table class="detail-table">
             {DETAIL_COLGROUP}
-            {detail_rows(f, file_fields)}
+            {detail_rows(f, FILE_FIELDS, last_row_class="last-row")}
         </table>"""
         for f in files
     )
