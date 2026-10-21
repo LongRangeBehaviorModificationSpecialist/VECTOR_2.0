@@ -824,7 +824,7 @@ td.header-value {
     font-size: 10pt;
     font-weight: bold;
     height: 1.65em;
-    padding: var(--default-padding);
+    padding: 2pt 8pt;
     text-align: left;
     vertical-align: middle;
 }
@@ -867,6 +867,7 @@ td.header-value {
 /* The shaded "Item No." / "File No." row that opens each item. */
 .detail-title-row {
     background-color: var(--report-gray);
+    border-top: 1px solid black
 }
 
 .detail-title-row .detail-label,
@@ -932,6 +933,7 @@ td.header-value {
         background-color: #FFFFFF;
         border: 1px solid transparent;
         color: #000000;
+        padding: 2px 0px;
     }
 
     .detail-value {
@@ -1508,18 +1510,6 @@ def build_files_report_html(active_case: list, files: list) -> str:
         </table>"""
         for f in files
     )
-
-    # file_tables = "".join(
-    #     f"""
-    #     <table class="detail-table">
-    #         {DETAIL_COLGROUP}
-    #         <tr class="detail-title-row">
-    #             <td class="detail-label">File No.:</td>
-    #             <td class="detail-value">{h(f["Z_PK"])}</td>
-    #         </tr>{detail_rows(f, file_fields)}
-    #     </table>"""
-    #     for f in files
-    # )
 
     header = build_case_header_html(
         active_case,
