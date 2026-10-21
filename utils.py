@@ -379,7 +379,7 @@ def confirm_delete_all(action: str, callback):
         ui.label(
             f"This will permanently delete ALL {action} from the database. "
             "This action cannot be undone."
-        ).classes("mb-4 text-base text-[#D4D4D8]")
+        ).classes("mb-4 text-base text-[var(--vsp-gray)]")
 
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button(
@@ -690,6 +690,31 @@ def set_redact_agent_report(on: bool, actor: str = "") -> None:
             ),
             before={"redact_agent_report": was},
             after={"redact_agent_report": bool(on)},
+            actor=actor or None,
+        )
+
+
+def set_print_all(copies: dict, actor: str = "") -> None:
+    """Changes what Print All on the Reports page prints, and records who
+    did it."""
+    was = settings.print_all_copies()
+    settings.set_print_all_copies(copies)
+    now = settings.print_all_copies()
+    changed = {name: now[name] for name in now if now[name] != was.get(name)}
+    if not changed:
+        return
+
+    with get_session() as session:
+        record_audit(
+            session,
+            action="SETTING_CHANGED",
+            table_name="(settings)",
+            summary="what Print All prints: " + ", ".join(
+                f"{name} {count} cop{'y' if count == 1 else 'ies'}"
+                for name, count in changed.items()
+            ),
+            before={"print_all": {name: was.get(name) for name in changed}},
+            after={"print_all": changed},
             actor=actor or None,
         )
 

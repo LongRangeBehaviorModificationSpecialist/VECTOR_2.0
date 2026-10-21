@@ -51,6 +51,10 @@ class Field:
                  current date and time
     tidy:        callable that puts typed text into the form it is saved
                  in, e.g. a phone number; given trimmed, non-empty text
+    keep_after_add: stays filled in on the add form once a record is
+                 saved, for the next one -- the room an item was found in,
+                 and who found and witnessed it, are usually the same for
+                 the next few. Clear empties it as usual
     """
 
     name: str
@@ -69,6 +73,7 @@ class Field:
     new_values: bool = False
     now_button: bool = False
     tidy: Optional[Callable[[str], str]] = None
+    keep_after_add: bool = False
 
 # ----- Notification helpers -----
 def notify_problem(message: str) -> None:

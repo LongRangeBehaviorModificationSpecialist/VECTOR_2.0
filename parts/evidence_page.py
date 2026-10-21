@@ -157,6 +157,12 @@ SPEC = CrudSpec(
     on_form_ready=_wire_triage_toggle,
     form_columns=2,
     card_width="max-w-6xl",
+    # A room is searched by the same two agents, item after item, and
+    # choosing all three again for every one was most of the typing.
+    form_hint=(
+        "Room Located, Found By and Witnessed By stay filled in for the "
+        "next item. Clear empties them."
+    ),
     fields=[
         Field(
             "EVIDNUM",
@@ -178,6 +184,7 @@ SPEC = CrudSpec(
             kind="select",
             required=True,
             options=load_room_labels,
+            keep_after_add=True,
         ),
         Field("EVIDLOCROOMDETAIL", "Where Located", table_label="Where",
               required=True),
@@ -187,6 +194,7 @@ SPEC = CrudSpec(
             kind="select",
             required=True,
             options=load_agent_names,
+            keep_after_add=True,
         ),
         Field(
             "EVIDFOUNDBYWITNESS",
@@ -194,6 +202,7 @@ SPEC = CrudSpec(
             kind="select",
             required=True,
             options=load_agent_names,
+            keep_after_add=True,
         ),
         Field("EVIDPICTAKEN", "Item Photographed", table_label="Photo",
               kind="select", options=lambda: YES_NO),

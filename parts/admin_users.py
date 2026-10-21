@@ -29,15 +29,20 @@ from auth import (
 )
 from models import (
     generate_one_time_password,
+    get_session,
     get_users_session,
     record_account_event,
+    record_audit,
     Users,
 )
 import settings
+from failures import explain, log
 from utils import (
     CONFIRM_TIMEOUT,
     WARN_TIMEOUT,
     ZERO_TIMEOUT,
+    delete_all_data,
+    get_case_info,
     set_network_access,
 )
 
@@ -714,3 +719,129 @@ def network_access_card() -> None:
             )
 
         switch.on_value_change(on_change)
+
+
+# ----- Training -----
+def load_demo_case(actor: str = "") -> str:
+    """Replaces the case with the made-up demo one, for practice. Returns
+    the demo's case number.
+
+    The case is cleared the usual way first, so the wipe is in the audit
+    trail like any other, and then the loading is. Accounts and the agent
+    list (parts/agents.json) are not touched.
+    """
+    from tools import make_demo_case as demo
+
+    delete_all_data()
+    demo.rebuild_case()
+    with get_session() as session:
+        record_audit(
+            session,
+            action="DEMO_SEED",
+            table_name="(all case tables)",
+            summary="fictional demo case loaded for training",
+            actor=actor or None,
+            after={"case": demo.DEMO_CASE["CASENUMBER"]},
+        )
+    return demo.DEMO_CASE["CASENUMBER"]
+
+
+def training_card() -> None:
+    """A made-up search to practise on, a button away."""
+    with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
+
+        ui.label("Training").classes("text-lg font-semibold mb-2")
+
+        ui.label(
+            "Loads a made-up search to practise on: a case with items, "
+            "rooms, agents, people and notes, every name and number "
+            "invented. It replaces the case on this computer. Accounts and "
+            "the agent list are not touched."
+        ).classes("text-sm text-gray-400 mb-3")
+
+        def open_dialog() -> None:
+            case = get_case_info()
+
+            with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
+                ui.label("Load the demo case?").classes(
+                    "text-lg font-bold mb-2 text-[var(--vsp-blue)]"
+                )
+
+                confirm = None
+                if case:
+                    ui.label(
+                        f"Case {case['CASENUMBER']} is open on this "
+                        "computer. Loading the demo DELETES it and "
+                        "everything recorded against it. Export it first "
+                        "if you need it."
+                    ).classes("text-sm text-[#F5B027] mb-3")
+                    confirm = ui.input(
+                        label="TYPE DEMO TO CONFIRM",
+                    ).classes("w-full yellow-label mb-3")
+                else:
+                    ui.label(
+                        "No case is open, so nothing is lost."
+                    ).classes("text-sm mb-3")
+
+                with ui.row().classes("w-full justify-end gap-2"):
+                    ui.button(
+                        "Cancel",
+                        on_click=dialog.close,
+                        color="transparent",
+                    ).props("flat").classes("p-3 hover-border-blue")
+
+                    def load() -> None:
+                        if not get_is_admin():
+                            dialog.close()
+                            ui.navigate.to("/")
+                            return
+                        if confirm is not None and (
+                            (confirm.value or "").strip() != "DEMO"
+                        ):
+                            ui.notify(
+                                "Type DEMO, in capital letters, to confirm.",
+                                type="warning",
+                                timeout=WARN_TIMEOUT,
+                                position="center",
+                                close_button="OK",
+                            )
+                            return
+                        dialog.close()
+                        try:
+                            number = load_demo_case(get_current_user_name())
+                        except Exception as err:
+                            log.exception("Could not load the demo case")
+                            ui.notify(
+                                "The demo case could not be loaded."
+                                f"\n\n{explain(err)}",
+                                multi_line=True,
+                                classes="multi-line-notification",
+                                type="warning",
+                                timeout=ZERO_TIMEOUT,
+                                position="center",
+                                close_button="OK",
+                            )
+                            return
+                        ui.notify(
+                            f"Demo case {number} loaded. Everything in it "
+                            "is made up.",
+                            timeout=CONFIRM_TIMEOUT,
+                            position="bottom",
+                            close_button="OK",
+                        )
+                        ui.navigate.to("/")
+
+                    ui.button(
+                        "Load demo case",
+                        on_click=load,
+                        color="#ef4444" if case else "var(--vsp-blue)",
+                    ).props("push").classes("p-3 hover-border-white")
+
+            dialog.open()
+
+        ui.button(
+            "Load the demo case",
+            icon="school",
+            on_click=open_dialog,
+            color="var(--vsp-blue)",
+        ).props("push").classes("p-3 hover-border-white")

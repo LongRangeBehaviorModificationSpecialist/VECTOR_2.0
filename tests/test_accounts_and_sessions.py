@@ -177,15 +177,19 @@ def test_the_sign_in_page_says_why_the_device_is_back_there(
     auth.invalidate_user_sessions("agent")
     auth.leave_ended_session()
 
-    assert auth.take_session_ended_notice() is True
-    assert auth.take_session_ended_notice() is False
+    # Every visit says so, until the next sign-in: two refused actions on
+    # the same page each send it there.
+    assert auth.session_ended_notice() is True
+    assert auth.session_ended_notice() is True
+    auth.sign_in("agent", False)
+    assert auth.session_ended_notice() is False
 
 
 def test_pressing_logout_needs_no_explanation(browser, went_to):
     auth.sign_in("agent", False)
     auth.sign_out()
     auth.leave_ended_session()
-    assert auth.take_session_ended_notice() is False
+    assert auth.session_ended_notice() is False
 
 
 def test_an_open_page_notices_within_seconds(browser, went_to, monkeypatch):

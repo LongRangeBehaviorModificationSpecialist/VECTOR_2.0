@@ -157,7 +157,7 @@ def open_delete_dialog(
         ui.label(
             "The record is removed, but the deletion and its "
             "contents are kept in the audit trail."
-        ).classes("mb-4 text-sm text-white")
+        ).classes("mb-4 text-sm")
 
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button(

@@ -40,6 +40,18 @@ Work through it in this order:
 Until a case is open, the top bar says **No Active Case** and nothing
 can be saved. On a phone or small tablet, the page buttons are under the
 menu button (three lines) at the top left.
+
+Once it is open, the Home page counts what has been recorded, and
+**Before you leave the scene** lists anything still to do: a room with
+one agent, an item not marked as photographed, no end time, no export.
+
+- *Find anything:* the magnifying glass at the top searches items,
+  rooms, agents, people, notes and files at once.
+- *Typed something and not saved it?* Leave the page, or be signed out,
+  and the form fills back in next time, marked *Filled in from before*.
+  **Discard** empties it.
+- *Hard to read in daylight?* **Light or dark page** in the account menu
+  (top right). Each device keeps its own.
 """),
 
     ("folder_open", "The case", """
@@ -82,6 +94,8 @@ Export it first: see *Saving the case*.
 - Pick who found it and who witnessed it. The witness must be a
   different person.
 - Mark whether it was photographed, triaged, and contains contraband.
+- **Room Located**, **Found By** and **Witnessed By** stay filled in for
+  the next item, as they are usually the same. **Clear** empties them.
 
 *Deleting an item renumbers the items after it*, so the list never
 skips a number. Once bags are labelled, change an item with the pencil
@@ -91,6 +105,8 @@ instead of deleting it, or the labels will no longer match.
     ("person", "People", """
 - Suspects and anyone else present at the search.
 - Date of birth as `MM-DD-YYYY`.
+- *Phone:* type it any way, as for agents. A US number is saved as
+  `(703) 555-1234`, with any extension; others as typed.
 """),
 
     ("edit_note", "Notes", """
@@ -112,6 +128,15 @@ instead of deleting it, or the labels will no longer match.
 """),
 
     ("print", "Reports and printing", """
+**Print All** prints the reports a search ends with, in one window, each
+starting on a new page: the Agent List, Room List, Evidence List (Full),
+two copies of the Inventory and Return, and the Persons List. Press it,
+then **Print Report** in the window that opens. Its pages are not
+numbered. To change what it prints, for this computer, open
+**Choose what Print All prints** under it.
+
+One report at a time:
+
 1. Open **Reports** and press the report you want.
 2. Press **Print Report**. The report opens in its own window.
 3. In that window, press **Print Report** to print, or **Close**. The
@@ -141,7 +166,8 @@ same Wi-Fi:
    turns on **Let other devices on this network reach VECTOR**.
 2. Restart VECTOR: close its window and start it again.
 3. On that laptop, open **Help**, then **Connect a Device**. It shows the
-   address to type on the tablet, such as `http://192.168.1.23:8080`.
+   address to type on the tablet, such as `http://192.168.1.23:8080`,
+   and a QR code: point the tablet's camera at it instead of typing.
 4. Each person signs in with their own account.
 
 Pages update by themselves when someone else saves. The connection is
@@ -180,6 +206,9 @@ not a hotel's or the venue's Wi-Fi.
   ends every session at once. A page left open on any device goes back
   to the sign-in page within seconds, and saves nothing more.
 - Sign out with **Logout** in the account menu.
+- Practising? **Load the demo case** in the Admin Panel loads a made-up
+  search to learn on. It replaces the case on this computer, so export a
+  real one first.
 """),
 
     ("history", "Audit Trail", """

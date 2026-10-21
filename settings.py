@@ -4,8 +4,9 @@
 settings.py
 
 Settings that belong to this machine rather than to the case: whether
-VECTOR listens on the network, and whether reports print the date and
-time they were printed.
+VECTOR listens on the network, whether reports print the date and time
+they were printed, whether the Agent List hides contact details, and
+what Print All prints.
 
 They are kept in db/settings.json rather than in the case database,
 because they describe this installation. A database copied to another
@@ -39,10 +40,29 @@ SETTINGS_PATH = DB_DIR / "settings.json"
 NETWORK_ACCESS = "network_access"
 REPORT_PRINT_DATE = "report_print_date"
 REDACT_AGENT_REPORT = "redact_agent_report"
+PRINT_ALL = "print_all"
+
+# What Print All on the Reports page prints, and how many copies of each:
+# the reports a search normally ends with, the return copy twice -- one
+# left at the premises, one kept. The keys are the reports' names in
+# parts/reports_page.PRINT_ALL_REPORTS.
+PRINT_ALL_DEFAULT = {
+    "agents": 1,
+    "rooms": 1,
+    "evidence": 1,
+    "evidence_by_room": 0,
+    "evidence_basic": 2,
+    "persons": 1,
+    "notes": 0,
+    "files": 0,
+}
+MAX_COPIES = 3
+
 DEFAULTS = {
     NETWORK_ACCESS: False,
     REPORT_PRINT_DATE: False,
     REDACT_AGENT_REPORT: False,
+    PRINT_ALL: PRINT_ALL_DEFAULT,
     }
 
 # Set at startup from what VECTOR actually bound to, so a page can say
@@ -115,6 +135,41 @@ def set_redact_agent_report(on: bool) -> None:
     """Turns redaction of the Agent List report on or off."""
     values = read()
     values[REDACT_AGENT_REPORT] = bool(on)
+    write(values)
+
+
+def _copies(value) -> int | None:
+    """A number of copies, or None when it is not one."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value if 0 <= value <= MAX_COPIES else None
+
+
+def print_all_copies() -> dict[str, int]:
+    """How many copies of each report Print All prints; 0 leaves it out.
+
+    Anything unreadable in the file falls back to the default for that
+    report, so a damaged setting never stops the printing.
+    """
+    stored = read().get(PRINT_ALL)
+    copies = dict(PRINT_ALL_DEFAULT)
+    if isinstance(stored, dict):
+        for name in copies:
+            number = _copies(stored.get(name))
+            if number is not None:
+                copies[name] = number
+    return copies
+
+
+def set_print_all_copies(copies: dict[str, int]) -> None:
+    """Saves what Print All prints. Unknown reports are ignored."""
+    current = print_all_copies()
+    for name, number in copies.items():
+        number = _copies(number)
+        if name in current and number is not None:
+            current[name] = number
+    values = read()
+    values[PRINT_ALL] = current
     write(values)
 
 

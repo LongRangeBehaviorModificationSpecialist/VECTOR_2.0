@@ -33,7 +33,8 @@ starter_links = {
     "File Extension Database": "https://www.file-extensions.org/",
     "List of USB IDs": "http://www.linux-usb.org/usb.ids",
     "FCC ID Search": "https://www.fcc.gov/oet/ea/fccid",
-    "The iPhone Wiki": "https://www.theiphonewiki.com/",
+    # The iPhone Wiki closed in 2024; its pages moved here.
+    "The Apple Wiki (was The iPhone Wiki)": "https://theapplewiki.com/",
     "TCP and UDP Port Numbers": "https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers",
 }
 

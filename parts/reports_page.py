@@ -16,6 +16,7 @@ Routes:
     /reports/persons           →  Person report
     /reports/notes             →  Notes report
     /reports/files             →  Files report
+    /reports/print-all         →  Print All's reports, for its print window
 
 
 WORKFLOW FOR REPORT CREATION:
@@ -31,7 +32,8 @@ WORKFLOW FOR REPORT CREATION:
 """
 
 from html import escape
-from nicegui import ui
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
+from nicegui import app, ui
 import json
 import re
 
@@ -50,6 +52,7 @@ from models import (
     Rooms,
     UploadedFiles,
 )
+from live import refresh_on_change
 from navbar import build_navbar, unit_logo
 from auth import (
     get_current_user_name,
@@ -66,6 +69,7 @@ from utils import (
     get_case_info,
     get_print_date_time,
     parse_entered_date,
+    set_print_all,
     set_redact_agent_report,
     set_report_print_date,
     room_display_key,
@@ -160,6 +164,9 @@ def build_reports_page() -> None:
 
     _remind_about_end_time()
 
+    # ----- One button for the reports a search ends with -----
+    _print_all_section()
+
     # ----- First row of buttons -----
     # Contains buttons for the following reports :
     # (1) Print Agent List
@@ -203,6 +210,108 @@ def build_reports_page() -> None:
                 on_click=lambda url=v["page_url"]: open_report(url),
                 color=style["color"],
             ).props(style["props"]).classes(style["classes"])
+
+
+COPIES_CHOICES = {
+    0: "Leave out",
+    1: "1 copy",
+    2: "2 copies",
+    3: "3 copies",
+}
+
+
+def _print_all_section() -> None:
+    """One button for the reports a search normally ends with.
+
+    Printing them meant opening each report and printing it in turn --
+    the return copy twice. The button opens one print window with all of
+    them, each starting on a new sheet. What it prints is chosen below
+    it, and kept for this machine.
+    """
+    case_number = (get_case_info() or {}).get("CASENUMBER", "")
+    is_valid, errors = validate_case_for_report()
+
+    with ui.card().classes("w-full max-w-2xl mx-auto p-6 mb-4 items-center"):
+        button = ui.button(
+            "Print All",
+            color="#1C69A8",
+        ).props("push icon=print").classes("w-70 p-6 hover-border-white")
+
+        if is_valid:
+            # Opened by the click itself; see render_report_page().
+            button.on("click", js_handler=print_all_script(case_number))
+        else:
+            button.on_click(lambda: show_validation_errors(errors))
+
+        summary = ui.label().classes(
+            "text-sm text-center text-[var(--vsp-gray)] mt-2"
+        )
+        rooms_note = ui.label().classes(
+            "text-sm text-center text-[#F5B027] mt-1"
+        )
+
+        def settle() -> None:
+            """The summary, the warning and the button, as things stand."""
+            copies = settings.print_all_copies()
+            chosen = print_all_summary(copies)
+            summary.set_text(
+                f"Prints, each starting on a new page: {chosen}." if chosen
+                else "Nothing is chosen for Print All yet. Choose below."
+            )
+            button.set_enabled(bool(chosen))
+            missing = rooms_missing_agents() if copies.get("rooms") else []
+            rooms_note.set_text(
+                "Room" + ("s " if len(missing) > 1 else " ")
+                + ", ".join(missing[:10])
+                + (" have" if len(missing) > 1 else " has")
+                + " no agent named, printed as [NOT RECORDED]."
+                if missing else ""
+            )
+            rooms_note.set_visibility(bool(missing))
+
+        settle()
+        # Rooms given their agents on another device.
+        refresh_on_change(settle)
+
+        with ui.expansion(
+            "Choose what Print All prints",
+            icon="tune",
+        ).classes("w-full mt-2"):
+            ui.label(
+                "Kept for this machine. In this order, each report "
+                "starting on a new sheet."
+            ).classes("text-xs text-gray-400 mb-2")
+
+            copies = settings.print_all_copies()
+            for key, name, _build in PRINT_ALL_REPORTS:
+
+                @require_session
+                def choose(event, key=key) -> None:
+                    try:
+                        set_print_all(
+                            {key: int(event.value)}, get_current_user_name()
+                        )
+                    except Exception as err:
+                        log.exception("Could not change what Print All prints")
+                        ui.notify(
+                            f"The setting was not changed.\n\n{explain(err)}",
+                            multi_line=True,
+                            classes="multi-line-notification",
+                            type="warning",
+                            timeout=ZERO_TIMEOUT,
+                            position="center",
+                            close_button="OK",
+                        )
+                        return
+                    settle()
+
+                with ui.row().classes("w-full items-center justify-between"):
+                    ui.label(name).classes("text-sm")
+                    ui.select(
+                        COPIES_CHOICES,
+                        value=copies.get(key, 0),
+                        on_change=choose,
+                    ).props("dense outlined").classes("w-36")
 
 
 def _printed_date_switch() -> None:
@@ -1425,17 +1534,38 @@ def build_files_report_html(active_case: list, files: list) -> str:
     )
 
 
-@ui.page("/reports/agents")
-def print_agents_report():
+# ----- Each report, built from the case -----
+# One function per report, apart from its page, so Print All can put the
+# same reports one after another in a single print window.
+def _evidence_rows(session, basic: bool = False) -> list[dict]:
+    """The evidence as the evidence reports print it, in item order."""
+    rows = []
+    for e in evidence_in_order(session):
+        row = {
+            "EVIDNUM": e.EVIDNUM,
+            "EVIDQTY": e.EVIDQTY,
+            "EVIDDESC": e.EVIDDESC,
+            "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "[NOT RECORDED]",
+            "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "[NOT RECORDED]",
+        }
+        if not basic:
+            row.update({
+                "EVIDLOCROOM": e.EVIDLOCROOM,
+                "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
+                "EVIDFOUNDBY": e.EVIDFOUNDBY,
+                "EVIDFOUNDBYWITNESS": e.EVIDFOUNDBYWITNESS,
+                "EVIDPICTAKEN": e.EVIDPICTAKEN,
+                "EVIDTRIAGED": e.EVIDTRIAGED,
+                "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY or "N/A",
+                "EVIDNOTE": e.EVIDNOTE or "[NOT RECORDED]",
+            })
+        rows.append(row)
+    return rows
 
-    if not is_authenticated():
-        ui.navigate.to("/")
-        return
 
+def agents_report_html() -> str:
     with get_session() as session:
-
         active_case = get_case_info()
-
         agents = [
             {
                 "AGENTNAME": a.AGENTNAME,
@@ -1447,14 +1577,123 @@ def print_agents_report():
             }
             for a in session.query(Agents).all()
         ]
-
-    html = build_agents_report_html(
+    return build_agents_report_html(
         active_case=active_case,
         agents=agents,
         redact_contacts=settings.redact_agent_report(),
     )
 
-    render_report_page(html_content=html, report_name="Agent List")
+
+def evidence_report_html() -> str:
+    with get_session() as session:
+        active_case = get_case_info()
+        evidence = _evidence_rows(session)
+    return build_evidence_report_html(
+        active_case=active_case,
+        evidence=evidence,
+    )
+
+
+def evidence_by_room_report_html() -> str:
+    with get_session() as session:
+        active_case = get_case_info()
+        unique_rooms_list = rooms_with_item_counts(session)
+        evidence = _evidence_rows(session)
+    return build_evidence_by_room_report_html(
+        active_case=active_case,
+        evidence=evidence,
+        unique_rooms=unique_rooms_list,
+    )
+
+
+def basic_evidence_report_html() -> str:
+    with get_session() as session:
+        active_case = get_case_info()
+        evidence = _evidence_rows(session, basic=True)
+    return build_basic_evidence_report_html(
+        active_case=active_case,
+        evidence=evidence,
+    )
+
+
+def rooms_report_html() -> str:
+    with get_session() as session:
+        active_case = get_case_info()
+        rooms = [
+            {
+                "ROOMLABEL": r.ROOMLABEL,
+                "ROOMDESC": r.ROOMDESC,
+                "ROOMFIRSTAGENT": r.ROOMFIRSTAGENT,
+                "ROOMSECONDAGENT": r.ROOMSECONDAGENT,
+                "ROOMNOTE": r.ROOMNOTE or "N/A",
+            }
+            for r in rooms_in_order(session)
+        ]
+    return build_rooms_report_html(
+        active_case=active_case,
+        rooms=rooms,
+    )
+
+
+def persons_report_html() -> str:
+    with get_session() as session:
+        active_case = get_case_info()
+        persons = [
+            {
+                "PERSONNAME": p.PERSONNAME,
+                "PERSONDOB": p.PERSONDOB or "N/A",
+                "PERSONADDRESS": p.PERSONADDRESS or "N/A",
+                "PERSONPHONE": p.PERSONPHONE or "N/A",
+                "PERSONNOTE": p.PERSONNOTE or "",
+            }
+            for p in session.query(Persons).order_by(Persons.PERSONNAME).all()
+        ]
+    return build_persons_report_html(
+        active_case=active_case,
+        persons=persons,
+    )
+
+
+def notes_report_html() -> str:
+    with get_session() as session:
+        active_case = get_case_info()
+        notes = [
+            {
+                "NOTEDATETIME": n.NOTEDATETIME,
+                "NOTEDATETIMEUPDATED": n.NOTEDATETIMEUPDATED or "N/A",
+                "NOTEAUTHOR": n.NOTEAUTHOR,
+                "NOTETEXT": n.NOTETEXT or "",
+            }
+            # In the order written: see the note on notes_page.SPEC.
+            for n in session.query(Notes).order_by(Notes.Z_PK).all()
+        ]
+    return build_notes_report_html(
+        active_case=active_case,
+        notes=notes,
+    )
+
+
+def files_report_html() -> str:
+    with get_session() as session:
+        active_case = get_case_info()
+        files = files_report_rows(session)
+        return build_files_report_html(
+            active_case=active_case,
+            files=files,
+        )
+
+
+# ----- The report pages -----
+@ui.page("/reports/agents")
+def print_agents_report():
+
+    if not is_authenticated():
+        ui.navigate.to("/")
+        return
+
+    render_report_page(
+        html_content=agents_report_html(), report_name="Agent List"
+    )
 
 
 @ui.page("/reports/evidence")
@@ -1464,35 +1703,10 @@ def print_evidence_report():
         ui.navigate.to("/")
         return
 
-    with get_session() as session:
-
-        active_case = get_case_info()
-
-        evidence = [
-            {
-                "EVIDNUM": e.EVIDNUM,
-                "EVIDQTY": e.EVIDQTY,
-                "EVIDDESC": e.EVIDDESC,
-                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "[NOT RECORDED]",
-                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "[NOT RECORDED]",
-                "EVIDLOCROOM": e.EVIDLOCROOM,
-                "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
-                "EVIDFOUNDBY": e.EVIDFOUNDBY,
-                "EVIDFOUNDBYWITNESS": e.EVIDFOUNDBYWITNESS,
-                "EVIDPICTAKEN": e.EVIDPICTAKEN,
-                "EVIDTRIAGED": e.EVIDTRIAGED,
-                "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY or "N/A",
-                "EVIDNOTE": e.EVIDNOTE or "[NOT RECORDED]",
-            }
-            for e in evidence_in_order(session)
-        ]
-
-    html = build_evidence_report_html(
-        active_case=active_case,
-        evidence=evidence
+    render_report_page(
+        html_content=evidence_report_html(),
+        report_name="Evidence List (Full)",
     )
-
-    render_report_page(html_content=html, report_name="Evidence List (Full)")
 
 
 @ui.page("/reports/evidence_by_room")
@@ -1502,35 +1716,10 @@ def print_evidence_by_room_report():
         ui.navigate.to("/")
         return
 
-    with get_session() as session:
-        active_case = get_case_info()
-        unique_rooms_list = rooms_with_item_counts(session)
-        evidence = [
-            {
-                "EVIDNUM": e.EVIDNUM,
-                "EVIDQTY": e.EVIDQTY,
-                "EVIDDESC": e.EVIDDESC,
-                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "[NOT RECORDED]",
-                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "[NOT RECORDED]",
-                "EVIDLOCROOM": e.EVIDLOCROOM,
-                "EVIDLOCROOMDETAIL": e.EVIDLOCROOMDETAIL,
-                "EVIDFOUNDBY": e.EVIDFOUNDBY,
-                "EVIDFOUNDBYWITNESS": e.EVIDFOUNDBYWITNESS,
-                "EVIDPICTAKEN": e.EVIDPICTAKEN,
-                "EVIDTRIAGED": e.EVIDTRIAGED,
-                "EVIDTRIAGEDBY": e.EVIDTRIAGEDBY or "N/A",
-                "EVIDNOTE": e.EVIDNOTE or "[NOT RECORDED]",
-            }
-            for e in evidence_in_order(session)
-        ]
-
-    html = build_evidence_by_room_report_html(
-        active_case=active_case,
-        evidence=evidence,
-        unique_rooms=unique_rooms_list,
+    render_report_page(
+        html_content=evidence_by_room_report_html(),
+        report_name="Evidence List (By Room)",
     )
-
-    render_report_page(html_content=html, report_name="Evidence List (By Room)")
 
 
 @ui.page("/reports/evidence_basic")
@@ -1540,25 +1729,10 @@ def print_basic_evidence_report():
         ui.navigate.to("/")
         return
 
-    with get_session() as session:
-        active_case = get_case_info()
-        evidence = [
-            {
-                "EVIDNUM": e.EVIDNUM,
-                "EVIDQTY": e.EVIDQTY,
-                "EVIDDESC": e.EVIDDESC,
-                "EVIDMODELNUMBER": e.EVIDMODELNUMBER or "[NOT RECORDED]",
-                "EVIDSERIALNUMBER": e.EVIDSERIALNUMBER or "[NOT RECORDED]",
-            }
-            for e in evidence_in_order(session)
-        ]
-
-    html = build_basic_evidence_report_html(
-        active_case=active_case,
-        evidence=evidence
+    render_report_page(
+        html_content=basic_evidence_report_html(),
+        report_name="Evidence List (Basic)",
     )
-
-    render_report_page(html_content=html, report_name="Evidence List (Basic)")
 
 
 @ui.page("/reports/check_rooms_agents")
@@ -1604,30 +1778,14 @@ def print_rooms_report():
         ui.navigate.to("/")
         return
 
-    with get_session() as session:
-        active_case = get_case_info()
-        rooms = [
-            {
-                "ROOMLABEL": r.ROOMLABEL,
-                "ROOMDESC": r.ROOMDESC,
-                "ROOMFIRSTAGENT": r.ROOMFIRSTAGENT,
-                "ROOMSECONDAGENT": r.ROOMSECONDAGENT,
-                "ROOMNOTE": r.ROOMNOTE or "N/A",
-            }
-            for r in rooms_in_order(session)
-        ]
-
     ui.add_head_html(
         "<title>V·E·C·T·O·R | Room List Report</title>",
         shared=True,
     )
 
-    html = build_rooms_report_html(
-        active_case=active_case,
-        rooms=rooms
+    render_report_page(
+        html_content=rooms_report_html(), report_name="Room List"
     )
-
-    render_report_page(html_content=html, report_name="Room List")
 
 
 @ui.page("/reports/persons")
@@ -1637,25 +1795,9 @@ def print_persons_report():
         ui.navigate.to("/")
         return
 
-    with get_session() as session:
-        active_case = get_case_info()
-        persons = [
-            {
-                "PERSONNAME": p.PERSONNAME,
-                "PERSONDOB": p.PERSONDOB or "N/A",
-                "PERSONADDRESS": p.PERSONADDRESS or "N/A",
-                "PERSONPHONE": p.PERSONPHONE or "N/A",
-                "PERSONNOTE": p.PERSONNOTE or "",
-            }
-            for p in session.query(Persons).order_by(Persons.PERSONNAME).all()
-        ]
-
-    html = build_persons_report_html(
-        active_case=active_case,
-        persons=persons
+    render_report_page(
+        html_content=persons_report_html(), report_name="Persons List"
     )
-
-    render_report_page(html_content=html, report_name="Persons List")
 
 
 @ui.page("/reports/notes")
@@ -1665,25 +1807,9 @@ def print_notes_report():
         ui.navigate.to("/")
         return
 
-    with get_session() as session:
-        active_case = get_case_info()
-        notes = [
-            {
-                "NOTEDATETIME": n.NOTEDATETIME,
-                "NOTEDATETIMEUPDATED": n.NOTEDATETIMEUPDATED or "N/A",
-                "NOTEAUTHOR": n.NOTEAUTHOR,
-                "NOTETEXT": n.NOTETEXT or "",
-            }
-            # In the order written: see the note on notes_page.SPEC.
-            for n in session.query(Notes).order_by(Notes.Z_PK).all()
-        ]
-
-    html = build_notes_report_html(
-        active_case=active_case,
-        notes=notes
+    render_report_page(
+        html_content=notes_report_html(), report_name="Notes List"
     )
-
-    render_report_page(html_content=html, report_name="Notes List")
 
 
 @ui.page("/reports/files")
@@ -1693,16 +1819,9 @@ def print_files_report():
         ui.navigate.to("/")
         return
 
-    with get_session() as session:
-        active_case = get_case_info()
-        files = files_report_rows(session)
-
-        html = build_files_report_html(
-            active_case=active_case,
-            files=files,
-        )
-
-    render_report_page(html_content=html, report_name="File List")
+    render_report_page(
+        html_content=files_report_html(), report_name="File List"
+    )
 
 
 def files_report_rows(session) -> list[dict]:
@@ -1728,6 +1847,184 @@ def files_report_rows(session) -> list[dict]:
         }
         for f in session.query(UploadedFiles).order_by(UploadedFiles.Z_PK)
     ]
+
+
+# ----- Print All -----
+# The reports a search normally ends with, printed by one button into one
+# print window, each starting on a new sheet. In the order the Reports
+# page lists them; settings.print_all_copies() says how many copies of
+# each, set on the Reports page.
+PRINT_ALL_REPORTS = [
+    ("agents", "Agent List", agents_report_html),
+    ("rooms", "Room List", rooms_report_html),
+    ("evidence", "Evidence List (Full)", evidence_report_html),
+    ("evidence_by_room", "Evidence List (By Room)",
+     evidence_by_room_report_html),
+    ("evidence_basic", "Inventory and Return", basic_evidence_report_html),
+    ("persons", "Persons List", persons_report_html),
+    ("notes", "Notes List", notes_report_html),
+    ("files", "File List", files_report_html),
+]
+
+PRINT_ALL_NAMES = {key: name for key, name, _build in PRINT_ALL_REPORTS}
+
+# Added to the print window's styles for Print All.
+PRINT_ALL_STYLES = """
+/* Each report starts on a new sheet. */
+.print-all-part + .print-all-part {
+    break-before: page;
+}
+
+/*
+No page numbers. The count runs on across every report in the window, so
+the second report's first page would read "Page 4 of 11".
+*/
+@page {
+    @bottom-center {
+        content: none;
+    }
+}
+"""
+
+_BODY = re.compile(r"<body[^>]*>(.*)</body>", re.S | re.I)
+
+
+def _report_body(html: str) -> str:
+    """What is inside a report's <body>; its styles come from the window."""
+    match = _BODY.search(html)
+    return match.group(1) if match else html
+
+
+def print_all_html(copies: dict | None = None) -> str:
+    """Every report Print All prints, one after another.
+
+    Each report is built once however many copies are asked for, so the
+    copies cannot differ.
+    """
+    copies = settings.print_all_copies() if copies is None else copies
+    parts = []
+    for key, _name, build in PRINT_ALL_REPORTS:
+        count = copies.get(key, 0)
+        if not count:
+            continue
+        body = _report_body(build())
+        parts += [f'<section class="print-all-part">{body}</section>'] * count
+    return "\n".join(parts)
+
+
+def print_all_summary(copies: dict | None = None) -> str:
+    """What Print All prints, as the Reports page says it."""
+    copies = settings.print_all_copies() if copies is None else copies
+    chosen = []
+    for key, name, _build in PRINT_ALL_REPORTS:
+        count = copies.get(key, 0)
+        if count == 1:
+            chosen.append(name)
+        elif count > 1:
+            chosen.append(f"{name} ({count} copies)")
+    return ", ".join(chosen)
+
+
+@app.get("/reports/print-all")
+async def print_all_document():
+    """The reports for Print All, fetched by its print window.
+
+    Signed-in users only, like every report. Not kept by the browser: it
+    is the case.
+    """
+    if not is_authenticated():
+        return Response(status_code=403)
+
+    is_valid, errors = validate_case_for_report()
+    if not is_valid:
+        return PlainTextResponse(
+            "Cannot print yet -- missing information:\n\n"
+            + "\n".join(f"- {error}" for error in errors),
+            status_code=409,
+        )
+
+    html = print_all_html()
+    if not html:
+        return PlainTextResponse(
+            "Print All has no reports chosen. Choose some on the Reports "
+            "page.",
+            status_code=409,
+        )
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
+
+
+def print_all_script(case_number: str = "") -> str:
+    """The browser-side handler behind Print All.
+
+    The window is opened by the click itself, as for a single report, so
+    a pop-up blocker lets it through; the reports are fetched into it
+    afterwards, so they are as the case is at that moment.
+    """
+    title = " · ".join(h(part) for part in ("Print All", case_number) if part)
+    values = {
+        "STYLES": json.dumps(
+            COMMON_STYLES + PRINT_WINDOW_STYLES + PRINT_ALL_STYLES
+        ),
+        "TITLE": json.dumps(title, ensure_ascii=False),
+        "TOOLBAR": json.dumps(
+            print_toolbar_html("Print All", case_number), ensure_ascii=False
+        ),
+    }
+    return re.sub(
+        r"__(STYLES|TITLE|TOOLBAR)__",
+        lambda match: values[match.group(1)],
+        _PRINT_ALL_JS,
+    )
+
+
+_PRINT_ALL_JS = """() => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('The browser blocked the print window. Allow pop-ups '
+                + 'for this address, and press Print All again.');
+            return;
+        }
+        printWindow.document.write(
+            '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'
+            + '<title>' + __TITLE__ + '</title></head>'
+            + '<body style="font: 16px -apple-system, Segoe UI, Arial, '
+            + 'sans-serif; padding: 24px;">Getting the reports ready...'
+            + '</body></html>'
+        );
+        printWindow.document.close();
+
+        const say = (text) => {
+            printWindow.document.body.textContent = text;
+            printWindow.document.body.style.whiteSpace = 'pre-line';
+        };
+
+        fetch('/reports/print-all', {credentials: 'same-origin', cache: 'no-store'})
+            .then((response) => response.text().then(
+                (text) => ({ok: response.ok, text: text})))
+            .then((answer) => {
+                if (!answer.ok) {
+                    say(answer.text || 'The reports could not be prepared.');
+                    return;
+                }
+                printWindow.document.open();
+                printWindow.document.write(
+                    '<!DOCTYPE html><html lang="en"><head>'
+                    + '<meta charset="UTF-8">'
+                    + '<meta name="viewport" content="width=device-width, '
+                    + 'initial-scale=1.0">'
+                    + '<title>' + __TITLE__ + '</title>'
+                    + '<style>' + __STYLES__ + '</style></head><body>'
+                    + __TOOLBAR__
+                    + '<div class="report-body">' + answer.text + '</div>'
+                    + '<scr' + 'ipt>setTimeout(() => window.print(), 500);'
+                    + '</scr' + 'ipt></body></html>'
+                );
+                printWindow.document.close();
+            })
+            .catch(() => say(
+                'The reports could not be loaded. Close this window and '
+                + 'press Print All again.'));
+    }"""
 
 
 # The print window's own styles, on top of the report's.

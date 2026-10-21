@@ -28,7 +28,7 @@ from auth import (
     sign_in,
     sign_out,
     signed_in_with_temporary_password,
-    take_session_ended_notice,
+    session_ended_notice,
     LOCK_AFTER_FAILURES,
     LOCKOUT_MINUTES,
 )
@@ -41,6 +41,7 @@ from models import (
     record_audit,
 )
 from navbar import build_navbar, unit_logo
+from parts.case_summary import case_overview
 from parts.help_page import build_help_page
 from parts.case_transfer import (
     open_delete_all_dialog,
@@ -140,6 +141,9 @@ def build_authenticated_home():
             "The Virginia Evidence Collection, Tracking, "
             "Organization, & Reporting Program"
         ).classes("text-base text-gray-400 text-center max-w-xl")
+
+    # ----- How much is recorded, and what to check before leaving -----
+    case_overview()
 
     with ui.row().classes(
         "flex justify-center items-center gap-6 w-full"):
@@ -257,7 +261,7 @@ def build_login_home():
         # A page whose session was ended -- by an administrator, by Sign
         # Everyone Out, by the password being changed on another device
         # -- comes here by itself, so say why.
-        if take_session_ended_notice():
+        if session_ended_notice():
             ui.label(
                 "This device was signed out. Sign in again to carry on."
             ).classes("text-sm text-[#F5B027] mb-4 text-center")

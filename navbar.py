@@ -13,12 +13,13 @@ so they have been removed rather than left as a second, dead answer to
 the same question.
 """
 
-from nicegui import ui
+from nicegui import app, ui
 
 from auth import is_authenticated
 from idle import leave_when_signed_out, sign_out_when_idle
 from live import refresh_on_change
 from models import check_case_info
+from parts.case_search import search_button
 from program.config import STATIC_DIR
 
 
@@ -44,6 +45,40 @@ def _nav_dropdown(
                     ui.separator()
                 else:
                     ui.menu_item(item_label, on_click=callback)
+
+
+# ----- Light or dark -----
+# Dark unless this browser chose light, with "Light or dark page" in the
+# account menu. A tablet outdoors is hard to read dark; a laptop in a dark
+# room is the other way round. Kept per browser, so each device keeps its
+# own. In the menu rather than the bar: the bar has to stay on one line,
+# on a phone as on a laptop, and it had no room for another button.
+THEME = "theme"
+THEME_ITEM = "Light or dark page"
+
+
+def prefers_light() -> bool:
+    try:
+        return app.storage.user.get(THEME) == "light"
+    except Exception:
+        # No browser request in scope: dark, as VECTOR has always been.
+        return False
+
+
+def apply_theme():
+    """Draws the page light or dark, as this browser chose. Returns the
+    switch, for the button that flips it."""
+    return ui.dark_mode(value=not prefers_light())
+
+
+def flip_theme(dark) -> None:
+    """Shows the page the other way, and keeps that for this browser."""
+    dark.value = not dark.value
+    try:
+        app.storage.user[THEME] = "dark" if dark.value else "light"
+    except Exception:
+        # No browser request in scope: this page flips, nothing is kept.
+        pass
 
 
 # ----- Unit logo -----
@@ -106,17 +141,24 @@ HELP_PAGES = [
 # a phone the badge shows just the case number and the account menu just
 # its icon, so the whole bar stays on one line.
 #
-# Measured in a browser with the case badge, the account menu and a short
-# name: the row needs 1,564 px with the roomy buttons below, and about
-# 1,300 px once their padding is tightened. So the padding is tightened
-# between NAV_ROW_MIN_WIDTH and NAV_ROW_ROOMY_WIDTH -- a laptop keeps the
-# whole row rather than folding it away, and a wide screen keeps the
-# roomier buttons.
+# Measured in a browser with the case badge, the search button, the
+# account menu and a short name: the row needs about 1,600 px with the
+# roomy buttons below, and fits from 1,340 px once their padding is
+# tightened. So the padding is tightened between NAV_ROW_MIN_WIDTH and
+# NAV_ROW_ROOMY_WIDTH -- a 1,366 px laptop keeps the whole row rather
+# than folding it away, and a wide screen keeps the roomier buttons.
+#
+# The phone layout runs to NAV_PHONE_MAX_WIDTH: from 600 px to 719 px the
+# full badge and the name in the account menu did not fit beside the menu
+# and search buttons. And below 375 px -- the narrowest common phone is
+# 360 -- the name beside the logo goes, rather than shrinking the buttons
+# below the size of a fingertip.
 #
 # Everything is shown or hidden with VECTOR's own classes and !important:
 # Quasar's utilities -- .block, .row -- are !important themselves, and sit
 # in a layer that outranks this CSS.
-NAV_ROW_MIN_WIDTH = 1320
+NAV_ROW_MIN_WIDTH = 1344
+NAV_PHONE_MAX_WIDTH = 720
 NAV_ROW_ROOMY_WIDTH = 1600
 
 _NAV_CSS = f"""
@@ -132,7 +174,7 @@ _NAV_CSS = f"""
         padding-right: 8px !important;
     }}
 }}
-@media (max-width: 599.98px) {{
+@media (max-width: {NAV_PHONE_MAX_WIDTH - 0.02}px) {{
     .nav-not-phone {{ display: none !important; }}
     .case-badge {{ padding: 4px 8px !important; font-size: 11px !important; }}
     .nav-brand {{ margin-right: 0 !important; }}
@@ -142,8 +184,11 @@ _NAV_CSS = f"""
         padding-right: 8px !important;
     }}
 }}
-@media (min-width: 600px) {{
+@media (min-width: {NAV_PHONE_MAX_WIDTH}px) {{
     .nav-phone {{ display: none !important; }}
+}}
+@media (max-width: 374.98px) {{
+    .nav-brand {{ display: none !important; }}
 }}
 """
 
@@ -181,6 +226,7 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
         username: The current user's display name.
     """
     ui.add_css(_NAV_CSS)
+    dark = apply_theme()
 
     with ui.header().classes("items-center bg-dark no-print"):
 
@@ -259,9 +305,14 @@ def build_navbar(is_admin: bool = False, username: str = "Guest") -> None:
         # ----- Spacer -----
         ui.space()
 
+        # ----- Search the whole case -----
+        search_button()
         # ----- Account menu -----
         # With the name on a wider screen, and just the icon on a phone.
         account_items = [
+            (THEME_ITEM, lambda: flip_theme(dark)),
+            ("---", None),
+        ] + [
             (label, _go(route)) for label, route in account_menu(is_admin)
         ]
         _nav_dropdown(

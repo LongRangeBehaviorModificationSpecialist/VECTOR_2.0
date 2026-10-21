@@ -30,6 +30,7 @@ from auth import require_session
 from failures import explain, log
 from live import refresh_on_change
 from models import get_session
+from parts.drafts import clear_draft, load_draft, save_draft
 from parts.crud_dialogs import (
     delete_all_section,
     open_delete_dialog,
@@ -100,6 +101,8 @@ class CrudSpec:
                     number
     searchable:     whether a search box appears above the table. On for
                     every table that grows; off for the one-row case
+    form_hint:      a line under the add form, saying something about how
+                    it behaves -- which fields stay filled in, say
     """
 
     model: type
@@ -132,6 +135,7 @@ class CrudSpec:
     delete_note: Optional[Callable[[dict], str]] = None
     live_defaults: tuple = ()
     searchable: bool = True
+    form_hint: str = ""
 
     def __post_init__(self):
         self.entity_plural = self.entity_plural or f"{self.entity}s"
@@ -142,6 +146,15 @@ class CrudSpec:
         self.empty_text = (
             self.empty_text or f"No {self.entity_plural} have been entered"
         )
+
+
+def _asked_for(name: str) -> str:
+    """A value from the page's address, such as ?find=..., or ""."""
+    try:
+        return str(ui.context.client.request.query_params.get(name, ""))[:200]
+    except Exception:
+        # No page request in scope: a test, or a page being rebuilt.
+        return ""
 
 
 # ----- The builder -----
@@ -227,6 +240,23 @@ def build_crud_page(spec: CrudSpec) -> None:
 
             with form_body:
 
+                # Shown when the form opens with what was typed before and
+                # not saved -- see parts/drafts.py.
+                with ui.row().classes(
+                    "w-full items-center gap-2 mb-2 draft-note"
+                ) as draft_note:
+                    ui.icon("restore", color="warning").classes("text-xl")
+                    ui.label(
+                        "Filled in from before: this was typed here and not "
+                        "saved yet."
+                    ).classes("text-sm text-[#F5B027] grow")
+                    ui.button(
+                        "Discard",
+                        on_click=lambda: _clear_form(),
+                        color="transparent",
+                    ).props("flat dense").classes("hover-border-blue")
+                draft_note.set_visibility(False)
+
                 def _render_fields(fields) -> None:
                     for spec_field in fields:
                         default = (
@@ -238,9 +268,14 @@ def build_crud_page(spec: CrudSpec) -> None:
 
                 if spec.form_columns == 2:
                     # Evidence has fourteen fields; one column makes the
-                    # agent scroll while logging an item.
+                    # agent scroll while logging an item. But only where
+                    # there is room: on a phone two columns of half a
+                    # screen each cut every label short, so below a
+                    # tablet's width the halves stack, in the same order.
                     half = (len(form_fields) + 1) // 2
-                    with ui.grid(columns=2).classes("w-full gap-6 items-start"):
+                    with ui.grid().classes(
+                        "w-full gap-6 items-start grid-cols-1 md:grid-cols-2"
+                    ):
                         with ui.column().classes("gap-4"):
                             _render_fields(form_fields[:half])
                         with ui.column().classes("gap-4"):
@@ -250,6 +285,11 @@ def build_crud_page(spec: CrudSpec) -> None:
 
                 if spec.on_form_ready:
                     spec.on_form_ready(form_widgets)
+
+                if spec.form_hint:
+                    ui.label(spec.form_hint).classes(
+                        "w-full text-sm text-[var(--vsp-gray)] mt-2"
+                    )
 
                 with ui.row().classes("w-full justify-end gap-2 mt-4"):
                     ui.button(
@@ -264,10 +304,15 @@ def build_crud_page(spec: CrudSpec) -> None:
                         color="var(--vsp-blue)").props("push"
                     ).classes("p-3 hover-border-white")
 
-        def _clear_form() -> None:
+        def _clear_form(after_add: bool = False) -> None:
+            """Empties the add form. After a record is saved, the fields
+            marked keep_after_add stay as they are, for the next one."""
+            drafting["on"] = False
             for spec_field in spec.fields:
                 widget = form_widgets.get(spec_field.name)
                 if widget is None:
+                    continue
+                if after_add and spec_field.keep_after_add:
                     continue
                 if spec_field.default:
                     widget.value = spec_field.default()
@@ -275,6 +320,59 @@ def build_crud_page(spec: CrudSpec) -> None:
                     widget.value = None
                 else:
                     widget.value = ""
+            # Saved, or cleared on purpose: nothing left to keep.
+            clear_draft(spec.title)
+            draft_note.set_visibility(False)
+            drafting["on"] = True
+
+        # ----- What was typed and not saved -----
+        # Kept as it is typed, and put back when the form next opens, so
+        # an idle sign-out or a dropped connection does not lose it. Only
+        # what someone typed or chose: not a number VECTOR hands out.
+        drafting = {"on": False}
+        typed_fields = [f for f in form_fields if not f.readonly]
+
+        def _keep_draft(_event=None) -> None:
+            if not drafting["on"]:
+                return
+            values = {}
+            for spec_field in typed_fields:
+                value = form_widgets[spec_field.name].value
+                if value in (None, ""):
+                    continue
+                if spec_field.default and value == spec_field.default():
+                    continue
+                values[spec_field.name] = value
+            save_draft(spec.title, values)
+
+        def _restore_draft() -> None:
+            saved = load_draft(spec.title)
+            restored = False
+            for spec_field in typed_fields:
+                if spec_field.name not in saved:
+                    continue
+                widget = form_widgets[spec_field.name]
+                value = saved[spec_field.name]
+                if spec_field.kind == "select":
+                    # A room or agent since deleted is still put back.
+                    widget.set_options(
+                        options_including(widget.options, value), value=value
+                    )
+                else:
+                    widget.value = value
+                restored = True
+            draft_note.set_visibility(restored)
+
+        try:
+            _restore_draft()
+        except Exception:
+            # A draft that no longer fits the form is not worth a page
+            # that will not open.
+            log.exception("Could not restore a draft on %s", spec.title)
+            clear_draft(spec.title)
+        drafting["on"] = True
+        for spec_field in typed_fields:
+            form_widgets[spec_field.name].on_value_change(_keep_draft)
 
         def _submit() -> None:
             values = _values_from(form_widgets, spec.fields)
@@ -310,7 +408,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                 f"{spec.entity.title()} "
                 f"{values.get(spec.label_field, '')} was added."
             )
-            _clear_form()
+            _clear_form(after_add=True)
             refresh_table()
 
         _submit = guard(_submit)
@@ -329,6 +427,11 @@ def build_crud_page(spec: CrudSpec) -> None:
             ).props("dense outlined clearable").classes(
                 "w-full max-w-md mb-2"
             )
+            # Opened from the search in the top bar: the table starts
+            # filtered to what was searched for.
+            searched_for = _asked_for("find")
+            if searched_for:
+                search_box.value = searched_for
 
         # Wide enough for a long evidence row, and never wider than
         # the window: the table scrolls inside itself instead of taking

@@ -26,6 +26,7 @@ ACTION_CHOICES = [
     "CREATE",
     "DELETE",
     "DELETE_ALL",
+    "DEMO_SEED",
     "DOWNLOAD",
     "EXPORT",
     "IMPORT",

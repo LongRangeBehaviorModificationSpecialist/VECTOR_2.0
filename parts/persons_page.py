@@ -10,7 +10,7 @@ from auth import get_current_user_name, get_is_admin
 from models import Persons
 from navbar import build_navbar
 from parts.crud import CrudSpec, Field, build_crud_page
-from utils import get_current_timestamp, validate_person_data
+from utils import format_phone, get_current_timestamp, validate_person_data
 
 
 def _validate(stage: str, values: dict, row: dict | None) -> bool:
@@ -44,11 +44,15 @@ SPEC = CrudSpec(
             props='mask="##-##-####"',
         ),
         Field("PERSONADDRESS", "Address"),
+        # As on the Agents page: typed any way, a US number is saved as
+        # (703) 555-1234, with any extension; anything else as typed. The
+        # mask here forced exactly ten digits, so a foreign number or an
+        # extension could not be entered for anyone at the scene.
         Field(
             "PERSONPHONE",
             "Phone Number",
-            placeholder="(###) ###-####",
-            props='mask="(###) ###-####"',
+            placeholder="(703) 555-1234 x12",
+            tidy=format_phone,
         ),
         Field("PERSONNOTE", "Notes", required=True),
         Field(
