@@ -166,11 +166,28 @@ SPEC = CrudSpec(
             readonly=True,
             default=get_next_evid_num,
         ),
-        Field("EVIDQTY", "Quantity", table_label="Qty", required=True),
-        Field("EVIDDESC", "Evidence Description", table_label="Description",
-              required=True),
-        Field("EVIDMODELNUMBER", "Model Number", table_label="Model #"),
-        Field("EVIDSERIALNUMBER", "Serial Number", table_label="Serial #"),
+        Field(
+            "EVIDQTY",
+            "Quantity",
+            table_label="Qty",
+            required=True
+        ),
+        Field(
+            "EVIDDESC",
+            "Evidence Description",
+            table_label="Description",
+            required=True
+        ),
+        Field(
+            "EVIDMODELNUMBER",
+            "Model Number",
+            table_label="Model #"
+        ),
+        Field(
+            "EVIDSERIALNUMBER",
+            "Serial Number",
+            table_label="Serial #"
+        ),
         Field(
             "EVIDLOCROOM",
             "Room Located",
@@ -179,8 +196,12 @@ SPEC = CrudSpec(
             required=True,
             options=load_room_labels,
         ),
-        Field("EVIDLOCROOMDETAIL", "Where Located", table_label="Where",
-              required=True),
+        Field(
+            "EVIDLOCROOMDETAIL",
+            "Where Located",
+            table_label="Where",
+            required=True
+        ),
         Field(
             "EVIDFOUNDBY",
             "Found By",
@@ -195,20 +216,37 @@ SPEC = CrudSpec(
             required=True,
             options=load_agent_names,
         ),
-        Field("EVIDPICTAKEN", "Item Photographed", table_label="Photo",
-              kind="select", options=lambda: YES_NO),
-        Field("EVIDTRIAGED", "Item Triaged?", table_label="Triaged",
-              kind="select", options=lambda: YES_NO),
+        Field(
+            "EVIDPICTAKEN",
+            "Item Photographed",
+            table_label="Photo",
+            kind="select",
+            options=lambda: YES_NO
+        ),
+        Field(
+            "EVIDTRIAGED",
+            "Item Triaged?",
+            table_label="Triaged",
+            kind="select",
+            options=lambda: YES_NO
+        ),
         Field(
             "EVIDTRIAGEDBY",
             "Triaged By",
             kind="select",
             options=load_agent_names,
         ),
-        Field("EVIDISCONTRABAND", "Contains Contraband?",
-              table_label="Contraband", kind="select",
-              options=lambda: CONTRABAND),
-        Field("EVIDNOTE", "Notes"),
+        Field(
+            "EVIDISCONTRABAND",
+            "Contains Contraband?",
+            table_label="Contraband",
+            kind="select",
+            options=lambda: CONTRABAND
+        ),
+        Field(
+            "EVIDNOTE",
+            "Notes"
+        ),
         Field(
             "ENTEREDDATETIME",
             "Entered",
