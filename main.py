@@ -518,10 +518,12 @@ def change_password_page():
 
                 ui.notify(
                     "Password changed."
-                    + ("" if ended else
-                       " Other devices signed in to this account could "
-                       "NOT be signed out; ask an administrator to use "
-                       "Sign Everyone Out."),
+                    + (
+                        "" if ended else
+                        " Other devices signed in to this account could "
+                        "NOT be signed out; ask an administrator to use "
+                        "Sign Everyone Out."
+                    ),
                     timeout=WARN_TIMEOUT,
                     position="bottom",
                     close_button="OK",
