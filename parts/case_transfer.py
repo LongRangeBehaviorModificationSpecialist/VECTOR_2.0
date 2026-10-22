@@ -276,10 +276,9 @@ def open_import_dialog() -> None:
 
             dialog.close()
 
-            # A .json, or a .zip holding one, goes through
-            # the JSON reader; the CSV archive is also a
-            # .zip, so the contents decide, not the suffix
-            # alone.
+            # A .json, or a .zip holding one, goes through the JSON
+            # reader; the CSV archive is also a .zip, so the contents
+            # decide, not the suffix alone.
             try:
                 if looks_like_json_export(path):
                     import_vector_from_json(
