@@ -333,7 +333,9 @@ def build_login_home():
             # bcrypt takes a quarter of a second by design. In a thread,
             # that quarter second is this sign-in's alone.
             correct = account is not None and await run.io_bound(
-                password_matches, entered_pass, account["PASSWORDHASH"]
+                password_matches,
+                entered_pass,
+                account["PASSWORDHASH"],
             )
 
             if correct:
@@ -442,10 +444,10 @@ def about_page():
 
         with ui.card().classes("p-6"):
 
-            ui.label(f"Version  :  {Config.version}").classes("mb-2")
-            ui.label(f"Authors  :  {Config.authors}").classes("mb-2")
-            ui.label(f"Department  :  {Config.dept}").classes("mb-2")
-            ui.label(f"URL : {Config.url}").classes("mb-2")
+            ui.label(f"Version       :  {Config.version}").classes("mb-2")
+            ui.label(f"Authors       :  {Config.authors}").classes("mb-2")
+            ui.label(f"Department    :  {Config.dept}").classes("mb-2")
+            ui.label(f"URL           :  {Config.url}").classes("mb-2")
             ui.label(f"Last Updated  :  {Config.updated}").classes("mb-2")
 
 
@@ -498,7 +500,7 @@ def confirm_new_case_handler() -> None:
 
             ui.button(
                 "Cancel",
-                on_click=warn_dialog.close
+                on_click=warn_dialog.close,
             ).props("flat").classes("p-3 hover-border-blue")
 
             @require_session
