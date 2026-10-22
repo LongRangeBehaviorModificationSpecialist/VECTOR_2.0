@@ -82,9 +82,7 @@ def build_link_section(title: str, icon: str, links: dict[str, str]) -> None:
     ).classes("w-full").props("default-opened"):
 
         with ui.row().classes("w-full flex-wrap gap-2"):
-
             for name, url in links.items():
-
                 ui.button(
                     name,
                     on_click=lambda u=url: ui.navigate.to(
@@ -106,11 +104,9 @@ def build_links_page() -> None:
     )
 
     with ui.column().classes("w-full max-w-4xl mx-auto p-4 gap-4"):
-
         ui.label(
             "Useful Links"
         ).classes("text-2xl font-bold mb-4")
-
         ui.label(
             "Quick access to frequently used resources. "
             "Click any link to open it in a new tab."
