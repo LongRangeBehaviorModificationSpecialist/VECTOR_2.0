@@ -21,8 +21,10 @@ from parts.file_table import files_table
 
 DOWNLOAD_SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
-    "Content-Security-Policy": "sandbox",  # even if opened inline, no scripts run
-    "Cache-Control": "no-store",  # don't leave evidence in browser/proxy caches
+    # even if opened inline, no scripts run
+    "Content-Security-Policy": "sandbox",
+    # don't leave evidence in browser/proxy caches
+    "Cache-Control": "no-store",
 }
 
 # ----- Downloads -----
@@ -32,7 +34,9 @@ def content_disposition(filename: str) -> str:
         char if 32 <= ord(char) < 127 and char not in '"\\' else "_"
         for char in filename
     ) or "attachment"
-    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename)}"
+    return (
+        f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename)}"
+    )
 
 
 @app.get("/attachments/{file_id}")

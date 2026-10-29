@@ -96,9 +96,10 @@ def show_chain_check() -> None:
         ).classes("text-xs text-gray-400 mb-4")
 
         with ui.row().classes("w-full justify-end"):
-            ui.button("Close", on_click=result.close).props("flat").classes(
-                "p-3 hover-border-blue"
-            )
+            ui.button(
+                "Close",
+                on_click=result.close
+            ).props("flat").classes("p-3 hover-border-blue")
 
     result.open()
 

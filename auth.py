@@ -83,6 +83,7 @@ def _signed_in() -> bool:
             return False
 
         return True
+
     except Exception:
         # No request in scope; see the note above.
         return False
@@ -251,6 +252,7 @@ def require_session(handler):
             if not is_authenticated():
                 leave_ended_session()
                 return None
+
             return await handler(*args, **kwargs)
 
         return async_guarded
@@ -260,6 +262,7 @@ def require_session(handler):
         if not is_authenticated():
             leave_ended_session()
             return None
+
         return handler(*args, **kwargs)
 
     return guarded
@@ -305,6 +308,7 @@ def invalidate_user_sessions(user_name: str) -> bool:
     except Exception:
         log.exception("Could not end the sessions of %s", user_name)
         return False
+
     return True
 
 
@@ -318,6 +322,7 @@ def invalidate_all_sessions() -> bool:
     except Exception:
         log.exception("Could not end every session")
         return False
+
     return True
 
 
@@ -348,14 +353,18 @@ def lockout_seconds_remaining(user_name: str) -> int:
     record = _failures().get(user_name)
     if not record:
         return 0
+
     locked_until = record.get("locked_until")
     if not locked_until:
         return 0
+
     try:
         expiry = datetime.fromisoformat(locked_until)
     except (TypeError, ValueError):
         return 0
+
     remaining = (expiry - _now()).total_seconds()
+
     return max(0, int(remaining))
 
 
@@ -368,6 +377,7 @@ def failure_delay_seconds(user_name: str) -> float:
     count = _failures().get(user_name, {}).get("count", 0)
     if count < SLOW_AFTER_FAILURES:
         return 0.0
+
     return min(2.0, 0.5 * (count - SLOW_AFTER_FAILURES + 1))
 
 
@@ -427,6 +437,7 @@ def record_login_failure(user_name: str) -> int:
 
     failures[user_name] = record
     _save_failures(failures)
+
     return count
 
 
@@ -452,6 +463,7 @@ def require_login(page_builder):
         if not is_authenticated():
             ui.navigate.to(where_to_sign_in())
             return None
+
         return page_builder(*args, **kwargs)
 
     return guarded
@@ -465,6 +477,7 @@ def require_admin(page_builder):
         if not is_authenticated():
             ui.navigate.to(where_to_sign_in())
             return None
+
         if not get_is_admin():
             ui.notify(
                 "Admin access is required to access this page.",
@@ -475,6 +488,7 @@ def require_admin(page_builder):
             )
             ui.navigate.to("/")
             return None
+
         return page_builder(*args, **kwargs)
 
     return guarded

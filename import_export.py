@@ -263,7 +263,6 @@ def get_case_info_for_folder_name() -> str:
             return ""
 
         case_number = safe_file_name(case.CASENUMBER or "UNKNOWN")
-
         begin_dt = case.CASEDATETIMEBEGIN or "UNKNOWN"
 
         # Format the datetime
@@ -709,7 +708,6 @@ def _import_csv_archive(
                 )
                 return
         else:
-
             # ----- Extract without password -----
             try:
                 with pyzipper.AESZipFile(zip_file, "r") as zf:
@@ -820,6 +818,7 @@ def _import_csv_archive(
             )
             if archive_name:
                 manifest_files[archive_name] = entry
+
     hash_mismatches = []
     unlisted_files = []
     stage = "the case"
@@ -844,8 +843,9 @@ def _import_csv_archive(
                         for col_name in columns:
                             if col_name in row:
                                 raw_value = row[col_name]
+                                # Skip binary columns
                                 if raw_value == "[BINARY_DATA]":
-                                    continue  # Skip binary columns
+                                    continue
                                 record_data[col_name] = deserialize_value(
                                     raw_value,
                                     column_objects[col_name],
@@ -1013,25 +1013,30 @@ def _json_to_value(value, column):
 
     if isinstance(column_type, LargeBinary):
         return base64.b64decode(value)
+
     if isinstance(column_type, Boolean):
         if isinstance(value, bool):
             return value
         return str(value).lower() in ("true", "1", "yes", "t")
+
     if isinstance(column_type, Integer):
         try:
             return int(value)
         except (TypeError, ValueError):
             return None
+
     if isinstance(column_type, Float):
         try:
             return float(value)
         except (TypeError, ValueError):
             return None
+
     if isinstance(column_type, DateTime):
         try:
             return datetime.fromisoformat(str(value))
         except (TypeError, ValueError):
             return None
+
     return value
 
 
@@ -1179,7 +1184,7 @@ def export_vector_to_json(
                 handle,
                 indent=4,
                 ensure_ascii=False,
-                default=str
+                default=str,
             )
 
         if password:
@@ -1218,11 +1223,11 @@ def export_vector_to_json(
                     "destination": str(final_path.name),
                     "date/time": payload.get("export_metadata", {}).get(
                         "export_date",
-                        "unknown"
+                        "unknown",
                     ),
                     "format_version": payload.get("export_metadata", {}).get(
                         "format_version",
-                        "unknown"
+                        "unknown",
                     ),
                     "records": total_records,
                     "files": len(file_records),
@@ -1457,11 +1462,11 @@ def _import_json_file(
                     "source": str(source),
                     "exported": payload.get("export_metadata", {}).get(
                         "export_date",
-                        "unknown"
+                        "unknown",
                     ),
                     "format_version": payload.get("export_metadata", {}).get(
                         "format_version",
-                        "unknown"
+                        "unknown",
                     ),
                     "hash_mismatches": hash_mismatches,
                 },

@@ -182,50 +182,6 @@ def build_crud_page(spec: CrudSpec) -> None:
 
         form_fields = [f for f in spec.fields if f.in_form]
 
-        # with ui.card().classes(f"w-full {spec.card_width} mx-auto p-6"):
-
-        #     def _render_fields(fields) -> None:
-        #         for spec_field in fields:
-        #             default = (
-        #                 spec_field.default() if spec_field.default else None
-        #             )
-        #             form_widgets[spec_field.name] = _make_widget(
-        #                 spec_field, default
-        #             )
-
-        #     if spec.form_columns == 2:
-        #         # Evidence has fourteen fields; one column makes the
-        #         # agent scroll while logging an item.
-        #         half = (len(form_fields) + 1) // 2
-        #         with ui.grid(columns=2).classes("w-full gap-6 items-start"):
-        #             with ui.column().classes("gap-4"):
-        #                 _render_fields(form_fields[:half])
-        #             with ui.column().classes("gap-4"):
-        #                 _render_fields(form_fields[half:])
-        #     else:
-        #         _render_fields(form_fields)
-
-        #     if spec.on_form_ready:
-        #         spec.on_form_ready(form_widgets)
-
-        #     limit_note = ui.label(spec.limit_message).classes(
-        #         "w-full text-sm text-[#F5B027]"
-        #     )
-        #     limit_note.set_visibility(False)
-
-        #     with ui.row().classes("w-full justify-end gap-2 mt-4"):
-        #         ui.button(
-        #             "Clear",
-        #             on_click=lambda: _clear_form(),
-        #             color="transparent").props("flat"
-        #         ).classes("p-3 hover-border-blue")
-
-        #         submit_button = ui.button(
-        #             spec.submit_label,
-        #             on_click=lambda: _submit(),
-        #             color="var(--vsp-blue)").props("push"
-        #         ).classes("p-3 hover-border-white")
-
         with ui.card().classes(f"w-full {spec.card_width} mx-auto p-6"):
 
             # Shown in place of the form while the table is full.
@@ -447,14 +403,6 @@ def build_crud_page(spec: CrudSpec) -> None:
                     getattr(record, spec_field.name, "") or ""
                 )
             return row
-
-        # def _apply_record_limit(count: int) -> None:
-        #     """Closes the add form while the table holds all it may."""
-        #     if not spec.max_records:
-        #         return
-        #     full = count >= spec.max_records
-        #     submit_button.set_enabled(not full)
-        #     limit_note.set_visibility(full)
 
         def _apply_record_limit(count: int) -> None:
             """While the table holds all it may, the card shows only the

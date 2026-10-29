@@ -86,9 +86,7 @@ def add_user_card(refresh_users: Callable[[], None]) -> None:
                 return
 
             with get_users_session() as session:
-
                 if session.query(Users).filter_by(USERNAME=uname).first():
-
                     ui.notify(
                         "That username already exists.",
                         type="warning",
@@ -118,17 +116,40 @@ def add_user_card(refresh_users: Callable[[], None]) -> None:
                 actor=get_current_user_name(),
             )
 
-            ui.notify(
-                f"User '{uname}' created.\n\n"
-                f"One-time password:  {one_time}\n\n"
-                "This is shown once and cannot be recovered. They "
-                "will be asked to change it at first sign-in.",
-                multi_line=True,
-                classes="multi-line-notification",
-                timeout=ZERO_TIMEOUT,
-                position="center",
-                close_button="OK",
-            )
+            with ui.dialog() as confirm_user_dialog, ui.card(
+                ).classes("max-w-md p-6"
+            ):
+                ui.label("New User Created").classes(
+                    "mb-2 text-xl font-bold text-[var(--vsp-blue)]")
+
+                with ui.row().classes("w-full mb-2"):
+                    ui.label(
+                        "User created successfully :"
+                    ).classes("text-base")
+                    ui.label(f"{uname}").classes(
+                        "text-base font-semibold text-[#F5B027]")
+
+                with ui.row().classes("w-full mb-2"):
+                    ui.label(
+                        f"New user's one-time password :"
+                    ).classes("text-base")
+                    ui.label(f"{one_time}").classes(
+                            "text-base font-semibold text-[#F5B027]"
+                        )
+
+                ui.label(
+                    "This password is only shown once and cannot be recovered. "
+                    "They will be asked to change it at first sign-in."
+                ).classes("mb-6 text-base text-[var(--vsp-gray)]")
+
+                with ui.row().classes("w-full justify-end gap-2"):
+                    ui.button(
+                        "Okay",
+                        on_click=confirm_user_dialog.close,
+                        color="var(--vsp-blue)",
+                    ).props("push").classes("w-25 p-3 hover-border-white")
+
+            confirm_user_dialog.open()
 
             new_username.value = ""
             refresh_users()
@@ -164,13 +185,11 @@ def users_table() -> Callable[[], None]:
                 table_container.clear()
 
                 with get_users_session() as session:
-
                     users = (
                         session.query(Users)
                         .order_by(Users.USERNAME)
                         .all()
                     )
-
                     rows = [
                         {
                             "Z_PK": u.Z_PK,
@@ -253,8 +272,8 @@ def users_table() -> Callable[[], None]:
                         """
                         <q-td :props="props">
                             <span v-if="props.row.locked"
-                                  class="text-red-500"
-                                  style="font-weight:600">
+                                class="text-red-500"
+                                style="font-weight:600">
                                 {{ props.row.locked }}
                             </span>
                             <span v-else class="text-green-500">OK</span>
@@ -267,13 +286,16 @@ def users_table() -> Callable[[], None]:
                         """
                         <q-td :props="props">
                             <div class="row no-wrap gap-1">
-                                <q-btn dense flat color="warning" \
-                                icon="refresh" size="sm"
+                                <q-btn dense flat
+                                color="warning" \
+                                icon="refresh"
+                                size="sm"
                                 style="color: #2984D1;"
                                 title="Reset Password"
                                     @click="$parent.$emit('reset', \
                                     props.row)" />
-                                <q-btn dense flat icon="lock_open"
+                                <q-btn dense flat
+                                    icon="lock_open"
                                     size="sm"
                                     style="color: #F59E0B;"
                                     title="Clear sign-in lock"
@@ -282,7 +304,8 @@ def users_table() -> Callable[[], None]:
                                     props.row)" />
                                 <q-btn dense flat color="negative" \
                                 icon="delete"
-                                    size="sm" title="Delete User"
+                                    size="sm"
+                                    title="Delete User"
                                     :disable="props.row.ISADMIN === 'True'"
                                     @click="$parent.$emit('delete', \
                                     props.row)" />
@@ -304,12 +327,10 @@ def users_table() -> Callable[[], None]:
                                 "mb-3 text-lg font-semibold "
                                 "text-[var(--vsp-blue)]"
                             )
-
                             ui.label(
                                 f"Generate a new one-time password for "
                                 f"{row['USERNAME']}?"
                             ).classes("mb-2")
-
                             ui.label(
                                 "Their current password stops working "
                                 "immediately and any session they have "
@@ -320,7 +341,6 @@ def users_table() -> Callable[[], None]:
                             with ui.row().classes(
                                 "w-full justify-end gap-2"
                             ):
-
                                 ui.button(
                                     "Cancel",
                                     on_click=reset_dialog.close,
@@ -337,13 +357,11 @@ def users_table() -> Callable[[], None]:
                                         return
 
                                     with get_users_session() as session:
-
                                         user = (
                                             session.query(Users)
                                             .filter_by(Z_PK=row["Z_PK"])
                                             .first()
                                         )
-
                                         one_time = None
                                         if user:
                                             one_time = (
@@ -379,8 +397,10 @@ def users_table() -> Callable[[], None]:
                                         summary=(
                                             f"{row['USERNAME']}: a new "
                                             "one-time password, sessions "
-                                            + ("ended" if ended else
-                                               "NOT ended")
+                                            + (
+                                                "ended" if ended else
+                                                "NOT ended"
+                                            )
                                         ),
                                         actor=get_current_user_name(),
                                     )
@@ -390,8 +410,7 @@ def users_table() -> Callable[[], None]:
                                         f"'{row['USERNAME']}' reset.\n\n"
                                         f"One-time password:  "
                                         f"{one_time}\n\n"
-                                        "Shown once, and cannot be "
-                                        "recovered. "
+                                        "Shown once, and cannot be recovered."
                                         + (
                                             "Any session they had open "
                                             "has been ended."
@@ -444,7 +463,6 @@ def users_table() -> Callable[[], None]:
                                 "mb-3 text-lg font-semibold "
                                 "text-[var(--vsp-blue)]"
                             )
-
                             ui.label(
                                 f"Are you sure you want to delete user "
                                 f"'{row['USERNAME']}'? This cannot be "
@@ -454,7 +472,6 @@ def users_table() -> Callable[[], None]:
                             with ui.row().classes(
                                 "w-full justify-end gap-2"
                             ):
-
                                 ui.button(
                                     "Cancel",
                                     on_click=delete_dialog.close,
@@ -470,7 +487,6 @@ def users_table() -> Callable[[], None]:
                                         return
 
                                     with get_users_session() as session:
-
                                         user = (
                                             session.query(Users)
                                             .filter_by(Z_PK=row["Z_PK"])
@@ -502,7 +518,9 @@ def users_table() -> Callable[[], None]:
                                     ended = invalidate_user_sessions(
                                         row["USERNAME"]
                                     )
+
                                     clear_login_failures(row["USERNAME"])
+
                                     if deleted:
                                         record_account_event(
                                             action="USER_DELETED",
@@ -510,8 +528,10 @@ def users_table() -> Callable[[], None]:
                                             summary=(
                                                 f"{row['USERNAME']}, "
                                                 "sessions "
-                                                + ("ended" if ended else
-                                                   "NOT ended")
+                                                + (
+                                                    "ended" if ended else
+                                                    "NOT ended"
+                                                )
                                             ),
                                             actor=get_current_user_name(),
                                         )
@@ -586,8 +606,8 @@ def session_controls() -> None:
         ui.label("Sessions").classes("text-xl font-bold mb-2")
 
         ui.label(
-            "Ends every signed-in session, on every device, at once. "
-            "Everyone signs in again; nothing else is affected."
+            "Ends every signed-in session, on every device, at once.  "
+            "Everyone signs in again. Nothing else is affected."
         ).classes("text-sm text-gray-400 mb-3 text-center max-w-lg")
 
         def open_sign_out_all_dialog() -> None:
@@ -627,6 +647,7 @@ def session_controls() -> None:
                             )
                             dialog.close()
                             return
+
                         record_account_event(
                             action="SIGN_OUT_ALL",
                             table_name="(session)",
@@ -663,7 +684,8 @@ def network_access_card() -> None:
     """
     with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
 
-        ui.label("Network access").classes("text-lg font-semibold mb-2")
+        ui.label("Network Access").classes(
+            "text-lg font-semibold mb-2 text-[var(--vsp-blue)]")
 
         if settings.reachable_now():
             addresses = settings.addresses_for_other_devices()
@@ -674,12 +696,12 @@ def network_access_card() -> None:
                 "The address to give them is on the Connect a Device page."
             )
             ui.label(
-                "Right now: other devices on this network can reach "
+                "Right now, other devices on this network can reach "
                 f"VECTOR. {where}"
             ).classes("text-sm text-[#F5B027] mb-3")
         else:
             ui.label(
-                "Right now: VECTOR is answering on this machine only."
+                "Right now, VECTOR is answering on this machine only."
             ).classes("text-sm text-[var(--vsp-gray)] mb-3")
 
         switch = ui.switch(
@@ -709,8 +731,8 @@ def network_access_card() -> None:
 
             ui.notify(
                 ("Other devices will be able to reach VECTOR "
-                 if allowed else
-                 "VECTOR will answer on this machine only ")
+                if allowed else
+                "VECTOR will answer on this machine only ")
                 + "the next time it starts.",
                 type="info",
                 timeout=ZERO_TIMEOUT,
