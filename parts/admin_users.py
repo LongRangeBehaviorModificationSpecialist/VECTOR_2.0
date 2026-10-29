@@ -131,7 +131,7 @@ def add_user_card(refresh_users: Callable[[], None]) -> None:
 
                 with ui.row().classes("w-full mb-2"):
                     ui.label(
-                        f"New user's one-time password :"
+                        "New user's one-time password :"
                     ).classes("text-base")
                     ui.label(f"{one_time}").classes(
                             "text-base font-semibold text-[#F5B027]"
