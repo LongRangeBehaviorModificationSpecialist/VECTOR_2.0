@@ -492,6 +492,21 @@ def test_an_item_is_kept_whole_on_a_printed_sheet(populated):
     assert by_room.count('<tbody class="detail-item">') == items
 
 
+def test_a_report_ending_at_the_foot_of_a_sheet_leaves_no_blank_sheet():
+    """The page's padding under the last line started a sheet of its own
+    when a report ended at the foot of one: the demo case's Evidence List
+    (By Room) printed on eight sheets, the eighth blank but for the
+    running line and its page number."""
+    import re
+    import parts.reports_page as reports
+    printing = reports.COMMON_STYLES[reports.COMMON_STYLES.index("@media print"):]
+    body = re.search(r"\n    body \{([^}]*)\}", printing)
+    assert body and "padding-bottom: 0;" in body.group(1)
+    # Nothing the print windows add puts padding back on paper.
+    for extra in (reports.PRINT_WINDOW_STYLES, reports.PRINT_ALL_STYLES):
+        assert "padding-bottom" not in extra
+
+
 # ----- The report on screen -----
 
 def test_the_report_on_screen_keeps_its_styles():

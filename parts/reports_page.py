@@ -944,9 +944,15 @@ border set on every .detail-table td above.
         display: none !important;
     }
 
+    /*
+    No padding under the report's last line on paper: when a report ended
+    at the foot of a sheet, the page's 1em of padding below it started a
+    sheet of its own, blank but for the running line and page number.
+    */
     body {
         background: white !important;
         color: black !important;
+        padding-bottom: 0;
     }
 
     .header-label {
