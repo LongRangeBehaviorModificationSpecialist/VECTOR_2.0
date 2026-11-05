@@ -8,35 +8,90 @@ record, and delete every record of that kind.
 
 They were written inside build_crud_page(), which ran to 514 lines. Each
 takes what it needs -- the page's spec, the row, the column labels for
-explaining a failure, and the function that redraws the table -- rather
-than closing over a builder's locals.
+explaining a failure, the function that redraws the table and the page's
+guard -- rather than closing over a builder's locals.
 
-parts/crud.py wires them to the table; the case guard stays there, on
-the handlers it hands to the table.
+parts/crud.py wires them to the table. Its guard -- a current session,
+an open case, and the case the page was opened on -- is checked again
+when a dialog is confirmed, not only when it is opened: a dialog can
+stay open while Start New Case runs on another tablet.
+
+And the record is checked as well: an edit or delete acts only on the
+record as it was when the dialog opened. Row numbers start again once a
+table is emptied, and a dialog that went by the number alone wrote over
+whichever record had it by then; it also let two agents overwrite each
+other's edits without either knowing.
 """
 
-from typing import Callable
+from typing import Callable, Optional
 
 from nicegui import ui
 
-from auth import require_session
 from failures import explain, log
 from models import get_session, has_active_case
 from parts.crud_widgets import (
     notify_done,
     notify_problem,
+    table_row,
     _make_widget,
     _values_from,
 )
+
+
+def _record_now(spec, row: dict):
+    """The record a row stands for, as the table holds it now, or None
+    when it has gone."""
+    with get_session() as session:
+        record = (
+            session.query(spec.model)
+            .filter_by(**{spec.row_key: row[spec.row_key]})
+            .first()
+        )
+        return table_row(spec, record) if record is not None else None
+
+
+def _same(now: Optional[dict], opened: dict) -> bool:
+    """Whether a record is still as a dialog was opened on it. Compared
+    field by field on what the table holds, whatever else the browser
+    sends back with the row."""
+    return now is not None and all(
+        opened.get(name) == value for name, value in now.items()
+    )
+
+
+def _changed_since(spec, opened: dict, refresh: Callable[[], None]) -> bool:
+    """True, having said so and redrawn the table, when the record is no
+    longer the one a dialog was opened on."""
+    now = _record_now(spec, opened)
+    if _same(now, opened):
+        return False
+    if now is None:
+        notify_problem(
+            f"That {spec.entity} no longer exists. It may have been "
+            "deleted on another device."
+        )
+    else:
+        notify_problem(
+            f"That {spec.entity} was changed on another device after this "
+            "was opened, so nothing was done. The list now shows it as it "
+            "is; open it again."
+        )
+    refresh()
+    return True
 
 
 def open_edit_dialog(
         spec,
         row: dict,
         labels: dict,
-        refresh: Callable[[], None]
+        refresh: Callable[[], None],
+        guard: Callable,
 ) -> None:
     """Edits one record, and redraws the table once it is saved."""
+    # The table can be a refresh behind the database.
+    if _changed_since(spec, row, refresh):
+        return
+
     with ui.dialog() as edit_dialog, ui.card().classes(
         "w-full max-w-lg p-6"
     ):
@@ -60,8 +115,8 @@ def open_edit_dialog(
             ).props("flat").classes("p-3 hover-border-blue")
 
             # A dialog can stay open while the session it came from is
-            # ended; the save checks again.
-            @require_session
+            # ended, or the case is replaced; the save checks again.
+            @guard
             def on_save_update() -> None:
                 values = _values_from(edit_widgets, spec.fields)
 
@@ -84,13 +139,11 @@ def open_edit_dialog(
                             )
                             .first()
                         )
-                        if record is None:
-                            notify_problem(
-                                f"That {spec.entity} no longer exists. It may "
-                                "have been deleted on another device."
-                            )
+                        if record is None or not _same(
+                            table_row(spec, record), row
+                        ):
                             edit_dialog.close()
-                            refresh()
+                            _changed_since(spec, row, refresh)
                             return
 
                         before = {
@@ -131,12 +184,15 @@ def open_delete_dialog(
         spec,
         row: dict,
         labels: dict,
-        refresh: Callable[[], None]
+        refresh: Callable[[], None],
+        guard: Callable,
 ) -> None:
     """Deletes one record, after saying what that will do."""
     # No button is drawn when deletes are off, but a crafted
     # event could still arrive, so refuse it here as well.
     if not spec.allow_delete:
+        return
+    if _changed_since(spec, row, refresh):
         return
     label = row.get(spec.label_field, "")
 
@@ -166,7 +222,7 @@ def open_delete_dialog(
                 color="transparent",
             ).props("flat").classes("p-3 hover-border-blue")
 
-            @require_session
+            @guard
             def on_confirm_delete() -> None:
                 try:
                     with get_session() as session:
@@ -178,23 +234,27 @@ def open_delete_dialog(
                             .first()
                         )
 
+                        if record is None or not _same(
+                            table_row(spec, record), row
+                        ):
+                            delete_dialog.close()
+                            _changed_since(spec, row, refresh)
+                            return
+
+                        removed = {
+                            spec_field.name: getattr(
+                                record, spec_field.name, None
+                            )
+                            for spec_field in spec.fields
+                        }
+
+                        session.delete(record)
                         follow_up = ""
-
-                        if record is not None:
-                            removed = {
-                                spec_field.name: getattr(
-                                    record, spec_field.name, None
-                                )
-                                for spec_field in spec.fields
-                            }
-
-                            session.delete(record)
-                            if spec.on_delete:
-                                session.flush()
-                                follow_up = (
-                                    spec.on_delete(session, removed)
-                                    or ""
-                                )
+                        if spec.on_delete:
+                            session.flush()
+                            follow_up = (
+                                spec.on_delete(session, removed) or ""
+                            )
 
                 except Exception as err:
                     log.exception(f"Could not delete a {spec.entity}")
@@ -254,7 +314,7 @@ def delete_all_section(
                             color="transparent",
                         ).props("flat").classes("p-3 hover-border-blue")
 
-                        @require_session
+                        @guard
                         def on_confirm_delete_all() -> None:
                             try:
                                 with get_session() as session:

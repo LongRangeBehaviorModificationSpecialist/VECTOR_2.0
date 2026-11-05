@@ -16,6 +16,7 @@ from nicegui import ui
 import mimetypes
 import re
 from models import (
+    case_generation,
     check_case_info,
     get_session,
     has_active_case,
@@ -33,7 +34,7 @@ from program.inc.agent_role import AGENT_ROLE_LIST
 from program.inc.agency_list import AGENCY_LIST
 from program.inc.jurisdictions import JURISDICTIONS
 from sqlalchemy import exists, inspect
-from typing import Optional
+from typing import Callable, Optional
 
 
 WARN_TIMEOUT = 6000
@@ -369,6 +370,87 @@ def require_active_case(func):
     return guarded
 
 
+CASE_CHANGED = (
+    "The case on this computer changed after this page was opened, so "
+    "this was not done. Reload the page to work in the case that is open "
+    "now. Anything typed here is still on screen to copy."
+)
+
+
+def _still_the_same_case(opened_on: str) -> bool:
+    """True while the case is the one a page was opened on; otherwise
+    says so and returns False."""
+    if case_generation() == opened_on:
+        return True
+
+    ui.notify(
+        CASE_CHANGED,
+        type="warning",
+        multi_line=True,
+        classes="multi-line-notification",
+        timeout=ZERO_TIMEOUT,
+        position="center",
+        close_button="OK",
+    )
+
+    return False
+
+
+def require_same_case(opened_on: str):
+    """Stops a page's add, edit, delete or upload once Start New Case, an
+    import or the demo case has put a different case on this computer.
+
+    opened_on is models.case_generation() as the page was drawn. Without
+    this a page left open on a tablet wrote into whatever case was open
+    when its button was pressed.
+    """
+    def decorate(func):
+        if iscoroutinefunction(func):
+            @wraps(func)
+            async def async_guarded(*args, **kwargs):
+                if not _still_the_same_case(opened_on):
+                    return None
+                return await func(*args, **kwargs)
+
+            return async_guarded
+
+        @wraps(func)
+        def guarded(*args, **kwargs):
+            if not _still_the_same_case(opened_on):
+                return None
+            return func(*args, **kwargs)
+
+        return guarded
+
+    return decorate
+
+
+def case_changed_banner(opened_on: str) -> Callable[[], None]:
+    """A line across the top of a page, shown once the case it was opened
+    on has been replaced. Returns what shows or hides it, for the page's
+    live refresh to call."""
+    with ui.row().classes(
+        "w-full max-w-3xl mx-auto items-center gap-3 p-3 my-2 rounded "
+        "border border-[#F5B027]"
+    ) as banner:
+        ui.icon("sync_problem", color="warning").classes("text-2xl")
+        ui.label(
+            "The case on this computer has changed since this page was "
+            "opened. Reload it before entering anything."
+        ).classes("text-sm text-[#F5B027] grow")
+        ui.button(
+            "Reload",
+            on_click=ui.navigate.reload,
+            color="var(--vsp-blue)",
+        ).props("push dense").classes("px-3 hover-border-white")
+    banner.set_visibility(False)
+
+    def settle() -> None:
+        banner.set_visibility(case_generation() != opened_on)
+
+    return settle
+
+
 @require_active_case
 def confirm_delete_all(action: str, callback):
     """Shows a confirmation dialog before executing a destructive action."""
@@ -595,6 +677,18 @@ def delete_all_data() -> None:
     The audit trail is deliberately NOT cleared -- it is append-only,
     and a wipe is exactly the event it exists to record.
     """
+    with get_session() as session:
+        clear_case(session)
+
+
+def clear_case(session) -> None:
+    """Deletes every row of case data inside the caller's transaction,
+    and records the wipe there.
+
+    For anything that wipes the case and puts something in its place --
+    the demo case -- so the two are committed together: a wipe committed
+    first, and a replacement that then failed, left no case at all.
+    """
     tables = [
         (Cases, "CASES"),
         (Agents, "AGENTS"),
@@ -605,24 +699,21 @@ def delete_all_data() -> None:
         (UploadedFiles, "FILES"),
     ]
 
-    with get_session() as session:
-        # query().delete() is a bulk statement and does not raise ORM
-        # events, so the flush listener never sees these. Count first,
-        # then record the wipe explicitly.
-        counts = {
-            name: session.query(model).count() for model, name in tables
-        }
+    # query().delete() is a bulk statement and does not raise ORM events,
+    # so the flush listener never sees these. Count first, then record the
+    # wipe explicitly.
+    counts = {name: session.query(model).count() for model, name in tables}
 
-        for model, _name in tables:
-            session.query(model).delete()
+    for model, _name in tables:
+        session.query(model).delete()
 
-        record_audit(
-            session,
-            action="DELETE_ALL",
-            table_name="(all case tables)",
-            summary=f"{sum(counts.values())} rows deleted",
-            before=counts,
-        )
+    record_audit(
+        session,
+        action="DELETE_ALL",
+        table_name="(all case tables)",
+        summary=f"{sum(counts.values())} rows deleted",
+        before=counts,
+    )
 
 
 def set_network_access(allowed: bool, actor: str = "") -> None:

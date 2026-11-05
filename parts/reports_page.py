@@ -43,6 +43,8 @@ import clock
 from failures import explain, log
 import settings
 from models import (
+    case_generation,
+    data_version,
     get_session,
     Agents,
     Cases,
@@ -635,8 +637,13 @@ def render_report_page(html_content: str, report_name: str = "") -> None:
         else:
             print_button.on_click(lambda: show_validation_errors(errors))
 
+        # NiceGUI 3 cleans what ui.html is given, and the cleaning keeps a
+        # document's body but drops its head -- where a report's styles
+        # are -- so the report showed as plain text. The body is shown,
+        # and the styles are added to the page, pointed at its sheet.
+        ui.add_css(SCREEN_REPORT_STYLES)
         with ui.element().props("id='report-container'").classes("w-full max-w-2xl my-12"):
-            ui.html(html_content)
+            ui.html(_report_body(html_content)).classes("report-sheet")
 
 
 def validate_case_for_report() -> tuple[bool, list[str]]:
@@ -1002,7 +1009,71 @@ border set on every .detail-table td above.
     .last-row {
         border-bottom: 2px solid black;
     }
+
+    /*
+    An item kept on one sheet where it fits, with its heading: a sheet
+    that began part-way through an item showed triage answers with no
+    item number above them. In the room-by-room report each item is its
+    own row group (tbody) inside the room's table.
+    */
+
+    .detail-table,
+    .detail-item {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .item-bar {
+        break-after: avoid;
+        page-break-after: avoid;
+    }
 }
+"""
+
+# On screen, a report sits inside the page rather than in a window of its
+# own. Its page-wide rule is pointed at the sheet it is drawn on instead,
+# so the rest of the page is left alone, and the sheet is white, as it
+# prints: its black lines could not be seen on the dark page.
+SCREEN_REPORT_STYLES = COMMON_STYLES.replace(
+    "\nbody {", "\n.report-sheet {", 1
+) + """
+.report-sheet {
+    background: #ffffff;
+    border-radius: 6px;
+}
+"""
+
+
+def _css_string(text: str) -> str:
+    """Text for inside a CSS string. Anything but plain letters, digits
+    and a few marks is escaped, so a case number can end neither the
+    string nor the style sheet it is in."""
+    return "".join(
+        char if (char.isascii() and char.isalnum()) or char in " -_.,:()#/"
+        else f"\\{ord(char):x} "
+        for char in text
+    )
+
+
+def running_line_css(case_number: str, report_name: str, page: str = "") -> str:
+    """The line at the top of every printed sheet: the case and the report,
+    so a sheet that comes loose can be put back where it belongs.
+
+    page names the sheets it is for -- Print All gives each of its reports
+    a named page of its own -- and "" means every sheet.
+    """
+    text = "  ·  ".join(part for part in (case_number, report_name) if part)
+    if not text:
+        return ""
+    return f"""
+@page {page} {{
+    @top-center {{
+        content: "{_css_string(text)}";
+        color: #333333;
+        font-family: "Arial", sans-serif;
+        font-size: 9pt;
+    }}
+}}
 """
 
 
@@ -1316,6 +1387,7 @@ def build_evidence_by_room_report_html(
         # label/value rows, all in the one table for the room.
         item_rows = "".join(
             f"""
+            <tbody class="detail-item">
             <tr>
                 <td class="detail-spacer"></td>
                 <td class="detail-spacer"></td>
@@ -1324,7 +1396,8 @@ def build_evidence_by_room_report_html(
                 <td class="detail-label">Item No.:</td>
                 <td class="detail-value">{h(e["EVIDNUM"])}</td>
             </tr>
-            {detail_rows(e, EVIDENCE_FIELDS, last_row_class="last-row")}"""
+            {detail_rows(e, EVIDENCE_FIELDS, last_row_class="last-row")}
+            </tbody>"""
             for e in evidence
             if e["EVIDLOCROOM"] == room_name
         )
@@ -1983,8 +2056,18 @@ def print_all_html(copies: dict | None = None) -> str:
         if not count:
             continue
         body = _report_body(build())
-        parts += [f'<section class="print-all-part">{body}</section>'] * count
+        # Its sheets are a named page, which print_all_script() heads with
+        # this report's name.
+        parts += [
+            f'<section class="print-all-part" style="page: {_print_all_page(key)}">'
+            f"{body}</section>"
+        ] * count
     return "\n".join(parts)
+
+
+def _print_all_page(key: str) -> str:
+    """The name of the printed pages one Print All report is on."""
+    return f"vector-{key}"
 
 
 def print_all_summary(copies: dict | None = None) -> str:
@@ -2001,42 +2084,75 @@ def print_all_summary(copies: dict | None = None) -> str:
 
 
 @app.get("/reports/print-all")
-async def print_all_document():
+async def print_all_document(case: str = ""):
     """The reports for Print All, fetched by its print window.
 
     Signed-in users only, like every report. Not kept by the browser: it
-    is the case.
+    is the case. `case` is the case number the Reports page showed when
+    Print All was pressed.
     """
     if not is_authenticated():
         return Response(status_code=403)
 
     # Built in a thread: every report of a long search takes a moment,
     # and this loop is the one answering every device in the meantime.
-    answer = await run.io_bound(_print_all_answer)
+    answer = await run.io_bound(_print_all_answer, case)
     if answer is None:
         # VECTOR is shutting down.
         return Response(status_code=503)
     return answer
 
 
-def _print_all_answer() -> Response:
-    """Print All's reports, or why they cannot be printed yet."""
-    is_valid, errors = validate_case_for_report()
-    if not is_valid:
-        return PlainTextResponse(
-            "Cannot print yet -- missing information:\n\n"
-            + "\n".join(f"- {error}" for error in errors),
-            status_code=409,
-        )
+# How many times Print All builds its reports again when something was
+# saved while it was building them.
+PRINT_ALL_ATTEMPTS = 3
 
-    html = print_all_html()
-    if not html:
-        return PlainTextResponse(
-            "Print All has no reports chosen. Choose some on the Reports "
-            "page.",
-            status_code=409,
-        )
-    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
+
+def _print_all_answer(expected_case: str = "") -> Response:
+    """Print All's reports, or why they cannot be printed.
+
+    The reports are built one after another while every other device
+    carries on, so a Start New Case or an import finishing part-way
+    through put two cases in one packet. They are checked against the
+    case the page showed, and built again until nothing was saved while
+    they were being built: the packet is the case at one moment.
+    """
+    for _attempt in range(PRINT_ALL_ATTEMPTS):
+        before = (case_generation(), data_version())
+
+        current = (get_case_info() or {}).get("CASENUMBER", "")
+        if expected_case and current != expected_case:
+            return PlainTextResponse(
+                f"The Reports page was showing case {expected_case}, but "
+                f"the case on this computer is now {current or 'none'}. "
+                "Close this window, reload the Reports page, and press "
+                "Print All again.",
+                status_code=409,
+            )
+
+        is_valid, errors = validate_case_for_report()
+        if not is_valid:
+            return PlainTextResponse(
+                "Cannot print yet -- missing information:\n\n"
+                + "\n".join(f"- {error}" for error in errors),
+                status_code=409,
+            )
+
+        html = print_all_html()
+        if not html:
+            return PlainTextResponse(
+                "Print All has no reports chosen. Choose some on the Reports "
+                "page.",
+                status_code=409,
+            )
+        if (case_generation(), data_version()) == before:
+            return HTMLResponse(html, headers={"Cache-Control": "no-store"})
+
+    return PlainTextResponse(
+        "The case kept changing while the reports were being prepared. "
+        "Close this window and press Print All again in a moment.",
+        status_code=409,
+    )
 
 
 def print_all_script(case_number: str = "") -> str:
@@ -2048,8 +2164,13 @@ def print_all_script(case_number: str = "") -> str:
     """
     title = " · ".join(h(part) for part in ("Print All", case_number) if part)
     values = {
+        "CASE": json.dumps(case_number, ensure_ascii=False),
         "STYLES": json.dumps(
             COMMON_STYLES + PRINT_WINDOW_STYLES + PRINT_ALL_STYLES
+            + "".join(
+                running_line_css(case_number, name, _print_all_page(key))
+                for key, name, _build in PRINT_ALL_REPORTS
+            )
         ),
         "TITLE": json.dumps(title, ensure_ascii=False),
         "TOOLBAR": json.dumps(
@@ -2057,7 +2178,7 @@ def print_all_script(case_number: str = "") -> str:
         ),
     }
     return re.sub(
-        r"__(STYLES|TITLE|TOOLBAR)__",
+        r"__(CASE|STYLES|TITLE|TOOLBAR)__",
         lambda match: values[match.group(1)],
         _PRINT_ALL_JS,
     )
@@ -2084,7 +2205,10 @@ _PRINT_ALL_JS = """() => {
             printWindow.document.body.style.whiteSpace = 'pre-line';
         };
 
-        fetch('/reports/print-all', {credentials: 'same-origin', cache: 'no-store'})
+        // The case this page showed: if another device has replaced it
+        // since, the window says so instead of printing the new one.
+        fetch('/reports/print-all?case=' + encodeURIComponent(__CASE__),
+              {credentials: 'same-origin', cache: 'no-store'})
             .then((response) => response.text().then(
                 (text) => ({ok: response.ok, text: text})))
             .then((answer) => {
@@ -2248,7 +2372,10 @@ def print_window_script(
     """
     title = " · ".join(h(part) for part in (report_name, case_number) if part)
     values = {
-        "STYLES": json.dumps(COMMON_STYLES + PRINT_WINDOW_STYLES),
+        "STYLES": json.dumps(
+            COMMON_STYLES + PRINT_WINDOW_STYLES
+            + running_line_css(case_number, report_name)
+        ),
         "TITLE": json.dumps(title or "V·E·C·T·O·R", ensure_ascii=False),
         "TOOLBAR": json.dumps(
             print_toolbar_html(report_name, case_number), ensure_ascii=False

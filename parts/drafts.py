@@ -14,7 +14,8 @@ cleared with Clear.
 
 Kept in the browser's own server-side session store (app.storage.user),
 not in the case database: a draft is not part of the case until it is
-saved. Which case it was typed in is kept with it. Start New Case, an
+saved. Which case it was typed in -- models.case_generation() as the
+form was drawn -- is kept with it. Start New Case, an
 import or the demo case put a different case on this computer, and a
 half-typed item from the last search must not turn up in the next one's
 form, one click from being saved there.
@@ -22,34 +23,11 @@ form, one click from being saved there.
 
 DRAFTS = "drafts"
 
-# Audit actions after which the case on this computer is a different one.
-CASE_REPLACED = ("DELETE_ALL", "IMPORT", "DEMO_SEED")
-
 
 def _store():
     """This browser's own storage. Raises outside a browser request."""
     from nicegui import app
     return app.storage.user
-
-
-def case_marker() -> str:
-    """Which case a draft is typed in: the newest audit entry that cleared
-    or replaced the case, so it changes whenever the case does."""
-    from sqlalchemy import func
-
-    from models import AuditLog, get_session
-
-    try:
-        with get_session() as session:
-            newest = (
-                session.query(func.max(AuditLog.id))
-                .filter(AuditLog.action.in_(CASE_REPLACED))
-                .scalar()
-            )
-    except Exception:
-        # No database to ask: nothing typed now is put back later.
-        return "unknown"
-    return str(newest or 0)
 
 
 def _account() -> str:

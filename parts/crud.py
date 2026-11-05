@@ -29,9 +29,9 @@ from nicegui import ui
 from auth import require_session
 from failures import explain, log
 from live import refresh_on_change
-from models import get_session
+from models import case_generation, get_session
 from parts.case_search import searched_for
-from parts.drafts import case_marker, clear_draft, load_draft, save_draft
+from parts.drafts import clear_draft, load_draft, save_draft
 from parts.crud_dialogs import (
     delete_all_section,
     open_delete_dialog,
@@ -47,8 +47,9 @@ from parts.crud_widgets import (  # noqa: F401
     typed_choice,
     _make_widget,
     _values_from,
+    table_row,
 )
-from utils import require_active_case
+from utils import case_changed_banner, require_active_case, require_same_case
 
 
 @dataclass
@@ -157,10 +158,17 @@ def build_crud_page(spec: CrudSpec) -> None:
     # where a case is opened, so it has to work before one exists.
     case_guard = require_active_case if spec.requires_case else (lambda f: f)
 
+    # And to the case the page was opened on: one left open on a tablet
+    # while another started the next case saved into that one, and its
+    # edit dialogs found the next case's records by their row numbers.
+    page_case = case_generation()
+
     # And every action needs a session that is still current: a page left
     # open after its account was deleted kept saving under that name.
     def guard(handler):
-        return require_session(case_guard(handler))
+        return require_session(
+            case_guard(require_same_case(page_case)(handler))
+        )
 
     # Column names as the page shows them, for explaining a failed save.
     labels = {f.name: f.label for f in spec.fields}
@@ -168,6 +176,8 @@ def build_crud_page(spec: CrudSpec) -> None:
     with ui.column().classes("w-full items-center"):
 
         ui.label(spec.title).classes("text-2xl font-bold m-4")
+
+        settle_case_banner = case_changed_banner(page_case)
 
         # ----- Add form -----
         form_widgets: dict = {}
@@ -269,7 +279,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                 else:
                     widget.value = ""
             # Saved, or cleared on purpose: nothing left to keep.
-            clear_draft(spec.title, draft_case)
+            clear_draft(spec.title, page_case)
             draft_note.set_visibility(False)
             drafting["on"] = True
 
@@ -277,11 +287,10 @@ def build_crud_page(spec: CrudSpec) -> None:
         # Kept as it is typed, and put back when the form next opens, so
         # an idle sign-out or a dropped connection does not lose it. Only
         # what someone typed or chose: not a number VECTOR hands out. And
-        # only into the case it was typed in: read once, as the page is
-        # built, so a form left open while the case was cleared keeps
-        # what is typed into it with the old case.
+        # only into the case it was typed in, the page's own: a form left
+        # open while the case was cleared keeps what is typed into it with
+        # the old case.
         drafting = {"on": False}
-        draft_case = case_marker()
         typed_fields = [f for f in form_fields if not f.readonly]
 
         def _keep_draft(_event=None) -> None:
@@ -295,10 +304,10 @@ def build_crud_page(spec: CrudSpec) -> None:
                 if spec_field.default and value == spec_field.default():
                     continue
                 values[spec_field.name] = value
-            save_draft(spec.title, draft_case, values)
+            save_draft(spec.title, page_case, values)
 
         def _restore_draft() -> None:
-            saved = load_draft(spec.title, draft_case)
+            saved = load_draft(spec.title, page_case)
             restored = False
             for spec_field in typed_fields:
                 if spec_field.name not in saved:
@@ -321,7 +330,7 @@ def build_crud_page(spec: CrudSpec) -> None:
             # A draft that no longer fits the form is not worth a page
             # that will not open.
             log.exception("Could not restore a draft on %s", spec.title)
-            clear_draft(spec.title, draft_case)
+            clear_draft(spec.title, page_case)
         drafting["on"] = True
         for spec_field in typed_fields:
             form_widgets[spec_field.name].on_value_change(_keep_draft)
@@ -392,14 +401,6 @@ def build_crud_page(spec: CrudSpec) -> None:
             "w-full max-w-[1536px] px-2 mx-auto items-center gap-2"
         )
 
-        def _row_dict(record) -> dict:
-            row = {spec.row_key: getattr(record, spec.row_key)}
-            for spec_field in spec.fields:
-                row[spec_field.name] = (
-                    getattr(record, spec_field.name, "") or ""
-                )
-            return row
-
         def _apply_record_limit(count: int) -> None:
             """While the table holds all it may, the card shows only the
             limit message; otherwise it shows the form."""
@@ -423,7 +424,7 @@ def build_crud_page(spec: CrudSpec) -> None:
                     .all()
                 )
                 # Built inside the session, before it closes.
-                rows = [_row_dict(record) for record in records]
+                rows = [table_row(spec, record) for record in records]
 
             if spec.sort_key:
                 rows.sort(key=spec.sort_key)
@@ -525,13 +526,13 @@ def build_crud_page(spec: CrudSpec) -> None:
 
         # ----- Edit -----
         def _open_edit_dialog(event) -> None:
-            open_edit_dialog(spec, event.args, labels, refresh_table)
+            open_edit_dialog(spec, event.args, labels, refresh_table, guard)
 
         _open_edit_dialog = guard(_open_edit_dialog)
 
         # ----- Delete one -----
         def _open_delete_dialog(event) -> None:
-            open_delete_dialog(spec, event.args, labels, refresh_table)
+            open_delete_dialog(spec, event.args, labels, refresh_table, guard)
 
         _open_delete_dialog = guard(_open_delete_dialog)
 
@@ -544,6 +545,7 @@ def build_crud_page(spec: CrudSpec) -> None:
 
         # Entries made on another device appear without a reload.
         def _live_refresh() -> None:
+            settle_case_banner()
             refresh_table()
             # A number handed out on another device moves the next one on.
             for name in spec.live_defaults:

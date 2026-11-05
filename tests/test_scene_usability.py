@@ -150,17 +150,17 @@ def test_a_draft_stays_with_the_case_it_was_typed_in(browser_store):
     assert "someone.else|4|Notes" in store["drafts"]
 
 
-def test_the_case_marker_changes_when_the_case_is_cleared_or_replaced(case):
-    from parts.drafts import case_marker
+def test_which_case_this_is_changes_when_the_case_is_cleared_or_replaced(case):
+    from models import case_generation
     from utils import delete_all_data
-    before = case_marker()
-    assert case_marker() == before
+    before = case_generation()
+    assert case_generation() == before
     delete_all_data()
-    after_clear = case_marker()
+    after_clear = case_generation()
     assert after_clear != before
     with get_session() as session:
         record_audit(session, action="IMPORT", table_name="(all case tables)")
-    assert case_marker() != after_clear
+    assert case_generation() != after_clear
 
 
 def test_drafts_never_break_a_page_outside_a_browser():
@@ -175,8 +175,8 @@ def test_every_add_form_keeps_its_draft_but_not_the_numbers_vector_hands_out():
     source = inspect.getsource(crud.build_crud_page)
     assert "typed_fields = [f for f in form_fields if not f.readonly]" in source
     assert "_restore_draft()" in source
-    assert "draft_case = case_marker()" in source
-    assert "clear_draft(spec.title, draft_case)" in source
+    assert "page_case = case_generation()" in source
+    assert "clear_draft(spec.title, page_case)" in source
 
 
 # ----- QR code -----
@@ -484,7 +484,7 @@ def test_print_all_puts_the_reports_in_order_with_two_return_copies(
     positions = [html.index(title) for title in titles]
     assert positions == sorted(positions)
     assert html.count("SEARCH INVENTORY AND RETURN") == 2
-    assert html.count('<section class="print-all-part">') == 6
+    assert html.count('<section class="print-all-part"') == 6
     assert "NOTES LIST" not in html and "ATTACHED FILES LIST" not in html
     # Bodies only: the print window carries the styles once.
     assert "<!DOCTYPE" not in html and "<style>" not in html
@@ -547,7 +547,7 @@ def test_print_all_with_nothing_chosen_says_so(
 def test_the_window_is_opened_by_the_click_and_filled_after(machine_settings):
     from parts.reports_page import print_all_script
     script = print_all_script('26-"0047"')
-    assert script.index("window.open(") < script.index("fetch('/reports/print-all'")
+    assert script.index("window.open(") < script.index("fetch('/reports/print-all?case='")
     # A typed case number is text in the window, never markup.
     assert "26-&quot;0047&quot;" in script
 
@@ -582,7 +582,7 @@ def test_the_rooms_note_says_an_agent_is_missing_not_both():
 def test_print_all_builds_the_reports_off_the_event_loop():
     import parts.reports_page as reports
     source = inspect.getsource(reports.print_all_document)
-    assert "await run.io_bound(_print_all_answer)" in source
+    assert "await run.io_bound(_print_all_answer, case)" in source
 
 
 def test_a_change_to_what_print_all_prints_is_audited_once(machine_settings):

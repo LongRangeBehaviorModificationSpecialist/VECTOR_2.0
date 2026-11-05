@@ -51,6 +51,9 @@ one agent, an item not marked as photographed, no end time, no export.
   and the form fills back in next time, marked *Filled in from before*.
   **Discard** empties it. It stays with its case: a new case starts with
   empty forms.
+- *A page says the case has changed?* Another device started a new case
+  or imported one. Reload the page before entering anything; it will not
+  save into the new case until you do.
 - *Hard to read in daylight?* **Light or dark page** in the account menu
   (top right). Each device keeps its own.
 """),

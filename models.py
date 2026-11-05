@@ -27,6 +27,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     LargeBinary,
+    func,
 )
 from sqlalchemy.orm import declarative_base, deferred, sessionmaker
 from marshmallow import Schema, fields
@@ -898,6 +899,32 @@ def data_version() -> int:
 def audit_version() -> int:
     """Goes up by one each time audit entries are committed."""
     return _audit_version
+
+
+# ----- Which case this is -----
+# A page, a form or a print window belongs to the case that was open when
+# it was drawn. Start New Case, an import or the demo case put another
+# case on this computer, and anything still showing the old one must not
+# write into it: a note typed for one search would be saved in the next,
+# and an edit dialog would find the next case's record under the same
+# row number, since row numbers start again once a table is emptied.
+CASE_REPLACED = ("DELETE_ALL", "IMPORT", "DEMO_SEED")
+
+
+def case_generation() -> str:
+    """Which case is on this computer: the newest audit entry that cleared
+    or replaced the case, so it changes whenever the case does."""
+    try:
+        with get_session() as session:
+            newest = (
+                session.query(func.max(AuditLog.id))
+                .filter(AuditLog.action.in_(CASE_REPLACED))
+                .scalar()
+            )
+    except Exception:
+        # No database to ask: nothing compares equal to this.
+        return "unknown"
+    return str(newest or 0)
 
 
 @event.listens_for(Session, "before_flush")

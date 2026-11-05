@@ -270,6 +270,19 @@ def _clean(value):
     return value
 
 
+def table_row(spec, record) -> dict:
+    """A record as the page's table holds it: its key and each field.
+
+    The edit and delete dialogs compare a record with this when they are
+    opened and again when they are confirmed, so they act only on the
+    record the user was looking at.
+    """
+    row = {spec.row_key: getattr(record, spec.row_key)}
+    for spec_field in spec.fields:
+        row[spec_field.name] = getattr(record, spec_field.name, "") or ""
+    return row
+
+
 def _values_from(widgets: dict, fields=()) -> dict:
     """Reads the current value of every widget, as it is to be saved.
 

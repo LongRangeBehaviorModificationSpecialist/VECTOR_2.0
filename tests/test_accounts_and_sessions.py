@@ -252,15 +252,18 @@ def _decorators(path: Path) -> dict:
 def test_every_button_that_changes_the_case_checks_the_session(path, handler):
     found = _decorators(ROOT / path)
     assert found.get(handler), f"{handler} is not in {path}"
+    # The entity dialogs take their page's guard, which checks the session
+    # first: see test_the_entity_pages_check_the_session_too.
+    checks = {"guard"} if path == "parts/crud_dialogs.py" else {"require_session"}
     for decorators in found[handler]:
-        assert "require_session" in decorators, f"{path}: {handler}"
+        assert checks <= decorators, f"{path}: {handler}"
 
 
 def test_the_entity_pages_check_the_session_too():
     import parts.crud as crud
-    assert "require_session(case_guard(handler))" in inspect.getsource(
-        crud.build_crud_page
-    )
+    source = " ".join(inspect.getsource(crud.build_crud_page).split())
+    assert ("require_session( case_guard(require_same_case(page_case)(handler)) )"
+            in source)
 
 
 # ----- The pause after failed sign-ins -----

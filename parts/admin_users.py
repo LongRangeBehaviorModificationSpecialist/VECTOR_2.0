@@ -41,7 +41,7 @@ from utils import (
     CONFIRM_TIMEOUT,
     WARN_TIMEOUT,
     ZERO_TIMEOUT,
-    delete_all_data,
+    clear_case,
     get_case_info,
     set_network_access,
 )
@@ -748,15 +748,18 @@ def load_demo_case(actor: str = "") -> str:
     """Replaces the case with the made-up demo one, for practice. Returns
     the demo's case number.
 
-    The case is cleared the usual way first, so the wipe is in the audit
-    trail like any other, and then the loading is. Accounts and the agent
-    list (parts/agents.json) are not touched.
+    The case is cleared the usual way, so the wipe is in the audit trail
+    like any other, and then the loading is -- all in one transaction, so
+    a demo that cannot be written leaves the case as it was. The wipe used
+    to be committed first, and a failed load left no case at all.
+    Accounts and the agent list (parts/agents.json) are not touched.
     """
     from tools import make_demo_case as demo
 
-    delete_all_data()
-    demo.rebuild_case()
     with get_session() as session:
+        clear_case(session)
+        demo.add_demo_case(session)
+        session.flush()
         record_audit(
             session,
             action="DEMO_SEED",

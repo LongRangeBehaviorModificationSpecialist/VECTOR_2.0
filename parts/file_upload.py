@@ -33,11 +33,14 @@ from utils import (
     derive_mime_type,
     is_allowed_file,
     require_active_case,
+    require_same_case,
 )
 
 
-def upload_card(refresh_files: Callable[[], None]) -> None:
-    """Draws the upload card. refresh_files redraws the list below it."""
+def upload_card(refresh_files: Callable[[], None], opened_on: str) -> None:
+    """Draws the upload card. refresh_files redraws the list below it;
+    opened_on is the case the page was opened on, which a file finishing
+    its upload after Start New Case on another tablet must not land in."""
     with ui.card().classes("w-full max-w-3xl mx-auto p-6"):
 
         ui.label(
@@ -51,6 +54,7 @@ def upload_card(refresh_files: Callable[[], None]) -> None:
 
         @require_session
         @require_active_case
+        @require_same_case(opened_on)
         async def handle_upload(e) -> None:
             """Handles file upload from ui.upload component."""
 

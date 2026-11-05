@@ -206,6 +206,17 @@ def test_a_failed_csv_import_leaves_the_case_unchanged(
 
     _rewrite_zip(archive, "EVIDENCE.csv", duplicate_first_row)
 
+    # And the manifest agrees, so the import gets as far as writing it:
+    # this is about what happens when that fails.
+    def one_more_evidence_row(data):
+        manifest = json.loads(data)
+        for table in manifest["tables"]:
+            if table["name"] == "EVIDENCE":
+                table["records"] += 1
+        return json.dumps(manifest).encode("utf-8")
+
+    _rewrite_zip(archive, "export_manifest.json", one_more_evidence_row)
+
     with get_session() as session:
         session.add(_agent("Local, Only"))
     _add_attachment()
@@ -231,6 +242,8 @@ def test_a_failed_json_import_leaves_the_case_unchanged(
     payload = json.loads(exported.read_text(encoding="utf-8"))
     records = payload["tables"]["EVIDENCE"]["records"]
     records.append(dict(records[0]))
+    # The count agrees, so the import gets as far as writing it.
+    payload["tables"]["EVIDENCE"]["record_count"] = len(records)
     exported.write_text(json.dumps(payload), encoding="utf-8")
 
     with get_session() as session:

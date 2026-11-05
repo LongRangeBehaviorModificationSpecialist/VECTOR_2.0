@@ -8,7 +8,7 @@ Everything about installing, running and looking after VECTOR, in detail. Most p
 
 - The **Help** page inside VECTOR — using it at a scene.
 
-`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `661 tests`
+`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `696 tests`
 
 ---
 
@@ -92,7 +92,7 @@ Everything the first version did, plus:
 | **Maintainability**    | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard                                                                                                                                                                                                                                                    |
 | **Touch screens**      | Raised buttons drawn cleanly on an iPad, with no hover border left behind by a tap; the print window's Print and Close buttons sized for a finger, in a bar that names the report and stays readable on a laptop in dark mode                                                                                                                                          |
 | **Install**            | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder                                                                                                                                                                                                                  |
-| **Tests**              | 661 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption                                                                                                                                                                                                                                                                    |
+| **Tests**              | 696 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption                                                                                                                                                                                                                                                                    |
 
 It also carries the original project's most recent work — JSON export, the active-case badge and guard, the capitalised column names, the refreshed interface, (28-Sep-2026) the larger buttons with hover borders, the Files report, `Page X of Y` on printed reports, exports recorded in the audit trail and a hash for every table in the CSV manifest, and (13 and 14-Oct-2026) uploads typed by their content rather than their name, downloads recorded in the audit trail and sent with safety headers, a switch that hides agents' phone numbers and emails on the Agent List, a Room List that waits for both agents in every room, and a Cases page that shows the open case instead of a second form — with fixes made while bringing it across.
 
@@ -357,6 +357,8 @@ Work top to bottom; each step feeds the next.
 
    **Print All** prints the reports a search ends with in one print window, each starting on a new page: by default the Agent List, Room List, Evidence List (Full), two copies of the Inventory and Return and the Persons List. **Choose what Print All prints**, under it, sets which reports and how many copies, for this machine, and each change is audited. Its pages are not numbered.
 
+   Every printed sheet, of any report, carries a line at the top with the case number and the report's name, so a sheet that comes loose can be put back, and an item is kept whole on one sheet with its number above it. Print All prints the case the Reports page showed, at one moment: if the case was replaced in the meantime it says so instead of printing, and if an entry was saved while it was preparing the reports it prepares them again.
+
 The open case's number is shown in the top bar on every page. Until a case is open, the other pages refuse new entries and say why.
 
 Prompts and confirmations fade after a few seconds. A message saying that something did **not** happen — a record that was not saved, an import or export that failed, an attachment that no longer matches its hash — stays until you press **OK**.
@@ -364,6 +366,8 @@ Prompts and confirmations fade after a few seconds. A message saying that someth
 Every table has a search box above it, which narrows the rows as you type — an item number, part of a description, a room, an agent's name. It filters the rows already on screen, so the order you sorted them into is kept. The magnifying glass in the top bar searches the whole case at once, and a result opens its page with that page's search filled in.
 
 The Home page counts what the case holds, and **Before you leave the scene** lists what is easy to miss at the end: a room with fewer than two agents, items not marked as photographed or with no answer for triage, a blank end time, and changes made since the last export.
+
+A page belongs to the case it was opened on. Once **Start New Case**, an import or the demo case replaces that case — on this device or another — the page says so at the top, and refuses to save, edit, delete or upload until it is reloaded, keeping anything typed on screen to copy. An edit or delete window also acts only on the record as it was when the window opened: if it was changed or replaced on another device meanwhile, it says so and nothing is done.
 
 Anything typed into an add form and not saved yet is kept, for that account on that browser and in that case, and put back the next time the form opens, marked *Filled in from before*, with **Discard**. Start New Case, an import or the demo case starts every form empty.
 
@@ -389,6 +393,8 @@ Digests are shown in capitals. One recorded in lower case, as every attachment w
 **Import** takes either format: choose the file, and VECTOR works out which format it is from the file itself — and whether it was exported with a password, asking for one only when it was. It replaces everything currently loaded. The one thing it will not replace is this machine's audit trail: the import is appended to it instead, so the receiving machine keeps its own history of what happened here.
 
 An import is all or nothing. If any part of the file cannot be read, nothing is imported, the case is left exactly as it was, and the message says which table the problem was in.
+
+The file is checked before anything is cleared, and refused, leaving the case as it was, when it would replace the case with less than it should: when it holds no case, or more than one; when a table holds fewer or more rows than the export recorded; or when an attachment the export listed is missing, has been altered since, or is in the file without being listed. An archive from before attachments were listed in the manifest is still imported, with its attachments marked unverified.
 
 ---
 
@@ -596,7 +602,7 @@ Every push and every pull request runs the same suite on GitHub Actions — Ubun
 
 That workflow also runs `ruff check`, configured in [`ruff.toml`](../ruff.toml) to look for errors rather than style: a name that does not exist, an import left behind by code that moved, a value assigned and never read. Style is left alone deliberately — this codebase has its own conventions and a linter arguing about them would be noise.
 
-661 tests, about twenty-five seconds. They run against a temporary database, which they remove when they finish, and never touch `db/`. The encryption tests skip themselves when the SQLCipher driver is not installed.
+696 tests, about twenty-five seconds. They run against a temporary database, which they remove when they finish, and never touch `db/`. The encryption tests skip themselves when the SQLCipher driver is not installed.
 
 The suite exists because of a specific failure: a variable rename reached the models and the CRUD pages but not the report or export code, and every report returned HTTP 500 for an unknown period with nothing to catch it. Coverage is aimed at that class of bug — each report is rendered and asserted to contain the case number, and the export is round-tripped and compared row for row and byte for byte.
 
@@ -609,6 +615,7 @@ The suite exists because of a specific failure: a variable rename reached the mo
 | `test_reports.py` | 37 | All eight reports render, carry the case header, and escape their values exactly once; the Files report prints upload times in local time; the printed date appears only when switched on, and the change is audited; the print window copies the report, not the page, names its report and case without letting a typed case number into its markup, and keeps a white page of its own |
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
 | `test_json_export.py` | 23 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected, a lower-case collection hash not mistaken for tampering; older and upstream layouts import |
+| `test_case_integrity.py` | 35 | A page, dialog, upload or Print All left open never writes into the next case; the demo case and imports never leave less than they replace; every printed sheet names its case |
 | `test_scene_usability.py` | 63 | Print All, case search, the Home checklist, drafts, light mode, the QR code, the evidence form's kept fields, the demo case |
 | `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
 | `test_accounts_and_sessions.py` | 44 | A one-time password opens Change Password and nothing else, and replacing it signs the account's other devices out; a page whose session was ended cannot save, delete, upload or export, notices within seconds, and the sign-in page says why; the sign-in never pauses VECTOR's shared loop; made-up names drop off the failure list; every account change reaches the audit trail |
@@ -644,7 +651,7 @@ A checkout ships with no case and no accounts; both are created on first run. To
 
 Add `--users` to reset the accounts at the same time and print fresh one-time passwords.
 
-Everything it loads is invented: placeholder names, `example.invalid` addresses, and telephone numbers in the 555-01xx range reserved for fiction. It replaces the case entirely, so do not run it against real case data. The same case is a button away for training: **Load the demo case** in the Admin Panel, which asks for DEMO to be typed when a case is open and leaves accounts and the agent roster alone.
+Everything it loads is invented: placeholder names, `example.invalid` addresses, and telephone numbers in the 555-01xx range reserved for fiction. It replaces the case entirely, so do not run it against real case data. The same case is a button away for training: **Load the demo case** in the Admin Panel, which asks for DEMO to be typed when a case is open and leaves accounts and the agent roster alone. It clears the case and loads the demo in one step, so if the demo cannot be loaded the case is left as it was; and it checks again when **Load demo case** is pressed that the open case is still the one it warned about.
 
 ---
 

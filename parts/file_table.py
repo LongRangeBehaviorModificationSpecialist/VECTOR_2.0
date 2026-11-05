@@ -13,6 +13,11 @@ delete-all button, which the page used to do by hand in a second
 function.
 
 parts/files_page.py draws it; nothing else does.
+
+Every action is checked against the case the page was opened on, and a
+download or delete against the file the row showed: a list left open
+while another tablet started the next case, or a moment behind it, would
+otherwise hand out or delete whichever file has that row number now.
 """
 
 from typing import Callable
@@ -26,19 +31,48 @@ from models import get_session, has_active_case, UploadedFiles
 from parts.case_search import searched_for
 from utils import (
     CONFIRM_TIMEOUT,
+    WARN_TIMEOUT,
     ZERO_TIMEOUT,
     confirm_delete_all,
+    require_same_case,
     format_file_size,
     require_active_case,
 )
 
 
-def files_table() -> Callable[[], None]:
+def _file_now(row: dict) -> bool:
+    """Whether the file a row shows is still there, unchanged: the same
+    record, name and fingerprint."""
+    with get_session() as session:
+        record = session.get(UploadedFiles, row.get("Z_PK"))
+        if record is None:
+            return False
+        fingerprint = (record.FILESHA256 or "").upper() or "not recorded"
+        return (
+            (record.FILENAME or "") == row.get("FILENAME")
+            and fingerprint == row.get("FILESHA256")
+        )
+
+
+def files_table(opened_on: str) -> Callable[[], None]:
     """Draws the list, and returns the function that redraws it.
 
     The returned function also settles the delete-all button, which is
-    disabled while no case is open.
+    disabled while no case is open. opened_on is the case the page was
+    opened on (models.case_generation()).
     """
+    same_case = require_same_case(opened_on)
+
+    def gone(refresh: Callable[[], None]) -> None:
+        ui.notify(
+            "That file has been removed or replaced on another device, so "
+            "nothing was done. The list now shows the files as they are.",
+            type="warning",
+            timeout=WARN_TIMEOUT,
+            position="center",
+            close_button="OK",
+        )
+        refresh()
     ui.separator().classes("my-6")
 
     ui.label("Files List").classes("text-xl font-bold mb-1")
@@ -207,7 +241,11 @@ def files_table() -> Callable[[], None]:
             )
 
             # ----- Download handler -----
+            @same_case
             def on_download(e) -> None:
+                if not _file_now(e.args):
+                    gone(refresh_files_table)
+                    return
                 # Served by /attachments above, straight from the
                 # database, so no copy of the file is written to disk.
                 ui.download.from_url(f"/attachments/{e.args['Z_PK']}")
@@ -215,9 +253,13 @@ def files_table() -> Callable[[], None]:
             # ----- Delete confirmation dialog -----
             @require_session
             @require_active_case
+            @same_case
             def open_delete_dialog(e) -> None:
                 """Confirms and deletes a file."""
                 row = e.args
+                if not _file_now(row):
+                    gone(refresh_files_table)
+                    return
                 with ui.dialog() as delete_dialog, ui.card(
                     ).classes("max-w-sm p-6"
                 ):
@@ -251,7 +293,12 @@ def files_table() -> Callable[[], None]:
                         ).props("flat").classes("p-3 hover-border-blue")
 
                         @require_session
+                        @same_case
                         def on_confirm_delete() -> None:
+                            if not _file_now(row):
+                                delete_dialog.close()
+                                gone(refresh_files_table)
+                                return
                             try:
                                 with get_session() as session:
                                     file_record = (
@@ -302,6 +349,7 @@ def files_table() -> Callable[[], None]:
     with ui.row().classes("w-full justify-center my-2"):
 
         @require_session
+        @same_case
         def delete_all_files() -> None:
             try:
                 with get_session() as session:
