@@ -49,7 +49,8 @@ one agent, an item not marked as photographed, no end time, no export.
   rooms, agents, people, notes and files at once.
 - *Typed something and not saved it?* Leave the page, or be signed out,
   and the form fills back in next time, marked *Filled in from before*.
-  **Discard** empties it.
+  **Discard** empties it. It stays with its case: a new case starts with
+  empty forms.
 - *Hard to read in daylight?* **Light or dark page** in the account menu
   (top right). Each device keeps its own.
 """),

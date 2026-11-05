@@ -8,7 +8,7 @@ Everything about installing, running and looking after VECTOR, in detail. Most p
 
 - The **Help** page inside VECTOR — using it at a scene.
 
-`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `652 tests`
+`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `661 tests`
 
 ---
 
@@ -92,7 +92,7 @@ Everything the first version did, plus:
 | **Maintainability**    | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard                                                                                                                                                                                                                                                    |
 | **Touch screens**      | Raised buttons drawn cleanly on an iPad, with no hover border left behind by a tap; the print window's Print and Close buttons sized for a finger, in a bar that names the report and stays readable on a laptop in dark mode                                                                                                                                          |
 | **Install**            | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder                                                                                                                                                                                                                  |
-| **Tests**              | 652 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption                                                                                                                                                                                                                                                                    |
+| **Tests**              | 661 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption                                                                                                                                                                                                                                                                    |
 
 It also carries the original project's most recent work — JSON export, the active-case badge and guard, the capitalised column names, the refreshed interface, (28-Sep-2026) the larger buttons with hover borders, the Files report, `Page X of Y` on printed reports, exports recorded in the audit trail and a hash for every table in the CSV manifest, and (13 and 14-Oct-2026) uploads typed by their content rather than their name, downloads recorded in the audit trail and sent with safety headers, a switch that hides agents' phone numbers and emails on the Agent List, a Room List that waits for both agents in every room, and a Cases page that shows the open case instead of a second form — with fixes made while bringing it across.
 
@@ -365,7 +365,7 @@ Every table has a search box above it, which narrows the rows as you type — an
 
 The Home page counts what the case holds, and **Before you leave the scene** lists what is easy to miss at the end: a room with fewer than two agents, items not marked as photographed or with no answer for triage, a blank end time, and changes made since the last export.
 
-Anything typed into an add form and not saved yet is kept, for that account on that browser, and put back the next time the form opens, marked *Filled in from before*, with **Discard**.
+Anything typed into an add form and not saved yet is kept, for that account on that browser and in that case, and put back the next time the form opens, marked *Filled in from before*, with **Discard**. Start New Case, an import or the demo case starts every form empty.
 
 **Light or dark page**, in the account menu, shows every page light for a tablet in daylight, or dark again. Each browser keeps its own choice.
 
@@ -596,7 +596,7 @@ Every push and every pull request runs the same suite on GitHub Actions — Ubun
 
 That workflow also runs `ruff check`, configured in [`ruff.toml`](../ruff.toml) to look for errors rather than style: a name that does not exist, an import left behind by code that moved, a value assigned and never read. Style is left alone deliberately — this codebase has its own conventions and a linter arguing about them would be noise.
 
-652 tests, about twenty-five seconds. They run against a temporary database, which they remove when they finish, and never touch `db/`. The encryption tests skip themselves when the SQLCipher driver is not installed.
+661 tests, about twenty-five seconds. They run against a temporary database, which they remove when they finish, and never touch `db/`. The encryption tests skip themselves when the SQLCipher driver is not installed.
 
 The suite exists because of a specific failure: a variable rename reached the models and the CRUD pages but not the report or export code, and every report returned HTTP 500 for an unknown period with nothing to catch it. Coverage is aimed at that class of bug — each report is rendered and asserted to contain the case number, and the export is round-tripped and compared row for row and byte for byte.
 
@@ -609,7 +609,7 @@ The suite exists because of a specific failure: a variable rename reached the mo
 | `test_reports.py` | 37 | All eight reports render, carry the case header, and escape their values exactly once; the Files report prints upload times in local time; the printed date appears only when switched on, and the change is audited; the print window copies the report, not the page, names its report and case without letting a typed case number into its markup, and keeps a white page of its own |
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
 | `test_json_export.py` | 23 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected, a lower-case collection hash not mistaken for tampering; older and upstream layouts import |
-| `test_scene_usability.py` | 54 | Print All, case search, the Home checklist, drafts, light mode, the QR code, the evidence form's kept fields, the demo case |
+| `test_scene_usability.py` | 63 | Print All, case search, the Home checklist, drafts, light mode, the QR code, the evidence form's kept fields, the demo case |
 | `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
 | `test_accounts_and_sessions.py` | 44 | A one-time password opens Change Password and nothing else, and replacing it signs the account's other devices out; a page whose session was ended cannot save, delete, upload or export, notices within seconds, and the sign-in page says why; the sign-in never pauses VECTOR's shared loop; made-up names drop off the failure list; every account change reaches the audit trail |
 | `test_left_behind.py` | 11 | An import that fails — a damaged manifest or archive, or something nobody foresaw — leaves no unpacked copy of the case in the temp folder, and says what happened; the start-up clean-up recognises one left by an older VECTOR; a run of the tests removes its own database folder |

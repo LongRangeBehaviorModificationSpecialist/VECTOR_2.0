@@ -23,6 +23,7 @@ from nicegui import ui
 from auth import require_session
 from failures import explain, log
 from models import get_session, has_active_case, UploadedFiles
+from parts.case_search import searched_for
 from utils import (
     CONFIRM_TIMEOUT,
     ZERO_TIMEOUT,
@@ -47,6 +48,11 @@ def files_table() -> Callable[[], None]:
     search_box = ui.input(
         placeholder="Search the files below",
     ).props("dense outlined clearable").classes("w-full max-w-md mb-2")
+    # Opened from the search in the top bar: the list starts filtered to
+    # what was searched for, as every other page's does.
+    found = searched_for()
+    if found:
+        search_box.value = found
 
     table_container = ui.column().classes(
         "w-full max-w-[1536px] px-2 mx-auto items-center gap-2")

@@ -33,7 +33,7 @@ WORKFLOW FOR REPORT CREATION:
 
 from html import escape
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
-from nicegui import app, ui
+from nicegui import app, run, ui
 import json
 import re
 
@@ -220,6 +220,33 @@ COPIES_CHOICES = {
 }
 
 
+def _print_all_state() -> tuple:
+    """(ready to print, what is missing, case number, anything chosen):
+    everything the Print All button depends on."""
+    ready, errors = validate_case_for_report()
+    case_number = (get_case_info() or {}).get("CASENUMBER", "")
+    chosen = any(settings.print_all_copies().values())
+    return ready, tuple(errors), case_number, chosen
+
+
+def rooms_missing_note(labels: list[str]) -> str:
+    """Under Print All: the rooms that print with an agent's name missing.
+
+    One of the two may be named; the blank one prints as [NOT RECORDED].
+    """
+    if not labels:
+        return ""
+    shown = ", ".join(labels[:10])
+    if len(labels) > 10:
+        shown += f" and {len(labels) - 10} more"
+    one = len(labels) == 1
+    return (
+        f"{'Room' if one else 'Rooms'} {shown} "
+        f"{'is' if one else 'are'} missing an agent's name, which prints as "
+        "[NOT RECORDED]."
+    )
+
+
 def _print_all_section() -> None:
     """One button for the reports a search normally ends with.
 
@@ -228,20 +255,28 @@ def _print_all_section() -> None:
     them, each starting on a new sheet. What it prints is chosen below
     it, and kept for this machine.
     """
-    case_number = (get_case_info() or {}).get("CASENUMBER", "")
-    is_valid, errors = validate_case_for_report()
-
     with ui.card().classes("w-full max-w-2xl mx-auto p-6 mb-4 items-center"):
-        button = ui.button(
-            "Print All",
-            color="#1C69A8",
-        ).props("push icon=print").classes("w-70 p-6 hover-border-white")
 
-        if is_valid:
-            # Opened by the click itself; see render_report_page().
-            button.on("click", js_handler=print_all_script(case_number))
-        else:
-            button.on_click(lambda: show_validation_errors(errors))
+        # Drawn again whenever the case becomes ready to print or stops
+        # being, or its number changes -- on this device or another -- so
+        # the button never acts on how things were when the page opened.
+        @ui.refreshable
+        def print_button(state: tuple) -> None:
+            ready, errors, case_number, chosen = state
+            button = ui.button(
+                "Print All",
+                color="#1C69A8",
+            ).props("push icon=print").classes("w-70 p-6 hover-border-white")
+            if not chosen:
+                button.disable()
+            elif ready:
+                # Opened by the click itself; see render_report_page().
+                button.on("click", js_handler=print_all_script(case_number))
+            else:
+                button.on_click(lambda: show_validation_errors(list(errors)))
+
+        shown = {"state": _print_all_state()}
+        print_button(shown["state"])
 
         summary = ui.label().classes(
             "text-sm text-center text-[var(--vsp-gray)] mt-2"
@@ -252,21 +287,18 @@ def _print_all_section() -> None:
 
         def settle() -> None:
             """The summary, the warning and the button, as things stand."""
+            state = _print_all_state()
+            if state != shown["state"]:
+                shown["state"] = state
+                print_button.refresh(state)
             copies = settings.print_all_copies()
             chosen = print_all_summary(copies)
             summary.set_text(
                 f"Prints, each starting on a new page: {chosen}." if chosen
                 else "Nothing is chosen for Print All yet. Choose below."
             )
-            button.set_enabled(bool(chosen))
             missing = rooms_missing_agents() if copies.get("rooms") else []
-            rooms_note.set_text(
-                "Room" + ("s " if len(missing) > 1 else " ")
-                + ", ".join(missing[:10])
-                + (" have" if len(missing) > 1 else " has")
-                + " no agent named, printed as [NOT RECORDED]."
-                if missing else ""
-            )
+            rooms_note.set_text(rooms_missing_note(missing))
             rooms_note.set_visibility(bool(missing))
 
         settle()
@@ -1978,6 +2010,17 @@ async def print_all_document():
     if not is_authenticated():
         return Response(status_code=403)
 
+    # Built in a thread: every report of a long search takes a moment,
+    # and this loop is the one answering every device in the meantime.
+    answer = await run.io_bound(_print_all_answer)
+    if answer is None:
+        # VECTOR is shutting down.
+        return Response(status_code=503)
+    return answer
+
+
+def _print_all_answer() -> Response:
+    """Print All's reports, or why they cannot be printed yet."""
     is_valid, errors = validate_case_for_report()
     if not is_valid:
         return PlainTextResponse(

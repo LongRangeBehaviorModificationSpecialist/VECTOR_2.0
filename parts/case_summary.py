@@ -20,7 +20,7 @@ they can be tested without a browser. home_page.py draws them.
 from dataclasses import dataclass
 
 from nicegui import ui
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from live import refresh_on_change
 from models import (
@@ -84,6 +84,11 @@ def _plural(count: int, one: str, many: str) -> str:
     return one if count == 1 else many
 
 
+def _blank(column):
+    """Empty, only spaces, or never filled in."""
+    return func.coalesce(func.trim(column), "") == ""
+
+
 def scene_checks() -> list[Check]:
     """What to look at before leaving the scene, ok or not.
 
@@ -94,29 +99,33 @@ def scene_checks() -> list[Check]:
         if case is None:
             return []
 
-        rooms = sorted(
-            session.query(Rooms).all(),
-            key=lambda room: room_label_key(room.ROOMLABEL),
-        )
-        items = sorted(
-            session.query(Evidence).all(),
-            key=lambda item: evidence_number_key(item.EVIDNUM),
-        )
+        # Only the labels and numbers that need a look, asked of the
+        # database: this runs again on every Home page with every entry
+        # made on any device, and loading every row each time did not
+        # scale with a long search.
+        rooms = session.query(Rooms.Z_PK).first() is not None
+        items = session.query(Evidence.Z_PK).first() is not None
 
         ended = bool((case.CASEDATETIMEEND or "").strip())
-        short_rooms = [
-            room.ROOMLABEL for room in rooms
-            if not (room.ROOMFIRSTAGENT or "").strip()
-            or not (room.ROOMSECONDAGENT or "").strip()
-        ]
-        not_photographed = [
-            item.EVIDNUM for item in items
-            if (item.EVIDPICTAKEN or "").strip() != "Yes"
-        ]
-        triage_unanswered = [
-            item.EVIDNUM for item in items
-            if not (item.EVIDTRIAGED or "").strip()
-        ]
+        short_rooms = sorted(
+            (label for (label,) in session.query(Rooms.ROOMLABEL).filter(
+                or_(_blank(Rooms.ROOMFIRSTAGENT),
+                    _blank(Rooms.ROOMSECONDAGENT))
+            )),
+            key=room_label_key,
+        )
+        not_photographed = sorted(
+            (number for (number,) in session.query(Evidence.EVIDNUM).filter(
+                func.coalesce(func.trim(Evidence.EVIDPICTAKEN), "") != "Yes"
+            )),
+            key=evidence_number_key,
+        )
+        triage_unanswered = sorted(
+            (number for (number,) in session.query(Evidence.EVIDNUM).filter(
+                _blank(Evidence.EVIDTRIAGED)
+            )),
+            key=evidence_number_key,
+        )
 
         last_export = (
             session.query(func.max(AuditLog.id))

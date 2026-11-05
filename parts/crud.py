@@ -30,7 +30,8 @@ from auth import require_session
 from failures import explain, log
 from live import refresh_on_change
 from models import get_session
-from parts.drafts import clear_draft, load_draft, save_draft
+from parts.case_search import searched_for
+from parts.drafts import case_marker, clear_draft, load_draft, save_draft
 from parts.crud_dialogs import (
     delete_all_section,
     open_delete_dialog,
@@ -146,15 +147,6 @@ class CrudSpec:
         self.empty_text = (
             self.empty_text or f"No {self.entity_plural} have been entered"
         )
-
-
-def _asked_for(name: str) -> str:
-    """A value from the page's address, such as ?find=..., or ""."""
-    try:
-        return str(ui.context.client.request.query_params.get(name, ""))[:200]
-    except Exception:
-        # No page request in scope: a test, or a page being rebuilt.
-        return ""
 
 
 # ----- The builder -----
@@ -277,15 +269,19 @@ def build_crud_page(spec: CrudSpec) -> None:
                 else:
                     widget.value = ""
             # Saved, or cleared on purpose: nothing left to keep.
-            clear_draft(spec.title)
+            clear_draft(spec.title, draft_case)
             draft_note.set_visibility(False)
             drafting["on"] = True
 
         # ----- What was typed and not saved -----
         # Kept as it is typed, and put back when the form next opens, so
         # an idle sign-out or a dropped connection does not lose it. Only
-        # what someone typed or chose: not a number VECTOR hands out.
+        # what someone typed or chose: not a number VECTOR hands out. And
+        # only into the case it was typed in: read once, as the page is
+        # built, so a form left open while the case was cleared keeps
+        # what is typed into it with the old case.
         drafting = {"on": False}
+        draft_case = case_marker()
         typed_fields = [f for f in form_fields if not f.readonly]
 
         def _keep_draft(_event=None) -> None:
@@ -299,10 +295,10 @@ def build_crud_page(spec: CrudSpec) -> None:
                 if spec_field.default and value == spec_field.default():
                     continue
                 values[spec_field.name] = value
-            save_draft(spec.title, values)
+            save_draft(spec.title, draft_case, values)
 
         def _restore_draft() -> None:
-            saved = load_draft(spec.title)
+            saved = load_draft(spec.title, draft_case)
             restored = False
             for spec_field in typed_fields:
                 if spec_field.name not in saved:
@@ -325,7 +321,7 @@ def build_crud_page(spec: CrudSpec) -> None:
             # A draft that no longer fits the form is not worth a page
             # that will not open.
             log.exception("Could not restore a draft on %s", spec.title)
-            clear_draft(spec.title)
+            clear_draft(spec.title, draft_case)
         drafting["on"] = True
         for spec_field in typed_fields:
             form_widgets[spec_field.name].on_value_change(_keep_draft)
@@ -385,9 +381,9 @@ def build_crud_page(spec: CrudSpec) -> None:
             )
             # Opened from the search in the top bar: the table starts
             # filtered to what was searched for.
-            searched_for = _asked_for("find")
-            if searched_for:
-                search_box.value = searched_for
+            found = searched_for()
+            if found:
+                search_box.value = found
 
         # Wide enough for a long evidence row, and never wider than
         # the window: the table scrolls inside itself instead of taking

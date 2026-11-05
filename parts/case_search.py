@@ -39,6 +39,14 @@ MIN_LENGTH = 2
 # Enough to find something; a search that matches more is too broad.
 MAX_HITS = 60
 
+# A result opens its page with this in the address, ?find=..., and the
+# page's own search starts filled in with it.
+FIND = "find"
+
+# How long the box waits after the last key before searching, in
+# milliseconds: a search per key ran every query again for each letter.
+TYPING_PAUSE_MS = 300
+
 
 @dataclass
 class Hit:
@@ -111,6 +119,21 @@ _ORDER = {
     "Room": lambda r: room_label_key(r.ROOMLABEL),
 }
 
+# Columns a page's table shows only part of. A record found by one opens
+# its page searched for the other column named here: the Files table
+# shows the first 12 characters of a SHA-256, so a search for any other
+# part of it found nothing there.
+_FIND_BY_INSTEAD = {"FILESHA256": "FILENAME"}
+
+
+def searched_for() -> str:
+    """What a search result asked its page to show, from ?find=..., or ""."""
+    try:
+        return str(ui.context.client.request.query_params.get(FIND, ""))[:200]
+    except Exception:
+        # No page request in scope: a test, or a page being rebuilt.
+        return ""
+
 
 def _like(text: str) -> str:
     """A LIKE pattern matching text anywhere, with % and _ taken literally."""
@@ -145,12 +168,16 @@ def search_case(text: str) -> list[Hit]:
     hits: list[Hit] = []
     with get_session() as session:
         for kind, model, route, columns, name in SOURCES:
+            # No more rows than can still be shown: a broad search used
+            # to load every match before stopping at MAX_HITS.
             matches = (
                 session.query(model)
                 .filter(or_(*(
                     getattr(model, column).ilike(pattern, escape="\\")
                     for column, _label in columns
                 )))
+                .order_by(model.Z_PK)
+                .limit(MAX_HITS - len(hits))
                 .all()
             )
             if kind in _ORDER:
@@ -167,11 +194,16 @@ def search_case(text: str) -> list[Hit]:
                     columns[0],
                 )
                 value = _snippet(getattr(record, column), text)
+                find = text
+                if column in _FIND_BY_INSTEAD:
+                    find = str(
+                        getattr(record, _FIND_BY_INSTEAD[column]) or text
+                    )
                 hits.append(Hit(
                     kind=kind,
                     title=name(record),
                     found=f"{label}: {value}",
-                    route=f"{route}?find={quote(text)}",
+                    route=f"{route}?{FIND}={quote(find)}",
                 ))
                 if len(hits) >= MAX_HITS:
                     return hits
@@ -185,7 +217,9 @@ def search_button(classes: str = "") -> None:
         ui.label("Search the case").classes("text-lg font-bold")
         box = ui.input(
             placeholder="A serial number, a name, a word from a note...",
-        ).props("autofocus clearable outlined dense").classes("w-full")
+        ).props(
+            f"autofocus clearable outlined dense debounce={TYPING_PAUSE_MS}"
+        ).classes("w-full")
         said = ui.label().classes("text-sm text-[var(--vsp-gray)]")
         results = ui.column().classes("w-full gap-1 max-h-[60vh] overflow-y-auto")
 

@@ -108,35 +108,66 @@ def browser_store(monkeypatch):
 
 def test_a_draft_is_kept_and_given_back(browser_store):
     from parts.drafts import load_draft, save_draft
-    save_draft("Evidence Management", {"EVIDDESC": "Laptop, silver"})
-    assert load_draft("Evidence Management") == {"EVIDDESC": "Laptop, silver"}
-    assert load_draft("Notes") == {}
+    save_draft("Evidence Management", "0", {"EVIDDESC": "Laptop, silver"})
+    assert load_draft("Evidence Management", "0") == {"EVIDDESC": "Laptop, silver"}
+    assert load_draft("Notes", "0") == {}
 
 
 def test_a_draft_belongs_to_the_account_that_typed_it(browser_store):
     """A tablet passed to a colleague does not show them your draft."""
     from parts.drafts import load_draft, save_draft
     _store, who = browser_store
-    save_draft("Notes", {"NOTETEXT": "Half a note"})
+    save_draft("Notes", "0", {"NOTETEXT": "Half a note"})
     who["name"] = "someone.else"
-    assert load_draft("Notes") == {}
+    assert load_draft("Notes", "0") == {}
 
 
 def test_saving_or_clearing_forgets_the_draft(browser_store):
     from parts.drafts import clear_draft, load_draft, save_draft
-    save_draft("Notes", {"NOTETEXT": "Half a note"})
-    clear_draft("Notes")
-    assert load_draft("Notes") == {}
-    save_draft("Notes", {"NOTETEXT": "Again"})
-    save_draft("Notes", {})          # everything typed was deleted
-    assert load_draft("Notes") == {}
+    save_draft("Notes", "0", {"NOTETEXT": "Half a note"})
+    clear_draft("Notes", "0")
+    assert load_draft("Notes", "0") == {}
+    save_draft("Notes", "0", {"NOTETEXT": "Again"})
+    save_draft("Notes", "0", {})          # everything typed was deleted
+    assert load_draft("Notes", "0") == {}
+
+
+def test_a_draft_stays_with_the_case_it_was_typed_in(browser_store):
+    """A half-typed item from the last search is not put into the next
+    one's form, and is forgotten once this account types in the next."""
+    from parts.drafts import load_draft, save_draft
+    store, who = browser_store
+    save_draft("Evidence Management", "4", {"EVIDDESC": "Old case's phone"})
+    who["name"] = "someone.else"
+    save_draft("Notes", "4", {"NOTETEXT": "Theirs"})
+    who["name"] = "agent"
+
+    assert load_draft("Evidence Management", "9") == {}
+    save_draft("Notes", "9", {"NOTETEXT": "New case"})
+    assert load_draft("Evidence Management", "4") == {}
+    assert load_draft("Notes", "9") == {"NOTETEXT": "New case"}
+    # Another account's drafts wait for that account.
+    assert "someone.else|4|Notes" in store["drafts"]
+
+
+def test_the_case_marker_changes_when_the_case_is_cleared_or_replaced(case):
+    from parts.drafts import case_marker
+    from utils import delete_all_data
+    before = case_marker()
+    assert case_marker() == before
+    delete_all_data()
+    after_clear = case_marker()
+    assert after_clear != before
+    with get_session() as session:
+        record_audit(session, action="IMPORT", table_name="(all case tables)")
+    assert case_marker() != after_clear
 
 
 def test_drafts_never_break_a_page_outside_a_browser():
     from parts.drafts import clear_draft, load_draft, save_draft
-    assert load_draft("Notes") == {}
-    save_draft("Notes", {"NOTETEXT": "x"})
-    clear_draft("Notes")
+    assert load_draft("Notes", "0") == {}
+    save_draft("Notes", "0", {"NOTETEXT": "x"})
+    clear_draft("Notes", "0")
 
 
 def test_every_add_form_keeps_its_draft_but_not_the_numbers_vector_hands_out():
@@ -144,7 +175,8 @@ def test_every_add_form_keeps_its_draft_but_not_the_numbers_vector_hands_out():
     source = inspect.getsource(crud.build_crud_page)
     assert "typed_fields = [f for f in form_fields if not f.readonly]" in source
     assert "_restore_draft()" in source
-    assert "clear_draft(spec.title)" in source
+    assert "draft_case = case_marker()" in source
+    assert "clear_draft(spec.title, draft_case)" in source
 
 
 # ----- QR code -----
@@ -290,10 +322,45 @@ def test_files_are_found_by_name_and_fingerprint(case):
     assert [hit.kind for hit in search_case(digest[:12].lower())] == ["File"]
 
 
+def test_a_file_found_by_its_fingerprint_opens_the_files_page_at_its_name(case):
+    """The Files table shows only the start of a SHA-256, so the page is
+    searched for the file's name instead."""
+    from parts.case_search import search_case
+    data = b"\xff\xd8\xff another photograph"
+    digest = hashlib.sha256(data).hexdigest().upper()
+    with get_session() as session:
+        session.add(UploadedFiles(
+            FILENAME="IMG_0043.jpg", FILEDATA=data, FILESIZE=len(data),
+            FILEMIMETYPE="image/jpeg", FILEUPLOADEDBY="Roe, Jane",
+            FILESHA256=digest,
+        ))
+    [by_hash] = search_case(digest[30:44].lower())
+    assert by_hash.route == "/uploads?find=IMG_0043.jpg"
+    [by_name] = search_case("img_0043")
+    assert by_name.route == "/uploads?find=img_0043"
+
+
+def test_a_broad_search_loads_no_more_than_it_shows(case):
+    from parts.case_search import MAX_HITS, search_case
+    with get_session() as session:
+        for number in range(MAX_HITS + 15):
+            session.add(Notes(NOTEDATETIME="now", NOTEAUTHOR="Doe, John",
+                              NOTETEXT=f"Entry {number}"))
+    assert len(search_case("entry")) == MAX_HITS
+
+
+def test_the_search_waits_for_a_pause_in_typing():
+    import parts.case_search as case_search
+    source = inspect.getsource(case_search.search_button)
+    assert "debounce={TYPING_PAUSE_MS}" in source
+    assert case_search.TYPING_PAUSE_MS >= 200
+
+
 def test_a_result_opens_its_page_filtered_to_what_was_searched_for():
     import parts.crud as crud
-    source = inspect.getsource(crud.build_crud_page)
-    assert '_asked_for("find")' in source
+    import parts.file_table as file_table
+    assert "searched_for()" in inspect.getsource(crud.build_crud_page)
+    assert "searched_for()" in inspect.getsource(file_table)
 
 
 def test_the_search_is_in_the_top_bar():
@@ -360,6 +427,19 @@ def test_an_export_after_the_last_change_is_ticked_off(populated):
     check = export_check()
     assert not check.ok
     assert check.text.startswith("The case has changed since it was last exported.")
+
+
+def test_the_checklist_asks_for_what_it_shows_not_every_row(populated):
+    """Run again on every Home page with every entry on any device."""
+    import parts.case_summary as case_summary
+    source = inspect.getsource(case_summary.scene_checks)
+    assert "query(Rooms).all()" not in source
+    assert "query(Evidence).all()" not in source
+    with get_session() as session:
+        session.query(Rooms).filter_by(ROOMLABEL="A").one().ROOMFIRSTAGENT = "  "
+        session.query(Rooms).filter_by(ROOMLABEL="B").one().ROOMSECONDAGENT = ""
+    problems = _texts(case_summary.scene_checks())
+    assert "Rooms A and B have fewer than two agents named." in problems
 
 
 def test_home_draws_them():
@@ -472,6 +552,39 @@ def test_the_window_is_opened_by_the_click_and_filled_after(machine_settings):
     assert "26-&quot;0047&quot;" in script
 
 
+def test_the_print_all_button_follows_the_case_as_it_changes(
+        populated, machine_settings):
+    """Read again as the case changes, not once when the page opened."""
+    import parts.reports_page as reports
+    ready, errors, number, chosen = reports._print_all_state()
+    assert ready and not errors and number and chosen
+    with get_session() as session:
+        session.query(Cases).one().JURISDICTION = ""
+    ready, errors, _number, _chosen = reports._print_all_state()
+    assert not ready and "Jurisdiction is required." in errors
+    settings.set_print_all_copies({key: 0 for key in settings.PRINT_ALL_DEFAULT})
+    assert reports._print_all_state()[3] is False
+    source = inspect.getsource(reports._print_all_section)
+    assert "print_button.refresh(state)" in source
+
+
+def test_the_rooms_note_says_an_agent_is_missing_not_both():
+    from parts.reports_page import rooms_missing_note
+    assert rooms_missing_note([]) == ""
+    assert rooms_missing_note(["B"]) == (
+        "Room B is missing an agent's name, which prints as [NOT RECORDED]."
+    )
+    assert rooms_missing_note([str(n) for n in range(12)]).startswith(
+        "Rooms 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 and 2 more are missing"
+    )
+
+
+def test_print_all_builds_the_reports_off_the_event_loop():
+    import parts.reports_page as reports
+    source = inspect.getsource(reports.print_all_document)
+    assert "await run.io_bound(_print_all_answer)" in source
+
+
 def test_a_change_to_what_print_all_prints_is_audited_once(machine_settings):
     from utils import set_print_all
     set_print_all({"notes": 1}, actor="admin")
@@ -527,6 +640,9 @@ def test_the_admin_panel_offers_it_and_asks_first():
     source = inspect.getsource(admin_users.training_card)
     assert "TYPE DEMO TO CONFIRM" in source
     assert "if not get_is_admin():" in source
+    # Asked again when Load is pressed: a case started on another device
+    # after the dialog opened was never warned about.
+    assert '(get_case_info() or {}).get("CASENUMBER") != opened_on' in source
 
 
 def test_the_demo_is_a_filter_on_the_audit_trail():
