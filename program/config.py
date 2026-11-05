@@ -52,11 +52,11 @@ def _env_int(name: str, default: int) -> int:
 class Config:
     """Application metadata and runtime settings."""
 
-    version = "0.99"
+    version = "0.99.1"
     authors = "SSA M. Sponheimer & SuSA M. Brown"
     dept = "Virginia State Police -- NOVA/DC ICAC"
     url = "github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0"
-    updated = "20-Oct-2026"
+    updated = "05-Nov-2026"
 
     # ----- Network -----
     # Loopback by default: the app is not reachable from the network
