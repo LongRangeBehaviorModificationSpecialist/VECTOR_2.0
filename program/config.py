@@ -84,6 +84,15 @@ class Config:
     # attachment, since an export carries every attachment in the case.
     MAX_IMPORT_BYTES = _env_int("VECTOR_MAX_IMPORT_MB", 2048) * 1024 * 1024
 
+    # And the most an import may unpack to, and the most entries it may
+    # hold. Photographs barely compress, so a real export unpacks to
+    # about its own size; a ZIP made to unpack to far more is refused as
+    # it unpacks, before it can fill the disk.
+    MAX_IMPORT_EXPANDED_BYTES = (
+        _env_int("VECTOR_MAX_IMPORT_EXPANDED_MB", 4096) * 1024 * 1024
+    )
+    MAX_IMPORT_ENTRIES = _env_int("VECTOR_MAX_IMPORT_ENTRIES", 50000)
+
     # ----- Sessions -----
     # A tablet left on a kitchen counter at a scene stays signed in to
     # the case until somebody closes the browser. A device nobody has

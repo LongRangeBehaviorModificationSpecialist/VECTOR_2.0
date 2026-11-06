@@ -26,12 +26,18 @@ from models import (
     UploadedFiles,
 )
 from program.config import Config
-from auth import get_current_user_name, require_session
+from auth import (
+    get_current_user_name,
+    is_authenticated,
+    leave_ended_session,
+    require_session,
+)
 from utils import (
     WARN_TIMEOUT,
     ZERO_TIMEOUT,
     derive_mime_type,
     is_allowed_file,
+    case_still_open_and_same,
     require_active_case,
     require_same_case,
 )
@@ -92,6 +98,18 @@ def upload_card(refresh_files: Callable[[], None], opened_on: str) -> None:
                 # than whatever the database holds later.
                 digest = hashlib.sha256(file_data).hexdigest().upper()
                 hashed_at = audit_timestamp()
+
+                # The checks above ran before the file had arrived, and
+                # a large one takes a while: the account can be signed
+                # out, or the case replaced on another tablet, meanwhile.
+                # Asked again here, with nothing awaited between this and
+                # the write, so the file lands only in the case the page
+                # was opened on and only for a session still current.
+                if not is_authenticated():
+                    leave_ended_session()
+                    return
+                if not case_still_open_and_same(opened_on):
+                    return
 
                 with get_session() as session:
                     new_file = UploadedFiles(

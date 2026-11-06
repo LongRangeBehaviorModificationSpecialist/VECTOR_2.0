@@ -223,12 +223,12 @@ COPIES_CHOICES = {
 
 
 def _print_all_state() -> tuple:
-    """(ready to print, what is missing, case number, anything chosen):
-    everything the Print All button depends on."""
+    """(ready to print, what is missing, case number, anything chosen,
+    case generation): everything the Print All button depends on."""
     ready, errors = validate_case_for_report()
     case_number = (get_case_info() or {}).get("CASENUMBER", "")
     chosen = any(settings.print_all_copies().values())
-    return ready, tuple(errors), case_number, chosen
+    return ready, tuple(errors), case_number, chosen, case_generation()
 
 
 def rooms_missing_note(labels: list[str]) -> str:
@@ -264,7 +264,7 @@ def _print_all_section() -> None:
         # the button never acts on how things were when the page opened.
         @ui.refreshable
         def print_button(state: tuple) -> None:
-            ready, errors, case_number, chosen = state
+            ready, errors, case_number, chosen, generation = state
             button = ui.button(
                 "Print All",
                 color="#1C69A8",
@@ -273,7 +273,10 @@ def _print_all_section() -> None:
                 button.disable()
             elif ready:
                 # Opened by the click itself; see render_report_page().
-                button.on("click", js_handler=print_all_script(case_number))
+                button.on(
+                    "click",
+                    js_handler=print_all_script(case_number, generation),
+                )
             else:
                 button.on_click(lambda: show_validation_errors(list(errors)))
 
@@ -2090,19 +2093,21 @@ def print_all_summary(copies: dict | None = None) -> str:
 
 
 @app.get("/reports/print-all")
-async def print_all_document(case: str = ""):
+async def print_all_document(case: str = "", generation: str = ""):
     """The reports for Print All, fetched by its print window.
 
     Signed-in users only, like every report. Not kept by the browser: it
     is the case. `case` is the case number the Reports page showed when
-    Print All was pressed.
+    Print All was pressed, and `generation` which case that was (see
+    models.case_generation()): a case replaced by one typed with the same
+    number has the same number and a different generation.
     """
     if not is_authenticated():
         return Response(status_code=403)
 
     # Built in a thread: every report of a long search takes a moment,
     # and this loop is the one answering every device in the meantime.
-    answer = await run.io_bound(_print_all_answer, case)
+    answer = await run.io_bound(_print_all_answer, case, generation)
     if answer is None:
         # VECTOR is shutting down.
         return Response(status_code=503)
@@ -2114,7 +2119,10 @@ async def print_all_document(case: str = ""):
 PRINT_ALL_ATTEMPTS = 3
 
 
-def _print_all_answer(expected_case: str = "") -> Response:
+def _print_all_answer(
+        expected_case: str = "",
+        expected_generation: str = "",
+) -> Response:
     """Print All's reports, or why they cannot be printed.
 
     The reports are built one after another while every other device
@@ -2127,6 +2135,15 @@ def _print_all_answer(expected_case: str = "") -> Response:
         before = (case_generation(), data_version())
 
         current = (get_case_info() or {}).get("CASENUMBER", "")
+        if expected_generation and before[0] != expected_generation:
+            return PlainTextResponse(
+                f"The Reports page was showing case {expected_case or 'none'}, "
+                "but that case has since been replaced on this computer -- "
+                "by Start New Case, an import or the demo case -- even if "
+                "the number is the same. Close this window, reload the "
+                "Reports page, and press Print All again.",
+                status_code=409,
+            )
         if expected_case and current != expected_case:
             return PlainTextResponse(
                 f"The Reports page was showing case {expected_case}, but "
@@ -2161,7 +2178,7 @@ def _print_all_answer(expected_case: str = "") -> Response:
     )
 
 
-def print_all_script(case_number: str = "") -> str:
+def print_all_script(case_number: str = "", generation: str = "") -> str:
     """The browser-side handler behind Print All.
 
     The window is opened by the click itself, as for a single report, so
@@ -2171,6 +2188,7 @@ def print_all_script(case_number: str = "") -> str:
     title = " · ".join(h(part) for part in ("Print All", case_number) if part)
     values = {
         "CASE": json.dumps(case_number, ensure_ascii=False),
+        "GENERATION": json.dumps(str(generation)),
         "STYLES": json.dumps(
             COMMON_STYLES + PRINT_WINDOW_STYLES + PRINT_ALL_STYLES
             + "".join(
@@ -2184,7 +2202,7 @@ def print_all_script(case_number: str = "") -> str:
         ),
     }
     return re.sub(
-        r"__(CASE|STYLES|TITLE|TOOLBAR)__",
+        r"__(CASE|GENERATION|STYLES|TITLE|TOOLBAR)__",
         lambda match: values[match.group(1)],
         _PRINT_ALL_JS,
     )
@@ -2213,7 +2231,8 @@ _PRINT_ALL_JS = """() => {
 
         // The case this page showed: if another device has replaced it
         // since, the window says so instead of printing the new one.
-        fetch('/reports/print-all?case=' + encodeURIComponent(__CASE__),
+        fetch('/reports/print-all?case=' + encodeURIComponent(__CASE__)
+              + '&generation=' + encodeURIComponent(__GENERATION__),
               {credentials: 'same-origin', cache: 'no-store'})
             .then((response) => response.text().then(
                 (text) => ({ok: response.ok, text: text})))

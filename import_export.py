@@ -23,6 +23,7 @@ import tempfile
 from typing import Optional
 
 from failures import explain, log
+from program.config import Config
 from models import (
     LEGACY_COLUMN_NAMES,
     LEGACY_TABLE_NAMES,
@@ -152,6 +153,95 @@ def canonical_file_entry(entry: dict) -> dict:
         _FILE_ENTRY_ALIASES.get(key, key): value
         for key, value in entry.items()
     }
+
+
+# ----- Unpacking an import, within limits -----
+# An import used to unpack the whole archive before looking at it: a ZIP
+# of under 2 KB unpacked a 1 MB file VECTOR never reads, and one made to
+# unpack to gigabytes could fill the disk. Only the files an import
+# reads are unpacked now, and unpacking stops at a limit on entries and
+# on bytes, counted as they are written -- a ZIP can say anything about
+# its own sizes.
+
+class ArchiveTooLarge(ValueError):
+    """An archive past the import limits. Nothing has been imported."""
+
+
+def _member_path(dest: Path, name: str) -> Optional[Path]:
+    """Where an entry unpacks to, or None for a name that would leave
+    dest (an absolute path, a drive, "..")."""
+    if name.startswith(("/", "\\")):
+        return None
+    parts = [part for part in name.replace("\\", "/").split("/")
+             if part not in ("", ".")]
+    if not parts or any(part == ".." or ":" in part for part in parts):
+        return None
+    return dest.joinpath(*parts)
+
+
+def _is_csv_import_member(name: str) -> bool:
+    """A file the CSV import reads: a table, the manifest, an attachment."""
+    parts = name.replace("\\", "/").lower().split("/")
+    return (
+        parts[-1].endswith(".csv")
+        or parts[-1] == "export_manifest.json"
+        or "files" in parts[:-1]
+    )
+
+
+def _is_json_import_member(name: str) -> bool:
+    """A file the JSON import reads: the export itself."""
+    return name.lower().endswith(".json")
+
+
+def _extract_wanted(archive, dest: Path, wanted) -> None:
+    """Unpacks the entries wanted(name) accepts into dest, within the
+    limits. Raises ArchiveTooLarge past them; RuntimeError for a wrong or
+    missing password, as extractall did."""
+    limit = Config.MAX_IMPORT_EXPANDED_BYTES
+    infos = archive.infolist()
+    if len(infos) > Config.MAX_IMPORT_ENTRIES:
+        raise ArchiveTooLarge(
+            f"It holds {len(infos):,} entries; an import may hold at most "
+            f"{Config.MAX_IMPORT_ENTRIES:,}."
+        )
+    chosen = [info for info in infos
+              if not info.is_dir() and wanted(info.filename)]
+    too_big = (
+        f"It unpacks to more than {limit // (1024 * 1024):,} MB, the most "
+        "an import may unpack to (VECTOR_MAX_IMPORT_EXPANDED_MB)."
+    )
+    if sum(info.file_size for info in chosen) > limit:
+        raise ArchiveTooLarge(too_big)
+
+    written = 0
+    for info in chosen:
+        target = _member_path(dest, info.filename)
+        if target is None:
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with archive.open(info) as source, open(target, "wb") as out:
+            while True:
+                chunk = source.read(1024 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > limit:
+                    raise ArchiveTooLarge(too_big)
+                out.write(chunk)
+
+
+def _refuse_large_archive(err: ArchiveTooLarge) -> None:
+    ui.notify(
+        "Nothing was imported, and the case on this computer is "
+        f"unchanged: this file is larger than an import may be.\n\n{err}",
+        multi_line=True,
+        classes="multi-line-notification",
+        type="warning",
+        timeout=ZERO_TIMEOUT,
+        position="center",
+        close_button="OK",
+    )
 
 
 def _report_failure(message: str, err: BaseException) -> None:
@@ -889,7 +979,7 @@ def _import_csv_archive(
             try:
                 with pyzipper.AESZipFile(zip_file, "r") as zf:
                     zf.setpassword(password.encode("utf-8"))
-                    zf.extractall(temp_dir)
+                    _extract_wanted(zf, temp_dir, _is_csv_import_member)
             except RuntimeError as err:
                 ui.notify(
                     f"Failed to decrypt ZIP file → {err}.\n"
@@ -904,7 +994,7 @@ def _import_csv_archive(
             # ----- Extract without password -----
             try:
                 with pyzipper.AESZipFile(zip_file, "r") as zf:
-                    zf.extractall(temp_dir)
+                    _extract_wanted(zf, temp_dir, _is_csv_import_member)
             except RuntimeError:
                 # This zip requires a password
                 ui.notify(
@@ -916,6 +1006,9 @@ def _import_csv_archive(
                 )
                 return
 
+    except ArchiveTooLarge as err:
+        _refuse_large_archive(err)
+        return
     except Exception as err:
         _report_failure(
             "Could not open that file. Nothing was imported, and the case "
@@ -1510,7 +1603,10 @@ def _import_json_file(
             with pyzipper.AESZipFile(source_path, "r") as archive:
                 if password:
                     archive.setpassword(password.encode("utf-8"))
-                archive.extractall(staging)
+                _extract_wanted(archive, staging, _is_json_import_member)
+        except ArchiveTooLarge as err:
+            _refuse_large_archive(err)
+            return
         except RuntimeError:
             ui.notify(
                 "Could not open that archive. If it is encrypted, check "

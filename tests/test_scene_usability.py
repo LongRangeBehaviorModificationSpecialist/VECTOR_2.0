@@ -556,11 +556,11 @@ def test_the_print_all_button_follows_the_case_as_it_changes(
         populated, machine_settings):
     """Read again as the case changes, not once when the page opened."""
     import parts.reports_page as reports
-    ready, errors, number, chosen = reports._print_all_state()
-    assert ready and not errors and number and chosen
+    ready, errors, number, chosen, generation = reports._print_all_state()
+    assert ready and not errors and number and chosen and generation
     with get_session() as session:
         session.query(Cases).one().JURISDICTION = ""
-    ready, errors, _number, _chosen = reports._print_all_state()
+    ready, errors, _number, _chosen, _generation = reports._print_all_state()
     assert not ready and "Jurisdiction is required." in errors
     settings.set_print_all_copies({key: 0 for key in settings.PRINT_ALL_DEFAULT})
     assert reports._print_all_state()[3] is False
@@ -582,7 +582,7 @@ def test_the_rooms_note_says_an_agent_is_missing_not_both():
 def test_print_all_builds_the_reports_off_the_event_loop():
     import parts.reports_page as reports
     source = inspect.getsource(reports.print_all_document)
-    assert "await run.io_bound(_print_all_answer, case)" in source
+    assert "await run.io_bound(_print_all_answer, case, generation)" in source
 
 
 def test_a_change_to_what_print_all_prints_is_audited_once(machine_settings):
@@ -640,9 +640,10 @@ def test_the_admin_panel_offers_it_and_asks_first():
     source = inspect.getsource(admin_users.training_card)
     assert "TYPE DEMO TO CONFIRM" in source
     assert "if not get_is_admin():" in source
-    # Asked again when Load is pressed: a case started on another device
-    # after the dialog opened was never warned about.
-    assert '(get_case_info() or {}).get("CASENUMBER") != opened_on' in source
+    # Asked again when Load is pressed: a case started or replaced on
+    # another device after the dialog opened was never warned about.
+    assert "opened_on = case_token()" in source
+    assert 'case_changed_since(opened_on, "nothing was loaded")' in source
 
 
 def test_the_demo_is_a_filter_on_the_audit_trail():

@@ -425,6 +425,47 @@ def require_same_case(opened_on: str):
     return decorate
 
 
+def case_still_open_and_same(opened_on: str) -> bool:
+    """For an action that waited part-way through, for an upload to
+    arrive say: True while a case is open and it is still the one the
+    page was opened on; otherwise says which and returns False."""
+    return _case_is_open() and _still_the_same_case(opened_on)
+
+
+# ----- Confirmation windows -----
+# A window that warns about one case -- Start New Case, Delete All Data,
+# an import, the demo case -- can stand open while another device
+# replaces that case or starts one. Confirming it then erased, or
+# replaced, a case nobody was warned about. Each window notes which case
+# it warned about when it opens, and acts only if that is still the case
+# when its button is pressed: the case generation, which moves whenever
+# the case is replaced even under a number typed the same, and the open
+# case's number, since saving a first case moves no generation.
+def case_token() -> tuple:
+    """Which case a confirmation window is about."""
+    return case_generation(), (get_case_info() or {}).get("CASENUMBER")
+
+
+def case_changed_since(opened_on: tuple, nothing_done: str) -> bool:
+    """True, having said so, when the case is no longer the one a
+    confirmation window warned about. nothing_done finishes "so ...",
+    as in "nothing was deleted"."""
+    if case_token() == opened_on:
+        return False
+
+    ui.notify(
+        "The case on this computer changed while this was open, so "
+        f"{nothing_done}. Open it again to see what it would affect now.",
+        type="warning",
+        multi_line=True,
+        classes="multi-line-notification",
+        timeout=ZERO_TIMEOUT,
+        position="center",
+        close_button="OK",
+    )
+    return True
+
+
 def case_changed_banner(opened_on: str) -> Callable[[], None]:
     """A line across the top of a page, shown once the case it was opened
     on has been replaced. Returns what shows or hides it, for the page's

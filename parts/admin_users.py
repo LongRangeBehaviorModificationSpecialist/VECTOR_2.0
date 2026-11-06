@@ -41,6 +41,8 @@ from utils import (
     CONFIRM_TIMEOUT,
     WARN_TIMEOUT,
     ZERO_TIMEOUT,
+    case_changed_since,
+    case_token,
     clear_case,
     get_case_info,
     set_network_access,
@@ -787,8 +789,9 @@ def training_card() -> None:
         def open_dialog() -> None:
             case = get_case_info()
             # What this dialog asks about, to compare with the case open
-            # when Load is pressed.
-            opened_on = (case or {}).get("CASENUMBER")
+            # when Load is pressed: a number alone would pass a case
+            # replaced under the same number. See utils.case_token().
+            opened_on = case_token()
 
             with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
                 ui.label("Load the demo case?").classes(
@@ -825,18 +828,8 @@ def training_card() -> None:
                             return
                         # A case started on another device while this was
                         # open was never warned about, nor confirmed.
-                        if (get_case_info() or {}).get("CASENUMBER") != opened_on:
+                        if case_changed_since(opened_on, "nothing was loaded"):
                             dialog.close()
-                            ui.notify(
-                                "The case on this computer changed while "
-                                "this was open. Nothing was loaded. Press "
-                                "Load the demo case again to see what it "
-                                "would replace.",
-                                type="warning",
-                                timeout=WARN_TIMEOUT,
-                                position="center",
-                                close_button="OK",
-                            )
                             return
                         if confirm is not None and (
                             (confirm.value or "").strip() != "DEMO"

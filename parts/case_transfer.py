@@ -36,6 +36,8 @@ from utils import (
     CONFIRM_TIMEOUT,
     WARN_TIMEOUT,
     ZERO_TIMEOUT,
+    case_changed_since,
+    case_token,
     delete_all_data,
 )
 
@@ -172,6 +174,9 @@ def open_import_dialog() -> None:
 
     The format, and whether the file needs a password, are read from
     the file itself rather than asked for."""
+    # The case this window warns about; see utils.case_token().
+    opened_on = case_token()
+
     with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
         ui.label("Import Data...").classes(
@@ -275,6 +280,9 @@ def open_import_dialog() -> None:
                 return
 
             dialog.close()
+            if case_changed_since(opened_on, "nothing was imported"):
+                discard_picked()
+                return
 
             # A .json, or a .zip holding one, goes through the JSON
             # reader; the CSV archive is also a .zip, so the contents
@@ -336,6 +344,9 @@ def open_delete_all_dialog() -> None:
 
     Accounts and the audit trail are kept: a wipe is exactly the
     event the trail exists to record."""
+    # The case this window warns about; see utils.case_token().
+    opened_on = case_token()
+
     with ui.dialog() as dialog, ui.card().classes("max-w-md p-6"):
 
         ui.label("Delete All Data?").classes(
@@ -392,6 +403,8 @@ def open_delete_all_dialog() -> None:
                 return
 
             dialog.close()
+            if case_changed_since(opened_on, "nothing was deleted"):
+                return
 
             try:
                 delete_all_data()

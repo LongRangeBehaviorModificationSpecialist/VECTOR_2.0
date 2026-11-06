@@ -520,3 +520,222 @@ def test_the_report_on_screen_keeps_its_styles():
     # Pointed at the sheet, not the page: the rest of the page is left alone.
     assert "\nbody {" not in screen
     assert ".report-sheet {" in screen and "background: #ffffff;" in screen
+
+
+# ======================================================================
+# The 6 November branch review
+# ======================================================================
+
+# ----- 01: a confirmation window acts only on the case it warned about -----
+
+@pytest.fixture
+def quiet(monkeypatch):
+    import utils
+    said = []
+    monkeypatch.setattr(utils.ui, "notify", lambda message, **kw: said.append(str(message)))
+    return said
+
+
+def test_a_window_warned_about_one_case_refuses_once_it_is_replaced(case, quiet):
+    from utils import case_changed_since, case_token
+    opened_on = case_token()
+    assert not case_changed_since(opened_on, "nothing was deleted")
+    _next_case()
+    assert case_changed_since(opened_on, "nothing was deleted")
+    assert "nothing was deleted" in quiet[-1]
+
+
+def test_a_case_replaced_under_the_same_number_is_still_another_case(populated, quiet):
+    from utils import case_changed_since, case_token
+    opened_on = case_token()
+    _next_case(number=populated)
+    assert case_changed_since(opened_on, "nothing was imported")
+
+
+def test_a_window_opened_before_any_case_refuses_once_one_is_saved(quiet):
+    from utils import case_changed_since, case_token
+    delete_all_data()
+    opened_on = case_token()
+    with get_session() as session:
+        session.add(Cases(CASENUMBER="26-777777", LOCATION="3 Third Street",
+                          JURISDICTION="Arlington County",
+                          CASEDATETIMEBEGIN="11-06-2026 09:00"))
+    assert case_changed_since(opened_on, "nothing was deleted")
+
+
+@pytest.mark.parametrize("module, function, act", [
+    ("home_page", "confirm_new_case_handler", "delete_all_data()"),
+    ("parts.case_transfer", "open_delete_all_dialog", "delete_all_data()"),
+    ("parts.case_transfer", "open_import_dialog", "import_vector_from_json("),
+    ("parts.admin_users", "training_card", "load_demo_case("),
+])
+def test_every_window_that_replaces_the_case_checks_it_first(module, function, act):
+    import importlib
+    func = getattr(importlib.import_module(module), function)
+    source = inspect.getsource(getattr(func, "__wrapped__", func))
+    assert "opened_on = case_token()" in source
+    # The call, not a comment naming it.
+    assert source.index("case_changed_since(opened_on") < source.rindex(act)
+
+
+# ----- 02: an upload checks the session and the case after it arrives -----
+
+def test_an_upload_checks_again_after_the_file_has_arrived():
+    import parts.file_upload as file_upload
+    source = inspect.getsource(file_upload.upload_card)
+    arrived = source.index("await uploaded_file.read()")
+    written = source.index("with get_session() as session:")
+    assert arrived < source.index("if not is_authenticated():") < written
+    assert arrived < source.index("case_still_open_and_same(opened_on)") < written
+
+
+def test_the_late_check_refuses_a_replaced_case(case, quiet):
+    from utils import case_still_open_and_same
+    opened_on = case_generation()
+    assert case_still_open_and_same(opened_on)
+    _next_case()
+    assert not case_still_open_and_same(opened_on)
+
+
+# ----- 03: an account changed while signing in is not signed in -----
+
+@pytest.fixture
+def account():
+    from models import Users, get_users_session
+    with get_users_session() as session:
+        session.query(Users).filter_by(USERNAME="review-agent").delete()
+        user = Users(USERNAME="review-agent", ISADMIN=False, ISACTIVE=True)
+        user.set_password("a-test-password")
+        session.add(user)
+        session.flush()
+        checked = {"Z_PK": user.Z_PK, "USERNAME": user.USERNAME,
+                   "ISADMIN": False, "MUSTCHANGEPASSWORD": False,
+                   "PASSWORDHASH": user.PASSWORDHASH}
+    yield checked
+    with get_users_session() as session:
+        session.query(Users).filter_by(USERNAME="review-agent").delete()
+
+
+def test_an_unchanged_account_signs_in(account):
+    import home_page
+    counters = home_page.sign_out_counters(account["USERNAME"])
+    assert home_page.account_as_checked(account, counters)["USERNAME"] == "review-agent"
+
+
+def test_an_account_deleted_during_its_password_check_is_not_signed_in(account):
+    import home_page
+    from models import Users, get_users_session
+    counters = home_page.sign_out_counters(account["USERNAME"])
+    with get_users_session() as session:
+        session.query(Users).filter_by(USERNAME="review-agent").delete()
+    assert home_page.account_as_checked(account, counters) is None
+
+
+def test_an_account_reset_or_deactivated_meanwhile_is_not_signed_in(account):
+    import home_page
+    from models import Users, get_users_session
+    counters = home_page.sign_out_counters(account["USERNAME"])
+    with get_users_session() as session:
+        session.query(Users).filter_by(USERNAME="review-agent").one().set_password("new-one")
+    assert home_page.account_as_checked(account, counters) is None
+    with get_users_session() as session:
+        user = session.query(Users).filter_by(USERNAME="review-agent").one()
+        account["PASSWORDHASH"] = user.PASSWORDHASH
+        user.ISACTIVE = False
+    assert home_page.account_as_checked(account, counters) is None
+
+
+def test_an_account_signed_out_meanwhile_is_not_signed_in(account, monkeypatch):
+    import home_page
+    counters = home_page.sign_out_counters(account["USERNAME"])
+    monkeypatch.setattr(home_page, "user_generation", lambda name: counters[1] + 1)
+    assert home_page.account_as_checked(account, counters) is None
+
+
+def test_the_sign_in_counts_the_sign_outs_before_the_password_check():
+    import home_page
+    source = inspect.getsource(home_page.build_login_home)
+    assert (source.index("generations = sign_out_counters(entered_user)")
+            < source.index("await run.io_bound(")
+            < source.index("account_as_checked(account, generations)")
+            < source.index("sign_in("))
+
+
+# ----- 04: Print All knows a case replaced under the same number -----
+
+def test_print_all_refuses_a_case_replaced_under_the_same_number(print_all, populated):
+    opened_on = case_generation()
+    _next_case(number=populated)
+    response = print_all._print_all_answer(populated, opened_on)
+    assert response.status_code == 409
+    assert b"replaced" in response.body
+    assert b"END OF REPORT" not in response.body
+
+
+def test_print_all_asks_for_the_case_generation_too():
+    import parts.reports_page as reports
+    script = reports.print_all_script("26-004711", "42")
+    assert "&generation=" in script and 'encodeURIComponent("42")' in script
+
+
+# ----- 05: an import unpacks only what it reads, within limits -----
+
+def _zip(tmp_path, members):
+    path = tmp_path / "made.zip"
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in members.items():
+            archive.writestr(name, data)
+    return path
+
+
+def test_an_import_unpacks_only_the_files_it_reads(tmp_path):
+    path = _zip(tmp_path, {
+        "case/CASES.csv": "CASENUMBER\n1\n",
+        "case/export_manifest.json": "{}",
+        "case/files/photo.jpg": b"jpeg",
+        "case/unrelated.bin": b"\0" * 1024 * 1024,
+    })
+    dest = tmp_path / "out"
+    with zipfile.ZipFile(path) as archive:
+        import_export._extract_wanted(archive, dest, import_export._is_csv_import_member)
+    found = sorted(p.relative_to(dest).as_posix() for p in dest.rglob("*") if p.is_file())
+    assert found == ["case/CASES.csv", "case/export_manifest.json", "case/files/photo.jpg"]
+
+
+def test_an_archive_unpacking_past_the_limit_is_stopped(tmp_path, monkeypatch):
+    monkeypatch.setattr(import_export.Config, "MAX_IMPORT_EXPANDED_BYTES", 64 * 1024)
+    path = _zip(tmp_path, {"CASES.csv": "x" * (1024 * 1024)})
+    dest = tmp_path / "out"
+    with zipfile.ZipFile(path) as archive, pytest.raises(import_export.ArchiveTooLarge):
+        import_export._extract_wanted(archive, dest, import_export._is_csv_import_member)
+    written = sum(p.stat().st_size for p in dest.rglob("*") if p.is_file())
+    assert written <= 64 * 1024
+
+
+def test_an_archive_with_too_many_entries_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr(import_export.Config, "MAX_IMPORT_ENTRIES", 3)
+    path = _zip(tmp_path, {f"{n}.csv": "a\n" for n in range(5)})
+    with zipfile.ZipFile(path) as archive, pytest.raises(import_export.ArchiveTooLarge):
+        import_export._extract_wanted(archive, tmp_path / "out",
+                                      import_export._is_csv_import_member)
+
+
+def test_an_entry_cannot_unpack_outside_its_folder(tmp_path):
+    path = _zip(tmp_path, {"../escaped.csv": "a\n", "files/../../up.csv": "a\n",
+                           "kept.csv": "a\n"})
+    dest = tmp_path / "out"
+    with zipfile.ZipFile(path) as archive:
+        import_export._extract_wanted(archive, dest, import_export._is_csv_import_member)
+    assert not (tmp_path / "escaped.csv").exists()
+    assert not (tmp_path / "up.csv").exists()
+    assert (dest / "kept.csv").exists()
+
+
+def test_an_import_past_the_limit_leaves_the_case_as_it_was(
+        with_attachment, out_dir, notices, monkeypatch):
+    archive = _csv_export(out_dir)
+    before = _counts()
+    monkeypatch.setattr(import_export.Config, "MAX_IMPORT_EXPANDED_BYTES", 16)
+    import_export.import_vector_from_csv(str(archive))
+    assert _counts() == before
+    assert any("larger than an import may be" in message for message in notices)
