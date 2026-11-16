@@ -341,7 +341,7 @@ def get_case_info_for_folder_name() -> str:
     from models import Cases
 
     with get_session() as session:
-        case = session.query(Cases).first()
+        case = session.query(Cases).order_by(Cases.Z_PK).first()
         if not case:
             ui.notify(
                 "No case found. Cannot export data.",
@@ -535,7 +535,10 @@ def export_vector_to_csv(
         with get_session() as session:
             uploaded_files = session.query(UploadedFiles).all()
             for uf in uploaded_files:
-                if uf.FILEDATA:
+                # An empty file is still an attachment: a zero-byte text
+                # file can be uploaded, and skipping it here left the
+                # export one file short with nothing said.
+                if uf.FILEDATA is not None:
                     # Sanitize filename
                     safe_name = uf.FILENAME or f"file_{uf.Z_PK}"
                     safe_name = safe_name.replace("/", "_").replace("\\", "_")
@@ -1399,7 +1402,8 @@ def export_vector_to_json(
     try:
         with get_session() as session:
             for uploaded in session.query(UploadedFiles).all():
-                if not uploaded.FILEDATA:
+                # An empty file is still an attachment; see the CSV export.
+                if uploaded.FILEDATA is None:
                     continue
 
                 current_hash = (

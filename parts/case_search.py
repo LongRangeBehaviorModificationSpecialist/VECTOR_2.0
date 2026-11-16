@@ -31,7 +31,7 @@ from models import (
     UploadedFiles,
     get_session,
 )
-from utils import evidence_number_key, room_label_key
+from utils import evidence_number_key, like_pattern, room_label_key
 
 # Shorter than this matches nearly everything.
 MIN_LENGTH = 2
@@ -136,11 +136,9 @@ def searched_for() -> str:
 
 
 def _like(text: str) -> str:
-    """A LIKE pattern matching text anywhere, with % and _ taken literally."""
-    escaped = (
-        text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    )
-    return f"%{escaped}%"
+    """A LIKE pattern matching text anywhere, with % and _ taken literally.
+    Shared with the Audit Trail's search; see utils.like_pattern()."""
+    return like_pattern(text)
 
 
 def _snippet(value: str, text: str, width: int = 70) -> str:

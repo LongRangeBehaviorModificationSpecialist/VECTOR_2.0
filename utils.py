@@ -173,10 +173,26 @@ def required_textarea(label: str, **kwargs):
     return req_textarea
 
 
+def like_pattern(text: str) -> str:
+    """A LIKE pattern matching text anywhere, with % and _ taken literally.
+
+    Use with ilike(pattern, escape="\\\\"). Without the escaping, a search
+    for "100%" matched every row.
+    """
+    escaped = (
+        text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    )
+    return f"%{escaped}%"
+
+
 def get_case_info() -> dict | None:
-    """Returns the single active case info (or None if no case exists)."""
+    """Returns the single active case info (or None if no case exists).
+
+    The first case by row, as check_case_info() reads it: VECTOR holds one
+    case, and every reader of it has to agree which.
+    """
     with get_session() as session:
-        case = session.query(Cases).first()
+        case = session.query(Cases).order_by(Cases.Z_PK).first()
 
         if not case:
             return None

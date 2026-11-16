@@ -25,8 +25,10 @@ from pathlib import Path
 import pytest
 
 import import_export
+import parts.audit_page
 import settings
 from models import (
+    AuditLog,
     Cases,
     Evidence,
     Notes,
@@ -739,3 +741,67 @@ def test_an_import_past_the_limit_leaves_the_case_as_it_was(
     import_export.import_vector_from_csv(str(archive))
     assert _counts() == before
     assert any("larger than an import may be" in message for message in notices)
+
+
+# ----- From the once-over of the whole branch, 16 November -----
+
+def _empty_attachment():
+    with get_session() as session:
+        session.add(UploadedFiles(
+            FILENAME="empty-notes.txt", FILESIZE=0, FILEMIMETYPE="text/plain",
+            FILEUPLOADEDBY="Roe, Jane", FILEDATA=b"",
+            FILESHA256=hashlib.sha256(b"").hexdigest().upper(),
+        ))
+
+
+def test_an_empty_attachment_is_exported_and_imported_by_csv(populated, out_dir, notices):
+    """A zero-byte file could be uploaded but was left out of every
+    export, with nothing said: one file short, lost at the next import."""
+    _empty_attachment()
+    archive = _csv_export(out_dir)
+    with zipfile.ZipFile(archive) as z:
+        assert any(name.endswith("files/empty-notes.txt") for name in z.namelist())
+        manifest = json.loads(z.read(next(n for n in z.namelist() if n.endswith("export_manifest.json"))))
+    assert manifest["total_files"] == 1
+    import_export.import_vector_from_csv(str(archive))
+    with get_session() as session:
+        stored = session.query(UploadedFiles).one()
+        assert stored.FILENAME == "empty-notes.txt" and stored.FILEDATA == b""
+
+
+def test_an_empty_attachment_is_exported_and_imported_by_json(populated, out_dir, notices):
+    _empty_attachment()
+    result = import_export.export_vector_to_json(destination=out_dir)
+    payload = json.loads(Path(result.zip_path).read_text(encoding="utf-8"))
+    assert payload["files"]["record_count"] == 1
+    import_export.import_vector_from_json(str(result.zip_path))
+    with get_session() as session:
+        assert session.query(UploadedFiles).one().FILEDATA == b""
+
+
+def test_the_audit_search_takes_percent_and_underscore_literally(populated):
+    """Searched as typed, like the case search: "100%" matched every entry."""
+    from utils import like_pattern
+    with get_session() as session:
+        session.add(Notes(NOTEDATETIME="11-16-2026 09:00", NOTEAUTHOR="Doe, John",
+                          NOTETEXT="n"))
+    with get_session() as session:
+        total = session.query(AuditLog).count()
+        matching = session.query(AuditLog).filter(
+            AuditLog.summary.ilike(like_pattern("100%"), escape="\\")
+        ).count()
+    assert total > 0 and matching == 0
+    source = inspect.getsource(parts.audit_page.build_audit_page)
+    assert "like_pattern(term)" in source and 'escape="\\\\"' in source
+
+
+def test_every_reader_of_the_case_reads_the_same_one():
+    """VECTOR holds one case, and every function that reads it orders by
+    row, so none can disagree with the others about which it is."""
+    import utils
+    import parts.reports_page as reports
+    for func in (utils.get_case_info, reports.validate_case_for_report,
+                 import_export.get_case_info_for_folder_name):
+        source = inspect.getsource(func)
+        assert "session.query(Cases).first()" not in source, func.__name__
+        assert "order_by(Cases.Z_PK).first()" in source, func.__name__

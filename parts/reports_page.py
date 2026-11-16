@@ -661,7 +661,7 @@ def validate_case_for_report() -> tuple[bool, list[str]]:
 
     with get_session() as session:
 
-        case = session.query(Cases).first()
+        case = session.query(Cases).order_by(Cases.Z_PK).first()
 
         if not case:
             errors.append(

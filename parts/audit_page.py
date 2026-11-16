@@ -19,6 +19,7 @@ import clock
 from live import refresh_on_change
 from models import audit_version, get_session, verify_audit_chain, AuditLog
 from navbar import build_navbar
+from utils import like_pattern
 
 
 ACTION_CHOICES = [
@@ -179,11 +180,13 @@ def build_audit_page() -> None:
 
                 term = (search_input.value or "").strip()
                 if term:
-                    like = f"%{term}%"
+                    # % and _ taken literally, as the case search takes
+                    # them: "100%" used to match every entry.
+                    like = like_pattern(term)
                     query = query.filter(
-                        AuditLog.actor.ilike(like)
-                        | AuditLog.table_name.ilike(like)
-                        | AuditLog.summary.ilike(like)
+                        AuditLog.actor.ilike(like, escape="\\")
+                        | AuditLog.table_name.ilike(like, escape="\\")
+                        | AuditLog.summary.ilike(like, escape="\\")
                     )
 
                 matching = query.count()
