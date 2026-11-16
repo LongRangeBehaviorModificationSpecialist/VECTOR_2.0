@@ -177,15 +177,19 @@ def test_the_sign_in_page_says_why_the_device_is_back_there(
     auth.invalidate_user_sessions("agent")
     auth.leave_ended_session()
 
-    assert auth.take_session_ended_notice() is True
-    assert auth.take_session_ended_notice() is False
+    # Every visit says so, until the next sign-in: two refused actions on
+    # the same page each send it there.
+    assert auth.session_ended_notice() is True
+    assert auth.session_ended_notice() is True
+    auth.sign_in("agent", False)
+    assert auth.session_ended_notice() is False
 
 
 def test_pressing_logout_needs_no_explanation(browser, went_to):
     auth.sign_in("agent", False)
     auth.sign_out()
     auth.leave_ended_session()
-    assert auth.take_session_ended_notice() is False
+    assert auth.session_ended_notice() is False
 
 
 def test_an_open_page_notices_within_seconds(browser, went_to, monkeypatch):
@@ -248,15 +252,18 @@ def _decorators(path: Path) -> dict:
 def test_every_button_that_changes_the_case_checks_the_session(path, handler):
     found = _decorators(ROOT / path)
     assert found.get(handler), f"{handler} is not in {path}"
+    # The entity dialogs take their page's guard, which checks the session
+    # first: see test_the_entity_pages_check_the_session_too.
+    checks = {"guard"} if path == "parts/crud_dialogs.py" else {"require_session"}
     for decorators in found[handler]:
-        assert "require_session" in decorators, f"{path}: {handler}"
+        assert checks <= decorators, f"{path}: {handler}"
 
 
 def test_the_entity_pages_check_the_session_too():
     import parts.crud as crud
-    assert "require_session(case_guard(handler))" in inspect.getsource(
-        crud.build_crud_page
-    )
+    source = " ".join(inspect.getsource(crud.build_crud_page).split())
+    assert ("require_session( case_guard(require_same_case(page_case)(handler)) )"
+            in source)
 
 
 # ----- The pause after failed sign-ins -----

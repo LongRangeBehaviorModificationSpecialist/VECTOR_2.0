@@ -23,6 +23,7 @@ import tempfile
 from typing import Optional
 
 from failures import explain, log
+from program.config import Config
 from models import (
     LEGACY_COLUMN_NAMES,
     LEGACY_TABLE_NAMES,
@@ -154,6 +155,95 @@ def canonical_file_entry(entry: dict) -> dict:
     }
 
 
+# ----- Unpacking an import, within limits -----
+# An import used to unpack the whole archive before looking at it: a ZIP
+# of under 2 KB unpacked a 1 MB file VECTOR never reads, and one made to
+# unpack to gigabytes could fill the disk. Only the files an import
+# reads are unpacked now, and unpacking stops at a limit on entries and
+# on bytes, counted as they are written -- a ZIP can say anything about
+# its own sizes.
+
+class ArchiveTooLarge(ValueError):
+    """An archive past the import limits. Nothing has been imported."""
+
+
+def _member_path(dest: Path, name: str) -> Optional[Path]:
+    """Where an entry unpacks to, or None for a name that would leave
+    dest (an absolute path, a drive, "..")."""
+    if name.startswith(("/", "\\")):
+        return None
+    parts = [part for part in name.replace("\\", "/").split("/")
+             if part not in ("", ".")]
+    if not parts or any(part == ".." or ":" in part for part in parts):
+        return None
+    return dest.joinpath(*parts)
+
+
+def _is_csv_import_member(name: str) -> bool:
+    """A file the CSV import reads: a table, the manifest, an attachment."""
+    parts = name.replace("\\", "/").lower().split("/")
+    return (
+        parts[-1].endswith(".csv")
+        or parts[-1] == "export_manifest.json"
+        or "files" in parts[:-1]
+    )
+
+
+def _is_json_import_member(name: str) -> bool:
+    """A file the JSON import reads: the export itself."""
+    return name.lower().endswith(".json")
+
+
+def _extract_wanted(archive, dest: Path, wanted) -> None:
+    """Unpacks the entries wanted(name) accepts into dest, within the
+    limits. Raises ArchiveTooLarge past them; RuntimeError for a wrong or
+    missing password, as extractall did."""
+    limit = Config.MAX_IMPORT_EXPANDED_BYTES
+    infos = archive.infolist()
+    if len(infos) > Config.MAX_IMPORT_ENTRIES:
+        raise ArchiveTooLarge(
+            f"It holds {len(infos):,} entries; an import may hold at most "
+            f"{Config.MAX_IMPORT_ENTRIES:,}."
+        )
+    chosen = [info for info in infos
+              if not info.is_dir() and wanted(info.filename)]
+    too_big = (
+        f"It unpacks to more than {limit // (1024 * 1024):,} MB, the most "
+        "an import may unpack to (VECTOR_MAX_IMPORT_EXPANDED_MB)."
+    )
+    if sum(info.file_size for info in chosen) > limit:
+        raise ArchiveTooLarge(too_big)
+
+    written = 0
+    for info in chosen:
+        target = _member_path(dest, info.filename)
+        if target is None:
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with archive.open(info) as source, open(target, "wb") as out:
+            while True:
+                chunk = source.read(1024 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > limit:
+                    raise ArchiveTooLarge(too_big)
+                out.write(chunk)
+
+
+def _refuse_large_archive(err: ArchiveTooLarge) -> None:
+    ui.notify(
+        "Nothing was imported, and the case on this computer is "
+        f"unchanged: this file is larger than an import may be.\n\n{err}",
+        multi_line=True,
+        classes="multi-line-notification",
+        type="warning",
+        timeout=ZERO_TIMEOUT,
+        position="center",
+        close_button="OK",
+    )
+
+
 def _report_failure(message: str, err: BaseException) -> None:
     """Explains a failed export or import on screen, and logs the detail."""
     log.error("%s", message, exc_info=err)
@@ -251,7 +341,7 @@ def get_case_info_for_folder_name() -> str:
     from models import Cases
 
     with get_session() as session:
-        case = session.query(Cases).first()
+        case = session.query(Cases).order_by(Cases.Z_PK).first()
         if not case:
             ui.notify(
                 "No case found. Cannot export data.",
@@ -445,7 +535,10 @@ def export_vector_to_csv(
         with get_session() as session:
             uploaded_files = session.query(UploadedFiles).all()
             for uf in uploaded_files:
-                if uf.FILEDATA:
+                # An empty file is still an attachment: a zero-byte text
+                # file can be uploaded, and skipping it here left the
+                # export one file short with nothing said.
+                if uf.FILEDATA is not None:
                     # Sanitize filename
                     safe_name = uf.FILENAME or f"file_{uf.Z_PK}"
                     safe_name = safe_name.replace("/", "_").replace("\\", "_")
@@ -683,6 +776,199 @@ def import_vector_from_csv(
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+# ----- Checked before anything is cleared -----
+# An import replaces the whole case, so a file that would put less in its
+# place is refused while the case is still there: a file holding no case,
+# a table cut short, a photograph the export listed and the archive lost,
+# a file altered since export. A JSON file with an empty table list used
+# to clear the case and report success, and an archive missing a listed
+# photograph imported without it.
+
+def _refuse_import(problems: list) -> None:
+    """Says why a file was not imported. Nothing has been changed."""
+    ui.notify(
+        "Nothing was imported, and the case on this computer is "
+        "unchanged: this file failed its integrity checks.\n\n"
+        + "\n\n".join(problems),
+        multi_line=True,
+        classes="multi-line-notification",
+        type="warning",
+        timeout=ZERO_TIMEOUT,
+        position="center",
+        close_button="OK",
+    )
+
+
+def _one_case(count: int) -> list:
+    if count == 1:
+        return []
+    if count == 0:
+        return ["It holds no case."]
+    return [f"It holds {count} cases; VECTOR holds one at a time."]
+
+
+def _csv_rows(path: Path) -> int:
+    with open(path, "r", newline="", encoding="utf-8") as handle:
+        return sum(1 for _row in csv.DictReader(handle))
+
+
+def _check_csv_archive(import_dir: Path, found_tables: list, manifest: dict) -> list:
+    """What is wrong with an unpacked CSV archive, or [] when nothing is.
+
+    An archive without a manifest, or whose manifest lists no files, is
+    from before files were listed: its attachments cannot be checked, and
+    the import says so afterwards, as it always has.
+    """
+    tables = {name: path for name, _model, path in found_tables}
+    problems = _one_case(_csv_rows(tables["CASES"]) if "CASES" in tables else 0)
+
+    # Every table the manifest lists, with the rows it had.
+    for entry in manifest.get("tables") or []:
+        if not isinstance(entry, dict) or not entry.get("name"):
+            continue
+        name = canonical_table_name(entry["name"])
+        if name not in get_all_models():
+            continue
+        if name not in tables:
+            problems.append(f"Its {entry['name']} table is missing.")
+            continue
+        listed = entry.get("records")
+        found = _csv_rows(tables[name])
+        if isinstance(listed, int) and found != listed:
+            problems.append(
+                f"Its {entry['name']} table should hold {listed} rows and "
+                f"holds {found}."
+            )
+
+    # The attachments: exactly those listed, each as it was exported.
+    listed_files = manifest.get("files")
+    if not isinstance(listed_files, list):
+        return problems
+    names, expected = [], {}
+    for entry in listed_files:
+        if not isinstance(entry, dict):
+            continue
+        entry = canonical_file_entry(entry)
+        name = entry.get("FILEARCHIVENAME") or entry.get("FILENAME")
+        if name:
+            names.append(name)
+            expected[name] = entry.get("FILEHASH")
+    files_dir = import_dir / "files"
+    present = (
+        {path.name: path for path in files_dir.iterdir() if path.is_file()}
+        if files_dir.is_dir() else {}
+    )
+    listed_once = list(dict.fromkeys(names))
+    missing = [name for name in listed_once if name not in present]
+    altered = [
+        name for name in listed_once
+        if name in present and expected[name]
+        and not same_hash(expected[name], hash_file(present[name]))
+    ]
+    unlisted = sorted(name for name in present if name not in expected)
+    twice = sorted({name for name in names if names.count(name) > 1})
+    if missing:
+        problems.append(
+            "Files its manifest lists that are not in the archive:\n"
+            + "\n".join(missing)
+        )
+    if altered:
+        problems.append(
+            "Files whose contents do not match the manifest hash:\n"
+            + "\n".join(altered)
+        )
+    if unlisted:
+        problems.append(
+            "Files in the archive that its manifest does not list:\n"
+            + "\n".join(unlisted)
+        )
+    if twice:
+        problems.append(
+            "Files its manifest lists twice:\n" + "\n".join(twice)
+        )
+    return problems
+
+
+def _check_json_export(payload: dict) -> tuple:
+    """What is wrong with a JSON export, and its attachments decoded.
+
+    Returns (problems, [(entry, bytes), ...]); problems is [] when the
+    file can replace the case.
+    """
+    import base64
+    import binascii
+
+    tables = payload.get("tables")
+    if not isinstance(tables, dict):
+        return ["Its list of tables is damaged."], []
+
+    problems = []
+    case_count = 0
+    for raw_name, table_data in tables.items():
+        name = canonical_table_name(raw_name)
+        if name not in get_all_models():
+            # The audit trail is exported but never restored.
+            continue
+        records = (
+            table_data.get("records") if isinstance(table_data, dict) else None
+        )
+        if not isinstance(records, list) or not all(
+            isinstance(record, dict) for record in records
+        ):
+            problems.append(f"Its {raw_name} table is damaged.")
+            continue
+        listed = table_data.get("record_count")
+        if isinstance(listed, int) and listed != len(records):
+            problems.append(
+                f"Its {raw_name} table should hold {listed} records and "
+                f"holds {len(records)}."
+            )
+        if name == "CASES":
+            case_count = len(records)
+    problems = _one_case(case_count) + problems
+
+    # A 1.0 export held a bare list. Upstream's layout, and 1.1, wrap it
+    # as {"record_count": n, "records": [...]}.
+    entries = payload.get("files", [])
+    if isinstance(entries, dict):
+        listed = entries.get("record_count")
+        entries = entries.get("records", [])
+        if isinstance(listed, int) and isinstance(entries, list) and (
+            listed != len(entries)
+        ):
+            problems.append(
+                f"It should hold {listed} attachments and holds "
+                f"{len(entries)}."
+            )
+    if not isinstance(entries, list):
+        return problems + ["Its list of attachments is damaged."], []
+
+    decoded, altered = [], []
+    for raw_entry in entries:
+        if not isinstance(raw_entry, dict):
+            problems.append("An attachment in it is damaged.")
+            continue
+        entry = canonical_file_entry(raw_entry)
+        name = entry.get("FILENAME") or "(unnamed)"
+        try:
+            data = base64.b64decode(entry.get("FILEDATA_b64", ""), validate=True)
+        except (binascii.Error, ValueError, TypeError):
+            problems.append(f"The attachment {name} is damaged.")
+            continue
+        expected = entry.get("FILEHASH")
+        if expected and not same_hash(
+            expected, hashlib.sha256(data).hexdigest()
+        ):
+            altered.append(name)
+        decoded.append((entry, data))
+    if altered:
+        problems.append(
+            "These attachments do not match the hash recorded in the file:\n"
+            + "\n".join(altered)
+        )
+    return problems, decoded
+
+
 def _import_csv_archive(
         zip_file: Path,
         password: Optional[str],
@@ -696,7 +982,7 @@ def _import_csv_archive(
             try:
                 with pyzipper.AESZipFile(zip_file, "r") as zf:
                     zf.setpassword(password.encode("utf-8"))
-                    zf.extractall(temp_dir)
+                    _extract_wanted(zf, temp_dir, _is_csv_import_member)
             except RuntimeError as err:
                 ui.notify(
                     f"Failed to decrypt ZIP file → {err}.\n"
@@ -711,7 +997,7 @@ def _import_csv_archive(
             # ----- Extract without password -----
             try:
                 with pyzipper.AESZipFile(zip_file, "r") as zf:
-                    zf.extractall(temp_dir)
+                    _extract_wanted(zf, temp_dir, _is_csv_import_member)
             except RuntimeError:
                 # This zip requires a password
                 ui.notify(
@@ -723,6 +1009,9 @@ def _import_csv_archive(
                 )
                 return
 
+    except ArchiveTooLarge as err:
+        _refuse_large_archive(err)
+        return
     except Exception as err:
         _report_failure(
             "Could not open that file. Nothing was imported, and the case "
@@ -790,6 +1079,11 @@ def _import_csv_archive(
             position="center",
             close_button="OK",
         )
+        return
+
+    problems = _check_csv_archive(import_dir, found_tables, manifest)
+    if problems:
+        _refuse_import(problems)
         return
 
     # ----- Replace the case, all or nothing -----
@@ -1108,7 +1402,8 @@ def export_vector_to_json(
     try:
         with get_session() as session:
             for uploaded in session.query(UploadedFiles).all():
-                if not uploaded.FILEDATA:
+                # An empty file is still an attachment; see the CSV export.
+                if uploaded.FILEDATA is None:
                     continue
 
                 current_hash = (
@@ -1312,7 +1607,10 @@ def _import_json_file(
             with pyzipper.AESZipFile(source_path, "r") as archive:
                 if password:
                     archive.setpassword(password.encode("utf-8"))
-                archive.extractall(staging)
+                _extract_wanted(archive, staging, _is_json_import_member)
+        except ArchiveTooLarge as err:
+            _refuse_large_archive(err)
+            return
         except RuntimeError:
             ui.notify(
                 "Could not open that archive. If it is encrypted, check "
@@ -1368,20 +1666,16 @@ def _import_json_file(
         )
         return
 
-    import base64
+    problems, attachments = _check_json_export(payload)
+    if problems:
+        _refuse_import(problems)
+        return
 
     models_by_name = get_all_models()
     imported = []
     total_records = 0
-    hash_mismatches = []
     files_imported = 0
     stage = "the case"
-
-    # A 1.0 export held a bare list. Upstream's layout, and 1.1, wrap it
-    # as {"record_count": n, "records": [...]}.
-    file_entries = payload.get("files", [])
-    if isinstance(file_entries, dict):
-        file_entries = file_entries.get("records", [])
 
     # ----- Replace the case, all or nothing -----
     # One transaction, as in the CSV import, so a failure leaves the case
@@ -1422,17 +1716,8 @@ def _import_json_file(
 
             stage = "the attachments"
             session.query(UploadedFiles).delete()
-            for raw_entry in file_entries:
-                entry = canonical_file_entry(raw_entry)
-                raw = base64.b64decode(entry.get("FILEDATA_b64", ""))
+            for entry, raw in attachments:
                 actual_hash = hashlib.sha256(raw).hexdigest().upper()
-
-                expected = entry.get("FILEHASH")
-                if expected and not same_hash(expected, actual_hash):
-                    hash_mismatches.append(
-                        entry.get("FILENAME") or "(unnamed)"
-                    )
-
                 session.add(
                     UploadedFiles(
                         FILENAME=entry.get("FILENAME") or "imported",
@@ -1468,7 +1753,6 @@ def _import_json_file(
                         "format_version",
                         "unknown",
                     ),
-                    "hash_mismatches": hash_mismatches,
                 },
             )
 
@@ -1481,22 +1765,6 @@ def _import_json_file(
         return
 
     normalise_legacy_dates()
-
-
-    if hash_mismatches:
-        ui.notify(
-            "WARNING -- these attachments do not match the hash recorded "
-            "in the file:\n"
-            + "\n".join(hash_mismatches)
-            + "\n\nThe import completed and has been recorded in the "
-            "audit trail. Treat these files as unverified.",
-            multi_line=True,
-            classes="multi-line-notification",
-            type="warning",
-            timeout=ZERO_TIMEOUT,
-            position="center",
-            close_button="OK",
-        )
 
     tables = " | ".join(imported)
 

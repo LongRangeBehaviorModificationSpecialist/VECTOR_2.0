@@ -36,7 +36,7 @@ It runs on your own laptop. Nothing is sent anywhere.
 
 **At the end**
 
-- **Eight printable reports**, including the inventory left at the premises.
+- **Eight printable reports**, including the inventory left at the premises, and **Print All** for the ones you print at every search, in one go.
 
 - **Export** the whole case to a file, protected with a password if you choose.
 
@@ -44,7 +44,9 @@ It runs on your own laptop. Nothing is sent anywhere.
 
 - An **audit trail** of every change, sign-in and download, and every account an administrator adds, resets or removes.
 
-- **Accounts** for each agent, and tablets on the same Wi-Fi if you allow it.
+- **Accounts** for each agent, and tablets on the same Wi-Fi if you allow it, connected by scanning a QR code.
+
+- **A search over the whole case**, a checklist before you leave the scene, and a light page for working in daylight.
 
 ---
 

@@ -56,6 +56,11 @@ def _archive(tmp_path, manifest="{}"):
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("case/export_manifest.json", manifest)
         archive.writestr(
+            "case/CASES.csv",
+            "Z_PK,CASENUMBER,LOCATION,JURISDICTION,CASEDATETIMEBEGIN\n"
+            '1,26-004711,"1 Elm Street",Fairfax County,09-10-2026 08:00\n',
+        )
+        archive.writestr(
             "case/NOTES.csv",
             "Z_PK,NOTEDATETIME,NOTEAUTHOR,NOTETEXT\n"
             '1,09-10-2026 08:05,"Doe, John",from the archive\n',
@@ -125,7 +130,7 @@ def test_the_json_staging_goes_when_something_unforeseen_stops_it(
         tmp_path, temp_root, notices, monkeypatch):
     path = tmp_path / "case.json.zip"
     with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("case.json", '{"tables": {}}')
+        archive.writestr("case.json", '{"tables": {"CASES": {"records": []}}}')
 
     def unforeseen():
         raise MemoryError("something nobody planned for")

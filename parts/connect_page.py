@@ -30,6 +30,22 @@ _KIND_NOTES = {
 }
 
 
+def qr_code_image(text: str) -> str:
+    """A QR code of `text`, as a PNG data address -- or "" when the QR
+    package is missing, which leaves the page as it was without one.
+
+    Black on white, whatever the theme: a camera reads that best. Made
+    here, on this computer, so it works with no internet at the scene.
+    """
+    try:
+        import segno
+    except ImportError:
+        return ""
+    return segno.make(text, error="m").png_data_uri(
+        scale=8, border=3, dark="#000000", light="#FFFFFF"
+    )
+
+
 def _address_line(item, size: str = "text-base") -> None:
     """One address, with the adapter it belongs to."""
     with ui.column().classes("gap-0 mb-2"):
@@ -96,6 +112,19 @@ def build_connect_page() -> None:
                     "On the other device, open a browser and type:"
                 ).classes("text-sm text-[var(--vsp-gray)] mb-2")
                 _address_line(best, size="text-xl")
+
+                # Typing an address like that on a tablet's keyboard, at
+                # a scene, is where it goes wrong. A phone or tablet
+                # camera opens it from the code instead.
+                code = qr_code_image(best.url)
+                if code:
+                    ui.label(
+                        "Or point the tablet's camera at this code, and "
+                        "open the link it shows:"
+                    ).classes("text-sm text-[var(--vsp-gray)] mt-2")
+                    ui.image(code).props(
+                        f'fit=contain alt="QR code for {best.url}"'
+                    ).classes("connect-qr w-56 h-56 my-2 rounded")
 
                 hotspots = [a for a in rest if a.kind == settings.HOTSPOT]
                 if hotspots:

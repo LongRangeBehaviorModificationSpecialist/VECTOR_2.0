@@ -40,6 +40,7 @@ from auth import (
     signed_in_with_temporary_password,
 )
 from models import get_users_session, record_account_event
+from navbar import apply_theme
 import settings
 from program.config import (
     Config,
@@ -320,6 +321,46 @@ dashed line on the raised edge and its shadow.
     }
 }
 
+/*
+Light mode, for a tablet in daylight -- "Light or dark page" in the
+account menu, kept per browser. VECTOR was drawn for a dark page, so the colours
+chosen for one are put right for the other here, in one place: the
+secondary grey and the amber of warnings were too pale to read on white.
+The top bar stays dark in both. (The backslashes are doubled for Python;
+the browser is given one, as the Tailwind class names need.)
+*/
+body.body--light {
+    --vsp-gray: #3F3F46;
+}
+
+body.body--light .text-gray-400,
+body.body--light .text-gray-500 {
+    color: #52525B !important;
+}
+
+body.body--light .text-\\[\\#F5B027\\],
+body.body--light .yellow-label .q-field__label {
+    color: #A16207 !important;
+}
+
+body.body--light .text-green-400,
+body.body--light .text-green-500 {
+    color: #15803D !important;
+}
+
+body.body--light .text-red-400 {
+    color: #B91C1C !important;
+}
+
+body.body--light .border-\\[\\#3a3a3a\\] {
+    border-color: #D4D4D8 !important;
+}
+
+/* A search result, under the pointer or a finger. */
+.search-hit:hover {
+    background: rgba(127, 127, 127, 0.15);
+}
+
 /* Print styles */
 @media print {
     .no-print {
@@ -413,6 +454,9 @@ def change_password_page():
         return
 
     username = get_current_user_name()
+
+    # Light or dark, as this browser chose: this page has no top bar.
+    apply_theme()
 
     with ui.column().classes("items-center w-full mt-12"):
 

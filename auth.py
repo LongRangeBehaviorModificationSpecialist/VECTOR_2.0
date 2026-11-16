@@ -190,6 +190,7 @@ def sign_out() -> None:
     store["USERNAME"] = ""
     store["ISADMIN"] = False
     store["must_change_password"] = False
+    store["session_ended_notice"] = False
     store["session_generation"] = 0
     store["user_generation"] = 0
 
@@ -218,14 +219,15 @@ def note_session_ended() -> None:
         pass
 
 
-def take_session_ended_notice() -> bool:
-    """Whether this device was just signed out; asking clears it."""
+def session_ended_notice() -> bool:
+    """Whether this device was signed out from elsewhere.
+
+    Kept until the next sign-in or Logout, rather than cleared once read:
+    two actions refused on the same ended page each send it to the
+    sign-in page, and the second visit lost the explanation.
+    """
     try:
-        store = _session_store()
-        noticed = bool(store.get("session_ended_notice", False))
-        if noticed:
-            store["session_ended_notice"] = False
-        return noticed
+        return bool(_session_store().get("session_ended_notice", False))
     except Exception:
         # No request in scope; see the note above.
         return False

@@ -52,11 +52,11 @@ def _env_int(name: str, default: int) -> int:
 class Config:
     """Application metadata and runtime settings."""
 
-    version = "0.98"
+    version = "0.99.1"
     authors = "SSA M. Sponheimer & SuSA M. Brown"
     dept = "Virginia State Police -- NOVA/DC ICAC"
     url = "github.com/LongRangeBehaviorModificationSpecialist/VECTOR_2.0"
-    updated = "19-Oct-2026"
+    updated = "05-Nov-2026"
 
     # ----- Network -----
     # Loopback by default: the app is not reachable from the network
@@ -83,6 +83,15 @@ class Config:
     # Largest export accepted back in through Import. Higher than an
     # attachment, since an export carries every attachment in the case.
     MAX_IMPORT_BYTES = _env_int("VECTOR_MAX_IMPORT_MB", 2048) * 1024 * 1024
+
+    # And the most an import may unpack to, and the most entries it may
+    # hold. Photographs barely compress, so a real export unpacks to
+    # about its own size; a ZIP made to unpack to far more is refused as
+    # it unpacks, before it can fill the disk.
+    MAX_IMPORT_EXPANDED_BYTES = (
+        _env_int("VECTOR_MAX_IMPORT_EXPANDED_MB", 4096) * 1024 * 1024
+    )
+    MAX_IMPORT_ENTRIES = _env_int("VECTOR_MAX_IMPORT_ENTRIES", 50000)
 
     # ----- Sessions -----
     # A tablet left on a kitchen counter at a scene stays signed in to

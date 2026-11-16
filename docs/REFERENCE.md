@@ -8,7 +8,7 @@ Everything about installing, running and looking after VECTOR, in detail. Most p
 
 - The **Help** page inside VECTOR — using it at a scene.
 
-`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `595 tests`
+`Python 3.10+` · `NiceGUI 3.16` · `SQLite` · `Windows · macOS · Linux` · `722 tests`
 
 ---
 
@@ -55,13 +55,13 @@ Everything about installing, running and looking after VECTOR, in detail. Most p
 - **Agents** — everyone on site, kept in a roster that pre-fills the next warrant.
 - **Rooms** — the premises lettered A, B, C… and on to AA, AB, with two agents assigned to each.
 - **Evidence** — numbered automatically, with where it was found, who found it, and a witness who must be someone else.
-- **People** — suspects and others present.
+- **People** — suspects and others present, with phone numbers typed any way.
 - **Notes** — timestamped narrative, attributed to whoever is signed in.
 - **Files** — photographs and documents, hashed the moment they arrive.
 
 ***Afterwards***
 
-- **Eight printable reports**, including the basic inventory left as the return copy and a list of every attached file with its SHA-256.
+- **Eight printable reports**, including the basic inventory left as the return copy and a list of every attached file with its SHA-256, and **Print All**, which prints the ones a search ends with in one go.
 - **Export** as a ZIP of CSVs, a single JSON file, or both — optionally AES-256 encrypted.
 - **Import** either format back, with every attachment checked against the hash taken when it was collected.
 
@@ -92,7 +92,7 @@ Everything the first version did, plus:
 | **Maintainability**    | Six hand-written entity pages replaced by declarations and one table-driven builder; one route table with one guard                                                                                                                                                                                                                                                    |
 | **Touch screens**      | Raised buttons drawn cleanly on an iPad, with no hover border left behind by a tap; the print window's Print and Close buttons sized for a finger, in a bar that names the report and stays readable on a laptop in dark mode                                                                                                                                          |
 | **Install**            | A double-click launcher that sets itself up, pinned dependencies, step-by-step Windows and macOS instructions, and a start that works from any folder                                                                                                                                                                                                                  |
-| **Tests**              | 595 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption                                                                                                                                                                                                                                                                    |
+| **Tests**              | 722 tests covering reports, export round trips, the audit trail, migrations, sign-in and encryption                                                                                                                                                                                                                                                                    |
 
 It also carries the original project's most recent work — JSON export, the active-case badge and guard, the capitalised column names, the refreshed interface, (28-Sep-2026) the larger buttons with hover borders, the Files report, `Page X of Y` on printed reports, exports recorded in the audit trail and a hash for every table in the CSV manifest, and (13 and 14-Oct-2026) uploads typed by their content rather than their name, downloads recorded in the audit trail and sent with safety headers, a switch that hides agents' phone numbers and emails on the Agent List, a Room List that waits for both agents in every room, and a Cases page that shows the open case instead of a second form — with fixes made while bringing it across.
 
@@ -285,7 +285,7 @@ To open it to other devices on the same network, add `--lan`:
 
 **The simplest way is the setting.** An administrator turns network access on in the **Admin Panel**, and from then on this machine starts that way — there is no flag to remember and no special launcher to find. It takes effect the next time VECTOR starts, because the address a server listens on is fixed when the socket opens; the page says so rather than pretending otherwise.
 
-**`Help => Connect a Device`** then shows the exact address to type on the other device, and says plainly when VECTOR is not on the network at all. The console window says the same when VECTOR starts:
+**`Help => Connect a Device`** then shows the exact address to type on the other device, with a QR code of it that a tablet's camera opens (drawn on this computer by the `segno` package, so no internet is needed), and says plainly when VECTOR is not on the network at all. The console window says the same when VECTOR starts:
 
 ```
   VECTOR is running.
@@ -323,6 +323,8 @@ All optional, read from the environment:
 | `VECTOR_PORT`                 | `8080`      | Port to listen on                                             |
 | `VECTOR_MAX_UPLOAD_MB`        | `512`       | Largest accepted attachment                                   |
 | `VECTOR_MAX_IMPORT_MB`        | `2048`      | Largest export accepted back by Import                        |
+| `VECTOR_MAX_IMPORT_EXPANDED_MB` | `4096`    | Most an import may unpack to                                  |
+| `VECTOR_MAX_IMPORT_ENTRIES`   | `50000`     | Most entries an import archive may hold                       |
 | `VECTOR_NO_BROWSER`           | unset       | Set to `1` to not open a browser on start                     |
 | `VECTOR_DB_DIR`               | `db/`       | Where the databases live                                      |
 | `VECTOR_DB_KEY`               | unset       | Passphrase for an encrypted database                          |
@@ -331,7 +333,7 @@ All optional, read from the environment:
 | `VECTOR_REQUIRE_ENCRYPTION`   | unset       | Set to `1` to refuse a plaintext database                     |
 | `VECTOR_SESSION_IDLE_MINUTES` | `60`        | Minutes untouched before a device signs out; `0` turns it off |
 
-Three things are settings rather than environment variables, because they describe this machine rather than travel with a copy of the case: network access, in the Admin Panel, and on the Reports page the printed date and Agent List redaction. They are kept in `db/settings.json`, which is not in version control, and every change to one is recorded in the audit trail.
+Four things are settings rather than environment variables, because they describe this machine rather than travel with a copy of the case: network access, in the Admin Panel, and on the Reports page the printed date, Agent List redaction and what Print All prints. They are kept in `db/settings.json`, which is not in version control, and every change to one is recorded in the audit trail.
 
 ---
 
@@ -345,9 +347,9 @@ Work top to bottom; each step feeds the next.
 
 3. **Rooms.** Letter the premises A, B, C..., and assign two agents to each, now or later.
 
-4. **Evidence.** Item numbers are assigned automatically. Room and agent fields are drawn from steps 2 and 3. Delete an item that was not seized after all, and the later items move down one number, so the list never skips.
+4. **Evidence.** Item numbers are assigned automatically. Room and agent fields are drawn from steps 2 and 3, and Room Located, Found By and Witnessed By stay filled in from one item to the next; **Clear** empties them. On a phone the form is one column. Delete an item that was not seized after all, and the later items move down one number, so the list never skips.
 
-5. **People.** Suspects and others present.
+5. **People.** Suspects and others present. A phone number is typed any way, as for agents.
 
 6. **Notes.** Timestamped narrative entries.
 
@@ -355,11 +357,23 @@ Work top to bottom; each step feeds the next.
 
 8. **Reports.** Eight printable layouts, including the basic inventory used as the return copy and the list of attached files. **Print Report** opens the report in a window of its own, under a bar naming the report and case with **Print Report** and **Close**; the bar is not printed. Two switches on the Reports page, both off unless turned on: one adds the date and time each report was printed, the other hides agents' phone numbers and emails on the Agent List. If a room is missing an agent, **Print Room List** says which, and offers **Print Report Without Names**, with the blanks printed as `[NOT RECORDED]`. If the case has no end time yet, the page offers to fill it in from this machine's clock.
 
+   **Print All** prints the reports a search ends with in one print window, each starting on a new page: by default the Agent List, Room List, Evidence List (Full), two copies of the Inventory and Return and the Persons List. **Choose what Print All prints**, under it, sets which reports and how many copies, for this machine, and each change is audited. Its pages are not numbered.
+
+   Every printed sheet, of any report, carries a line at the top with the case number and the report's name, so a sheet that comes loose can be put back, and an item is kept whole on one sheet with its number above it. Print All prints the case the Reports page showed, at one moment: if the case was replaced in the meantime, even by one typed with the same number, it says so instead of printing, and if an entry was saved while it was preparing the reports it prepares them again.
+
 The open case's number is shown in the top bar on every page. Until a case is open, the other pages refuse new entries and say why.
 
 Prompts and confirmations fade after a few seconds. A message saying that something did **not** happen — a record that was not saved, an import or export that failed, an attachment that no longer matches its hash — stays until you press **OK**.
 
-Every table has a search box above it, which narrows the rows as you type — an item number, part of a description, a room, an agent's name. It filters the rows already on screen, so the order you sorted them into is kept.
+Every table has a search box above it, which narrows the rows as you type — an item number, part of a description, a room, an agent's name. It filters the rows already on screen, so the order you sorted them into is kept. The magnifying glass in the top bar searches the whole case at once, and a result opens its page with that page's search filled in.
+
+The Home page counts what the case holds, and **Before you leave the scene** lists what is easy to miss at the end: a room with fewer than two agents, items not marked as photographed or with no answer for triage, a blank end time, and changes made since the last export.
+
+A page belongs to the case it was opened on. Once **Start New Case**, an import or the demo case replaces that case — on this device or another — the page says so at the top, and refuses to save, edit, delete or upload until it is reloaded, keeping anything typed on screen to copy. An edit or delete window also acts only on the record as it was when the window opened: if it was changed or replaced on another device meanwhile, it says so and nothing is done. And a window that warns about the case — **Start New Case**, **Delete All Data**, **Import**, **Load the demo case** — acts only on the case it warned about: if another device replaced it while the window stood open, even with a case typed under the same number, or saved a first case, it says so and does nothing, and opening it again shows what it would affect now. An upload checks the session and the case again once the file has arrived, just before it is saved.
+
+Anything typed into an add form and not saved yet is kept, for that account on that browser and in that case, and put back the next time the form opens, marked *Filled in from before*, with **Discard**. Start New Case, an import or the demo case starts every form empty.
+
+**Light or dark page**, in the account menu, shows every page light for a tablet in daylight, or dark again. Each browser keeps its own choice.
 
 The **Help** page inside VECTOR (top bar) explains all of this in short topics, with a search box, for the agents using it at a scene.
 
@@ -382,6 +396,10 @@ Digests are shown in capitals. One recorded in lower case, as every attachment w
 
 An import is all or nothing. If any part of the file cannot be read, nothing is imported, the case is left exactly as it was, and the message says which table the problem was in.
 
+The file is checked before anything is cleared, and refused, leaving the case as it was, when it would replace the case with less than it should: when it holds no case, or more than one; when a table holds fewer or more rows than the export recorded; or when an attachment the export listed is missing, has been altered since, or is in the file without being listed. An archive from before attachments were listed in the manifest is still imported, with its attachments marked unverified.
+
+Only the files an import reads are unpacked from an archive — the tables, the manifest and the attachments — and unpacking stops, with nothing imported, past `VECTOR_MAX_IMPORT_ENTRIES` entries or `VECTOR_MAX_IMPORT_EXPANDED_MB` written, counted as they are written rather than as the archive claims. A small ZIP made to unpack to gigabytes cannot fill the disk, and an entry naming a place outside the import folder is skipped.
+
 ---
 
 ## 10.0 Accounts & Sessions
@@ -395,6 +413,8 @@ An import is all or nothing. If any part of the file cannot be read, nothing is 
 **Failed sign-ins.** After three failures VECTOR starts pausing before each attempt, and after ten it locks the account for fifteen minutes. Failures older than thirty minutes are forgotten, so attempts spread across a shift never accumulate into a lock, and a name that was never an account is dropped from the list once its failures have aged out. Every attempt — successful or not — is in the audit trail.
 
 The pause holds up that sign-in and nothing else, and so does the password check itself, which bcrypt makes take a quarter of a second on purpose. Both used to run on the loop that serves every device, so each wrong password stopped every tablet at the scene for up to two seconds.
+
+When the password check succeeds, the account is read again before the session is opened: an account deleted, deactivated, given a new password or signed out while its password was being checked is not signed in.
 
 The numbers are deliberately forgiving. An agent mistyping a password at 3am on a scene must not be shut out of evidence logging.
 
@@ -588,19 +608,21 @@ Every push and every pull request runs the same suite on GitHub Actions — Ubun
 
 That workflow also runs `ruff check`, configured in [`ruff.toml`](../ruff.toml) to look for errors rather than style: a name that does not exist, an import left behind by code that moved, a value assigned and never read. Style is left alone deliberately — this codebase has its own conventions and a linter arguing about them would be noise.
 
-595 tests, about twenty-five seconds. They run against a temporary database, which they remove when they finish, and never touch `db/`. The encryption tests skip themselves when the SQLCipher driver is not installed.
+722 tests, about twenty-five seconds. They run against a temporary database, which they remove when they finish, and never touch `db/`. The encryption tests skip themselves when the SQLCipher driver is not installed.
 
 The suite exists because of a specific failure: a variable rename reached the models and the CRUD pages but not the report or export code, and every report returned HTTP 500 for an unknown period with nothing to catch it. Coverage is aimed at that class of bug — each report is rendered and asserted to contain the case number, and the export is round-tripped and compared row for row and byte for byte.
 
 | File | Tests | Covers |
 | ---- | ----- | ------ |
-| `test_modules_import.py` | 38 | Every module imports: a page builder moved into a new file cannot break the application without failing here |
+| `test_modules_import.py` | 41 | Every module imports: a page builder moved into a new file cannot break the application without failing here |
 | `test_page_specs.py` | 53 | Every page field names a real column; required columns are reachable; validators accept what the builder passes; the Cases page holds one case and has no delete button; notes list in the order written |
 | `test_order_dates_and_files.py` | 29 | Reports and tables list items and rooms in order; renaming a room moves its evidence; impossible or half-typed dates are refused; attachment contents load only when read, and downloads keep their names |
 | `test_times_and_numbers.py` | 25 | Stamps carry this machine's time zone and offset, and UTC stamps already saved are rewritten once; both case times offer the fill button, and the end-time reminder never fills in a time before the start; typed text in a dropdown is kept; removing an item moves the later numbers down, audited |
 | `test_reports.py` | 37 | All eight reports render, carry the case header, and escape their values exactly once; the Files report prints upload times in local time; the printed date appears only when switched on, and the change is audited; the print window copies the report, not the page, names its report and case without letting a typed case number into its markup, and keeps a white page of its own |
 | `test_crypto.py` | 22 | Encryption is detected without a passphrase; awkward passphrases round-trip; case data is unreadable in the raw file |
 | `test_json_export.py` | 23 | JSON round trip, embedded attachments, attachments sharing a name, format detection, tampering detected, a lower-case collection hash not mistaken for tampering; older and upstream layouts import |
+| `test_case_integrity.py` | 61 | A page, dialog, upload or Print All left open never writes into the next case, and a confirmation window never acts on a case it did not warn about; an account changed while signing in is not signed in; the demo case and imports never leave less than they replace; every printed sheet names its case, and no report ends with a blank sheet; an import unpacks only what it reads, within limits; an empty attachment is exported like any other; the Audit Trail search takes % and _ literally |
+| `test_scene_usability.py` | 63 | Print All, case search, the Home checklist, drafts, light mode, the QR code, the evidence form's kept fields, the demo case |
 | `test_auth.py` | 20 | One-time passwords are unique; throttling escalates and locks; session invalidation is per-account |
 | `test_accounts_and_sessions.py` | 44 | A one-time password opens Change Password and nothing else, and replacing it signs the account's other devices out; a page whose session was ended cannot save, delete, upload or export, notices within seconds, and the sign-in page says why; the sign-in never pauses VECTOR's shared loop; made-up names drop off the failure list; every account change reaches the audit trail |
 | `test_left_behind.py` | 11 | An import that fails — a damaged manifest or archive, or something nobody foresaw — leaves no unpacked copy of the case in the temp folder, and says what happened; the start-up clean-up recognises one left by an older VECTOR; a run of the tests removes its own database folder |
@@ -635,7 +657,7 @@ A checkout ships with no case and no accounts; both are created on first run. To
 
 Add `--users` to reset the accounts at the same time and print fresh one-time passwords.
 
-Everything it loads is invented: placeholder names, `example.invalid` addresses, and telephone numbers in the 555-01xx range reserved for fiction. It replaces the case entirely, so do not run it against real case data.
+Everything it loads is invented: placeholder names, `example.invalid` addresses, and telephone numbers in the 555-01xx range reserved for fiction. It replaces the case entirely, so do not run it against real case data. The same case is a button away for training: **Load the demo case** in the Admin Panel, which asks for DEMO to be typed when a case is open and leaves accounts and the agent roster alone. It clears the case and loads the demo in one step, so if the demo cannot be loaded the case is left as it was; and it checks again when **Load demo case** is pressed that the open case is still the one it warned about.
 
 ---
 
@@ -656,14 +678,17 @@ idle.py                 signs out a device nobody has touched
 live.py                 refreshes open pages when another device saves
 utils.py                validators, the active-case guard, shared helpers
 import_export.py        CSV and JSON export and import
-navbar.py               top navigation and the case badge
-settings.py             this machine's settings: network, printed date, redaction
+navbar.py               top navigation, the case badge, light or dark
+settings.py             this machine's settings: network, printed date, redaction, Print All
 home_page.py            login, main menu, the buttons on it
 parts/case_transfer.py  export, import and Delete All Data
 parts/admin_users.py    the Admin Panel's card, table and sessions
 parts/file_upload.py    the upload card, the checks, the SHA-256
 parts/file_table.py     the attachments list, downloads, deletes
-parts/connect_page.py   the address another device should open
+parts/connect_page.py   the address another device should open, and its QR code
+parts/case_search.py    the search over the whole case, in the top bar
+parts/case_summary.py   Home's counts and its before-you-leave checklist
+parts/drafts.py         keeps what was typed into a form and not saved
 parts/crud.py           the table-driven builder every entity page uses
 parts/crud_widgets.py   the Field description and the widgets
 parts/crud_dialogs.py   edit, delete and delete-all

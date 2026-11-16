@@ -11,11 +11,11 @@ from urllib.parse import quote
 from fastapi import Response
 from nicegui import app, ui
 
-from models import get_session, record_audit, UploadedFiles
+from models import case_generation, get_session, record_audit, UploadedFiles
 from live import refresh_on_change
 from navbar import build_navbar
 from auth import get_current_user_name, get_is_admin, is_authenticated
-from utils import ALLOWED_MIME_TYPES
+from utils import ALLOWED_MIME_TYPES, case_changed_banner
 from parts.file_upload import upload_card
 from parts.file_table import files_table
 
@@ -100,15 +100,24 @@ def build_uploads_page() -> None:
             "File Upload & Management"
         ).classes("text-2xl font-bold m-4")
 
+        # Uploads, downloads and deletes belong to the case the page was
+        # opened on; see utils.require_same_case().
+        page_case = case_generation()
+        settle_case_banner = case_changed_banner(page_case)
+
         # The card is drawn above the list it refreshes, so the list's
         # own refresh is handed to it once both exist.
         refresh = {"files": lambda: None}
 
-        upload_card(lambda: refresh["files"]())
-        refresh["files"] = files_table()
+        upload_card(lambda: refresh["files"](), page_case)
+        refresh["files"] = files_table(page_case)
 
     # ----- Initial render -----
     refresh["files"]()
 
     # Files added or removed on another device appear without a reload.
-    refresh_on_change(refresh["files"])
+    def live_refresh() -> None:
+        settle_case_banner()
+        refresh["files"]()
+
+    refresh_on_change(live_refresh)

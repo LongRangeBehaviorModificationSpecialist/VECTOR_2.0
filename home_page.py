@@ -23,12 +23,14 @@ from auth import (
     get_is_admin,
     is_authenticated,
     lockout_seconds_remaining,
+    global_generation,
     record_login_failure,
     require_session,
     sign_in,
     sign_out,
     signed_in_with_temporary_password,
-    take_session_ended_notice,
+    session_ended_notice,
+    user_generation,
     LOCK_AFTER_FAILURES,
     LOCKOUT_MINUTES,
 )
@@ -41,6 +43,7 @@ from models import (
     record_audit,
 )
 from navbar import build_navbar, unit_logo
+from parts.case_summary import case_overview
 from parts.help_page import build_help_page
 from parts.case_transfer import (
     open_delete_all_dialog,
@@ -52,6 +55,8 @@ from utils import (
     CONFIRM_TIMEOUT,
     WARN_TIMEOUT,
     ZERO_TIMEOUT,
+    case_changed_since,
+    case_token,
     delete_all_data,
 )
 
@@ -140,6 +145,9 @@ def build_authenticated_home():
             "The Virginia Evidence Collection, Tracking, "
             "Organization, & Reporting Program"
         ).classes("text-base text-gray-400 text-center max-w-xl")
+
+    # ----- How much is recorded, and what to check before leaving -----
+    case_overview()
 
     with ui.row().classes(
         "flex justify-center items-center gap-6 w-full"):
@@ -234,6 +242,42 @@ def build_authenticated_home():
                 ).props("push").classes("w-70 p-6 hover-border-white")
 
 
+def sign_out_counters(user_name: str) -> tuple:
+    """The counters that end sessions: everyone's, and this account's.
+    Signing everyone out, deleting the account or resetting its password
+    moves one of them."""
+    return global_generation(), user_generation(user_name)
+
+
+def account_as_checked(account: dict, generations: tuple) -> dict | None:
+    """The account as it is now, if nothing has changed it since its
+    password was checked; None if it has.
+
+    The password check takes a moment, in a thread. An account deleted,
+    deactivated, given a new password or signed out in that moment
+    finished signing in, with a fresh session stamped with the counters
+    as they stood afterwards, which then passed every later check.
+    generations is sign_out_counters() taken before the check.
+    """
+    from models import Users
+
+    with get_users_session() as session:
+        now = session.get(Users, account["Z_PK"])
+        if (
+            now is None
+            or not now.ISACTIVE
+            or now.USERNAME != account["USERNAME"]
+            or now.PASSWORDHASH != account["PASSWORDHASH"]
+            or sign_out_counters(account["USERNAME"]) != generations
+        ):
+            return None
+        return {
+            **account,
+            "ISADMIN": bool(now.ISADMIN),
+            "MUSTCHANGEPASSWORD": bool(now.MUSTCHANGEPASSWORD),
+        }
+
+
 def build_login_home():
     """Login page for unauthenticated users."""
 
@@ -257,7 +301,7 @@ def build_login_home():
         # A page whose session was ended -- by an administrator, by Sign
         # Everyone Out, by the password being changed on another device
         # -- comes here by itself, so say why.
-        if take_session_ended_notice():
+        if session_ended_notice():
             ui.label(
                 "This device was signed out. Sign in again to carry on."
             ).classes("text-sm text-[#F5B027] mb-4 text-center")
@@ -330,6 +374,11 @@ def build_login_home():
                     "PASSWORDHASH": user.PASSWORDHASH,
                 }
 
+            # The sign-out counters as the check starts: an administrator
+            # who deletes the account, resets its password or signs
+            # everyone out while it runs moves one of them.
+            generations = sign_out_counters(entered_user)
+
             # bcrypt takes a quarter of a second by design. In a thread,
             # that quarter second is this sign-in's alone.
             correct = account is not None and await run.io_bound(
@@ -337,6 +386,26 @@ def build_login_home():
                 entered_pass,
                 account["PASSWORDHASH"],
             )
+
+            # The account as it is now, not as it was read before the
+            # check: a deleted account finished signing in, with a fresh
+            # session that passed every later check, because the session
+            # was stamped with the counters as they stood afterwards.
+            if correct:
+                current = account_as_checked(account, generations)
+                if current is None:
+                    password_input.value = ""
+                    ui.notify(
+                        "This account was changed by an administrator while "
+                        "it was signing in, so it was not signed in. Try "
+                        "again, or ask the administrator.",
+                        type="warning",
+                        timeout=WARN_TIMEOUT,
+                        position="center",
+                        close_button="OK",
+                    )
+                    return
+                account = current
 
             if correct:
                 with get_session() as audit_session:
@@ -479,6 +548,9 @@ def confirm_new_case_handler() -> None:
         ui.navigate.to("/cases")
         return
 
+    # The case this window warns about; see utils.case_token().
+    opened_on = case_token()
+
     with ui.dialog() as warn_dialog, ui.card().classes("max-w-md p-6"):
 
         ui.label(
@@ -510,6 +582,8 @@ def confirm_new_case_handler() -> None:
                 # so a new case inherited the last one's attachments; this
                 # path also records the wipe in the audit trail.
                 warn_dialog.close()
+                if case_changed_since(opened_on, "nothing was deleted"):
+                    return
                 try:
                     delete_all_data()
                 except Exception as err:

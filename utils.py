@@ -16,6 +16,7 @@ from nicegui import ui
 import mimetypes
 import re
 from models import (
+    case_generation,
     check_case_info,
     get_session,
     has_active_case,
@@ -33,7 +34,7 @@ from program.inc.agent_role import AGENT_ROLE_LIST
 from program.inc.agency_list import AGENCY_LIST
 from program.inc.jurisdictions import JURISDICTIONS
 from sqlalchemy import exists, inspect
-from typing import Optional
+from typing import Callable, Optional
 
 
 WARN_TIMEOUT = 6000
@@ -172,10 +173,26 @@ def required_textarea(label: str, **kwargs):
     return req_textarea
 
 
+def like_pattern(text: str) -> str:
+    """A LIKE pattern matching text anywhere, with % and _ taken literally.
+
+    Use with ilike(pattern, escape="\\\\"). Without the escaping, a search
+    for "100%" matched every row.
+    """
+    escaped = (
+        text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    )
+    return f"%{escaped}%"
+
+
 def get_case_info() -> dict | None:
-    """Returns the single active case info (or None if no case exists)."""
+    """Returns the single active case info (or None if no case exists).
+
+    The first case by row, as check_case_info() reads it: VECTOR holds one
+    case, and every reader of it has to agree which.
+    """
     with get_session() as session:
-        case = session.query(Cases).first()
+        case = session.query(Cases).order_by(Cases.Z_PK).first()
 
         if not case:
             return None
@@ -369,6 +386,128 @@ def require_active_case(func):
     return guarded
 
 
+CASE_CHANGED = (
+    "The case on this computer changed after this page was opened, so "
+    "this was not done. Reload the page to work in the case that is open "
+    "now. Anything typed here is still on screen to copy."
+)
+
+
+def _still_the_same_case(opened_on: str) -> bool:
+    """True while the case is the one a page was opened on; otherwise
+    says so and returns False."""
+    if case_generation() == opened_on:
+        return True
+
+    ui.notify(
+        CASE_CHANGED,
+        type="warning",
+        multi_line=True,
+        classes="multi-line-notification",
+        timeout=ZERO_TIMEOUT,
+        position="center",
+        close_button="OK",
+    )
+
+    return False
+
+
+def require_same_case(opened_on: str):
+    """Stops a page's add, edit, delete or upload once Start New Case, an
+    import or the demo case has put a different case on this computer.
+
+    opened_on is models.case_generation() as the page was drawn. Without
+    this a page left open on a tablet wrote into whatever case was open
+    when its button was pressed.
+    """
+    def decorate(func):
+        if iscoroutinefunction(func):
+            @wraps(func)
+            async def async_guarded(*args, **kwargs):
+                if not _still_the_same_case(opened_on):
+                    return None
+                return await func(*args, **kwargs)
+
+            return async_guarded
+
+        @wraps(func)
+        def guarded(*args, **kwargs):
+            if not _still_the_same_case(opened_on):
+                return None
+            return func(*args, **kwargs)
+
+        return guarded
+
+    return decorate
+
+
+def case_still_open_and_same(opened_on: str) -> bool:
+    """For an action that waited part-way through, for an upload to
+    arrive say: True while a case is open and it is still the one the
+    page was opened on; otherwise says which and returns False."""
+    return _case_is_open() and _still_the_same_case(opened_on)
+
+
+# ----- Confirmation windows -----
+# A window that warns about one case -- Start New Case, Delete All Data,
+# an import, the demo case -- can stand open while another device
+# replaces that case or starts one. Confirming it then erased, or
+# replaced, a case nobody was warned about. Each window notes which case
+# it warned about when it opens, and acts only if that is still the case
+# when its button is pressed: the case generation, which moves whenever
+# the case is replaced even under a number typed the same, and the open
+# case's number, since saving a first case moves no generation.
+def case_token() -> tuple:
+    """Which case a confirmation window is about."""
+    return case_generation(), (get_case_info() or {}).get("CASENUMBER")
+
+
+def case_changed_since(opened_on: tuple, nothing_done: str) -> bool:
+    """True, having said so, when the case is no longer the one a
+    confirmation window warned about. nothing_done finishes "so ...",
+    as in "nothing was deleted"."""
+    if case_token() == opened_on:
+        return False
+
+    ui.notify(
+        "The case on this computer changed while this was open, so "
+        f"{nothing_done}. Open it again to see what it would affect now.",
+        type="warning",
+        multi_line=True,
+        classes="multi-line-notification",
+        timeout=ZERO_TIMEOUT,
+        position="center",
+        close_button="OK",
+    )
+    return True
+
+
+def case_changed_banner(opened_on: str) -> Callable[[], None]:
+    """A line across the top of a page, shown once the case it was opened
+    on has been replaced. Returns what shows or hides it, for the page's
+    live refresh to call."""
+    with ui.row().classes(
+        "w-full max-w-3xl mx-auto items-center gap-3 p-3 my-2 rounded "
+        "border border-[#F5B027]"
+    ) as banner:
+        ui.icon("sync_problem", color="warning").classes("text-2xl")
+        ui.label(
+            "The case on this computer has changed since this page was "
+            "opened. Reload it before entering anything."
+        ).classes("text-sm text-[#F5B027] grow")
+        ui.button(
+            "Reload",
+            on_click=ui.navigate.reload,
+            color="var(--vsp-blue)",
+        ).props("push dense").classes("px-3 hover-border-white")
+    banner.set_visibility(False)
+
+    def settle() -> None:
+        banner.set_visibility(case_generation() != opened_on)
+
+    return settle
+
+
 @require_active_case
 def confirm_delete_all(action: str, callback):
     """Shows a confirmation dialog before executing a destructive action."""
@@ -379,7 +518,7 @@ def confirm_delete_all(action: str, callback):
         ui.label(
             f"This will permanently delete ALL {action} from the database. "
             "This action cannot be undone."
-        ).classes("mb-4 text-base text-[#D4D4D8]")
+        ).classes("mb-4 text-base text-[var(--vsp-gray)]")
 
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button(
@@ -595,6 +734,18 @@ def delete_all_data() -> None:
     The audit trail is deliberately NOT cleared -- it is append-only,
     and a wipe is exactly the event it exists to record.
     """
+    with get_session() as session:
+        clear_case(session)
+
+
+def clear_case(session) -> None:
+    """Deletes every row of case data inside the caller's transaction,
+    and records the wipe there.
+
+    For anything that wipes the case and puts something in its place --
+    the demo case -- so the two are committed together: a wipe committed
+    first, and a replacement that then failed, left no case at all.
+    """
     tables = [
         (Cases, "CASES"),
         (Agents, "AGENTS"),
@@ -605,24 +756,21 @@ def delete_all_data() -> None:
         (UploadedFiles, "FILES"),
     ]
 
-    with get_session() as session:
-        # query().delete() is a bulk statement and does not raise ORM
-        # events, so the flush listener never sees these. Count first,
-        # then record the wipe explicitly.
-        counts = {
-            name: session.query(model).count() for model, name in tables
-        }
+    # query().delete() is a bulk statement and does not raise ORM events,
+    # so the flush listener never sees these. Count first, then record the
+    # wipe explicitly.
+    counts = {name: session.query(model).count() for model, name in tables}
 
-        for model, _name in tables:
-            session.query(model).delete()
+    for model, _name in tables:
+        session.query(model).delete()
 
-        record_audit(
-            session,
-            action="DELETE_ALL",
-            table_name="(all case tables)",
-            summary=f"{sum(counts.values())} rows deleted",
-            before=counts,
-        )
+    record_audit(
+        session,
+        action="DELETE_ALL",
+        table_name="(all case tables)",
+        summary=f"{sum(counts.values())} rows deleted",
+        before=counts,
+    )
 
 
 def set_network_access(allowed: bool, actor: str = "") -> None:
@@ -690,6 +838,31 @@ def set_redact_agent_report(on: bool, actor: str = "") -> None:
             ),
             before={"redact_agent_report": was},
             after={"redact_agent_report": bool(on)},
+            actor=actor or None,
+        )
+
+
+def set_print_all(copies: dict, actor: str = "") -> None:
+    """Changes what Print All on the Reports page prints, and records who
+    did it."""
+    was = settings.print_all_copies()
+    settings.set_print_all_copies(copies)
+    now = settings.print_all_copies()
+    changed = {name: now[name] for name in now if now[name] != was.get(name)}
+    if not changed:
+        return
+
+    with get_session() as session:
+        record_audit(
+            session,
+            action="SETTING_CHANGED",
+            table_name="(settings)",
+            summary="what Print All prints: " + ", ".join(
+                f"{name} {count} cop{'y' if count == 1 else 'ies'}"
+                for name, count in changed.items()
+            ),
+            before={"print_all": {name: was.get(name) for name in changed}},
+            after={"print_all": changed},
             actor=actor or None,
         )
 

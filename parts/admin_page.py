@@ -17,6 +17,7 @@ from parts.admin_users import (
     add_user_card,
     network_access_card,
     session_controls,
+    training_card,
     users_table,
 )
 
@@ -53,6 +54,8 @@ def build_admin_page():
         refresh["users"] = users_table()
         session_controls()
         network_access_card()
+        ui.separator().classes("my-6")
+        training_card()
 
     # Initial render
     refresh["users"]()

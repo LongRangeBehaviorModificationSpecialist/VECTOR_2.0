@@ -374,7 +374,8 @@ DEMO_NOTES = [
 
 
 def rebuild_case() -> None:
-    """Clears the case tables and writes the demo case."""
+    """Clears the case tables and writes the demo case, in one
+    transaction."""
     with get_session() as session:
         for model in (
             Cases,
@@ -386,92 +387,95 @@ def rebuild_case() -> None:
             UploadedFiles,
         ):
             session.query(model).delete()
+        add_demo_case(session)
 
-    with get_session() as session:
-        session.add(Cases(**DEMO_CASE))
 
-        for name, agency, role, second, phone, email in DEMO_AGENTS:
-            session.add(
-                Agents(
-                    AGENTNAME=name,
-                    AGENTPARENTAGENCY=agency,
-                    AGENTPRIMARYROLE=role,
-                    AGENTROLESECONDARY=second,
-                    AGENTPHONE=phone,
-                    AGENTEMAIL=email,
-                    ENTEREDDATETIME=_scene_time("09-01-2026 07:35:00"),
-                )
+def add_demo_case(session) -> None:
+    """Adds the demo case's records in the caller's transaction."""
+    session.add(Cases(**DEMO_CASE))
+
+    for name, agency, role, second, phone, email in DEMO_AGENTS:
+        session.add(
+            Agents(
+                AGENTNAME=name,
+                AGENTPARENTAGENCY=agency,
+                AGENTPRIMARYROLE=role,
+                AGENTROLESECONDARY=second,
+                AGENTPHONE=phone,
+                AGENTEMAIL=email,
+                ENTEREDDATETIME=_scene_time("09-01-2026 07:35:00"),
             )
+        )
 
-        for label, desc, first, second in DEMO_ROOMS:
-            session.add(
-                Rooms(
-                    ROOMLABEL=label,
-                    ROOMDESC=desc,
-                    ROOMFIRSTAGENT=first,
-                    ROOMSECONDAGENT=second,
-                    ENTEREDDATETIME=_scene_time("09-01-2026 07:50:00"),
-                )
+    for label, desc, first, second in DEMO_ROOMS:
+        session.add(
+            Rooms(
+                ROOMLABEL=label,
+                ROOMDESC=desc,
+                ROOMFIRSTAGENT=first,
+                ROOMSECONDAGENT=second,
+                ENTEREDDATETIME=_scene_time("09-01-2026 07:50:00"),
             )
+        )
 
-        for item in DEMO_EVIDENCE:
-            (
-                num,
-                qty,
-                desc,
-                model_no,
-                serial,
-                room,
-                where,
-                found_by,
-                witness,
-                photographed,
-                triaged,
-                triaged_by,
-                contraband,
-                note
-            ) = item
-            session.add(
-                Evidence(
-                    EVIDNUM=num,
-                    EVIDQTY=qty,
-                    EVIDDESC=desc,
-                    EVIDMODELNUMBER=model_no,
-                    EVIDSERIALNUMBER=serial,
-                    EVIDLOCROOM=room,
-                    EVIDLOCROOMDETAIL=where,
-                    EVIDFOUNDBY=found_by,
-                    EVIDFOUNDBYWITNESS=witness,
-                    EVIDPICTAKEN=photographed,
-                    EVIDTRIAGED=triaged,
-                    EVIDTRIAGEDBY=triaged_by,
-                    EVIDISCONTRABAND=contraband,
-                    EVIDNOTE=note,
-                    ENTEREDDATETIME=_scene_time("09-01-2026 09:00:00"),
-                )
+    for item in DEMO_EVIDENCE:
+        (
+            num,
+            qty,
+            desc,
+            model_no,
+            serial,
+            room,
+            where,
+            found_by,
+            witness,
+            photographed,
+            triaged,
+            triaged_by,
+            contraband,
+            note
+        ) = item
+        session.add(
+            Evidence(
+                EVIDNUM=num,
+                EVIDQTY=qty,
+                EVIDDESC=desc,
+                EVIDMODELNUMBER=model_no,
+                EVIDSERIALNUMBER=serial,
+                EVIDLOCROOM=room,
+                EVIDLOCROOMDETAIL=where,
+                EVIDFOUNDBY=found_by,
+                EVIDFOUNDBYWITNESS=witness,
+                EVIDPICTAKEN=photographed,
+                EVIDTRIAGED=triaged,
+                EVIDTRIAGEDBY=triaged_by,
+                EVIDISCONTRABAND=contraband,
+                EVIDNOTE=note,
+                ENTEREDDATETIME=_scene_time("09-01-2026 09:00:00"),
             )
+        )
 
-        for name, dob, address, phone, note in DEMO_PERSONS:
-            session.add(
-                Persons(
-                    PERSONNAME=name,
-                    PERSONDOB=dob,
-                    PERSONADDRESS=address,
-                    PERSONPHONE=phone,
-                    PERSONNOTE=note,
-                    ENTEREDDATETIME=_scene_time("09-01-2026 08:05:00"),
-                )
+    for name, dob, address, phone, note in DEMO_PERSONS:
+        session.add(
+            Persons(
+                PERSONNAME=name,
+                PERSONDOB=dob,
+                PERSONADDRESS=address,
+                PERSONPHONE=phone,
+                PERSONNOTE=note,
+                ENTEREDDATETIME=_scene_time("09-01-2026 08:05:00"),
             )
+        )
 
-        for when, author, text in DEMO_NOTES:
-            session.add(
-                Notes(
-                    NOTEDATETIME=_scene_time(when),
-                    NOTEDATETIMEUPDATED="",
-                    NOTEAUTHOR=author,
-                    NOTETEXT=text,
-                )
+    for when, author, text in DEMO_NOTES:
+        session.add(
+            Notes(
+                NOTEDATETIME=_scene_time(when),
+                NOTEDATETIMEUPDATED="",
+                NOTEAUTHOR=author,
+                NOTETEXT=text,
             )
+        )
 
 
 def reset_users() -> list:

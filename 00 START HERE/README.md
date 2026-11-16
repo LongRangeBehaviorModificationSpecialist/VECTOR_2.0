@@ -211,8 +211,9 @@ Tablets and other laptops can use VECTOR over the same Wi-Fi:
 3. The first time, Windows asks whether to allow Python on the network.
    Allow it on **private networks** only. A Mac asks whether to accept
    incoming connections: allow it.
-4. On the VECTOR laptop, open **Help → Connect a Device**. Type the address
-   it shows, such as `http://192.168.1.23:8080`, into the tablet's browser.
+4. On the VECTOR laptop, open **Help → Connect a Device**. Point the
+   tablet's camera at the QR code it shows and open the link, or type the
+   address, such as `http://192.168.1.23:8080`, into the tablet's browser.
 
 The connection is not encrypted. Use a network you control, such as your
 own hotspot, not a hotel's or the venue's Wi-Fi.

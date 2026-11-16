@@ -51,6 +51,10 @@ class Field:
                  current date and time
     tidy:        callable that puts typed text into the form it is saved
                  in, e.g. a phone number; given trimmed, non-empty text
+    keep_after_add: stays filled in on the add form once a record is
+                 saved, for the next one -- the room an item was found in,
+                 and who found and witnessed it, are usually the same for
+                 the next few. Clear empties it as usual
     """
 
     name: str
@@ -69,6 +73,7 @@ class Field:
     new_values: bool = False
     now_button: bool = False
     tidy: Optional[Callable[[str], str]] = None
+    keep_after_add: bool = False
 
 # ----- Notification helpers -----
 def notify_problem(message: str) -> None:
@@ -263,6 +268,19 @@ def _clean(value):
     if isinstance(value, str):
         return value.strip()
     return value
+
+
+def table_row(spec, record) -> dict:
+    """A record as the page's table holds it: its key and each field.
+
+    The edit and delete dialogs compare a record with this when they are
+    opened and again when they are confirmed, so they act only on the
+    record the user was looking at.
+    """
+    row = {spec.row_key: getattr(record, spec.row_key)}
+    for spec_field in spec.fields:
+        row[spec_field.name] = getattr(record, spec_field.name, "") or ""
+    return row
 
 
 def _values_from(widgets: dict, fields=()) -> dict:
